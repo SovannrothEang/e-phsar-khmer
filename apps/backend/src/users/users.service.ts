@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { buildUsernameBase, generateUniqueUsername } from './username.util';
 import { randomUUID } from 'node:crypto';
 import { DRIZZLE } from '../db/drizzle.provider';
@@ -14,6 +14,7 @@ import type { DbClient } from '../db/drizzle.provider';
 import {
   communes,
   districts,
+  userBlocks,
   userPhones,
   users,
 } from '../db/schema/users.schema';
@@ -22,7 +23,18 @@ import { SupabaseService } from '../common/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import type { AddPhoneDto } from './dto/add-phone.dto';
+import type { BlockUserDto } from './dto/block-user.dto';
 import type { PublicUser } from '../auth/auth.service';
+
+export interface BlockedUserItem {
+  id: string;
+  blockedUser: {
+    id: string;
+    username: string | null;
+    profilePhotoUrl: string | null;
+  } | null;
+  createdAt: Date;
+}
 
 @Injectable()
 export class UsersService {
@@ -193,6 +205,76 @@ export class UsersService {
       .where(eq(userPhones.id, phoneId))
       .returning();
     return updated;
+  }
+
+  async blockUser(
+    userId: string,
+    dto: BlockUserDto,
+  ): Promise<{ blocked: true }> {
+    if (dto.userId === userId)
+      throw new BadRequestException('Cannot block yourself');
+
+    const [target] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, dto.userId), isNull(users.deletedAt)))
+      .limit(1);
+    if (!target) throw new NotFoundException('User not found');
+
+    await this.db
+      .insert(userBlocks)
+      .values({ blockerId: userId, blockedId: dto.userId })
+      .onConflictDoNothing({
+        target: [userBlocks.blockerId, userBlocks.blockedId],
+      });
+    return { blocked: true };
+  }
+
+  async unblockUser(
+    userId: string,
+    blockedId: string,
+  ): Promise<{ removed: true }> {
+    const [deleted] = await this.db
+      .delete(userBlocks)
+      .where(
+        and(
+          eq(userBlocks.blockerId, userId),
+          eq(userBlocks.blockedId, blockedId),
+        ),
+      )
+      .returning();
+    if (!deleted) throw new NotFoundException('Block not found');
+    return { removed: true };
+  }
+
+  async listBlocks(userId: string): Promise<BlockedUserItem[]> {
+    const blocks = await this.db
+      .select()
+      .from(userBlocks)
+      .where(eq(userBlocks.blockerId, userId))
+      .orderBy(desc(userBlocks.createdAt));
+    if (blocks.length === 0) return [];
+
+    const profiles = await this.db
+      .select({
+        id: users.id,
+        username: users.username,
+        profilePhotoUrl: users.profilePhotoUrl,
+      })
+      .from(users)
+      .where(
+        inArray(
+          users.id,
+          blocks.map((b) => b.blockedId),
+        ),
+      );
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+    return blocks.map((b) => ({
+      id: b.id,
+      blockedUser: profileMap.get(b.blockedId) ?? null,
+      createdAt: b.createdAt,
+    }));
   }
 
   async setProfilePhoto(

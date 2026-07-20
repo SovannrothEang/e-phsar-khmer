@@ -665,3 +665,123 @@ describe('UsersService updateProfile username generation', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 });
+
+describe('UsersService blocks', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  describe('blockUser', () => {
+    it('throws BadRequestException when blocking yourself', async () => {
+      await expect(service.blockUser('u1', { userId: 'u1' })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when target is missing or soft-deleted', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([]) }),
+        }),
+      });
+
+      await expect(service.blockUser('u1', { userId: 'u2' })).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('inserts idempotently and returns { blocked: true }', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([{ id: 'u2' }]) }),
+        }),
+      });
+      const onConflictDoNothing = jest.fn().mockResolvedValue([]);
+      db.insert.mockReturnValue({ values: () => ({ onConflictDoNothing }) });
+
+      const result = await service.blockUser('u1', { userId: 'u2' });
+
+      expect(result).toEqual({ blocked: true });
+      expect(onConflictDoNothing).toHaveBeenCalled();
+    });
+  });
+
+  describe('unblockUser', () => {
+    it('throws NotFoundException when no block exists', async () => {
+      db.delete.mockReturnValue({
+        where: () => ({ returning: () => Promise.resolve([]) }),
+      });
+
+      await expect(service.unblockUser('u1', 'u2')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('returns { removed: true } when the block is deleted', async () => {
+      db.delete.mockReturnValue({
+        where: () => ({
+          returning: () =>
+            Promise.resolve([{ id: 'b1', blockerId: 'u1', blockedId: 'u2' }]),
+        }),
+      });
+
+      await expect(service.unblockUser('u1', 'u2')).resolves.toEqual({
+        removed: true,
+      });
+    });
+  });
+
+  describe('listBlocks', () => {
+    it('returns [] without a profile query when no blocks exist', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ orderBy: () => Promise.resolve([]) }),
+        }),
+      });
+
+      await expect(service.listBlocks('u1')).resolves.toEqual([]);
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('maps blocked user profiles onto block rows', async () => {
+      const createdAt = new Date();
+      let callCount = 0;
+      db.select.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            from: () => ({
+              where: () => ({
+                orderBy: () =>
+                  Promise.resolve([
+                    { id: 'b1', blockerId: 'u1', blockedId: 'u2', createdAt },
+                  ]),
+              }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () =>
+              Promise.resolve([
+                { id: 'u2', username: 'dara', profilePhotoUrl: null },
+              ]),
+          }),
+        };
+      });
+
+      await expect(service.listBlocks('u1')).resolves.toEqual([
+        {
+          id: 'b1',
+          blockedUser: { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          createdAt,
+        },
+      ]);
+    });
+  });
+});

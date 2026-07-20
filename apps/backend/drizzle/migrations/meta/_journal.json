@@ -36,6 +36,20 @@
       "when": 1783138416323,
       "tag": "0004_premium_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783924277648,
+      "tag": "0005_nosy_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783925398286,
+      "tag": "0006_overjoyed_doorman",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   numeric,
@@ -161,6 +162,28 @@ export const userAuthProviders = pgTable(
   ],
 );
 
+export const userBlocks = pgTable(
+  'user_blocks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    blockerId: uuid('blocker_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedId: uuid('blocked_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('user_blocks_pair_uq').on(t.blockerId, t.blockedId),
+    // Reverse-direction lookups: "who blocked me"
+    index('user_blocks_blocked_id_idx').on(t.blockedId),
+    check('user_blocks_not_self', sql`blocker_id <> blocked_id`),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -174,3 +197,5 @@ export type UserPhoneRow = typeof userPhones.$inferSelect;
 export type NewUserPhone = typeof userPhones.$inferInsert;
 export type UserAuthProviderRow = typeof userAuthProviders.$inferSelect;
 export type NewUserAuthProvider = typeof userAuthProviders.$inferInsert;
+export type UserBlockRow = typeof userBlocks.$inferSelect;
+export type NewUserBlock = typeof userBlocks.$inferInsert;

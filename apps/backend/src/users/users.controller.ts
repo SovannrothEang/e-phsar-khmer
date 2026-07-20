@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   UploadedFile,
@@ -21,6 +22,7 @@ import type { RequestUser } from '../common/types/api-response.types';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddPhoneDto } from './dto/add-phone.dto';
+import { BlockUserDto } from './dto/block-user.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -90,6 +92,27 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.usersService.setCoverPhoto(user.id, file);
+  }
+
+  @Get('me/blocks')
+  @ApiOperation({ summary: 'List users blocked by current user' })
+  listBlocks(@CurrentUser() user: RequestUser) {
+    return this.usersService.listBlocks(user.id);
+  }
+
+  @Post('me/blocks')
+  @ApiOperation({ summary: 'Block a user' })
+  blockUser(@CurrentUser() user: RequestUser, @Body() dto: BlockUserDto) {
+    return this.usersService.blockUser(user.id, dto);
+  }
+
+  @Delete('me/blocks/:userId')
+  @ApiOperation({ summary: 'Unblock a user' })
+  unblockUser(
+    @CurrentUser() user: RequestUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.usersService.unblockUser(user.id, userId);
   }
 
   @Get(':id')

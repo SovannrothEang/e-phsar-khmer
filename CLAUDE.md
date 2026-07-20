@@ -186,12 +186,13 @@ When populating `field_schema` from a `spec-detail-*.md` file (see "Frontend lis
 
 ### Users schema
 
-The `users` table relates to **five satellite tables**:
+The `users` table relates to **six satellite tables**:
 
 | Table                 | Purpose                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |
 | `user_phones`         | Phone numbers (`phone unique`, `isPrimary`, owned by `userId`)          |
 | `user_auth_providers` | One row per (user, provider): `telegram`, `phone`, `google`, `facebook` |
+| `user_blocks`         | Directional blocks; unique `(blocker_id, blocked_id)`, both FKs cascade |
 | `provinces`           | 25 Cambodian provinces (slug unique, seeded)                            |
 | `districts`           | ~200 districts; unique on `(province_id, slug)` (25 seeded)             |
 | `communes`            | ~1600 communes; unique on `(district_id, slug)` (0 seeded yet)          |
@@ -207,9 +208,11 @@ Key columns on `users`:
 
 **Phone management endpoints** (all require JWT): `POST /api/v1/users/me/phones`, `DELETE /api/v1/users/me/phones/:phoneId`, `PATCH /api/v1/users/me/phones/:phoneId/primary`. Ownership is enforced via `and(eq(id), eq(userId))`.
 
+**Block endpoints** (all require JWT): `GET/POST /api/v1/users/me/blocks`, `DELETE /api/v1/users/me/blocks/:userId`. Blocking is idempotent (`onConflictDoNothing`); a block in either direction makes chat sends fail with 403 (see Chat).
+
 **Activity tracking:** `LastSeenInterceptor` (global `APP_INTERCEPTOR`) calls `ActivityService.touch(userId)` on every authenticated request. `touch` is fire-and-forget with a 5-minute in-memory throttle per user.
 
-**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0004` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (`categories`/`subcategories` + their `*_translations`, `users` + the 5 satellite tables, `listings`, `brands`/`models`/`brand_subcategory_links`, `idempotency_keys`); `0001`–`0002` alter `users`; `0003` adds the `listing_photos` table (+ a `listings` alter); `0004_premium_mephisto` swaps the `users` uniques for partial indexes, adds the single-primary-phone index, `listings` CHECK constraints + commune index, and the user-scoped idempotency unique. Run `db:migrate` to apply, then `db:seed`; regenerate with `db:generate` after editing `src/db/schema/`.
+**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0004` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (`categories`/`subcategories` + their `*_translations`, `users` + the 5 satellite tables, `listings`, `brands`/`models`/`brand_subcategory_links`, `idempotency_keys`); `0001`–`0002` alter `users`; `0003` adds the `listing_photos` table (+ a `listings` alter); `0004_premium_mephisto` swaps the `users` uniques for partial indexes, adds the single-primary-phone index, `listings` CHECK constraints + commune index, and the user-scoped idempotency unique; `0005_nosy_monster_badoon` adds the chat tables (`conversations`, `messages`) + `user_blocks`; `0006_overjoyed_doorman` narrows the chat cursor timestamps to `timestamp(3)`. Run `db:migrate` to apply, then `db:seed`; regenerate with `db:generate` after editing `src/db/schema/`.
 
 **Cambodian geography seed** (`src/db/seeds/cambodia-geography.seed.ts`): 25 provinces, 25 districts (one per province), 0 communes.
 
@@ -251,9 +254,26 @@ Supported query params: `categorySlug`, `subcategorySlug`, `provinceSlug`, `dist
 
 **Owner listing** (`GET /api/v1/listings/me/all`): offset pagination, adds `status` filter.
 
+### Chat
+
+`ChatModule` (`src/chat/`) — 1:1 buyer↔seller messaging, REST + polling (no WebSockets). **Per-contact threads**: exactly one `conversations` row per unordered user pair (CHECK `user_a_id < user_b_id` + unique; the service canonicalizes the pair and upserts with `onConflictDoUpdate`, bumping `last_message_at`). A message may carry an optional `listingId` context card (FK `ON DELETE SET NULL`). All routes require JWT:
+
+```
+POST /api/v1/chats/messages          → send { recipientId, body?, listingId?, imagePath? }; find-or-creates the conversation
+GET  /api/v1/chats                   → inbox: cursor on (lastMessageAt, id); items carry otherUser, lastMessage, unreadCount
+GET  /api/v1/chats/unread-count      → { total } for the badge
+GET  /api/v1/chats/with/:userId      → resolve thread with a user (read-only — never creates; conversation may be null)
+GET  /api/v1/chats/:id/messages      → history (cursor=, DESC) or polling deltas (after=, ASC); meta adds latestCursor + peerLastReadAt
+POST /api/v1/chats/:id/read          → bulk mark-read; returns { marked }
+```
+
+Send rejections: self (400), no body & no imagePath (400), imagePath outside `chat/{senderId}/` (400), recipient missing/soft-deleted (404), block in either direction (403 `Messaging unavailable`), listing owned by neither participant (400). Non-participants get 404 (not 403) on conversation routes — no existence oracle. Clients poll with `after = meta.latestCursor`; read receipts surface via `peerLastReadAt` (= `max(readAt)` of my messages, valid because mark-read is bulk).
+
+`messages.created_at` and `conversations.last_message_at` are `timestamp(3)` — cursor values roundtrip through JS Dates (ms precision), so µs columns would re-deliver the boundary row on `after` polls.
+
 ### Files
 
-`FilesModule` (`src/files/`) handles file uploads to Supabase Storage. Signed upload URLs are generated server-side; the client uploads directly to Supabase. Public URLs are returned for confirmed uploads. Bucket name is configured via `SUPABASE_STORAGE_BUCKET` (default: `listings`).
+`FilesModule` (`src/files/`) handles file uploads to Supabase Storage. Signed upload URLs are generated server-side; the client uploads directly to Supabase. Public URLs are returned for confirmed uploads. Bucket name is configured via `SUPABASE_STORAGE_BUCKET` (default: `listings`). `POST /files/sign` scopes: `avatar | cover | listing | chat` — `chat` paths are per-user (`chat/{userId}/…`) so ChatService can verify `imagePath` ownership by prefix.
 
 ### Adding a new feature module
 
@@ -338,4 +358,6 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 - **Communes not seeded.** `COMMUNES = []` in `cambodia-geography.seed.ts`. ~1600 Cambodian communes need to be added before `communeId` FK is useful.
 - **Models table empty.** `GET /brands/:id/models` returns `[]` for all brands until admin UI populates the `models` table.
 - **Car/motorcycle brands not seeded.** `GET /brands?subcategory=cars-for-sale` returns `[]` until brand lists are defined and seeded.
+- **No push notifications for chat.** New messages reach clients only via polling (`after=` deltas); no FCM/APNs/WebSocket layer exists. The chat schema needs no changes to add one later.
+- **Chat images are public-bucket URLs.** Same exposure as avatars/listing photos; switch to a private bucket + `createSignedDownloadUrl` if chat privacy is required.
 - **Inline `field_schema` duplication.** ~10 no-Type/no-Condition subcategory forms (all of Pets, Foods, and the no-Type Furniture blocks) are byte-identical to `commonListingFields` yet re-inline all 11 fields (~75 lines each) instead of referencing the const. Consistent by current convention but heavy; a one-time systemic refactor (e.g. `fieldSchema: [...commonListingFields]` for exact-match subcats) could DRY it. Non-blocking — do it once across all categories, never per-ship.
