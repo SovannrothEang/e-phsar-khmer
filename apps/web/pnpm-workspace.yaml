@@ -1,0 +1,12 @@
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  msw: true
+  sharp: true
+  unrs-resolver: true
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+minimumReleaseAgeExclude:
+  - '@tanstack/query-core@5.101.3'
+  - '@tanstack/react-query@5.101.3'

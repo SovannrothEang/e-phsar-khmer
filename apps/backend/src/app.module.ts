@@ -25,6 +25,7 @@ import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
+import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 
 @Module({
@@ -56,6 +57,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
     HealthModule,
     ActivityModule,
     ChatModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,0 +1,58 @@
+{
+  "HomePage": {
+    "welcome": {
+     "title": "캄보디아 최대 온라인 마켓, psakhmer에 오신 것을 환영합니다."
+    },
+    "BrowseByCategory": {
+      "title": "카테고리별 탐색",
+      "Cars and Vehicles": "자동차 및 차량",
+      "Phones & Tablets": "전화 및 태블릿",
+      "Computers & Accessories": "컴퓨터 및 액세서리",
+      "Electronics & Appliances": "전자 제품 및 가전",
+      "House & Land": "주택 및 토지",
+      "Jobs": "직업",
+      "Services": "서비스",
+      "Fashion & Beauty": "패션 & 뷰티",
+      "Furniture & Decor": "가구 및 장식",
+      "Books, Sports & Hobbies": "책, 스포츠 및 취미",
+      "Pets": "애완동물",
+      "Foods": "음식"
+    },
+    "topads": "상단 광고",
+    "latestads": "최신 광고",
+    "viewall": "전체보기",
+    "BrowseByLocation": {
+      "title": "지역별 둘러보기",
+      "Phnom Penh": "프놈펜",
+      "Preah Sihanouk": "프레아 시아누크",
+      "Kampong Cham": "깜퐁참",
+      "Siem Reap": "시엠립",
+      "Battambang": "바탐방",
+      "Kandal": "칸달",
+      "Banteay Meanchey": "반테아이 미안체이",
+      "Kampong Chhnang": "깜퐁치낭",
+      "Kampong Speu": "깜퐁스푸",
+      "Kampong Thom": "깜퐁톰",
+      "Kampot": "캄폿",
+      "Kep": "켑",
+      "Koh Kong": "코콩",
+      "Kratie": "크라티에",
+      "Mondulkiri": "몬둘키리",
+      "Oddar Meanchey": "오다르 미안체이",
+      "Pailin": "파일린",
+      "Preah Vihear": "프레아 비헤아",
+      "Prey Veng": "프레이벵",
+      "Pursat": "포삿",
+      "Ratanakiri": "라따나끼리",
+      "Stung Treng": "스퉁트렝",
+      "Svay Rieng": "스바이리엥",
+      "Takeo": "타케오",
+      "Tboung Khmum": "쯔봉크뭄"
+    }
+  },
+  "Card": {
+    "title": "여기에 당신의 광고를 게시하고 싶으신가요?",
+    "des": "Psakhmer에서 상품을 판매하고\n추가 수입을 올려보세요. 지금 시작하세요, 빠르고\n간편합니다.",
+    "button_post_ad": "판매하기"
+  }
+}

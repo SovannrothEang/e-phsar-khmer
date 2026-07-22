@@ -10,6 +10,7 @@ import {
 import { categoriesSeed } from '../categories/seeds/categories.seed';
 import { seedGeography } from './seeds/cambodia-geography.seed';
 import { seedBrands } from '../brands/seeds/brands.seed';
+import { seedAdmin } from './seeds/admin.seed';
 import * as schema from './schema';
 
 async function seed() {
@@ -93,6 +94,9 @@ async function seed() {
 
   console.log('Seeding brands...');
   await seedBrands(db);
+
+  console.log('Seeding admin...');
+  await seedAdmin(db);
 
   console.log('Seed complete.');
   await client.end();

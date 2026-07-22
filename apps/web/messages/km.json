@@ -1,0 +1,58 @@
+{
+  "HomePage": {
+    "welcome": {
+      "title": "សូមស្វាគមន៍មកកាន់ psakhmer ទីផ្សារអនឡាញដ៏ធំបំផុតនៅក្នុងប្រទេសកម្ពុជា។"
+    },
+    "BrowseByCategory": {
+      "title": "ស្វែងរកតាមប្រភេទ",
+      "Cars and Vehicles": "រថយន្ត និងយានយន្ត",
+      "Phones & Tablets": "ទូរស័ព្ទ & ថេប្លេត",
+      "Computers & Accessories": "កុំព្យូទ័រ & គ្រឿងបន្លាស់",
+      "Electronics & Appliances": "អេឡិចត្រូនិច & គ្រឿងប្រើប្រាស់",
+      "House & Land": "ផ្ទះ & ដី",
+      "Jobs": "ការងារ",
+      "Services": "សេវាកម្ម",
+      "Fashion & Beauty": "សំលៀកបំពាក់ & សម្រស់",
+      "Furniture & Decor": "គ្រឿងសង្ហារឹម & ការតុបតែង",
+      "Books, Sports & Hobbies": "សៀវភៅ កីឡា & ចំណូលចិត្ត",
+      "Pets": "សត្វចិញ្ចឹម",
+      "Foods": "អាហារ"
+    },
+    "topads": "ផលិតផលល្បីៗ",
+    "latestads": "ផលិតផលចុងក្រោយ",
+    "viewall": "មើលទាំងអស់",
+    "BrowseByLocation": {
+      "title": "ស្វែងរកតាមទីតាំង",
+      "Phnom Penh": "ភ្នំពេញ",
+      "Preah Sihanouk": "ព្រះសីហនុ",
+      "Kampong Cham": "កំពង់ចាម",
+      "Siem Reap": "សៀមរាប",
+      "Battambang": "បាត់ដំបង",
+      "Kandal": "កណ្ដាល",
+      "Banteay Meanchey": "បន្ទាយមានជ័យ",
+      "Kampong Chhnang": "កំពង់ឆ្នាំង",
+      "Kampong Speu": "កំពង់ស្ពឺ",
+      "Kampong Thom": "កំពង់ធំ",
+      "Kampot": "កំពត",
+      "Kep": "កែប",
+      "Koh Kong": "កោះកុង",
+      "Kratie": "ក្រចេះ",
+      "Mondulkiri": "មណ្ឌលគីរី",
+      "Oddar Meanchey": "ឧត្តរមានជ័យ",
+      "Pailin": "ប៉ៃលិន",
+      "Preah Vihear": "ព្រះវិហារ",
+      "Prey Veng": "ព្រៃវែង",
+      "Pursat": "ពោធិ៍សាត់",
+      "Ratanakiri": "រតនគីរី",
+      "Stung Treng": "ស្ទឹងត្រែង",
+      "Svay Rieng": "ស្វាយរៀង",
+      "Takeo": "តាកែវ",
+      "Tboung Khmum": "ត្បូងឃ្មុំ"
+    }
+  },
+  "Card": {
+    "title": "ចង់ឃើញពាណិជ្ជកម្មរបស់អ្នកនៅទីនេះទេ?",
+    "des": "រកប្រាក់ចំណូលបន្ថែមដោយការលក់ទំនិញក្នុង Psakhmer ។\n វាលឿន នឹង ងាយស្រួល។",
+    "button_post_ad": "ដាក់លក់"
+  }
+}

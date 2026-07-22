@@ -1,0 +1,58 @@
+{
+  "HomePage": {
+    "welcome": {
+      "title": "Chào mừng bạn đến với psakhmer, chợ trực tuyến lớn nhất tại Campuchia."
+    },
+    "BrowseByCategory": {
+      "title": "Duyệt theo danh mục",
+      "Cars and Vehicles": "Xe và Phương tiện",
+      "Phones & Tablets": "Điện thoại & Máy tính bảng",
+      "Computers & Accessories": "Máy tính & Phụ kiện",
+      "Electronics & Appliances": "Điện tử & Thiết bị",
+      "House & Land": "Nhà & Đất",
+      "Jobs": "Công việc",
+      "Services": "Dịch vụ",
+      "Fashion & Beauty": "Thời trang & Làm đẹp",
+      "Furniture & Decor": "Nội thất và Trang trí",
+      "Books, Sports & Hobbies": "Sách, Thể thao & Sở thích",
+      "Pets": "Thú cưng",
+      "Foods": "Thức ăn"
+    },
+    "topads": "Quảng cáo hàng đầu",
+    "latestads": "Quảng cáo mới nhất",
+    "viewall": "Xem tất cả",
+    "BrowseByLocation": {
+      "title": "Duyệt theo vị trí",
+      "Phnom Penh": "Phnôm Pênh",
+      "Preah Sihanouk": "Preah Sihanouk",
+      "Kampong Cham": "Kampong Cham",
+      "Siem Reap": "Siem Reap",
+      "Battambang": "Battambang",
+      "Kandal": "Kandal",
+      "Banteay Meanchey": "Banteay Meanchey",
+      "Kampong Chhnang": "Kampong Chhnang",
+      "Kampong Speu": "Kampong Speu",
+      "Kampong Thom": "Kampong Thom",
+      "Kampot": "Kampot",
+      "Kep": "Kep",
+      "Koh Kong": "Koh Kong",
+      "Kratie": "Kratie",
+      "Mondulkiri": "Mondulkiri",
+      "Oddar Meanchey": "Oddar Meanchey",
+      "Pailin": "Pailin",
+      "Preah Vihear": "Preah Vihear",
+      "Prey Veng": "Prey Veng",
+      "Pursat": "Pursat",
+      "Ratanakiri": "Ratanakiri",
+      "Stung Treng": "Stung Treng",
+      "Svay Rieng": "Svay Rieng",
+      "Takeo": "Takeo",
+      "Tboung Khmum": "Tboung Khmum"
+    }   
+  },
+  "Card": {
+      "title": "Bạn muốn thấy quảng cáo của mình ở đây?",
+      "des": "Kiếm thêm thu nhập bằng cách bán hàng\ntrên Psakhmer. Thử ngay nào, rất nhanh chóng và\ndễ dàng.",
+      "button_post_ad": "Bán"
+    }
+}

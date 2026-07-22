@@ -1,0 +1,58 @@
+{
+  "HomePage": {
+    "welcome": {
+      "title": "欢迎来到psakhmer, 柬埔寨最大的在线市场。"
+    },
+    "topads": "置顶广告",
+    "BrowseByCategory": {
+      "title": "按类别浏览",
+      "Cars and Vehicles": "车辆和汽车",
+      "Phones & Tablets": "手机和平板",
+      "Computers & Accessories": "电脑和配件",
+      "Electronics & Appliances": "电子产品和设备",
+      "House & Land": "房屋和土地",
+      "Jobs": "工作",
+      "Services": "服务",
+      "Fashion & Beauty": "时装和美容",
+      "Furniture & Decor": "家具和装饰",
+      "Books, Sports & Hobbies": "书籍、运动和爱好",
+      "Pets": "宠物",
+      "Foods": "食物"
+    },
+    "latestads": "最新广告",
+    "viewall": "查看全部",
+    "BrowseByLocation": {
+      "title": "按地点浏览",
+      "Phnom Penh": "金边",
+      "Preah Sihanouk": "西哈努克港",
+      "Kampong Cham": "磅湛",
+      "Siem Reap": "暹粒",
+      "Battambang": "马德望",
+      "Kandal": "干丹",
+      "Banteay Meanchey": "班蒂棉吉",
+      "Kampong Chhnang": "磅清扬",
+      "Kampong Speu": "磅士卑",
+      "Kampong Thom": "磅同",
+      "Kampot": "贡布",
+      "Kep": "白马省",
+      "Koh Kong": "戈公省",
+      "Kratie": "桔井",
+      "Mondulkiri": "蒙多基里",
+      "Oddar Meanchey": "奥多棉芷",
+      "Pailin": "拜林",
+      "Preah Vihear": "柏威夏",
+      "Prey Veng": "波萝勉",
+      "Pursat": "普尔·萨特",
+      "Ratanakiri": "拉达那基里",
+      "Stung Treng": "上丁省",
+      "Svay Rieng": "柴桢",
+      "Takeo": "武雄",
+      "Tboung Khmum": "特本克蒙"
+    }
+  },
+  "Card": {
+    "title": "想在这里看到您的广告吗？",
+    "des": "在 Psakhmer 上出售此商品可赚取额外现金。",
+    "button_post_ad": "出售"
+  }
+}

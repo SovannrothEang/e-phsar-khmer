@@ -1,0 +1,58 @@
+{
+  "HomePage": {
+    "welcome": {
+      "title": "Selamat datang di psakhmer, pasar online terbesar di Kamboja."
+    },
+    "BrowseByCategory": {
+      "title": "Jelajahi Berdasarkan Kategori",
+      "Cars and Vehicles": "Mobil dan Kendaraan",
+      "Phones & Tablets": "Telepon & Tablet",
+      "Computers & Accessories": "Komputer & Aksesori",
+      "Electronics & Appliances": "Elektronik & Peralatan",
+      "House & Land": "Rumah & Tanah",
+      "Jobs": "Pekerjaan",
+      "Services": "Layanan",
+      "Fashion & Beauty": "Fashion & Kecantikan",
+      "Furniture & Decor": "Perabotan dan Dekorasi",
+      "Books, Sports & Hobbies": "Buku, Olahraga & Hobi",
+      "Pets": "Hewan Peliharaan",
+      "Foods": "Makanan"
+    },
+    "topads": "Iklan Teratas",
+    "latestads": "Iklan Terbarux",
+    "viewall": "Tampilkan Semua",
+    "BrowseByLocation": {
+      "title": "Telusuri Berdasarkan Lokasi",
+      "Phnom Penh": "Phnom Penh",
+      "Preah Sihanouk": "Preah Sihanouk",
+      "Kampong Cham": "Kampong Cham",
+      "Siem Reap": "Siem Reap",
+      "Battambang": "Battambang",
+      "Kandal": "Kandal",
+      "Banteay Meanchey": "Banteay Meanchey",
+      "Kampong Chhnang": "Kampong Chhnang",
+      "Kampong Speu": "Kampong Speu",
+      "Kampong Thom": "Kampong Thom",
+      "Kampot": "Kampot",
+      "Kep": "Kep",
+      "Koh Kong": "Koh Kong",
+      "Kratie": "Kratie",
+      "Mondulkiri": "Mondulkiri",
+      "Oddar Meanchey": "Oddar Meanchey",
+      "Pailin": "Pailin",
+      "Preah Vihear": "Preah Vihear",
+      "Prey Veng": "Prey Veng",
+      "Pursat": "Pursat",
+      "Ratanakiri": "Ratanakiri",
+      "Stung Treng": "Stung Treng",
+      "Svay Rieng": "Svay Rieng",
+      "Takeo": "Takeo",
+      "Tboung Khmum": "Tboung Khmum"
+    }
+  },
+  "Card": {
+      "title": "Ingin melihat iklan Anda di sini?",
+      "des": "Dapatkan uang ekstra dengan berjualan\ndi Psakhmer. Ayo coba, prosesnya cepat dan\nmudah.",
+      "button_post_ad": "Jual"
+    }
+}
