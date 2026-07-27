@@ -21,6 +21,7 @@ export interface ModelDto {
   id: string;
   slug: string;
   name: string;
+  image: string | null;
   sortOrder: number;
 }
 
@@ -79,6 +80,7 @@ export class BrandsService {
         id: models.id,
         slug: models.slug,
         name: models.name,
+        image: models.image,
         sortOrder: models.sortOrder,
       })
       .from(models)

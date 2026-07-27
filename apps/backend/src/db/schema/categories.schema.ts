@@ -17,7 +17,7 @@ export const localeEnum = pgEnum('locale', ['en', 'km', 'zh']);
 export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
   slug: varchar('slug', { length: 80 }).unique().notNull(),
-  icon: varchar('icon', { length: 120 }),
+  icon: varchar('icon', { length: 500 }),
   sortOrder: integer('sort_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -37,6 +37,7 @@ export const subcategories = pgTable(
       .notNull()
       .references(() => categories.id, { onDelete: 'cascade' }),
     slug: varchar('slug', { length: 100 }).notNull(),
+    icon: varchar('icon', { length: 500 }),
     fieldSchema: jsonb('field_schema').$type<FieldDef[]>(),
     sortOrder: integer('sort_order').default(0).notNull(),
     isActive: boolean('is_active').default(true).notNull(),

@@ -1,32 +1,73 @@
-"use server"
+"use server";
 
-import { modelSchema, deleteModelSchema } from "@/schemas/model"
-import z from "zod"
+import { modelSchema, deleteModelSchema } from "@/schemas/model";
+import { serverFetch, ApiError } from "@/lib/api/client";
+import z from "zod";
+
+// The form's categoryId + subcategories are UI-only (they drive the cascade to
+// pick a brand); the backend model only needs brandId + slug + name + image.
 
 export async function createModel(unsafeData: z.infer<typeof modelSchema>) {
-  const data = modelSchema.safeParse(unsafeData)
+  const parsed = modelSchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  if (!data.success) return { success: false }
-
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch("/admin/models", {
+      method: "POST",
+      body: JSON.stringify({
+        brandId: parsed.data.brandId,
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        image: parsed.data.image || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to create model";
+    return { success: false, error: message };
+  }
 }
-export async function updateModel(unsafeData: z.infer<typeof modelSchema>) {
-  const data = modelSchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false }
+export async function updateModel(
+  modelId: string,
+  unsafeData: z.infer<typeof modelSchema>,
+) {
+  const parsed = modelSchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/models/${modelId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        brandId: parsed.data.brandId,
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        image: parsed.data.image || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to update model";
+    return { success: false, error: message };
+  }
 }
-export async function deleteModel(unsafeData: z.infer<typeof deleteModelSchema>) {
-  const data = deleteModelSchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false, error: "Invalid brand ID" }
+export async function deleteModel(
+  unsafeData: z.infer<typeof deleteModelSchema>,
+) {
+  const parsed = deleteModelSchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid model ID" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/models/${parsed.data.modelId}`, {
+      method: "DELETE",
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to delete model";
+    return { success: false, error: message };
+  }
 }

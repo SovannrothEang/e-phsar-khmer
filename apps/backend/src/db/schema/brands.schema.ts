@@ -15,7 +15,7 @@ export const brands = pgTable('brands', {
   id: uuid('id').defaultRandom().primaryKey(),
   slug: varchar('slug', { length: 80 }).unique().notNull(),
   name: varchar('name', { length: 120 }).notNull(),
-  icon: varchar('icon', { length: 120 }),
+  icon: varchar('icon', { length: 500 }),
   sortOrder: integer('sort_order').default(0).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -36,6 +36,7 @@ export const models = pgTable(
       .references(() => brands.id, { onDelete: 'cascade' }),
     slug: varchar('slug', { length: 100 }).notNull(),
     name: varchar('name', { length: 120 }).notNull(),
+    image: varchar('image', { length: 500 }),
     sortOrder: integer('sort_order').default(0).notNull(),
     isActive: boolean('is_active').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })

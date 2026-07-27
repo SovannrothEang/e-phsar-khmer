@@ -1,5 +1,7 @@
 import UserClient from "./UserClient";
+import { getAdminUsers } from "@/actions/admin-users";
 
-export default function UserPage() {
-    return <UserClient />;
+export default async function UserPage() {
+  const initialData = await getAdminUsers().catch(() => undefined);
+  return <UserClient initialData={initialData} />;
 }

@@ -16,6 +16,7 @@ import { AdminService } from './admin.service';
 import { ListUsersDto } from './dto/list-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { TimeseriesQueryDto } from './dto/timeseries-query.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -26,9 +27,17 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('stats')
-  @ApiOperation({ summary: 'Dashboard KPI counters' })
+  @ApiOperation({
+    summary: 'Dashboard KPI counters with period-over-period deltas',
+  })
   getStats() {
     return this.adminService.getStats();
+  }
+
+  @Get('stats/timeseries')
+  @ApiOperation({ summary: 'Daily new users + new listings over a date range' })
+  getTimeseries(@Query() query: TimeseriesQueryDto) {
+    return this.adminService.getTimeseries(query.range);
   }
 
   @Get('users')

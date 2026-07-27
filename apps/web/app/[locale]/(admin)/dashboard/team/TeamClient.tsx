@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,16 +8,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -26,32 +26,58 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MoreVertical, Plus, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, XIcon } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Users } from "@/lib/users"
-import { User } from "@/types/user"
-import { z } from "zod"
-import Image from "next/image"
-import { USER_ROLES, usersSchema, editUserSchema } from "@/schemas/user"
-import { toast } from "@/components/ui/sonner"
-import { FieldGroup, FieldLabel, FieldSet, FieldContent, FieldLegend, FieldDescription, Field, FieldError } from "@/components/ui/field"
-import { useAppForm } from "@/components/form/hooks"
-import { createUser, updateUser, deleteUser } from "@/actions/user"
-import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
-import { ScrollArea } from "@/components/ui/scroll-area"
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  MoreVertical,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search,
+  XIcon,
+} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAdminUsers, type AdminUsersResult } from "@/actions/admin-users";
+import { User } from "@/types/user";
+import { z } from "zod";
+import Image from "next/image";
+import { USER_ROLES, usersSchema, editUserSchema } from "@/schemas/user";
+import { toast } from "@/components/ui/sonner";
+import {
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+  FieldContent,
+  FieldLegend,
+  FieldDescription,
+  Field,
+  FieldError,
+} from "@/components/ui/field";
+import { useAppForm } from "@/components/form/hooks";
+import { createUser, updateUser, deleteUser } from "@/actions/user";
+import {
+  InputGroup,
+  InputGroupInput,
+  InputGroupAddon,
+  InputGroupButton,
+} from "@/components/ui/input-group";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-
-type AddUserFormData = z.infer<typeof usersSchema>
-type EditUserFormData = z.infer<typeof editUserSchema>
+type AddUserFormData = z.infer<typeof usersSchema>;
+type EditUserFormData = z.infer<typeof editUserSchema>;
 
 // ─── Add User Form ─────────────────────────────────────────────────────────────
 
@@ -59,8 +85,8 @@ function AddUserForm({
   onSuccess,
   onCancel,
 }: {
-  onSuccess: (data: AddUserFormData) => void
-  onCancel: () => void
+  onSuccess: (data: AddUserFormData) => void;
+  onCancel: () => void;
 }) {
   const form = useAppForm({
     defaultValues: {
@@ -70,29 +96,29 @@ function AddUserForm({
       profile: "",
       password: "",
       phones: [{ phone: "" }],
-      role: "admin" as typeof USER_ROLES[number],
+      role: "admin" as (typeof USER_ROLES)[number],
     },
     validators: {
       onChange: usersSchema,
       onSubmit: usersSchema,
     },
     onSubmit: async ({ value }) => {
-      const res = await createUser(value)
+      const res = await createUser(value);
 
       if (res.success) {
-        form.reset()
-        onSuccess(value)
+        form.reset();
+        onSuccess(value);
       } else {
-        toast.error("Failed to add user")
+        toast.error(res.error ?? "Failed to add user");
       }
     },
-  })
+  });
 
   return (
     <form
       onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
+        e.preventDefault();
+        form.handleSubmit();
       }}
       className="flex flex-col h-full max-h-[85vh]"
     >
@@ -111,7 +137,9 @@ function AddUserForm({
           </form.AppField>
 
           <form.AppField name="password">
-            {(field) => <field.Input label="Password" type="password" required />}
+            {(field) => (
+              <field.Input label="Password" type="password" required />
+            )}
           </form.AppField>
 
           {/* Phone Numbers (array field) */}
@@ -147,7 +175,7 @@ function AddUserForm({
                       {(innerField) => {
                         const isInvalid =
                           innerField.state.meta.isTouched &&
-                          !innerField.state.meta.isValid
+                          !innerField.state.meta.isValid;
                         return (
                           <Field
                             orientation="horizontal"
@@ -182,11 +210,13 @@ function AddUserForm({
                                 )}
                               </InputGroup>
                               {isInvalid && (
-                                <FieldError errors={innerField.state.meta.errors} />
+                                <FieldError
+                                  errors={innerField.state.meta.errors}
+                                />
                               )}
                             </FieldContent>
                           </Field>
-                        )
+                        );
                       }}
                     </form.Field>
                   ))}
@@ -217,13 +247,12 @@ function AddUserForm({
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
+                    const file = e.target.files?.[0];
                     if (file) {
-                      form.setFieldValue("profile", URL.createObjectURL(file))
+                      form.setFieldValue("profile", URL.createObjectURL(file));
                     }
                   }}
                 />
-
               </>
             )}
           </form.AppField>
@@ -260,7 +289,7 @@ function AddUserForm({
         </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }
 
 // ─── Edit User Form ────────────────────────────────────────────────────────────
@@ -270,9 +299,9 @@ function EditUserForm({
   onSuccess,
   onCancel,
 }: {
-  user: User
-  onSuccess: (data: EditUserFormData) => void
-  onCancel: () => void
+  user: User;
+  onSuccess: (data: EditUserFormData) => void;
+  onCancel: () => void;
 }) {
   const form = useAppForm({
     defaultValues: {
@@ -281,39 +310,38 @@ function EditUserForm({
       email: user.email,
       profile: user.profileImage ?? "",
       password: "",
-      phones: user.networks.length > 0
-        ? user.networks.map((n) => ({ phone: n }))
-        : [{ phone: "" }],
-      role: (USER_ROLES.includes(user.role as typeof USER_ROLES[number])
+      phones:
+        user.networks.length > 0
+          ? user.networks.map((n) => ({ phone: n }))
+          : [{ phone: "" }],
+      role: (USER_ROLES.includes(user.role as (typeof USER_ROLES)[number])
         ? user.role
-        : "user") as typeof USER_ROLES[number],
+        : "user") as (typeof USER_ROLES)[number],
     } satisfies EditUserFormData,
     validators: {
       onChange: editUserSchema,
       onSubmit: editUserSchema,
     },
     onSubmit: async ({ value }) => {
-      const res = await updateUser(value)
+      const res = await updateUser(user.userId, value);
       if (res.success) {
-        onSuccess(value)
-        toast.success("User updated successfully")
+        onSuccess(value);
+        toast.success("User updated successfully");
       } else {
-        toast.error("Failed to update user")
+        toast.error(res.error ?? "Failed to update user");
       }
     },
-  })
+  });
 
   return (
-    
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          form.handleSubmit()
-        }}
-        className="flex flex-col h-full max-h-[85vh]"
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        form.handleSubmit();
+      }}
+      className="flex flex-col h-full max-h-[85vh]"
     >
       <div className="flex-1 overflow-y-auto px-1 pr-3 max-h-[80vh] scrollbar-thin">
-    
         <FieldGroup className="py-4">
           <form.AppField name="name">
             {(field) => <field.Input label="Name" required />}
@@ -370,7 +398,7 @@ function EditUserForm({
                       {(innerField) => {
                         const isInvalid =
                           innerField.state.meta.isTouched &&
-                          !innerField.state.meta.isValid
+                          !innerField.state.meta.isValid;
                         return (
                           <Field
                             orientation="horizontal"
@@ -405,11 +433,13 @@ function EditUserForm({
                                 )}
                               </InputGroup>
                               {isInvalid && (
-                                <FieldError errors={innerField.state.meta.errors} />
+                                <FieldError
+                                  errors={innerField.state.meta.errors}
+                                />
                               )}
                             </FieldContent>
                           </Field>
-                        )
+                        );
                       }}
                     </form.Field>
                   ))}
@@ -440,9 +470,9 @@ function EditUserForm({
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   onChange={(e) => {
-                    const file = e.target.files?.[0]
+                    const file = e.target.files?.[0];
                     if (file) {
-                      form.setFieldValue("profile", URL.createObjectURL(file))
+                      form.setFieldValue("profile", URL.createObjectURL(file));
                     }
                   }}
                 />
@@ -463,28 +493,26 @@ function EditUserForm({
             )}
           </form.AppField>
         </FieldGroup>
-        </div>
+      </div>
 
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
-          >
-            Save Changes
-          </Button>
-        </DialogFooter>
-      </form>
-    
-  )
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+        >
+          Save Changes
+        </Button>
+      </DialogFooter>
+    </form>
+  );
 }
 
 // ─── Delete User Form ──────────────────────────────────────────────────────────
@@ -494,28 +522,28 @@ function DeleteUserForm({
   onSuccess,
   onCancel,
 }: {
-  user: User
-  onSuccess: () => void
-  onCancel: () => void
+  user: User;
+  onSuccess: () => void;
+  onCancel: () => void;
 }) {
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDelete() {
     try {
-      setIsDeleting(true)
-      const res = await deleteUser({ userId: user.userId })
+      setIsDeleting(true);
+      const res = await deleteUser({ userId: user.userId });
 
       if (res.success) {
-        onSuccess()
-        toast.success("User deleted successfully")
+        onSuccess();
+        toast.success("User deleted successfully");
       } else {
-        toast.error("Failed to delete user")
+        toast.error("Failed to delete user");
       }
     } catch (error) {
-      console.error("Delete Error:", error)
-      toast.error("An unexpected error occurred")
+      console.error("Delete Error:", error);
+      toast.error("An unexpected error occurred");
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
   }
 
@@ -525,8 +553,10 @@ function DeleteUserForm({
         <DialogTitle>Delete User</DialogTitle>
         <DialogDescription>
           Are you sure you want to delete{" "}
-          <strong className="font-semibold text-red-500">&quot;{user.name}&quot;</strong>?{" "}
-          This action cannot be undone.
+          <strong className="font-semibold text-red-500">
+            &quot;{user.name}&quot;
+          </strong>
+          ? This action cannot be undone.
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>
@@ -546,28 +576,39 @@ function DeleteUserForm({
         </Button>
       </DialogFooter>
     </>
-  )
+  );
 }
 
 // ─── Main TeamPage ─────────────────────────────────────────────────────────────
 
-export default function TeamPage() {
-  const [users, setUsers] = useState<User[]>(Users)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [viewUser, setViewUser] = useState<User | null>(null)
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [rowsPerPage, setRowsPerPage] = useState(10)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [tab, setTab] = useState("all")
+export default function TeamPage({
+  initialData,
+}: {
+  initialData?: AdminUsersResult;
+}) {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["admin", "team"],
+    queryFn: () => getAdminUsers({ role: "admin" }),
+    initialData,
+  });
+  const users = data?.users ?? [];
+
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [viewUser, setViewUser] = useState<User | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tab, setTab] = useState("all");
 
   // Filter: hide plain "user" role — this page shows team members (admins etc.)
   const filteredUsers = users.filter((user) => {
-    const query = searchQuery.toLowerCase()
+    const query = searchQuery.toLowerCase();
 
-    if (user.role.toLowerCase() === "user") return false
+    if (user.role.toLowerCase() === "user") return false;
 
     const matchesSearch =
       user.userId.toLowerCase().includes(query) ||
@@ -575,19 +616,22 @@ export default function TeamPage() {
       user.username.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query) ||
       user.networks.join(",").toLowerCase().includes(query) ||
-      user.status.toLowerCase().includes(query)
+      user.status.toLowerCase().includes(query);
 
     const matchesTab =
       tab === "all" ||
       (tab === "online" && user.status === "Online") ||
-      (tab === "offline" && user.status === "Offline")
+      (tab === "offline" && user.status === "Offline");
 
-    return matchesSearch && matchesTab
-  })
+    return matchesSearch && matchesTab;
+  });
 
-  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage)
-  const startIndex = (currentPage - 1) * rowsPerPage
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + rowsPerPage)
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const paginatedUsers = filteredUsers.slice(
+    startIndex,
+    startIndex + rowsPerPage,
+  );
 
   const getStatusBadge = (status: User["status"]) => {
     switch (status) {
@@ -597,72 +641,40 @@ export default function TeamPage() {
             <span className="size-1.5 rounded-full bg-emerald-500" />
             Online
           </Badge>
-        )
+        );
       case "Offline":
         return (
           <Badge variant="outline">
             <span className="size-1.5 rounded-full bg-rose-500" />
             Offline
           </Badge>
-        )
+        );
     }
-  }
+  };
+
+  const refreshTeam = () =>
+    queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
 
   // ── Add handler ──────────────────────────────────────────────────────────────
-  const handleAddSuccess = (data: AddUserFormData) => {
-    const newUser: User = {
-      userId: (users.length + 1).toString(),
-      username: data.username.toLowerCase().replace(/\s+/g, "-"),
-      name: data.name,
-      profileImage: data.profile || "/user-img/default.png",
-      coverImage: "",
-      networks: data.phones.map((p) => p.phone),
-      email: data.email,
-      role: data.role,
-      accountType: "Normal",
-      isVerified: false,
-      status: "Offline",
-      following: [],
-      followers: [],
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      password: "",
-    }
-    setUsers((prev) => [...prev, newUser])
-    setIsAddDialogOpen(false)
-    toast.success("User added successfully")
-  }
+  const handleAddSuccess = () => {
+    refreshTeam();
+    setIsAddDialogOpen(false);
+    toast.success("User added successfully");
+  };
 
   // ── Edit handler ─────────────────────────────────────────────────────────────
-  const handleEditSuccess = (data: EditUserFormData) => {
-    if (!selectedUser) return
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.userId === selectedUser.userId
-          ? {
-            ...u,
-            name: data.name,
-            username: data.username.toLowerCase().replace(/\s+/g, "-"),
-            email: data.email,
-            networks: data.phones.map((p) => p.phone),
-            role: data.role,
-            profileImage: data.profile || u.profileImage,
-            updatedAt: new Date().toISOString().split("T")[0],
-          }
-          : u
-      )
-    )
-    setIsEditDialogOpen(false)
-    setSelectedUser(null)
-  }
+  const handleEditSuccess = () => {
+    refreshTeam();
+    setIsEditDialogOpen(false);
+    setSelectedUser(null);
+  };
 
   // ── Delete handler ────────────────────────────────────────────────────────────
   const handleDeleteSuccess = () => {
-    if (!selectedUser) return
-    setUsers((prev) => prev.filter((u) => u.userId !== selectedUser.userId))
-    setIsDeleteDialogOpen(false)
-    setSelectedUser(null)
-  }
+    refreshTeam();
+    setIsDeleteDialogOpen(false);
+    setSelectedUser(null);
+  };
 
   return (
     <>
@@ -671,7 +683,9 @@ export default function TeamPage() {
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">Team</h1>
+              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+                Team
+              </h1>
               <p className="text-sm text-muted-foreground mt-2">
                 Manage your team and roles
               </p>
@@ -692,8 +706,8 @@ export default function TeamPage() {
               placeholder="Search by name, email, ID..."
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value)
-                setCurrentPage(1)
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
               }}
               className="pl-9"
             />
@@ -703,22 +717,36 @@ export default function TeamPage() {
           <Tabs
             value={tab}
             onValueChange={(value) => {
-              setTab(value)
-              setCurrentPage(1)
+              setTab(value);
+              setCurrentPage(1);
             }}
           >
             <TabsList>
-              <TabsTrigger value="all" className="cursor-pointer">All Users</TabsTrigger>
+              <TabsTrigger value="all" className="cursor-pointer">
+                All Users
+              </TabsTrigger>
               <TabsTrigger value="online" className="cursor-pointer">
                 Online
                 <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
-                  {users.filter((u) => u.status === "Online" && u.role.toLowerCase() !== "user").length}
+                  {
+                    users.filter(
+                      (u) =>
+                        u.status === "Online" &&
+                        u.role.toLowerCase() !== "user",
+                    ).length
+                  }
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="offline" className="cursor-pointer">
                 Offline
                 <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
-                  {users.filter((u) => u.status === "Offline" && u.role.toLowerCase() !== "user").length}
+                  {
+                    users.filter(
+                      (u) =>
+                        u.status === "Offline" &&
+                        u.role.toLowerCase() !== "user",
+                    ).length
+                  }
                 </Badge>
               </TabsTrigger>
             </TabsList>
@@ -768,18 +796,25 @@ export default function TeamPage() {
                       <Avatar className="size-8">
                         <AvatarImage src={user.profileImage} alt={user.name} />
                         <AvatarFallback className="text-xs">
-                          {user.name.split(" ").map((n) => n[0]).join("")}
+                          {user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
                         </AvatarFallback>
                       </Avatar>
                     </TableCell>
                     {/* Name + Email */}
                     <TableCell>
                       <div className="font-medium">{user.name}</div>
-                      <div className="text-xs text-muted-foreground">{user.email}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {user.email}
+                      </div>
                     </TableCell>
                     {/* Username */}
                     <TableCell>
-                      <div className="text-sm text-muted-foreground">{user.username}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {user.username}
+                      </div>
                     </TableCell>
                     {/* Phone */}
                     <TableCell>
@@ -819,7 +854,11 @@ export default function TeamPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon" className="rounded-full cursor-pointer">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full cursor-pointer"
+                          >
                             <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -834,8 +873,8 @@ export default function TeamPage() {
                           <DropdownMenuItem
                             className="text-yellow-500 cursor-pointer"
                             onClick={() => {
-                              setSelectedUser(user)
-                              setIsEditDialogOpen(true)
+                              setSelectedUser(user);
+                              setIsEditDialogOpen(true);
                             }}
                           >
                             <Pencil className="mr-2 size-4" />
@@ -844,8 +883,8 @@ export default function TeamPage() {
                           <DropdownMenuItem
                             className="cursor-pointer text-destructive"
                             onClick={() => {
-                              setSelectedUser(user)
-                              setIsDeleteDialogOpen(true)
+                              setSelectedUser(user);
+                              setIsDeleteDialogOpen(true);
                             }}
                           >
                             <Trash2 className="mr-2 size-4" />
@@ -866,8 +905,8 @@ export default function TeamPage() {
                 <Select
                   value={rowsPerPage.toString()}
                   onValueChange={(value) => {
-                    setRowsPerPage(Number(value))
-                    setCurrentPage(1)
+                    setRowsPerPage(Number(value));
+                    setCurrentPage(1);
                   }}
                 >
                   <SelectTrigger className="h-8 w-[70px]">
@@ -908,7 +947,9 @@ export default function TeamPage() {
                     variant="outline"
                     size="icon"
                     className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages || totalPages === 0}
                   >
                     <ChevronRight className="size-4" />
@@ -940,15 +981,25 @@ export default function TeamPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <Avatar className="size-16">
-                  <AvatarImage src={viewUser.profileImage} alt={viewUser.name} />
+                  <AvatarImage
+                    src={viewUser.profileImage}
+                    alt={viewUser.name}
+                  />
                   <AvatarFallback className="text-lg">
-                    {viewUser.name.split(" ").map((n) => n[0]).join("")}
+                    {viewUser.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-semibold text-lg">{viewUser.name}</h3>
-                  <div className="text-sm text-muted-foreground">{viewUser.username}</div>
-                  <p className="text-sm text-muted-foreground">{viewUser.email}</p>
+                  <div className="text-sm text-muted-foreground">
+                    {viewUser.username}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {viewUser.email}
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
@@ -974,21 +1025,27 @@ export default function TeamPage() {
                   <div>
                     <p className="text-sm text-muted-foreground">Created At:</p>
                     <p>
-                      {new Date(viewUser.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {new Date(viewUser.createdAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        },
+                      )}
                     </p>
                   </div>
                   <div className="text-left">
                     <p className="text-sm text-muted-foreground">Updated At:</p>
                     <p>
-                      {new Date(viewUser.updatedAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {new Date(viewUser.updatedAt).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        },
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1018,8 +1075,8 @@ export default function TeamPage() {
       <Dialog
         open={isEditDialogOpen}
         onOpenChange={(open) => {
-          setIsEditDialogOpen(open)
-          if (!open) setSelectedUser(null)
+          setIsEditDialogOpen(open);
+          if (!open) setSelectedUser(null);
         }}
       >
         <DialogContent>
@@ -1033,8 +1090,8 @@ export default function TeamPage() {
               user={selectedUser}
               onSuccess={handleEditSuccess}
               onCancel={() => {
-                setIsEditDialogOpen(false)
-                setSelectedUser(null)
+                setIsEditDialogOpen(false);
+                setSelectedUser(null);
               }}
             />
           )}
@@ -1045,8 +1102,8 @@ export default function TeamPage() {
       <Dialog
         open={isDeleteDialogOpen}
         onOpenChange={(open) => {
-          setIsDeleteDialogOpen(open)
-          if (!open) setSelectedUser(null)
+          setIsDeleteDialogOpen(open);
+          if (!open) setSelectedUser(null);
         }}
       >
         <DialogContent>
@@ -1055,13 +1112,13 @@ export default function TeamPage() {
               user={selectedUser}
               onSuccess={handleDeleteSuccess}
               onCancel={() => {
-                setIsDeleteDialogOpen(false)
-                setSelectedUser(null)
+                setIsDeleteDialogOpen(false);
+                setSelectedUser(null);
               }}
             />
           )}
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { useState } from "react"
-import { Plus, Pencil, Trash2, Search, MoreHorizontal } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState } from "react";
+import { Plus, Pencil, Trash2, Search, MoreHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -20,37 +20,43 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Loader2 } from "lucide-react"
-import { categories as initialCategories } from "@/lib/categories"
-import Image from "next/image"
-import type { Category } from "@/types/category"
-import { createcategories, updatecategories, deletecategories } from "@/actions/category"
-import { useAppForm } from "@/components/form/hooks"
-import { categorySchema } from "@/schemas/category"
-import { FieldGroup, FieldLabel } from "@/components/ui/field"
-import { toast } from "@/components/ui/sonner"
-import { z } from "zod"
+} from "@/components/ui/dropdown-menu";
+import { Loader2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getAdminCategories } from "@/actions/admin-categories";
+import Image from "next/image";
+import { ImageUpload } from "@/components/dashboard/image-upload";
+import type { Category } from "@/types/category";
+import {
+  createcategories,
+  updatecategories,
+  deletecategories,
+} from "@/actions/category";
+import { useAppForm } from "@/components/form/hooks";
+import { categorySchema } from "@/schemas/category";
+import { FieldGroup } from "@/components/ui/field";
+import { toast } from "@/components/ui/sonner";
+import { z } from "zod";
 
-type CategoryFormData = z.infer<typeof categorySchema>
+type CategoryFormData = z.infer<typeof categorySchema>;
 
 type CategoryWithDates = Category & {
-  createdAt: string
-  updatedAt: string
-}
+  createdAt: string;
+  updatedAt: string;
+};
 
 function AddCategoryForm({
   onSuccess,
   onCancel,
 }: {
-  onSuccess: (data: CategoryFormData) => void
-  onCancel: () => void
+  onSuccess: (data: CategoryFormData) => void;
+  onCancel: () => void;
 }) {
   const form = useAppForm({
     defaultValues: {
@@ -63,20 +69,20 @@ function AddCategoryForm({
       onChange: categorySchema,
     },
     onSubmit: async ({ value }) => {
-      const res = await createcategories(value)
+      const res = await createcategories(value);
       if (res.success) {
-        onSuccess(value)
+        onSuccess(value);
       } else {
-        toast.error("Failed to add category")
+        toast.error("Failed to add category");
       }
     },
-  })
+  });
 
   return (
     <form
       onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
+        e.preventDefault();
+        form.handleSubmit();
       }}
     >
       <FieldGroup className="py-4">
@@ -89,30 +95,12 @@ function AddCategoryForm({
         </form.AppField>
         <form.AppField name="cateIcon">
           {(field) => (
-            <>
-              <FieldLabel htmlFor="cateIcon">Icon</FieldLabel>
-              <Input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    const imageUrl = URL.createObjectURL(file)
-                    form.setFieldValue("cateIcon", imageUrl)
-                  }
-                }}
-              />
-              {field.state.value && (
-                <Image
-                  src={field.state.value}
-                  alt="Preview"
-                  width={150}
-                  height={150}
-                  className="w-40 h-40 object-cover rounded border border-border"
-                  unoptimized
-                />
-              )}
-            </>
+            <ImageUpload
+              scope="category"
+              value={field.state.value}
+              onChange={(url) => form.setFieldValue("cateIcon", url)}
+              label="Icon"
+            />
           )}
         </form.AppField>
       </FieldGroup>
@@ -133,7 +121,7 @@ function AddCategoryForm({
         </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }
 
 function EditCategoryForm({
@@ -141,9 +129,9 @@ function EditCategoryForm({
   onSuccess,
   onCancel,
 }: {
-  category: CategoryWithDates
-  onSuccess: (data: CategoryFormData) => void
-  onCancel: () => void
+  category: CategoryWithDates;
+  onSuccess: (data: CategoryFormData) => void;
+  onCancel: () => void;
 }) {
   const form = useAppForm({
     defaultValues: {
@@ -156,23 +144,20 @@ function EditCategoryForm({
       onChange: categorySchema,
     },
     onSubmit: async ({ value }) => {
-      console.log("submit", value)
-
-      const res = await updatecategories(value)
-
-      console.log(res)
-
+      const res = await updatecategories(category.cateId, value);
       if (res.success) {
-        onSuccess(value)
+        onSuccess(value);
+      } else {
+        toast.error(res.error ?? "Failed to update category");
       }
-    }
-  })
+    },
+  });
 
   return (
     <form
       onSubmit={(e) => {
-        e.preventDefault()
-        form.handleSubmit()
+        e.preventDefault();
+        form.handleSubmit();
       }}
     >
       <FieldGroup className="py-4">
@@ -186,30 +171,12 @@ function EditCategoryForm({
 
         <form.AppField name="cateIcon">
           {(field) => (
-            <>
-              <FieldLabel htmlFor="cateIcon">Icon</FieldLabel>
-              {field.state.value && (
-                <Image
-                  src={field.state.value}
-                  alt="Current category icon"
-                  width={150}
-                  height={150}
-                  className="w-40 h-40 object-cover rounded border border-border"
-                  unoptimized
-                />
-              )}
-              <Input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    const imageUrl = URL.createObjectURL(file)
-                    form.setFieldValue("cateIcon", imageUrl)
-                  }
-                }}
-              />
-            </>
+            <ImageUpload
+              scope="category"
+              value={field.state.value}
+              onChange={(url) => form.setFieldValue("cateIcon", url)}
+              label="Icon"
+            />
           )}
         </form.AppField>
       </FieldGroup>
@@ -231,38 +198,37 @@ function EditCategoryForm({
         </Button>
       </DialogFooter>
     </form>
-  )
+  );
 }
 function DeleteCategoryForm({
   category,
   onSuccess,
   onCancel,
 }: {
-  category: CategoryWithDates
-  onSuccess: (data: CategoryWithDates) => void
-  onCancel: () => void
+  category: CategoryWithDates;
+  onSuccess: (data: CategoryWithDates) => void;
+  onCancel: () => void;
 }) {
-  
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDelete() {
     try {
-      setIsDeleting(true)
+      setIsDeleting(true);
 
       const res = await deletecategories({
         cateId: category.cateId,
-      })
+      });
 
       if (res?.success) {
-        onSuccess(category)
+        onSuccess(category);
       } else {
-        toast.error("error" in res ? res.error : "Failed to delete category")
+        toast.error("error" in res ? res.error : "Failed to delete category");
       }
     } catch (error) {
-      console.error("Delete Error:", error)
-      toast.error("An unexpected error occurred")
+      console.error("Delete Error:", error);
+      toast.error("An unexpected error occurred");
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
   }
 
@@ -271,7 +237,8 @@ function DeleteCategoryForm({
       <DialogHeader>
         <DialogTitle>Delete Category</DialogTitle>
         <DialogDescription>
-          Are you sure you want to delete &quot;{category?.name}&quot;? This action cannot be undone.
+          Are you sure you want to delete &quot;{category?.name}&quot;? This
+          action cannot be undone.
         </DialogDescription>
       </DialogHeader>
 
@@ -281,7 +248,7 @@ function DeleteCategoryForm({
           variant="outline"
           className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
           onClick={onCancel}
-          disabled={isDeleting} 
+          disabled={isDeleting}
         >
           Cancel
         </Button>
@@ -293,93 +260,67 @@ function DeleteCategoryForm({
           onClick={handleDelete}
           disabled={isDeleting}
         >
-          {isDeleting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            "Delete"
-          )}
+          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
         </Button>
       </DialogFooter>
     </>
-  )
+  );
 }
 
 export default function CategoriesPage() {
-  const [categoryList, setCategoryList] = useState<CategoryWithDates[]>(
-    initialCategories.map((c) => ({
-      ...c,
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    }))
-  )
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState<CategoryWithDates | null>(null)
+  const queryClient = useQueryClient();
+  const { data: categoryList = [] } = useQuery({
+    queryKey: ["admin", "categories"],
+    queryFn: getAdminCategories,
+  });
+  const refreshCategories = () =>
+    queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] =
+    useState<CategoryWithDates | null>(null);
 
   const filteredCategories = categoryList.filter(
     (category) =>
       category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      category.slug.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+      category.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   const handleAddSuccess = (data: CategoryFormData) => {
-    const newCategory: CategoryWithDates = {
-      cateId: String(Date.now()),
-      name: data.name,
-      slug: data.slug,
-      cateIcon: data.cateIcon ?? "",
-      subcategories: [],
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-    }
-    setCategoryList([...categoryList, newCategory])
-    setIsAddDialogOpen(false)
-    toast.success(`Category "${data.name}" created successfully!`)
-  }
+    refreshCategories();
+    setIsAddDialogOpen(false);
+    toast.success(`Category "${data.name}" created successfully!`);
+  };
 
   const handleEditSuccess = (data: CategoryFormData) => {
-    if (!selectedCategory) return
-    setCategoryList(
-      categoryList.map((c) => {
-        console.log("mapping c:", c)
-        console.log("selectedCategory:", selectedCategory)
-        return c.cateId === selectedCategory.cateId
-          ? {
-            ...c,
-            name: data.name,
-            slug: data.slug,
-            cateIcon: data.cateIcon ?? c.cateIcon,
-            updatedAt: new Date().toISOString().split("T")[0],
-          }
-          : c
-      }
-      )
-    )
-    setSelectedCategory(null)
-    setIsEditDialogOpen(false)
-    toast.success(`Category "${data.name}" updated successfully!`)
-  }
+    if (!selectedCategory) return;
+    refreshCategories();
+    setSelectedCategory(null);
+    setIsEditDialogOpen(false);
+    toast.success(`Category "${data.name}" updated successfully!`);
+  };
 
   const handleDeleteSuccess = () => {
-    if (!selectedCategory) return
-    const name = selectedCategory.name
-    setCategoryList(categoryList.filter((c) => c.cateId !== selectedCategory.cateId))
-    setSelectedCategory(null)
-    setIsDeleteDialogOpen(false)
-    toast.success(`Category "${name}" deleted successfully!`)
-  }
+    if (!selectedCategory) return;
+    const name = selectedCategory.name;
+    refreshCategories();
+    setSelectedCategory(null);
+    setIsDeleteDialogOpen(false);
+    toast.success(`Category "${name}" deleted successfully!`);
+  };
 
   const openEditDialog = (category: CategoryWithDates) => {
-    setSelectedCategory(category)
-    setIsEditDialogOpen(true)
-  }
+    setSelectedCategory(category);
+    setIsEditDialogOpen(true);
+  };
 
   const openDeleteDialog = (category: CategoryWithDates) => {
-    setSelectedCategory(category)
-    setIsDeleteDialogOpen(true)
-  }
+    setSelectedCategory(category);
+    setIsDeleteDialogOpen(true);
+  };
 
   return (
     <>
@@ -387,7 +328,9 @@ export default function CategoriesPage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">Categories</h1>
+              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+                Categories
+              </h1>
               <p className="text-sm text-muted-foreground mt-2">
                 Manage product categories
               </p>
@@ -433,11 +376,11 @@ export default function CategoriesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-center">ID</TableHead>
-                  <TableHead >Name</TableHead>
-                  <TableHead >Slug</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Slug</TableHead>
                   <TableHead className="text-start">Image</TableHead>
-                  <TableHead >Created</TableHead>
-                  <TableHead >Updated</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Updated</TableHead>
                   <TableHead className="text-center">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -476,6 +419,7 @@ export default function CategoriesPage() {
                           width={56}
                           height={56}
                           className="h-12 w-12 object-cover"
+                          unoptimized
                         />
                       </TableCell>
 
@@ -555,5 +499,5 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

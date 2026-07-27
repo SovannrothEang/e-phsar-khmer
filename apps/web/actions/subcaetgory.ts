@@ -1,32 +1,67 @@
-"use server"
+"use server";
 
-import { subCategorySchema } from "@/schemas/subcategories"
-import z from "zod"
+import { subCategorySchema } from "@/schemas/subcategories";
+import { serverFetch, ApiError } from "@/lib/api/client";
+import z from "zod";
 
-export async function createsubcategories(unsafeData: z.infer<typeof subCategorySchema>) {
-  const data = subCategorySchema.safeParse(unsafeData)
+export async function createsubcategories(
+  unsafeData: z.infer<typeof subCategorySchema>,
+) {
+  const parsed = subCategorySchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  if (!data.success) return { success: false }
-
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch("/admin/subcategories", {
+      method: "POST",
+      body: JSON.stringify({
+        categoryId: parsed.data.categoryId,
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        icon: parsed.data.subIcon || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to create subcategory";
+    return { success: false, error: message };
+  }
 }
-export async function updatesubcategories(unsafeData: z.infer<typeof subCategorySchema>) {
-  const data = subCategorySchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false }
+export async function updatesubcategories(
+  subId: string,
+  unsafeData: z.infer<typeof subCategorySchema>,
+) {
+  const parsed = subCategorySchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/subcategories/${subId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        categoryId: parsed.data.categoryId,
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        icon: parsed.data.subIcon || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to update subcategory";
+    return { success: false, error: message };
+  }
 }
-export async function deletesubcategories(unsafeData: z.infer<typeof subCategorySchema>) {
-  const data = subCategorySchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false }
+export async function deletesubcategories(subId: string) {
+  if (!subId) return { success: false, error: "Invalid subcategory ID" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/subcategories/${subId}`, { method: "DELETE" });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to delete subcategory";
+    return { success: false, error: message };
+  }
 }

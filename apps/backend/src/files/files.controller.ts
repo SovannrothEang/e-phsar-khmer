@@ -9,8 +9,27 @@ class SignUploadDto {
   @IsString()
   filename: string;
 
-  @IsIn(['avatar', 'cover', 'listing', 'chat'])
-  scope: 'avatar' | 'cover' | 'listing' | 'chat';
+  @IsIn([
+    'avatar',
+    'cover',
+    'listing',
+    'chat',
+    'category',
+    'subcategory',
+    'brand',
+    'model',
+    'attribute',
+  ])
+  scope:
+    | 'avatar'
+    | 'cover'
+    | 'listing'
+    | 'chat'
+    | 'category'
+    | 'subcategory'
+    | 'brand'
+    | 'model'
+    | 'attribute';
 }
 
 class DeleteFilesDto {

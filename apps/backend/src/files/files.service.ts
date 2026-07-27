@@ -43,7 +43,12 @@ export class FilesService {
     bucket: string,
     folder: string,
     filename: string,
-  ): Promise<{ signedUrl: string; path: string; token: string }> {
+  ): Promise<{
+    signedUrl: string;
+    path: string;
+    token: string;
+    publicUrl: string;
+  }> {
     const path = `${folder}/${randomUUID()}-${this.safeName(filename)}`;
     const { data, error } = await this.supabaseService.createSignedUploadUrl(
       bucket,
@@ -51,7 +56,13 @@ export class FilesService {
     );
     if (error || !data)
       throw new ForbiddenException('Failed to create signed upload URL');
-    return { signedUrl: data.signedUrl, path, token: data.token };
+    const { data: pub } = this.supabaseService.getPublicUrl(bucket, path);
+    return {
+      signedUrl: data.signedUrl,
+      path,
+      token: data.token,
+      publicUrl: pub.publicUrl,
+    };
   }
 
   async createSignedDownloadUrl(
@@ -71,6 +82,27 @@ export class FilesService {
 
   async remove(bucket: string, paths: string[]): Promise<void> {
     await this.supabaseService.removeObjects(bucket, paths);
+  }
+
+  /**
+   * Best-effort cleanup of the storage object backing a public URL. Derives the
+   * object path from the URL (only matches URLs pointing into the default
+   * bucket), silently skips non-storage values (e.g. "/placeholder.svg"), and
+   * swallows errors so a Supabase hiccup never fails a DB operation. Used by
+   * admin services when an icon/image leaves the DB (entity delete or replace).
+   */
+  async removeByPublicUrl(publicUrl: string | null): Promise<void> {
+    if (!publicUrl) return;
+    const bucket = this.defaultBucket;
+    const marker = `/object/public/${bucket}/`;
+    const idx = publicUrl.indexOf(marker);
+    if (idx === -1) return;
+    const objectPath = publicUrl.slice(idx + marker.length);
+    try {
+      await this.supabaseService.removeObjects(bucket, [objectPath]);
+    } catch {
+      // Best-effort — don't surface storage failures from a delete/update.
+    }
   }
 
   private validateImage(file: Express.Multer.File) {

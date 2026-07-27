@@ -1,7 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const modelSchema = z.object({
-  
   name: z
     .string()
     .trim()
@@ -14,13 +13,14 @@ export const modelSchema = z.object({
     .max(50, "Model slug must be less than 50 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Model slug must be lowercase with hyphens only (e.g. my-category)"
+      "Model slug must be lowercase with hyphens only (e.g. my-category)",
     ),
+  image: z.string(),
   brandId: z.string().min(1, "Brand ID is required"),
   categoryId: z.string().min(1, "Category ID is required"),
   subcategories: z.array(z.string()).min(1, "Select at least one subcategory"),
-})
+});
 
 export const deleteModelSchema = z.object({
   modelId: z.string().min(1, "Model ID is required"),
-})
+});

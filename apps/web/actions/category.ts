@@ -1,32 +1,70 @@
-"use server"
+"use server";
 
-import { categorySchema, deleteCategorySchema } from "@/schemas/category"
-import z from "zod"
+import { categorySchema, deleteCategorySchema } from "@/schemas/category";
+import { serverFetch, ApiError } from "@/lib/api/client";
+import z from "zod";
 
-export async function createcategories(unsafeData: z.infer<typeof categorySchema>) {
-  const data = categorySchema.safeParse(unsafeData)
+export async function createcategories(
+  unsafeData: z.infer<typeof categorySchema>,
+) {
+  const parsed = categorySchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  if (!data.success) return { success: false }
-
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch("/admin/categories", {
+      method: "POST",
+      body: JSON.stringify({
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        icon: parsed.data.cateIcon || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to create category";
+    return { success: false, error: message };
+  }
 }
-export async function updatecategories(unsafeData: z.infer<typeof categorySchema>) {
-  const data = categorySchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false }
+export async function updatecategories(
+  cateId: string,
+  unsafeData: z.infer<typeof categorySchema>,
+) {
+  const parsed = categorySchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid input" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/categories/${cateId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        slug: parsed.data.slug,
+        name: parsed.data.name,
+        icon: parsed.data.cateIcon || null,
+      }),
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to update category";
+    return { success: false, error: message };
+  }
 }
-export async function deletecategories(unsafeData: z.infer<typeof deleteCategorySchema>) {
-  const data = deleteCategorySchema.safeParse(unsafeData)
 
-  if (!data.success) return { success: false, error: "Invalid category ID" }
+export async function deletecategories(
+  unsafeData: z.infer<typeof deleteCategorySchema>,
+) {
+  const parsed = deleteCategorySchema.safeParse(unsafeData);
+  if (!parsed.success) return { success: false, error: "Invalid category ID" };
 
-  // Save to DB
-
-  return { success: true }
+  try {
+    await serverFetch(`/admin/categories/${parsed.data.cateId}`, {
+      method: "DELETE",
+    });
+    return { success: true };
+  } catch (err) {
+    const message =
+      err instanceof ApiError ? err.message : "Failed to delete category";
+    return { success: false, error: message };
+  }
 }

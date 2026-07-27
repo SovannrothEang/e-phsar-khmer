@@ -64,8 +64,8 @@ pnpm --filter backend db:seed        # ts-node src/db/seed.ts (idempotent seed)
 ### Web & Docs (Next.js)
 
 ```bash
-pnpm --filter web dev          # Next.js dev on port 3000
-pnpm --filter docs dev         # Next.js dev on port 3001
+pnpm --filter web dev          # Next.js dev on port 3001
+pnpm --filter docs dev         # Next.js dev on port 3002
 pnpm --filter web build        # next build
 pnpm --filter docs build       # next build
 pnpm --filter web check-types  # next typegen → tsc --noEmit
@@ -73,7 +73,7 @@ pnpm --filter docs check-types # next typegen → tsc --noEmit
 pnpm --filter web lint         # eslint --max-warnings 0
 ```
 
-Currently scaffolding only (no business logic). Both import `@repo/ui` for shared components and extend `@repo/typescript-config/nextjs.json` + `@repo/eslint-config/next-js`.
+`web` is a full admin dashboard (Next.js 16 App Router + `next-intl` i18n). `docs` is scaffolding only. Both import `@repo/ui` for shared components and extend `@repo/typescript-config/nextjs.json` + `@repo/eslint-config/next-js`.
 
 ### Shared packages
 
@@ -212,7 +212,7 @@ Key columns on `users`:
 
 **Activity tracking:** `LastSeenInterceptor` (global `APP_INTERCEPTOR`) calls `ActivityService.touch(userId)` on every authenticated request. `touch` is fire-and-forget with a 5-minute in-memory throttle per user.
 
-**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0004` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (`categories`/`subcategories` + their `*_translations`, `users` + the 5 satellite tables, `listings`, `brands`/`models`/`brand_subcategory_links`, `idempotency_keys`); `0001`–`0002` alter `users`; `0003` adds the `listing_photos` table (+ a `listings` alter); `0004_premium_mephisto` swaps the `users` uniques for partial indexes, adds the single-primary-phone index, `listings` CHECK constraints + commune index, and the user-scoped idempotency unique; `0005_nosy_monster_badoon` adds the chat tables (`conversations`, `messages`) + `user_blocks`; `0006_overjoyed_doorman` narrows the chat cursor timestamps to `timestamp(3)`. Run `db:migrate` to apply, then `db:seed`; regenerate with `db:generate` after editing `src/db/schema/`.
+**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0009` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (categories/subcategories, users, listings, brands/models, idempotency_keys); `0001`–`0002` alter `users`; `0003` adds `listing_photos`; `0004_premium_mephisto` swaps `users` uniques for partial indexes + listing CHECK constraints; `0005_nosy_monster_badoon` adds chat tables + `user_blocks`; `0006_overjoyed_doorman` narrows chat timestamps to `timestamp(3)`; `0007_far_pet_avengers` adds `attribute_options`; `0008_legal_barracuda` adds subscription tables (4-tier hierarchy: categories→plans→packages→terms + `user_subscriptions`); `0009_tidy_screwball` adds report tables (`report_reasons`, `user_reports`, `listing_reports`).
 
 **Cambodian geography seed** (`src/db/seeds/cambodia-geography.seed.ts`): 25 provinces, 25 districts (one per province), 0 communes.
 
@@ -283,6 +283,105 @@ Send rejections: self (400), no body & no imagePath (400), imagePath outside `ch
 4. Mark public endpoints with `@Public()`. Everything else requires a valid JWT automatically.
 5. Do **not** import `DbModule` or `SupabaseModule`; their providers are available globally.
 
+**For admin-only features**, add the controller + service to `AdminModule` instead of creating a separate module. Register them in `src/admin/admin.module.ts`. The controller uses `@Roles('admin')` (guard is inherited from `AdminModule` or applied at the controller level if the feature has its own module).
+
+### Repository history note
+
+The admin dashboard originally lived at `apps/admin` and was renamed to `apps/web`. The old `apps/admin` directory was a nested git repo, which prevented `git mv` — it was moved with plain `mv` + `git add -A`. If you see stale references to `apps/admin` or `pnpm --filter admin`, mentally substitute `apps/web` / `pnpm --filter web`.
+
+### Admin API (`/api/v1/admin/*`)
+
+`AdminModule` (`src/admin/admin.module.ts`) registers all admin controllers. Every route requires `@Roles('admin')` + `RolesGuard` (enforced globally — no `@Public()` on admin routes). The admin surface covers:
+
+| Controller                     | Routes                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `AdminController`              | `GET /admin/stats`, `GET /admin/stats/timeseries`, `GET/POST /admin/users`, `GET/PATCH/DELETE /admin/users/:id`    |
+| `AdminCategoriesController`    | CRUD `GET/POST/PATCH/DELETE /admin/categories` (+ translations)                                                    |
+| `AdminSubcategoriesController` | CRUD `GET/POST/PATCH/DELETE /admin/subcategories` (+ translations)                                                 |
+| `AdminBrandsController`        | CRUD `GET/POST/PATCH/DELETE /admin/brands`                                                                         |
+| `AdminModelsController`        | CRUD `GET/POST/PATCH/DELETE /admin/models`                                                                         |
+| `AdminAttributesController`    | `GET/POST/PATCH/DELETE /admin/attributes/:type` (generic — `type` discriminates: colors, rams, cpus, bodytypes, …) |
+| `SubscriptionConfigController` | CRUD for subscription categories/plans/packages/terms (4-tier cascade)                                             |
+| `UserSubscriptionsController`  | `GET /admin/user-subscriptions`, `POST` grant, `DELETE :id`                                                        |
+| `ReportsController`            | `GET /admin/reports/reasons`, `GET/PATCH/DELETE /admin/reports/users`, `/admin/reports/listings`                   |
+
+**Admin stats** (`AdminService.getStats`): 4 card metrics (`totalUsers`, `newUsers`, `totalListings`, `activeListings`), each with `{value, changePct, trend}` comparing current 30d vs prior 30d. `getTimeseries(range)` returns daily `{date, newUsers, newListings}` bucketed in ICT (UTC+7) via `date_trunc(... AT TIME ZONE 'Asia/Phnom_Penh')`.
+
+**Admin user management** (`AdminService.listUsers`): offset-paginated with filters (`q`, `role`, `status`). Premium derivation via EXISTS on active `user_subscriptions` (expiresAt > now) → `accountType: 'Premium'|'Normal'`. Create/update handles password hashing (bcrypt, 10 rounds) and phone rows in a transaction. Delete is soft-delete: frees `user_phones` rows, sets `status='deleted'` + `deletedAt`.
+
+**Admin seed bootstrap:** The seed (`src/db/seed.ts`) upserts an admin user when `ADMIN_SEED_USERNAME` + `ADMIN_SEED_PASSWORD` are set in the environment. The user gets `role: 'admin'` and a bcrypt `passwordHash` — this is the only path to create the initial admin (phone-OTP users have no password).
+
+## Web app architecture (admin dashboard)
+
+The `apps/web` Next.js 16 app is the admin dashboard. It runs on port **3001** and talks to the backend at `http://localhost:3000/api/v1` (configurable via `API_URL` env, default baked into `lib/api/client.ts`).
+
+### Auth flow
+
+1. `actions/login.ts` (server action) calls `POST /api/v1/auth/login` with `{identifier, password}`, verifies `user.role === 'admin'`, then calls `setSession()` to persist `accessToken` + `refreshToken` in **httpOnly cookies** (`admin_access_token` / `admin_refresh_token`).
+2. `proxy.ts` (Next.js 16 replacement for `middleware.ts`) guards `/dashboard/**` — if no `admin_access_token` cookie, redirects to `/login`. It composes with `next-intl` middleware (locale prefix routing).
+3. `serverFetch<T>(path, init?)` in `lib/api/client.ts` reads the httpOnly cookie, injects `Authorization: Bearer`, unwraps the `{success, data, meta}` envelope, and **transparently refreshes** on 401 (calls `POST /auth/refresh`, sets new cookies, retries once). On refresh failure, clears session. Throws `ApiError` on non-ok responses.
+4. `clearSession()` on 401 failure in `serverFetch` — cookie writes throw during RSC render (read-only context), which is caught and swallowed (token persists until next mutation).
+
+### Data fetching patterns
+
+- **TanStack Query** (`@tanstack/react-query`) for client-side reads/mutations. `QueryClientProvider` mounted in `app/providers.tsx` with `staleTime: 30s`, `retry: 1`.
+- **Server actions** (`actions/*.ts`, all `"use server"`) call `serverFetch` and return typed data. Mutations return `{success, error?}`; queries return the data directly.
+- **Verbose-adapter pattern:** The admin UI types (`types/user.ts`, `types/reportuser.ts`, etc.) have a different shape than backend DTOs. Each page maps backend rows → UI types inside the `queryFn` (e.g. `ReportUserRow` extends `ReportUser` with `_reporterName`/`_targetName` internal fields). The adapter lives inline in the page, not in a separate file.
+- **Batch-lookup pattern** (avoiding Drizzle double-JOIN alias issues): When a query needs names from the `users` table for two different FKs (e.g. reporter + target), collect all IDs → single `inArray` query → `Map<id, name>` in JS. Used in `ReportsService.listUserReports()` and `listListingReports()`.
+
+### Page conventions
+
+Admin pages under `app/[locale]/(admin)/dashboard/` are `"use client"` components using:
+
+- `useQuery` with a `["admin", <domain>, ...]` key for initial fetch
+- Client-side search + tab filtering + pagination on the full dataset (no server-side re-fetch per keystroke)
+- `useQueryClient().invalidateQueries(...)` after mutations
+- `toast.success`/`toast.error` from `@/components/ui/sonner` for mutation feedback
+
+### Key files
+
+| File                                  | Purpose                                                    |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `lib/api/client.ts`                   | `serverFetch<T>()` — typed API client with auth + refresh  |
+| `lib/api/adapters.ts`                 | `BackendUser` interface + `toUiUser()` mapping             |
+| `lib/auth/session.ts`                 | Cookie get/set/clear for access & refresh tokens           |
+| `proxy.ts`                            | Auth guard + `next-intl` middleware composition            |
+| `app/providers.tsx`                   | `QueryClientProvider`                                      |
+| `actions/login.ts`                    | Login server action (admin-only gate)                      |
+| `actions/admin-users.ts`              | User CRUD actions                                          |
+| `actions/admin-stats.ts`              | Dashboard stats + timeseries actions                       |
+| `actions/admin-categories.ts`         | Category CRUD actions                                      |
+| `actions/admin-subscriptions.ts`      | Subscription config CRUD (categories/plans/packages/terms) |
+| `actions/admin-user-subscriptions.ts` | User subscription grant/delete actions                     |
+| `actions/admin-reports.ts`            | Report reasons + user/listing report actions               |
+
+## Schema domains beyond the core
+
+### Subscriptions (`subscriptions.schema.ts`)
+
+4-tier config hierarchy — cascading parent selects in the admin UI:
+
+```
+subscription_categories → subscription_plans → subscription_packages → subscription_terms
+```
+
+- `subscription_plans` unique on `(categoryId, slug)`; FK cascade on parent delete.
+- `subscription_packages` feature fields are **integers** (`photos`, `ads`, `renews`, `autoRenews`, `videos`) — admin forms use number inputs.
+- `subscription_terms`: `durationValue` (int) + `durationUnit` (`day|month|year`) + `price` (numeric) + `discount`/`discountType` (reuses `discountTypeEnum` from listings).
+- `user_subscriptions`: `userId` FK cascade, `termId` FK set null on delete, `priceUsd` (snapshot at grant time), `paymentMethod`, `subscribedAt`, `expiresAt`. Status is **derived** (`expiresAt < now → expired`), not stored.
+
+### Reports (`reports.schema.ts`)
+
+- `report_reasons`: admin-managed picklist, unique on `(targetType, reason)`, discriminated by `targetType` (`user`|`listing`).
+- `user_reports`: `reporterId` → `targetUserId`, optional `reasonId` (set null on delete), `imagePaths` JSONB string array, `status` (`pending|approved|rejected`), `reviewedById`.
+- `listing_reports`: `reporterId` → `listingId`, same status/reviewedBy pattern.
+
+Admin list endpoints batch-lookup user names (reporter + target) via `inArray` to avoid Drizzle's double-JOIN alias limitation.
+
+### Attributes (`attributes.schema.ts`)
+
+Single generic `attribute_options` table with `type` discriminator (colors, rams, cpus, bodytypes, enginetypes, jobtypes, networks, storages, screensizes, etc. — 18 types). Unique on `(type, slug)`. Optional `categoryId` FK + `subcategoryIds` JSONB (denormalized mirror of admin UI selections). Admin CRUD at `/admin/attributes/:type`. Frontend: `<AttributeManager type title hasImage? />` generic component in `components/dashboard/attribute-manager.tsx`.
+
 ## Pipeline workflow
 
 The `.pipeline/` directory tracks feature changes through a structured four-phase workflow:
@@ -349,14 +448,15 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 
 ## Known gaps (track as separate tickets)
 
+- **Feedback schema not built** — the admin Feedback page (`dashboard/feedback/page.tsx`) is a mock-data stub. Needs a new `feedback` table + `POST /feedback` (public) + `GET /admin/feedback` (admin). This is Phase 8, the last remaining phase of the admin-backend integration.
 - **No `km`/`zh` seed copy.** Category translations contain only `en` values. Add `km`/`zh` keys to `src/categories/seeds/categories.seed.ts` — no code change needed.
 - **Idempotency completed-row hash reuse.** A repeated `POST` with the same `Idempotency-Key` but a different body returns the cached response instead of 422.
 - **`removePhone` no primary reassignment.** Deleting a primary phone leaves the user with zero primary phones (the DB now enforces _at most_ one primary, not _exactly_ one).
-- **No delete-account flow yet.** Nothing sets `users.deletedAt`. When it's built, it must also delete the user's `user_phones` rows — `user_phones.phone` is globally unique and is not freed by the partial indexes on `users`.
+- **No delete-account flow yet.** Nothing sets `users.deletedAt` via user-facing flow (admin can soft-delete via `DELETE /admin/users/:id`, which also frees `user_phones` rows). The user-facing delete-account flow still needs to be built.
 - **Geography names not i18n'd.** `provinces/districts/communes` carry a single `name` while the app supports `en/km/zh`.
 - **`PublicUser` over-exposes fields cross-user.** `GET /users/:id` returns `Omit<UserRow,'passwordHash'>`, exposing `deletedAt`, verification timestamps. Consider narrowing to an explicit allow-list.
 - **Communes not seeded.** `COMMUNES = []` in `cambodia-geography.seed.ts`. ~1600 Cambodian communes need to be added before `communeId` FK is useful.
-- **Models table empty.** `GET /brands/:id/models` returns `[]` for all brands until admin UI populates the `models` table.
+- **Models table has admin CRUD but no seed data.** Admin UI can create models via `/admin/models`, but no models are seeded — `GET /brands/:id/models` returns `[]` until populated.
 - **Car/motorcycle brands not seeded.** `GET /brands?subcategory=cars-for-sale` returns `[]` until brand lists are defined and seeded.
 - **No push notifications for chat.** New messages reach clients only via polling (`after=` deltas); no FCM/APNs/WebSocket layer exists. The chat schema needs no changes to add one later.
 - **Chat images are public-bucket URLs.** Same exposure as avatars/listing photos; switch to a private bucket + `createSignedDownloadUrl` if chat privacy is required.

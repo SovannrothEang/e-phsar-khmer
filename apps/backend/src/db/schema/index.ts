@@ -2,5 +2,8 @@ export * from './users.schema';
 export * from './categories.schema';
 export * from './listings.schema';
 export * from './brands.schema';
+export * from './attributes.schema';
+export * from './subscriptions.schema';
+export * from './reports.schema';
 export * from './idempotency.schema';
 export * from './chat.schema';

@@ -11,6 +11,7 @@ import { categoriesSeed } from '../categories/seeds/categories.seed';
 import { seedGeography } from './seeds/cambodia-geography.seed';
 import { seedBrands } from '../brands/seeds/brands.seed';
 import { seedAdmin } from './seeds/admin.seed';
+import { seedReports } from './seeds/reports.seed';
 import * as schema from './schema';
 
 async function seed() {
@@ -97,6 +98,9 @@ async function seed() {
 
   console.log('Seeding admin...');
   await seedAdmin(db);
+
+  console.log('Seeding reports...');
+  await seedReports(db);
 
   console.log('Seed complete.');
   await client.end();

@@ -1,0 +1,106 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { SubscriptionConfigService } from './subscription-config.service';
+import {
+  CreateSubCategoryDto,
+  UpdateSubCategoryDto,
+  CreateSubPlanDto,
+  UpdateSubPlanDto,
+  CreateSubPackageDto,
+  UpdateSubPackageDto,
+  CreateSubTermDto,
+  UpdateSubTermDto,
+} from './dto/subscription-config.dto';
+
+@ApiTags('admin')
+@ApiBearerAuth()
+@Roles('admin')
+@UseGuards(RolesGuard)
+@Controller('admin/subscriptions')
+export class SubscriptionConfigController {
+  constructor(private readonly service: SubscriptionConfigService) {}
+
+  // Categories
+  @Get('categories')
+  listCategories() {
+    return this.service.listCategories();
+  }
+  @Post('categories')
+  createCategory(@Body() dto: CreateSubCategoryDto) {
+    return this.service.createCategory(dto);
+  }
+  @Patch('categories/:id')
+  updateCategory(@Param('id') id: string, @Body() dto: UpdateSubCategoryDto) {
+    return this.service.updateCategory(id, dto);
+  }
+  @Delete('categories/:id')
+  removeCategory(@Param('id') id: string) {
+    return this.service.removeCategory(id);
+  }
+
+  // Plans
+  @Get('plans')
+  listPlans(@Query('categoryId') categoryId?: string) {
+    return this.service.listPlans(categoryId);
+  }
+  @Post('plans')
+  createPlan(@Body() dto: CreateSubPlanDto) {
+    return this.service.createPlan(dto);
+  }
+  @Patch('plans/:id')
+  updatePlan(@Param('id') id: string, @Body() dto: UpdateSubPlanDto) {
+    return this.service.updatePlan(id, dto);
+  }
+  @Delete('plans/:id')
+  removePlan(@Param('id') id: string) {
+    return this.service.removePlan(id);
+  }
+
+  // Packages
+  @Get('packages')
+  listPackages(@Query('planId') planId?: string) {
+    return this.service.listPackages(planId);
+  }
+  @Post('packages')
+  createPackage(@Body() dto: CreateSubPackageDto) {
+    return this.service.createPackage(dto);
+  }
+  @Patch('packages/:id')
+  updatePackage(@Param('id') id: string, @Body() dto: UpdateSubPackageDto) {
+    return this.service.updatePackage(id, dto);
+  }
+  @Delete('packages/:id')
+  removePackage(@Param('id') id: string) {
+    return this.service.removePackage(id);
+  }
+
+  // Terms
+  @Get('terms')
+  listTerms(@Query('packageId') packageId?: string) {
+    return this.service.listTerms(packageId);
+  }
+  @Post('terms')
+  createTerm(@Body() dto: CreateSubTermDto) {
+    return this.service.createTerm(dto);
+  }
+  @Patch('terms/:id')
+  updateTerm(@Param('id') id: string, @Body() dto: UpdateSubTermDto) {
+    return this.service.updateTerm(id, dto);
+  }
+  @Delete('terms/:id')
+  removeTerm(@Param('id') id: string) {
+    return this.service.removeTerm(id);
+  }
+}
