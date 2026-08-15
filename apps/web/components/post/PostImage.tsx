@@ -19,8 +19,8 @@ const MAX_THUMBS = 7;
 export default function PostImage({ post }: { post: Post }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [open, setOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [, setSelectedImage] = useState(0);
 
   const images = post?.images ?? [];
   const slides = images

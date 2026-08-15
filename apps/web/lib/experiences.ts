@@ -1,6 +1,5 @@
 
 import { experience } from "@/types/experience"
-import { categories } from "./categories";
 
 export const experiences: experience[] = [
   //7 every jobs

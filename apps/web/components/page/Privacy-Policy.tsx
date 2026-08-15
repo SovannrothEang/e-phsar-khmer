@@ -119,7 +119,7 @@ export default function PrivacyPolicy() {
                             administering our business activities, providing the products and
                             services you requested, to process your payment, to monitor the use of
                             the service, our marketing and promotional efforts and improve our
-                            content and service offerings, and customize our site's content,
+                            content and service offerings, and customize our site&apos;s content,
                             layout, services and for other lawful purposes. These uses improve our
                             site and better tailor it to meet your needs.
                         </p>
@@ -223,7 +223,7 @@ export default function PrivacyPolicy() {
                             Please remember that when you use a link to go from our Website to
                             another web site, our Privacy Policy is no longer in effect. Your
                             browsing and interaction on any other web site, including web sites,
-                            which have a link on our Website, is subject to that Web site's own
+                            which have a link on our Website, is subject to that Web site&apos;s own
                             rules and policies. Please read over those rules and policies before
                             proceeding.
                         </p>
@@ -232,7 +232,7 @@ export default function PrivacyPolicy() {
                         </h2>
                         <p className="text-foreground leading-7 mb-3">
                             To exercise your privacy rights and choices, if you do not want us to
-                            process your data, then you can contact PSA-NPIC's customer service to
+                            process your data, then you can contact PSA-NPIC&apos;s customer service to
                             request data deletion.
                         </p>
                         <h2 className="text-lg font-semibold mt-4 mb-3">

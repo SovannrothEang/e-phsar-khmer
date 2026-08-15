@@ -1,13 +1,10 @@
 'use client'
 
-import * as React from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Locale, routing, usePathname, useRouter } from "@/i18n/routing"
+import { Locale, usePathname, useRouter } from "@/i18n/routing"
 import { useParams } from "next/navigation"
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuGroup,
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
     DropdownMenuRadioItem,

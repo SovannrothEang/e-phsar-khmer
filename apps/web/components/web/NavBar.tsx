@@ -2,11 +2,8 @@
 
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import LocaleSwitcher from "../LocalSwitcher";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
-import { posts } from "@/lib/posts";
 import { FaCamera } from "react-icons/fa";
-import { toSlug } from "@/lib/utils";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
 import LocalSelector from "../LocalSelector"
@@ -23,15 +20,15 @@ type User = {
 export function NavBar({ }) {
 
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true) // Added to prevent layout shift during hydration
   const locale = useLocale()
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
+      // Hydrate once from localStorage (client-only data source).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(JSON.parse(storedUser))
     }
-    setIsLoading(false)
   }, [])
 
   // 2. Dynamically determine login status based on state

@@ -7,7 +7,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { Check, X } from "lucide-react"
+import { X } from "lucide-react"
 import { IconCircleCheckFilled } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Separator } from "@/components/ui/separator"

@@ -1,12 +1,20 @@
 import { IconMapPin,IconPhoneCall  } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 
-export default function ContactUser({ user, district, province }: { user: any, district: any, province: any }) {
+export default function ContactUser({
+  user,
+  district,
+  province,
+}: {
+  user: { phone?: string[] };
+  district?: { name?: string };
+  province?: { name?: string };
+}) {
     return (
         <>
             <div className="mt-4">
                 <h1 className="text-sm text-foreground mb-3">
-                    Please click on phone number to show and don't forget to mention that you found this ad on PsaKhmer.com.
+                    Please click on phone number to show and don&apos;t forget to mention that you found this ad on PsaKhmer.com.
                 </h1>
                 <h3 className="text-base font-medium flex items-center mb-2">
                     <IconPhoneCall className="scale-80 mr-2 text-muted-foreground" />Contact Phones

@@ -37,8 +37,8 @@ export default function AccountDeletion() {
                                     <li>Log in to PSA-NPIC using the account you will like to disconnect</li>
                                     <li>Go to your profile</li>
                                     <li>Click on the settings icon</li>
-                                    <li>Select "Facebook"</li>
-                                    <li>Select "Disconnect"</li>
+                                    <li>Select &quot;Facebook&quot;</li>
+                                    <li>Select &quot;Disconnect&quot;</li>
                                 </ol>
                             </div>
                             <div className="mb-4 px-3">
@@ -50,8 +50,8 @@ export default function AccountDeletion() {
                                     <li>Log in to PSA-NPIC using the account you will like to disconnect</li>
                                     <li>Go to your profile</li>
                                     <li>Click on the settings icon</li>
-                                    <li>Select "Google"</li>
-                                    <li>Select "Disconnect"</li>
+                                    <li>Select &quot;Google&quot;</li>
+                                    <li>Select &quot;Disconnect&quot;</li>
                                 </ol>
                             </div>
                             <div className="mb-4 px-3">
@@ -63,12 +63,12 @@ export default function AccountDeletion() {
                                     <li>Log in to PSA-NPIC using the account you will like to delete</li>
                                     <li>Go to your profile</li>
                                     <li>Click on the settings icon</li>
-                                    <li>Select "Delete Account"</li>
-                                    <li>Select "Delete"</li>
-                                    <li>Enter your password to confirm your deletion and then select "Delete"</li>
+                                    <li>Select &quot;Delete Account&quot;</li>
+                                    <li>Select &quot;Delete&quot;</li>
+                                    <li>Enter your password to confirm your deletion and then select &quot;Delete&quot;</li>
                                 </ol>
                                 <p className="text-foreground leading-relaxed mt-3">
-                                    Your account will be deactivated and won't be visible to the public. During deactivation, you can reactivate your account anytime. After 90 days, your data will be deleted permanently.
+                                    Your account will be deactivated and won&apos;t be visible to the public. During deactivation, you can reactivate your account anytime. After 90 days, your data will be deleted permanently.
                                 </p>
                             </div>
                         </div>

@@ -21,7 +21,6 @@ interface Filters {
 }
 
 export default function LSPHeader({ title }: { title: string }) {
-  const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
 
   const [filters, setFilters] = useState<Filters>({
@@ -44,6 +43,7 @@ export default function LSPHeader({ title }: { title: string }) {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showPriceDropdown, setShowPriceDropdown] = useState(false);
+  const [, setShowFilters] = useState(false);
 
   // Helper to format province display name
   const getProvinceLabel = () => {

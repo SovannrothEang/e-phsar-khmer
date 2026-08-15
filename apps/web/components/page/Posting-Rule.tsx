@@ -93,7 +93,7 @@ export default function PostingRule() {
                   Consequences of Breach of Listing Policy.
                 </a>
                 <p className="text-foreground leading-7 mb-4">
-                  Learning about PSA-NPIC's policies will help you avoid breaking
+                  Learning about PSA-NPIC&apos;s policies will help you avoid breaking
                   rules (including the law) and aid you in trading with reliable,
                   trustworthy buyers and sellers.
                 </p>

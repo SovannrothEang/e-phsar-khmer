@@ -1,22 +1,19 @@
 "use client"
 
-import { Globe, Phone, Mail, MessageCircleMore, UserPlus, UserCheck } from "lucide-react";
+import { MessageCircleMore, UserPlus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { useState } from "react";
 import { toast } from "sonner"
 import { getUserById } from "@/lib/data"
-import { useRouter } from "next/navigation"
 import { IconPhoneCall,IconWorld,IconMail  } from '@tabler/icons-react';
 
 export default function ProfileSidebar({ userId }: { userId: string }) {
-    const router = useRouter()
-    const user = getUserById(userId);
-    if (!user) return null;
-    const link = user?.userlink;
     const [isFollowing, setIsFollowing] = useState(false)
     const [loading, setLoading] = useState(false)
+    const user = getUserById(userId);
+    if (!user) return null;
 
     const handleFollow = () => {
         setLoading(true)

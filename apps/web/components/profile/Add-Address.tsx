@@ -1,13 +1,6 @@
 
 "use client"
-import * as React from "react"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover"
 import {
     Field,
     FieldLabel,
@@ -25,16 +18,12 @@ import { Textarea } from "@/components/ui/textarea"
 import {
     FieldSet,
     FieldGroup,
-    FieldContent
 } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { Checkbox } from "@/components/ui/checkbox"
 import SettingSidebar from "../setting/SettingSidebar"
 import { useState } from "react"
 export default function AddAddress() {
-    const [open, setOpen] = React.useState(false)
-    const [date, setDate] = React.useState<Date | undefined>(undefined)
     const [autoUpdate, setAutoUpdate] = useState(false);
     return (
         <div className="min-h-screen bg-muted pb-10 pt-4">

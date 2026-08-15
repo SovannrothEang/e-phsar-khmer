@@ -285,6 +285,8 @@ Send rejections: self (400), no body & no imagePath (400), imagePath outside `ch
 
 **For admin-only features**, add the controller + service to `AdminModule` instead of creating a separate module. Register them in `src/admin/admin.module.ts`. The controller uses `@Roles('admin')` (guard is inherited from `AdminModule` or applied at the controller level if the feature has its own module).
 
+**Exception:** the attributes feature owns its own module at `src/attributes/` (`AttributesModule` — admin-scoped routes at `/admin/attributes/:type`, registered in `AppModule`, imports `FilesModule`). It was decoupled from `AdminModule` so it can grow a public surface; keep admin-only features in `AdminModule` unless they have the same trajectory.
+
 ### Repository history note
 
 The admin dashboard originally lived at `apps/admin` and was renamed to `apps/web`. The old `apps/admin` directory was a nested git repo, which prevented `git mv` — it was moved with plain `mv` + `git add -A`. If you see stale references to `apps/admin` or `pnpm --filter admin`, mentally substitute `apps/web` / `pnpm --filter web`.

@@ -11,11 +11,6 @@ import {
   TruckIcon,
   HeartIcon,
   Play,
-  EllipsisVertical,
-  User,
-  BookmarkIcon,
-  Forward,
-  AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -25,31 +20,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Toggle } from "@/components/ui/toggle";
 import { ThreeDotPost } from "../Card/ThreeDotPost";
 
 export function GridCardPost({ post }: { post: Post }) {
-  
+  const [isLiked, setIsLiked] = useState(false);
+
   const user = getUserById(post.userId);
   if (!user) return null;
 
   const province = getProvinceById(post.proId);
   const district = getDistrictById(post.proId, post.disId);
 
-  const imageCount = post.images.length;
   const discountAmount = post.oldPrice ? post.oldPrice - post.price : 0;
 
   const discountPercent = post.oldPrice
     ? Math.round((discountAmount / post.oldPrice) * 100)
     : 0;
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [open, setOpen] = useState(false);
 
   return (
     <Card className="relative select-none cursor-pointer  min-w-[260px] bg-card rounded-sm shadow-sm hover:shadow-md transition overflow-hidden pt-0 border-none">
       <Link
-        // @ts-ignore
+        // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
         href={`/${toSlug(post.title)}-adid-${post.postId}`}
         className="absolute inset-0 z-20"
       />

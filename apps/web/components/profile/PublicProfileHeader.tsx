@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { User } from "@/lib/user";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-    EllipsisVertical,
     PhoneCall,
     Mail,
     House,

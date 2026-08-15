@@ -31,7 +31,7 @@ interface CarCategoryLayoutProps {
 export default function ServicesCategoryLayout({
   category,
 }: CarCategoryLayoutProps) {
-  const [showFilters, setShowFilters] = useState(false);
+  const [, setShowFilters] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
 
   const [filters, setFilters] = useState<Filters>({
@@ -53,7 +53,6 @@ export default function ServicesCategoryLayout({
 
   const [showLocationDropdown, setShowLocationDropdown] = useState(false)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
-  const [showPriceDropdown, setShowPriceDropdown] = useState(false)
 
   // Helper to format province display name
   const getProvinceLabel = () => {

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { IconBrandFacebook, IconPlayerPlayFilled,IconChevronUp } from "@tabler/icons-react";
-import { FaFacebookF } from "react-icons/fa6";
 
 import Image from "next/image";
 

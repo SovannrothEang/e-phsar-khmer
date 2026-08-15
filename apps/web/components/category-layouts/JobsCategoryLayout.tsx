@@ -30,8 +30,7 @@ interface CarCategoryLayoutProps {
 export default function JobsCategoryLayout({
   category,
 }: CarCategoryLayoutProps) {
-  const [showFilters, setShowFilters] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [, setShowFilters] = useState(false);
 
   const [filters, setFilters] = useState<Filters>({
     search: "",

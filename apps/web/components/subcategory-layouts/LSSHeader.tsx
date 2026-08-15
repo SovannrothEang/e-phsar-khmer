@@ -20,8 +20,6 @@ interface Filters {
 }
 
 export default function LSSHeader({ title }: { title: string }) {
-  const [showFilters, setShowFilters] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("grid");
 
   const [filters, setFilters] = useState<Filters>({
     search: "",
@@ -43,6 +41,7 @@ export default function LSSHeader({ title }: { title: string }) {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showSalaryDropdown, setShowSalaryDropdown] = useState(false);
+  const [, setShowFilters] = useState(false);
 
   // Helper to format province display name
   const getProvinceLabel = () => {

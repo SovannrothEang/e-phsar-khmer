@@ -16,11 +16,7 @@ import {
 } from "@/components/ui/input-group"
 import { categories } from "@/lib/categories";
 import { IconSelector, IconSearch, IconChevronDown } from '@tabler/icons-react';
-import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
-import { toSlug } from "@/lib/utils";
-import { posts } from "@/lib/posts";
-import { User } from "@/lib/user";
 
 export default function SearchBar() {
 

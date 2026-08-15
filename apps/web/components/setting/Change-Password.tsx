@@ -42,7 +42,7 @@ export default function EditProfile() {
                     <main className="flex-1">
                         <div className="bg-card border border-border rounded-sm ">
                             <h1 className="text-2xl font-medium text-foreground  mb-4 mt-12 text-center ">Change Password</h1>
-                            <p className="text-center mb-6">You'll use this password to access your account.</p>
+                            <p className="text-center mb-6">You&apos;ll use this password to access your account.</p>
 
                             <Field className="w-full max-w-md mx-auto">
                                 <FieldLabel className="text-sm  text-foreground tracking-tight">

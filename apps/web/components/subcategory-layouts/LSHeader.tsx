@@ -20,7 +20,6 @@ interface Filters {
 }
 
 export default function LSHeader({ title }: { title: string }) {
-  const [showFilters, setShowFilters] = useState(false);
   const [view, setView] = useState<"grid" | "list">("grid");
 
   const [filters, setFilters] = useState<Filters>({
@@ -42,7 +41,7 @@ export default function LSHeader({ title }: { title: string }) {
 
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [showPriceDropdown, setShowPriceDropdown] = useState(false);
+  const [, setShowFilters] = useState(false);
 
   // Helper to format province display name
   const getProvinceLabel = () => {
@@ -60,16 +59,6 @@ export default function LSHeader({ title }: { title: string }) {
     if (filters.sort === 'price-low') return 'Price: Low to High';
     if (filters.sort === 'price-high') return 'Price: High to Low';
     return 'Sort';
-  };
-
-  const getPriceLabel = () => {
-    if (!filters.priceRange) return 'Price';
-    switch (filters.priceRange) {
-      case 'under-100': return 'Under $100';
-      case '100-500': return '$100-$500';
-      case '500-plus': return '$500+';
-      default: return 'Price';
-    }
   };
 
   return (

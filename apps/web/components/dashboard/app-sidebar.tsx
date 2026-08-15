@@ -1,19 +1,14 @@
 "use client"
 
+import type { ComponentProps, ComponentType } from "react"
 import {
   LayoutDashboard,
   Users,
   FileText,
-  Bot,
-  Command,
-  ChevronsUpDown,
   ChevronRight,
-  LogOut,
   CreditCard,
-  Bell,
   Folder,
   FolderTreeIcon,
-  User,
   Layers,
 } from "lucide-react"
 import {
@@ -49,7 +44,6 @@ import {
 
 } from '@tabler/icons-react';
 import { Link } from "@/i18n/routing";
-import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -66,35 +60,25 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
-import { title } from "process";
-
 export type MenuItem = {
   title: string
-  icon: any
-  href: any
+  icon: ComponentType<{ className?: string }>
+  href: ComponentProps<typeof Link>["href"]
   items?: {
     title: string
-    icon: any
-    href: any
+    icon: ComponentType<{ className?: string }>
+    href: ComponentProps<typeof Link>["href"]
   }[]
 }
 export type DocumentItem = {
   title: string
-  icon: any
-  href: any
+  icon: ComponentType<{ className?: string }>
+  href: ComponentProps<typeof Link>["href"]
   items?: {
     title: string
-    icon: any
-    href: any
+    icon: ComponentType<{ className?: string }>
+    href: ComponentProps<typeof Link>["href"]
   }[]
 }
 

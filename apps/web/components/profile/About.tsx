@@ -1,4 +1,4 @@
-import { BadgeCheck, Globe, PhoneCall, MapPin, CircleCheckBig } from 'lucide-react';
+import { Globe, MapPin, CircleCheckBig } from 'lucide-react';
 import { IconPhone, IconMailFilled } from '@tabler/icons-react';
 import { Separator } from "@/components/ui/separator"
 import { User } from "@/lib/user";

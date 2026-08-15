@@ -318,21 +318,9 @@
 import { register } from "@/actions/register"
 import { Button } from "@/components/ui/button"
 import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldError,
   FieldGroup,
-  FieldLegend,
   FieldSeparator,
-  FieldSet,
 } from "@/components/ui/field"
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group"
 import { registerSchema } from "@/schemas/register"
 import { toast } from "sonner"
 import { z } from "zod"

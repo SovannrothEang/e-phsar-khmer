@@ -13,7 +13,7 @@ export default function SavedAds() {
             <div className="text-center">
               <h2 className="text-lg font-medium text-foreground mb-2">No Result!</h2>
               <p className="text-muted-foreground text-sm">
-                Oops! Looks like you haven't saved any posts yet.
+                Oops! Looks like you haven&apos;t saved any posts yet.
               </p>
             </div>
             

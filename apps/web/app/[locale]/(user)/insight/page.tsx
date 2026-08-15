@@ -1,5 +1,4 @@
 import React from 'react';
-import { House, ChevronRight } from 'lucide-react';
 import { IconHome,IconChevronRight } from '@tabler/icons-react';
 import { Link } from '@/i18n/routing';
 

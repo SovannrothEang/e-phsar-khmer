@@ -1,4 +1,4 @@
-import { SearchIcon, MapPin, LayoutGrid, List, Funnel } from "lucide-react"
+import { SearchIcon, MapPin, LayoutGrid, List } from "lucide-react"
 import { IconFilterSearch, IconBasketSearch } from '@tabler/icons-react';
 import { Field } from "@/components/ui/field"
 import {
@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { User } from "@/lib/user";
 
-export default function HomeProfile({ user }: { user: User }) {
+export default function HomeProfile({}: { user: User }) {
     return (
         <div className="bg-muted">
             <div className="max-w-7xl mx-auto pb-40 px-4 pt-1">
@@ -55,7 +55,7 @@ export default function HomeProfile({ user }: { user: User }) {
                                 <IconBasketSearch className="text-muted-foreground scale-180" stroke={2} />
                             </div>
                             <p className="text-lg text-foreground font-medium pt-4">No Result Found</p>
-                            <p className="text-muted-foreground pt-2">You don't have any post right now</p>
+                            <p className="text-muted-foreground pt-2">You don&apos;t have any post right now</p>
                         </div>
                     </div>
                 </div>

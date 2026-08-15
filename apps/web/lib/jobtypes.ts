@@ -1,6 +1,5 @@
 
 import { JobType } from "@/types/jobtype"
-import { categories } from "./categories";
 
 export const JobTypes: JobType[] = [
   //7 every jobs

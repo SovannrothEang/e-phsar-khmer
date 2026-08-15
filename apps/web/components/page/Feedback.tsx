@@ -10,8 +10,8 @@ import Image from "next/image";
 
 export default function Feedback() {
   const [files, setFiles] = useState<File[]>([]);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors] = useState<{ [key: string]: string }>({});
+  const [, setIsSubmitting] = useState(false);
 
   // Single ref for the hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,7 +144,7 @@ export default function Feedback() {
         </div>
         <div className="bg-card rounded-sm border p-4 mt-4 text-center md:text-left">
           <p className="text-sm text-foreground">
-            Thanks for taking the time to give us feedback. Though we can't review every submission, we use your input to improve the experience for everyone.
+            Thanks for taking the time to give us feedback. Though we can&apos;t review every submission, we use your input to improve the experience for everyone.
           </p>
           <Button
             type="submit"

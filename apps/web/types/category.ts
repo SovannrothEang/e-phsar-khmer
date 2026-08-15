@@ -6,7 +6,6 @@ export type Category = {
   subcategories: Subcategory[];
 };
 export type Subcategory = {
-  [x: string]: string;
   subId: string;
   name: string;
   slug: string;

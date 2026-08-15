@@ -99,7 +99,7 @@ export default function ManageAds() {
         {activeTab === "active" ? (
           <div className="flex flex-col items-center gap-8">
             <p className="text-muted-foreground text-sm">
-              Oops! You don't have any active ads.
+              Oops! You don&apos;t have any active ads.
             </p>
             <Button 
             onClick={() => router.push("/post")}
@@ -109,7 +109,7 @@ export default function ManageAds() {
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            You don't have any expired ads yet.
+            You don&apos;t have any expired ads yet.
           </p>
         )}
       </div>

@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button"
 
 import SettingSidebar from "./SettingSidebar"
-import Link from "next/link"
 import { UserRoundKey, Plus } from "lucide-react"
 
 

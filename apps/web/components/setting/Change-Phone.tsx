@@ -13,7 +13,7 @@ export default function EditProfile() {
 
     // ===== STATE =====
     const [phone, setPhone] = useState("")
-    const [showPhone, setShowPhone] = useState(false)
+    const [showPhone] = useState(false)
     const [touchedPhone, setTouchedPhone] = useState(false)
    
 

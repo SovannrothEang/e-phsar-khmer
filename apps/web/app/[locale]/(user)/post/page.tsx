@@ -16,8 +16,6 @@ import {
   Mail,
   Building2,
   User,
-  Tag,
-  FileText,
   DollarSign,
   Truck,
 } from "lucide-react";
@@ -257,6 +255,7 @@ function ImageUpload({
               key={i}
               className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- client-side object URL preview */}
               <img
                 src={URL.createObjectURL(f)}
                 alt=""

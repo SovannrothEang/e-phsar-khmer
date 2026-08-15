@@ -17,7 +17,13 @@ const flagMap: Record<string, { name: string; url: string }> = {
   zh: { name: "中文", url: "/flag/zh.png" },
 };
 
-export default function LocaleSwitcherSelect({ defaultValue, label }: any) {
+export default function LocaleSwitcherSelect({
+  defaultValue,
+  label,
+}: {
+  defaultValue: string;
+  label: string;
+}) {
   
   const router = useRouter();
   const pathname = usePathname();

@@ -56,7 +56,6 @@ export default function SubcategoryPage() {
     subcategorySlug: string;
   }>();
   const searchParams  = useSearchParams();
-  const keyword       = searchParams.get("keyword") ?? "";
   const brand         = searchParams.get("ad_field");
   const bodyType      = searchParams.get("body_type");
   const isFiltered    = !!(brand || bodyType);

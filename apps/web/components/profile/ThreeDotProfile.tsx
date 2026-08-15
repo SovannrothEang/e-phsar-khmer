@@ -2,12 +2,8 @@
 
 import {
     AlertTriangleIcon,
-    CheckIcon,
-    ChevronDownIcon,
     CopyIcon,
     ShareIcon,
-    TrashIcon,
-    UserRoundXIcon,
     VolumeOffIcon,
 } from "lucide-react"
 

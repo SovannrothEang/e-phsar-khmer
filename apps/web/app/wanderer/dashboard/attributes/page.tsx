@@ -1,0 +1,42 @@
+import { Link, routing } from "@/i18n/routing";
+import { ATTRIBUTE_TYPES } from "@/lib/attribute-types";
+
+type Pathname = keyof typeof routing.pathnames;
+type AttributePathname = Extract<Pathname, `/dashboard/attributes/${string}`>;
+
+const ATTRIBUTES = [
+  { href: "/dashboard/attributes/brands", title: "Brands" },
+  { href: "/dashboard/attributes/models", title: "Models" },
+  ...ATTRIBUTE_TYPES.map((a) => ({
+    href: `/dashboard/attributes/${a.type}` as AttributePathname,
+    title: a.title,
+  })),
+] as const;
+
+export default function AttributePage() {
+  return (
+    <main className="flex-1 overflow-auto p-6 min-w-0">
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+            Attributes
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Manage the option sets used by listing forms.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {ATTRIBUTES.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              className="rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
+            >
+              {a.title}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}

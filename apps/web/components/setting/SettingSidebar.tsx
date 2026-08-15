@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Separator } from "@/components/ui/separator"
 import { Link } from "@/i18n/routing"
 import { ChevronRight } from "lucide-react"
-import { Field, FieldLabel, FieldGroup } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import Image from "next/image"
 import { toast } from "sonner"

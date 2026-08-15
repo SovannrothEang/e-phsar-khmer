@@ -1,6 +1,6 @@
 "use client"
 import { reportUserOption } from "@/lib/report";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,11 +17,9 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { FieldGroup } from "@/components/ui/field";
 import Image from "next/image";
@@ -36,8 +34,6 @@ interface ReportAccountProps {
 export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) {
 
   const [files, setFiles] = useState<File[]>([]);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Single ref for the hidden file input
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,18 +58,6 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
 
   const triggerUpload = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleSubmit = () => {
-    if (files.length === 0) {
-      alert("Please upload at least one image");
-      return;
-    }
-    if (Object.keys(errors).length > 0) {
-      alert("Please fix the errors");
-      return;
-    }
-    setIsSubmitting(true);
   };
 
   return (

@@ -1,9 +1,6 @@
 "use client"
 
-import { Columns3, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs } from "@/components/ui/tabs"
 
 export function DocumentTabs() {
   return (

@@ -21,7 +21,6 @@ import LoanCalculator from "./LoanCalculator";
 import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
 import PostImage from "./PostImage";
-import { GridCardPost } from "../ads/GridCardPost";
 
 export default function PostDetail({ id }: { id: string }) {
   const post = getPostById(id);

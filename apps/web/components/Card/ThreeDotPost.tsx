@@ -24,7 +24,6 @@ export function ThreeDotPost({ post }: { post: Post }) {
   const [shareOpen, setShareOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [isSaved, setIsSaved] = useState(false);
-  const [open, setOpen] = useState(false);
 
   return (
     <>

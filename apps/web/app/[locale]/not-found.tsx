@@ -7,7 +7,7 @@ export default function NotFound() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
       <h2 className="text-3xl font-bold tracking-tight">Page Not Found</h2>
       <p className="text-muted-foreground">
-        Sorry, we couldn't find the page you are looking for.
+        Sorry, we couldn&apos;t find the page you are looking for.
       </p>
       <Link 
         href="/"

@@ -1,10 +1,11 @@
 import { useSearchParams } from "next/navigation";
 import OptionGrid from "./OptionGrid";
+import type { Subcategory } from "@/types/category";
 
 type Props = {
   categorySlug: string;
   subcategorySlug: string;
-  subcategory: any;
+  subcategory: Subcategory;
 };
 
 export default function SubcategoryContent({
@@ -18,7 +19,6 @@ const searchParams = useSearchParams();
 
 const brandSlug = searchParams.get("ad_field");
 const bodyType = searchParams.get("ad_type");
-const model = searchParams.get("ad_model");
 
 // 1. Force lowercase comparison to avoid "Kia" vs "kia" issues
 const selectedBrand = subcategory.brands?.find(

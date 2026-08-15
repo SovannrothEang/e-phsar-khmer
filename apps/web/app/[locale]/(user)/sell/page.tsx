@@ -241,7 +241,7 @@ export default function SellPage() {
             </div>
             {step === 1 ? (
               <CategorySelecter
-                onSelect={handleSelect}
+                onSelectAction={handleSelect}
               />
             ) : (
               selectedCategory &&
@@ -249,7 +249,7 @@ export default function SellPage() {
                 <PostForm
                   category={selectedCategory}
                   subcategory={selectedSub}
-                  onBack={handleBack}
+                  onBackAction={handleBack}
                 />
               )
             )}

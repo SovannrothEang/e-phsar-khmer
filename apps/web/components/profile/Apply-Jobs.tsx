@@ -13,7 +13,6 @@ import { Link } from "@/i18n/routing";
 import { useRouter } from "@/i18n/routing";
 export default function JobApplications() {
     const router = useRouter()
-    const slug = "jobs"
 
 
     return (
@@ -75,7 +74,7 @@ export default function JobApplications() {
                         <div className="text-center">
                             <h2 className="text-xl font-medium text-foreground mb-2">No Result!</h2>
                             <p className="text-muted-foreground text-sm mb-8">
-                                You don't have any job applied right now.
+                                You don&apos;t have any job applied right now.
                             </p>
                             <Button
                                 onClick={() => router.push({

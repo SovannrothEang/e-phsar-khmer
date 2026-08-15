@@ -9,6 +9,9 @@ const DynamicProvider = dynamic(
   { ssr: false }
 )
 
-export function ClientThemeProvider({ children, ...props }: any) {
+export function ClientThemeProvider({
+  children,
+  ...props
+}: React.ComponentProps<typeof DynamicProvider>) {
   return <DynamicProvider {...props}>{children}</DynamicProvider>
 }

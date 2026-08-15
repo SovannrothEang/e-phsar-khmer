@@ -36,7 +36,7 @@ import { ThemeProvider as NextThemesProvider } from "next-themes"
 // The warning is a false-positive — the script runs correctly during SSR.
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   const origError = console.error;
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     if (typeof args[0] === "string" && args[0].includes("Encountered a script tag")) {
       return;
     }

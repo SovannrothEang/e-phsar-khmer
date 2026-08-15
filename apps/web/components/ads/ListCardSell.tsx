@@ -23,7 +23,7 @@ export function ListCardSell() {
       </CardHeader>
       <CardContent>
         <p className="text-base opacity-90 px-2">
-          Make some extra cash by selling this in khmer24. Go on, it's quick and easy.
+          Make some extra cash by selling this in khmer24. Go on, it&apos;s quick and easy.
         </p>
       </CardContent>
       <CardFooter className="p-3 border-none leading-relaxed ">

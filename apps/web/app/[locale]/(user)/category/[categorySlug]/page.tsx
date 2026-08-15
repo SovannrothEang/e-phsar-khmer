@@ -12,17 +12,15 @@ import ServicesCategoryLayout from "@/components/category-layouts/ServicesCatego
 import JobsCategoryLayout from "@/components/category-layouts/JobsCategoryLayout";
 import CarsCategoryLayout from "@/components/category-layouts/CarsCategoryLayout";
 import SubcategoryGrid from "@/components/category-layouts/SubcategoryGrid";
-import SmallAdBanner from "@/components/ads/SmallAdBanner";
 import HighLightAds from "@/components/ads/HighLightAds";
 import NormalAd from "@/components/ads/NormalAd";
-import AdsPhoto from "@/components/ads/AdsPhoto";
 import { useSearchParams } from "next/navigation";
 import OptionGrid from "@/components/subcategory-layouts/OptionGrid";
 export default function CategoryPage() {
   const { categorySlug } = useParams<{ categorySlug: string }>();
   const searchParams = useSearchParams();
-  const [isSticky, setIsSticky] = useState(false);
   const filterBarRef = useRef<HTMLDivElement>(null);
+  const [, setIsSticky] = useState(false);
 
   const SUBCATEGORY_LAYOUT: Record<string, number> = {
     "cars-and-vehicles": 5,
@@ -55,7 +53,6 @@ export default function CategoryPage() {
    const SERVICES_CATEGORIES = ["services"];
    const JOBS_CATEGORIES = ["jobs"];
 
-  const adType = searchParams.get("ad_type");
   const adField = searchParams.get("ad_field");
 
   let Layout;

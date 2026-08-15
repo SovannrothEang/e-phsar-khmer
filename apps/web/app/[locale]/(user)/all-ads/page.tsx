@@ -2,7 +2,6 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import HighLightAds from "@/components/ads/HighLightAds";
-import NormalAd from "@/components/ads/NormalAd";
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import AdsPhoto from "@/components/ads/AdsPhoto";
 import { IconHome,IconChevronRightFilled } from '@tabler/icons-react';

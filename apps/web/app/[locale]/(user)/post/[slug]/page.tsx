@@ -1,10 +1,9 @@
 import PostDetail from "@/components/post/Post-Detail"
 import { posts } from "@/lib/posts";
-import type { Metadata, ResolvingMetadata } from "next";
+import type { Metadata } from "next";
 
 export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> },
-  parent: ResolvingMetadata
+  { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
     const { slug } = await params;
     // Extract actual ID if the URL has the slug format (e.g., "post-title-adid-123")

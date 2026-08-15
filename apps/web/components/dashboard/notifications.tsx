@@ -9,7 +9,7 @@ import {
     DrawerTitle,
     DrawerTrigger,
 } from "@/components/ui/drawer"
-import { Bell, Package, CheckCircle, AlertTriangle, Briefcase, Zap } from "lucide-react"
+import { Bell, Package, AlertTriangle, Briefcase, Zap } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 

@@ -22,6 +22,8 @@ export function ThemeSwitcher() {
   const [mounted, setMounted] = React.useState(false)
 
   React.useEffect(() => {
+    // Gate SSR/hydration: theme is only known after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
   }, [])
 

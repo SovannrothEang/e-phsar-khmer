@@ -1,11 +1,8 @@
 "use client"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Link } from "@/i18n/routing"
 import { ThemeSwitcher } from "@/components/ui/theme-switcher"
 import  Notifications  from "./notifications"
-import { Bell } from 'lucide-react';
 import { NavUser } from "./nav-user"
 
 export function DashboardHeader() {

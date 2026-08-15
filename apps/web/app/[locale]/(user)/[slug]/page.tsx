@@ -3,11 +3,10 @@ import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
 import HomeProfile from "@/components/profile/Home";
 import { posts } from "@/lib/posts";
 import { users } from "@/lib/user";
-import type { Metadata, ResolvingMetadata } from "next";
+import type { Metadata } from "next";
 
 export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> },
-  parent: ResolvingMetadata
+  { params }: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await params;
 

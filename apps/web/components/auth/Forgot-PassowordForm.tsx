@@ -13,7 +13,7 @@ export  function ForgotPasswordForm() {
   // Split into two separate states so they don't trigger together
   const [isTooShort, setIsTooShort] = useState(false);
   const [isInvalidFormat, setIsInvalidFormat] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +64,7 @@ export  function ForgotPasswordForm() {
         <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
           Enter your phone number or email address that you registered on
           <br />
-          Khmer24 and we'll send the code to set the new password
+          Khmer24 and we&apos;ll send the code to set the new password
         </p>
 
         {/* 1. Big Alert Banner - ONLY shows if the format is invalid */}

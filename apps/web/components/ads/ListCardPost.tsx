@@ -35,9 +35,6 @@ import { Toggle } from "@/components/ui/toggle";
 
 export function ListCardPost({ post }: { post: Post }) {
   const discountAmount = post.oldPrice ? post.oldPrice - post.price : 0;
-  const discountPercent = post.oldPrice
-    ? Math.round((discountAmount / post.oldPrice) * 100)
-    : 0;
 
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -49,7 +46,7 @@ export function ListCardPost({ post }: { post: Post }) {
 
         {/* Full-card link */}
         <Link
-          // @ts-ignore
+          // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
           href={`/${toSlug(post.title)}-adid-${post.postId}`}
           className="absolute inset-0 z-10"
         />
@@ -96,7 +93,8 @@ export function ListCardPost({ post }: { post: Post }) {
               >
                 <DropdownMenuItem asChild>
                   <Link
-                    href={"/profile" as any}
+                    // @ts-expect-error "/profile" isn't declared in the i18n pathnames
+                    href={"/profile"}
                     className="flex items-center gap-3 px-3 py-2 cursor-pointer"
                   >
                     <User size={15} />

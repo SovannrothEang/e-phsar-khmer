@@ -10,8 +10,6 @@ import { AdminBrandsController } from './admin-brands.controller';
 import { AdminBrandsService } from './admin-brands.service';
 import { AdminModelsController } from './admin-models.controller';
 import { AdminModelsService } from './admin-models.service';
-import { AdminAttributesController } from './admin-attributes.controller';
-import { AdminAttributesService } from './admin-attributes.service';
 import { SubscriptionConfigController } from './subscriptions/subscription-config.controller';
 import { SubscriptionConfigService } from './subscriptions/subscription-config.service';
 import { UserSubscriptionsController } from './subscriptions/user-subscriptions.controller';
@@ -27,7 +25,6 @@ import { ReportsService } from './reports/reports.service';
     AdminSubcategoriesController,
     AdminBrandsController,
     AdminModelsController,
-    AdminAttributesController,
     SubscriptionConfigController,
     UserSubscriptionsController,
     ReportsController,
@@ -38,7 +35,6 @@ import { ReportsService } from './reports/reports.service';
     AdminSubcategoriesService,
     AdminBrandsService,
     AdminModelsService,
-    AdminAttributesService,
     SubscriptionConfigService,
     UserSubscriptionsService,
     ReportsService,

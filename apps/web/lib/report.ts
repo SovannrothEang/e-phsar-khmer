@@ -1,4 +1,4 @@
-import { ReportPost, ReportUser, ReportPostOption, ReportUserOption } from "@/types/report";
+import { ReportPostOption, ReportUserOption } from "@/types/report";
 
 export const reportUserOption: ReportUserOption[] = [
    {

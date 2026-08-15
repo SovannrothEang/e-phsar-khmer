@@ -4,11 +4,9 @@ import {
     Field,
     FieldContent,
     FieldTitle,
-    FieldDescription,
     FieldGroup,
     FieldLabel,
     FieldLegend,
-    FieldSeparator,
     FieldSet,
 } from "@/components/ui/field"
 import {
@@ -29,24 +27,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { useState } from "react"
-import { IconChevronRight, IconHome } from "@tabler/icons-react"
+import { IconChevronRight } from "@tabler/icons-react"
 import { categories } from "@/lib/categories"
 import type { Category, Subcategory, BrandOption } from "@/types/category"
-import { Link } from "@/i18n/routing"
 import clsx from "clsx"
 import { Separator } from "@/components/ui/separator"
-import { Replace } from "lucide-react"
-type FormData = Record<string, string | number | boolean | string[]>;
 
 export function CategorySelecter({
-    onSelect,
+    onSelectAction,
 }: {
-    onSelect: (cat: Category, sub: Subcategory) => void;
+    onSelectAction: (cat: Category, sub: Subcategory) => void;
 }) {
     const [activeCategory, setActiveCategory] = useState(categories[0])
-    const [selectedCateId, setSelectedCateId] = useState(categories[0].cateId)
-    const selectedCate = categories.find((c) => c.cateId === selectedCateId)
-    const [step, setStep] = useState(1)
 
     return (
         <>
@@ -119,7 +111,7 @@ export function CategorySelecter({
                     <div className="max-h-[800px] overflow-y-auto pt-4 pb-4">
                         {activeCategory.subcategories?.map((sub) => (
                             <button
-                                onClick={() => onSelect(activeCategory, sub)}
+                                onClick={() => onSelectAction(activeCategory, sub)}
                                 key={sub.slug}
                                 className="flex w-full items-center justify-between px-5 py-3 hover:bg-muted/60 transition-colors duration-100 cursor-pointer"
                             >
@@ -152,22 +144,17 @@ export function CategorySelecter({
 export function PostForm({
     category,
     subcategory,
-    onBack,
+    onBackAction,
 }: {
     category: Category
     subcategory: Subcategory
-    onBack: () => void
+    onBackAction: () => void
 }) {
-    const [form, setForm] = useState<FormData>({});
-    const [selectedBrand, setSelectedBrand] = useState<BrandOption | null>(null)
+      const [selectedBrand, setSelectedBrand] = useState<BrandOption | null>(null)
     const subcate = subcategory
 
 
     // Then access:
-    subcate?.brands       // BrandOption[]
-    subcate?.bodyTypes    // BodyTypeOption[]
-    subcate?.years        // YearOption[]
-    subcate?.condition    // ConditionOption[]
     // etc.
     return (
         <div className="w-full max-w-4xl">
@@ -196,7 +183,7 @@ export function PostForm({
                                         {category.name} <IconChevronRight className="text-muted-foreground scale-60" /> {subcategory.name}
                                          <button
                                             type="button"
-                                            onClick={onBack}
+                                            onClick={onBackAction}
                                             className="bg-[#00a0e9] h-8 w-18 rounded-sm text-white text-sm cursor-pointer"
                                         >
                                             Change

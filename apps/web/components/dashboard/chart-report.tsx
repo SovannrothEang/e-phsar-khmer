@@ -25,8 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ReportPost } from "@/types/report"
-import { ReportUser } from "@/types/report"
 
 export const description = "An report area chart"
 

@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import {
   Dialog,
   DialogContent,
@@ -153,6 +151,8 @@ export default function MoreFilters() {
   // Sync draft from URL whenever dialog opens
   useEffect(() => {
     if (!open) return
+    // Sync draft from URL each time the dialog opens.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setKeyword(searchParams.get(KEYWORD_PARAM)      ?? "")
     setSort((searchParams.get(SORT_PARAM)  as SortValue) ?? DEFAULT_SORT)
     setDate((searchParams.get(DATE_PARAM)  as DateValue) ?? "")
@@ -187,7 +187,11 @@ export default function MoreFilters() {
 
     set(KEYWORD_PARAM, keyword)
     set(DATE_PARAM, date)
-    sort === DEFAULT_SORT ? params.delete(SORT_PARAM) : params.set(SORT_PARAM, sort)
+    if (sort === DEFAULT_SORT) {
+      params.delete(SORT_PARAM)
+    } else {
+      params.set(SORT_PARAM, sort)
+    }
     set(LOCATION_PRO_PARAM, proId)
     set(LOCATION_DIS_PARAM, disId)
     set(LOCATION_COM_PARAM, comId)

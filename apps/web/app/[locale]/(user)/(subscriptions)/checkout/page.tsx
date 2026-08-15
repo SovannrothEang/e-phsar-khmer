@@ -143,7 +143,6 @@ export default function CheckoutPage() {
   const price = Number(params.get("price") || 60)
 
   const [method, setMethod] = useState("card")
-  const [addresses, setAddresses] = useState<any[]>([])
 
   const discount = 0
   const vat = price * 0.1

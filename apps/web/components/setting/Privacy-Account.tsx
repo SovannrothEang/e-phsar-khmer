@@ -2,15 +2,6 @@
 import * as React from "react"
 import { Lock, Globe } from "lucide-react"
 import SettingSidebar from "./SettingSidebar"
-import { UserRoundKey, Plus } from "lucide-react"
-import {
-    Field,
-    FieldContent,
-    FieldDescription,
-    FieldGroup,
-    FieldLabel,
-    FieldTitle,
-} from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 
 interface PrivacyRowProps {

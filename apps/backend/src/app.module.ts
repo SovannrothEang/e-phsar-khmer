@@ -25,6 +25,7 @@ import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
+import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 
@@ -57,6 +58,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
     HealthModule,
     ActivityModule,
     ChatModule,
+    AttributesModule,
     AdminModule,
   ],
   controllers: [AppController],

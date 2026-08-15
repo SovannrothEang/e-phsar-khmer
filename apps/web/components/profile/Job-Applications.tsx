@@ -69,7 +69,7 @@ export default function JobApplications() {
                         <div className="text-center">
                             <h2 className="text-xl font-medium text-foreground mb-2">No Result!</h2>
                             <p className="text-muted-foreground text-sm mb-8">
-                                You don't have any job applications right now.
+                                You don&apos;t have any job applications right now.
                             </p>
                         </div>
                     </div>

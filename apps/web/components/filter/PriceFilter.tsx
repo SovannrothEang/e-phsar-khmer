@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import type { Post } from "@/lib/posts"
 
 export const MIN_AD_PRICE_PARAM = "min_ad_price"
@@ -63,17 +63,15 @@ export default function PriceFilter() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  const [open, setOpen] = useState(false)
+
+  // Initializers re-derive the params on each render, so the URL values are
+  // always in sync without a set-state effect.
   const minParam = searchParams.get(MIN_AD_PRICE_PARAM) ?? ""
   const maxParam = searchParams.get(MAX_AD_PRICE_PARAM) ?? ""
 
   const [min, setMin] = useState(minParam)
   const [max, setMax] = useState(maxParam)
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    setMin(minParam)
-    setMax(maxParam)
-  }, [minParam, maxParam])
 
   const hasActiveFilter = Boolean(minParam || maxParam)
   const priceLabel = PriceLabel(minParam, maxParam)

@@ -33,6 +33,8 @@ export function NavUser() {
     const storedUser = localStorage.getItem("user")
 
     if (storedUser) {
+      // Hydrate once from localStorage (client-only data source).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setUser(JSON.parse(storedUser))
     }
   }, [])

@@ -1,11 +1,9 @@
 "use client"
 
-import * as React from "react"
 import { useState, useRef, useEffect } from "react"
-import Image from "next/image"
 import {
   Plus, MapPin, ImageIcon, Mic, MoreVertical, X,
-  Check, CheckCheck, FileText, Phone, ChevronLeft,
+  Check, CheckCheck, FileText,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {

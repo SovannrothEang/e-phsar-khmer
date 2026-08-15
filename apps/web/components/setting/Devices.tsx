@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button"
 import SettingSidebar from "./SettingSidebar"
 import { Monitor, Smartphone, LogOut, Laptop } from "lucide-react"
 
