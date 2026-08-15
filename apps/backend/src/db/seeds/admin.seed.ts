@@ -7,7 +7,7 @@ import { users } from '../schema/users.schema';
  * Idempotently upserts a single bootstrap admin account so the admin dashboard
  * has something to log in with. Users normally register via phone OTP and carry
  * no password hash; admins authenticate by username + password, so this seed
- * sets `passwordHash` + `role: 'admin'` directly.
+ * sets `passwordHash` + `role: 'super_admin'` directly.
  *
  * Env-driven:
  *   ADMIN_SEED_USERNAME  (default 'admin')
@@ -33,14 +33,14 @@ export async function seedAdmin(db: DbClient): Promise<void> {
     .values({
       username,
       passwordHash,
-      role: 'admin',
+      role: 'super_admin',
       status: 'active',
       primaryPhone: phone,
     })
     .onConflictDoUpdate({
       target: users.username,
       targetWhere: isNull(users.deletedAt),
-      set: { passwordHash, role: 'admin', status: 'active' },
+      set: { passwordHash, role: 'super_admin', status: 'active' },
     });
 
   console.log(`  ✓ admin user '${username}'`);

@@ -9,7 +9,8 @@ import {
 } from './schema/categories.schema';
 import { categoriesSeed } from '../categories/seeds/categories.seed';
 import { seedGeography } from './seeds/cambodia-geography.seed';
-import { seedBrands } from '../brands/seeds/brands.seed';
+import { seedBrands, seedModels } from '../brands/seeds/brands.seed';
+import { seedAttributes } from '../attributes/seeds/attributes.seed';
 import { seedAdmin } from './seeds/admin.seed';
 import { seedReports } from './seeds/reports.seed';
 import * as schema from './schema';
@@ -95,6 +96,12 @@ async function seed() {
 
   console.log('Seeding brands...');
   await seedBrands(db);
+
+  console.log('Seeding models...');
+  await seedModels(db);
+
+  console.log('Seeding attributes...');
+  await seedAttributes(db);
 
   console.log('Seeding admin...');
   await seedAdmin(db);

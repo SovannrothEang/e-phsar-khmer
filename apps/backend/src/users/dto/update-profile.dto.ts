@@ -79,8 +79,8 @@ export class UpdateProfileDto {
   @Type(() => Number)
   longitude?: number;
 
-  @ApiPropertyOptional({ enum: ['en', 'km', 'zh'] })
+  @ApiPropertyOptional({ enum: ['en', 'km', 'zh', 'ko', 'id', 'vi'] })
   @IsOptional()
-  @IsIn(['en', 'km', 'zh'])
+  @IsIn(['en', 'km', 'zh', 'ko', 'id', 'vi'])
   preferredLanguage?: string;
 }

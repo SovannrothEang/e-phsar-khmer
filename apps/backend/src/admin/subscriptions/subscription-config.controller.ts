@@ -26,7 +26,7 @@ import {
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin')
+@Roles('admin', 'super_admin')
 @UseGuards(RolesGuard)
 @Controller('admin/subscriptions')
 export class SubscriptionConfigController {

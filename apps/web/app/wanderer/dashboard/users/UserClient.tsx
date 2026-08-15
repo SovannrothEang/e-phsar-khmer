@@ -46,7 +46,8 @@ import {
   UserRound,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getAdminUsers, type AdminUsersResult } from "@/actions/admin-users";
@@ -76,6 +77,7 @@ export default function UserPage({
   const [tab, setTab] = useState("all");
 
   const router = useRouter();
+  const locale = useLocale();
 
   const deleteMutation = useMutation({
     mutationFn: (userId: string) => deleteUser({ userId }),
@@ -96,7 +98,7 @@ export default function UserPage({
 
   const filteredUsers = users.filter((user) => {
     const query = searchQuery.toLowerCase();
-    if (user.role.toLowerCase() === "admin") {
+    if (user.role === "admin" || user.role === "super_admin") {
       return false;
     }
     const matchesSearch =
@@ -317,12 +319,9 @@ export default function UserPage({
                           <DropdownMenuItem
                             className="text-sky-500 cursor-pointer"
                             onClick={() => {
-                              router.push({
-                                pathname: `/[slug]`,
-                                params: {
-                                  slug: `${user?.username}${user?.userId}`,
-                                },
-                              });
+                              router.push(
+                                `/${locale}/${user?.username}${user?.userId}`,
+                              );
                             }}
                           >
                             <Eye className="mr-2 size-4" />

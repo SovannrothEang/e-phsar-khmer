@@ -84,10 +84,12 @@ export function AttributeManager({
   type,
   title,
   hasImage = false,
+  readOnly = false,
 }: {
   type: string;
   title: string;
   hasImage?: boolean;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { data: items = [] } = useQuery({
@@ -126,11 +128,21 @@ export function AttributeManager({
         : [...prev.subcategories, subId],
     }));
 
-  const filtered = items.filter(
-    (i) =>
-      i.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      i.slug.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filtered = items.filter((i) => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    const categoryName =
+      allCategories.find((c) => c.cateId === i.categoryId)?.name ?? "";
+    const subNames = i.subcategories
+      .map((id) => allSubcategories.find((s) => s.subId === id)?.name ?? "")
+      .join(" ");
+    return (
+      i.name.toLowerCase().includes(q) ||
+      i.slug.toLowerCase().includes(q) ||
+      categoryName.toLowerCase().includes(q) ||
+      subNames.toLowerCase().includes(q)
+    );
+  });
   const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
   const paginated = filtered.slice(
     (currentPage - 1) * rowsPerPage,
@@ -281,13 +293,20 @@ export function AttributeManager({
                 Manage {title} here.
               </p>
             </div>
-            <Button
-              className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
-              onClick={openAdd}
-            >
-              <Plus className="mr-2 size-4" />
-              Add {title}
-            </Button>
+            {readOnly ? (
+              <p className="text-sm text-muted-foreground">
+                Years are generated automatically (1980 –{" "}
+                {new Date().getFullYear() + 1}) and cannot be edited.
+              </p>
+            ) : (
+              <Button
+                className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+                onClick={openAdd}
+              >
+                <Plus className="mr-2 size-4" />
+                Add {title}
+              </Button>
+            )}
           </div>
 
           <div className="relative max-w-sm">
@@ -295,7 +314,12 @@ export function AttributeManager({
             <Input
               placeholder="Search..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                // Back to page 1 so a shrinking result set can't leave the
+                // pagination pointing past the end (matches rowsPerPage reset).
+                setCurrentPage(1);
+              }}
               className="pl-9"
             />
           </div>
@@ -393,36 +417,40 @@ export function AttributeManager({
                         {item.updatedAt}
                       </TableCell>
                       <TableCell className="text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="rounded-full cursor-pointer"
-                            >
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="center">
-                            <DropdownMenuItem
-                              className="text-orange-500 cursor-pointer"
-                              onClick={() => openEdit(item)}
-                            >
-                              <Pencil className="mr-2 size-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer"
-                              onClick={() => {
-                                setSelected(item);
-                                setIsDeleteOpen(true);
-                              }}
-                            >
-                              <Trash2 className="mr-2 size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {readOnly ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="rounded-full cursor-pointer"
+                              >
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="center">
+                              <DropdownMenuItem
+                                className="text-orange-500 cursor-pointer"
+                                onClick={() => openEdit(item)}
+                              >
+                                <Pencil className="mr-2 size-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive cursor-pointer"
+                                onClick={() => {
+                                  setSelected(item);
+                                  setIsDeleteOpen(true);
+                                }}
+                              >
+                                <Trash2 className="mr-2 size-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

@@ -21,16 +21,16 @@ Fixes/features (hasImage null-wipe, `DELETE /files` ownership, seeding, `:type` 
 
 ## Verification results
 
-| Gate | Result | Detail |
-| --- | --- | --- |
-| Backend lint | ✅ PASS | `eslint --fix`, exit 0 |
-| Backend build | ✅ PASS | `nest build`, exit 0 |
-| Backend tests | ✅ PASS | 15 suites / 140 tests, all green |
-| Route surface | ✅ UNCHANGED | `@Controller('admin/attributes/:type')` + GET/POST/PATCH/DELETE byte-identical; `admin.module.ts` has zero attribute references |
-| Web lint (changed files) | ✅ PASS | `page.tsx`, `[type]/page.tsx`, `lib/attribute-types.ts` → exit 0 |
-| Web build | ⚠️ PRE-EXISTING FAILURE | Fails on `components/testcard/ListorGrid.tsx` (`Cannot find name 'posts'`) — **proven identical on clean `main`** (stash + baseline build). My files type-check; zero new errors |
-| Web lint (whole app) | ⚠️ PRE-EXISTING FAILURE | 73 errors / 210 warnings — **proven identical on clean `main`** |
-| Git history | ✅ CLEAN RENAMES | 4 `R` renames, no content diff in moved service/controller/DTOs beyond class-name change |
+| Gate                     | Result                  | Detail                                                                                                                                                                           |
+| ------------------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend lint             | ✅ PASS                 | `eslint --fix`, exit 0                                                                                                                                                           |
+| Backend build            | ✅ PASS                 | `nest build`, exit 0                                                                                                                                                             |
+| Backend tests            | ✅ PASS                 | 15 suites / 140 tests, all green                                                                                                                                                 |
+| Route surface            | ✅ UNCHANGED            | `@Controller('admin/attributes/:type')` + GET/POST/PATCH/DELETE byte-identical; `admin.module.ts` has zero attribute references                                                  |
+| Web lint (changed files) | ✅ PASS                 | `page.tsx`, `[type]/page.tsx`, `lib/attribute-types.ts` → exit 0                                                                                                                 |
+| Web build                | ⚠️ PRE-EXISTING FAILURE | Fails on `components/testcard/ListorGrid.tsx` (`Cannot find name 'posts'`) — **proven identical on clean `main`** (stash + baseline build). My files type-check; zero new errors |
+| Web lint (whole app)     | ⚠️ PRE-EXISTING FAILURE | 73 errors / 210 warnings — **proven identical on clean `main`**                                                                                                                  |
+| Git history              | ✅ CLEAN RENAMES        | 4 `R` renames, no content diff in moved service/controller/DTOs beyond class-name change                                                                                         |
 
 ## Review
 
@@ -44,6 +44,7 @@ Fixes/features (hasImage null-wipe, `DELETE /files` ownership, seeding, `:type` 
 **Problem:** `next build` on `main` failed with 821 type errors — all pre-existing & committed (proven via `git show HEAD`; attributes refactor contributes zero).
 
 **Fixes applied:**
+
 - Deleted `apps/web/lib/models.ts` (dead mock, 0 importers; 636 errors) — `types/model.ts` KEPT (imported by live admin Models page)
 - Deleted `apps/web/components/testcard/` (`ListorGrid.tsx` + `ViewToggle.tsx`; dead scratchpad, undefined `posts`)
 - Deleted `apps/web/app/[locale]/(admin)/dashboard/attributes/networks/Phone.tsx` (broken scratchpad)
@@ -66,6 +67,7 @@ Fixes/features (hasImage null-wipe, `DELETE /files` ownership, seeding, `:type` 
 **Scope (user decision):** fix the genuine runtime bugs + effect-pattern errors only; warnings + cosmetic errors deferred.
 
 **Fixes:**
+
 - `components/ads/GridCardPost.tsx` — hoisted 3 `useState` above the `if (!user) return null` early return (conditional hooks — real runtime bug); `@ts-ignore` → `@ts-expect-error` (ban-ts-comment)
 - `components/post/Profile-Sidebar.tsx` — same hooks hoist (2 `useState`)
 - `components/filter/PriceFilter.tsx` — removed the set-state effect entirely; params now re-derived and used as `useState` initializers (same values, one render fewer)
@@ -88,6 +90,7 @@ Fixes/features (hasImage null-wipe, `DELETE /files` ownership, seeding, `:type` 
 **Scope (user decision):** clean up ALL remaining lint problems — 57 errors + 209 warnings → 0/0.
 
 **Fixes:**
+
 - **Errors (57)**: 37 `no-unescaped-entities` (escaped `'`/`"` → `&apos;`/`&quot;` in ~18 files); 19 `no-explicit-any` (typed `ContactUser`/`LocalSwitcherSelect`/`ClientThemeProvider`/`theme-provider`/`i18n/request`/`SubcategoryContent`(→`Subcategory`)/`app-sidebar`(→`ComponentType`/`ComponentProps<typeof Link>`)/`checkout`); 1 `react-hooks/purity` (`sidebar.tsx` Math.random → deterministic `useId`-derived width)
 - **Warnings (209)**: removed ~200 unused imports/vars across ~40 files; 5 `no-unused-expressions` (MoreFilters ternary → if/else; PostForm dead expressions removed); 4 `no-img-element` (disable + reason comment — dynamic attachment URLs / object-URL previews / static placeholder)
 - **Mistakes caught & reverted during sweep**: LSPHeader `showPriceDropdown` (actually read), Forgot-PassowordForm `isLoading` (actually read), PostImage/`isSticky`/`showFilters` setters (live) — all restored as setter-only or full forms
@@ -105,3 +108,38 @@ Fixes/features (hasImage null-wipe, `DELETE /files` ownership, seeding, `:type` 
 - **`PostForm.tsx` + `sell/page.tsx`:** `onSelect` → `onSelectAction`, `onBack` → `onBackAction` (the compiler-recommended convention for client-boundary function props; renamed consistently at all 4 usage sites).
 
 Both resolved without touching the server-action semantics or behavior beyond the retry-button fix. Full gates after: tsc 0, lint 0, build PASSES.
+
+---
+
+# Ticket — Image pipeline fixes (2026-08-04)
+
+**Context:** Read-only investigation found (1) a latent image-disappearance risk — `next/image` `remotePatterns` missing the Supabase host, which would break optimization once real Storage URLs flow through user-facing `<Image>` consumers (`GridCardPost`, `ListCardPost`, `AdBanner`, `PublicProfileHeader`); (2) orphaned images on avatar/cover/listing-photo replace — admin entities already clean up via `removeByPublicUrl`, but user/listing surfaces did not; (3) a CLAUDE.md inaccuracy — models described as "text-only" when they carry an image field.
+
+**Captain's secret-leak concern:** investigated — zero hardcoded Supabase URLs in source (only dummy test fixtures); backend already reads `SUPABASE_URL` via `ConfigService`. Fix #1 derives the host from `process.env.SUPABASE_URL` at build time (no hardcoding, server-side only).
+
+**Fixes applied:**
+
+1. **`apps/web/next.config.ts`** — reads `process.env.SUPABASE_URL`, parses hostname via `new URL(...)`, adds it to `remotePatterns` conditionally (`protocol: "https" as const` to satisfy Next's `RemotePattern` literal type). Removed stale `images.khmer24.co` (pre-rename scaffolding cruft). Kept `ui-avatars.com` (default avatars). Web env vars documented in CLAUDE.md (web `.env.example` blocked by the `.env*` file guard).
+2. **`UsersService`** — `setProfilePhoto` / `setCoverPhoto` now read the prior URL before overwriting, then call `filesService.removeByPublicUrl(oldUrl)` after commit (best-effort, gated on actual change). `UsersModule` imports `FilesModule`. Spec `makeService` updated with FilesService mock (4th constructor arg).
+3. **`ListingsService.update`** — photo-swap branch captures existing photo URLs before `delete(listingPhotos)`, then calls `removeByPublicUrl` for photos removed from the payload (kept photos untouched in storage). `ListingsModule` imports `FilesModule`. Spec `makeService` updated. Soft-delete `remove()` intentionally untouched (restore must work).
+4. **`CLAUDE.md`** — models "text-only" → "each model carries an optional image; old images are cleaned up on update/delete via `removeByPublicUrl`". Added web env-var documentation paragraph.
+
+**Pattern reuse:** avatar/cover/listing cleanup follows the identical `removeByPublicUrl`-after-commit pattern already used by 5 admin services. No new helpers added; `FilesService.removeByPublicUrl` (`files.service.ts:105-125`) reused throughout.
+
+**Verification:**
+| Gate | Result |
+| --- | --- |
+| Backend lint | ✅ PASS (exit 0) |
+| Backend build | ✅ PASS (`nest build`, exit 0) |
+| Backend tests | ✅ PASS (16 suites / 149 tests, all green) |
+| Web build | ✅ PASS (full route compile, includes type-checking — resolves the `as const` RemotePattern type) |
+| Web lint | ✅ PASS (exit 0) |
+| Dependencies / commits | ✅ none changed / none made |
+
+**Out of scope (flagged for follow-up):**
+
+- Admin user soft-delete avatar/cover cleanup (`admin.service.ts:393-411`) — privacy-relevant; separate ticket.
+- Listing soft-delete storage cleanup — intentionally skipped (restore must work).
+- Chat image cleanup — no delete path by design.
+- Orphans reaper / GC sweep — no scheduled job; pre-existing orphans not reclaimed.
+- Backend `.env.example` is empty (0 lines) — real docs gap, not addressed here.

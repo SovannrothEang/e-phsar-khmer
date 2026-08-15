@@ -5,30 +5,43 @@ import { ACCESS_TOKEN_COOKIE } from "./lib/auth/session";
 
 const intlMiddleware = createMiddleware(routing);
 
-const LOCALE_RE = new RegExp(`^/(${routing.locales.join("|")})(?=/|$)`);
+const LOCALE_RE = new RegExp(`^/(en|km|zh|ko|id|vi)(?=/wanderer(?:/|$))`);
 
 export default function proxy(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
 
-  const localeMatch = pathname.match(LOCALE_RE);
-  const locale = localeMatch?.[1] ?? routing.defaultLocale;
-  const rest = localeMatch ? pathname.slice(localeMatch[0].length) : pathname;
-
-  // Guard the admin dashboard: no access-token cookie → send to login.
-  if (rest === "/dashboard" || rest.startsWith("/dashboard/")) {
-    const hasToken = Boolean(req.cookies.get(ACCESS_TOKEN_COOKIE)?.value);
-    if (!hasToken) {
-      const url = req.nextUrl.clone();
-      url.pathname = `/${locale}/login`;
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
+  // Strip a stray locale prefix from /wanderer/* URLs (e.g. /en/wanderer/login
+  // → /wanderer/login). The admin surface is intentionally non-localized.
+  const strayLocale = pathname.match(LOCALE_RE);
+  if (strayLocale) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/" + pathname.slice(strayLocale[0].length);
+    return NextResponse.redirect(url);
   }
 
+  // The entire /wanderer/* surface is non-localized — never hand it to
+  // next-intl (which would prepend a locale prefix and 404).
+  if (pathname === "/wanderer" || pathname.startsWith("/wanderer/")) {
+    // Guard the dashboard: no admin token → /wanderer/login.
+    if (
+      pathname === "/wanderer/dashboard" ||
+      pathname.startsWith("/wanderer/dashboard/")
+    ) {
+      const hasToken = Boolean(req.cookies.get(ACCESS_TOKEN_COOKIE)?.value);
+      if (!hasToken) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/wanderer/login";
+        url.searchParams.set("next", pathname);
+        return NextResponse.redirect(url);
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // Locale-prefixed paths → next-intl.
   return intlMiddleware(req);
 }
 
 export const config = {
-  // Match only internationalized pathnames
-  matcher: ["/", "/(en|km|zh|ko|id|vi)/:path*"],
+  matcher: ["/", "/(en|km|zh|ko|id|vi)/:path*", "/wanderer/:path*"],
 };

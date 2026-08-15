@@ -217,7 +217,7 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshDto): Promise<AuthTokens> {
-    let payload: { sub: string; role: 'user' | 'admin' };
+    let payload: { sub: string; role: 'user' | 'admin' | 'super_admin' };
     try {
       payload = await this.jwtService.verifyAsync(dto.refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),

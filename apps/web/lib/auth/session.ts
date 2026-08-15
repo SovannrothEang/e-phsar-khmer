@@ -1,13 +1,19 @@
-import { cookies } from "next/headers"
+import { cookies } from "next/headers";
 
-export const ACCESS_TOKEN_COOKIE = "admin_access_token"
-export const REFRESH_TOKEN_COOKIE = "admin_refresh_token"
+export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
+export const ADMIN_REFRESH_TOKEN_COOKIE = "admin_refresh_token";
+export const USER_ACCESS_TOKEN_COOKIE = "user_access_token";
+export const USER_REFRESH_TOKEN_COOKIE = "user_refresh_token";
 
-const THIRTY_DAYS = 60 * 60 * 24 * 30
+/** Backward-compatible alias — the proxy guards the admin cookie. */
+export const ACCESS_TOKEN_COOKIE = ADMIN_ACCESS_TOKEN_COOKIE;
+export const REFRESH_TOKEN_COOKIE = ADMIN_REFRESH_TOKEN_COOKIE;
+
+const THIRTY_DAYS = 60 * 60 * 24 * 30;
 
 export interface SessionTokens {
-  accessToken: string
-  refreshToken: string
+  accessToken: string;
+  refreshToken: string;
 }
 
 function cookieOptions() {
@@ -17,26 +23,51 @@ function cookieOptions() {
     sameSite: "lax" as const,
     path: "/",
     maxAge: THIRTY_DAYS,
-  }
+  };
 }
 
-/** Persist tokens in httpOnly cookies. Only valid inside a Server Action or Route Handler. */
-export async function setSession(tokens: SessionTokens): Promise<void> {
-  const store = await cookies()
-  store.set(ACCESS_TOKEN_COOKIE, tokens.accessToken, cookieOptions())
-  store.set(REFRESH_TOKEN_COOKIE, tokens.refreshToken, cookieOptions())
+// ── Admin session ───────────────────────────────────────────────────────────
+
+/** Persist admin tokens in httpOnly cookies. Server Action / Route Handler only. */
+export async function setAdminSession(tokens: SessionTokens): Promise<void> {
+  const store = await cookies();
+  store.set(ADMIN_ACCESS_TOKEN_COOKIE, tokens.accessToken, cookieOptions());
+  store.set(ADMIN_REFRESH_TOKEN_COOKIE, tokens.refreshToken, cookieOptions());
 }
 
-export async function clearSession(): Promise<void> {
-  const store = await cookies()
-  store.delete(ACCESS_TOKEN_COOKIE)
-  store.delete(REFRESH_TOKEN_COOKIE)
+export async function clearAdminSession(): Promise<void> {
+  const store = await cookies();
+  store.delete(ADMIN_ACCESS_TOKEN_COOKIE);
+  store.delete(ADMIN_REFRESH_TOKEN_COOKIE);
 }
 
-export async function getAccessToken(): Promise<string | null> {
-  return (await cookies()).get(ACCESS_TOKEN_COOKIE)?.value ?? null
+export async function getAdminAccessToken(): Promise<string | null> {
+  return (await cookies()).get(ADMIN_ACCESS_TOKEN_COOKIE)?.value ?? null;
 }
 
-export async function getRefreshToken(): Promise<string | null> {
-  return (await cookies()).get(REFRESH_TOKEN_COOKIE)?.value ?? null
+export async function getAdminRefreshToken(): Promise<string | null> {
+  return (await cookies()).get(ADMIN_REFRESH_TOKEN_COOKIE)?.value ?? null;
+}
+
+// ── User session ────────────────────────────────────────────────────────────
+
+/** Persist user tokens in httpOnly cookies. Server Action / Route Handler only. */
+export async function setUserSession(tokens: SessionTokens): Promise<void> {
+  const store = await cookies();
+  store.set(USER_ACCESS_TOKEN_COOKIE, tokens.accessToken, cookieOptions());
+  store.set(USER_REFRESH_TOKEN_COOKIE, tokens.refreshToken, cookieOptions());
+}
+
+export async function clearUserSession(): Promise<void> {
+  const store = await cookies();
+  store.delete(USER_ACCESS_TOKEN_COOKIE);
+  store.delete(USER_REFRESH_TOKEN_COOKIE);
+}
+
+export async function getUserAccessToken(): Promise<string | null> {
+  return (await cookies()).get(USER_ACCESS_TOKEN_COOKIE)?.value ?? null;
+}
+
+export async function getUserRefreshToken(): Promise<string | null> {
+  return (await cookies()).get(USER_REFRESH_TOKEN_COOKIE)?.value ?? null;
 }

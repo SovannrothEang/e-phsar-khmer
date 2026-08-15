@@ -15,6 +15,7 @@ export default async function Page({
       type={meta.type}
       title={meta.title}
       hasImage={meta.hasImage}
+      readOnly={meta.readOnly}
     />
   );
 }

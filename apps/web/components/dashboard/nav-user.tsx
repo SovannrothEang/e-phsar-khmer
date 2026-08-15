@@ -1,11 +1,12 @@
-'use client'
+"use client";
+import { useTransition } from "react";
 import {
   Avatar,
   AvatarBadge,
   AvatarFallback,
   AvatarImage,
-} from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,32 +15,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Bell, LogOut, Users } from "lucide-react"
-import { useEffect, useState } from "react"
+} from "@/components/ui/dropdown-menu";
+import { Bell, LogOut, Users } from "lucide-react";
+import type { CurrentUser } from "@/actions/user";
+import { adminLogout } from "@/actions/logout";
 
-type User = {
-  username: string
-  role: string
-  email: string
-  profileImage: string
-}
-
-export function NavUser() {
-
-  const [user, setUser] = useState<User | null>(null)
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-
-    if (storedUser) {
-      // Hydrate once from localStorage (client-only data source).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(JSON.parse(storedUser))
-    }
-  }, [])
-
-  if (!user) return null
+export function NavUser({ user }: { user: CurrentUser | null }) {
+  const [, startTransition] = useTransition();
+  if (!user) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -80,14 +63,23 @@ export function NavUser() {
           </DropdownMenuItem>
           <DropdownMenuItem>
             {/* <Roles className="mr-2 size-4" /> */}
-            Role: <div className="ml-1 rounded-lg px-2 py-0.5 bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100">{user.role}</div>
+            Role:{" "}
+            <div className="ml-1 rounded-lg px-2 py-0.5 bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100">
+              {user.role}
+            </div>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem variant="destructive"><LogOut className="mr-2 size-4" />Log out</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => startTransition(() => void adminLogout())}
+          >
+            <LogOut className="mr-2 size-4" />
+            Log out
+          </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

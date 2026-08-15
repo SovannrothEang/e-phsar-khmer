@@ -11,7 +11,7 @@ export interface AdminUsersResult {
 
 export interface GetAdminUsersParams {
   q?: string;
-  role?: "user" | "admin";
+  role?: "user" | "admin" | "super_admin";
   page?: number;
   pageSize?: number;
 }

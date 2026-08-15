@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { IconBrandFacebook, IconPlayerPlayFilled,IconChevronUp } from "@tabler/icons-react";
+import {
+  IconBrandFacebook,
+  IconPlayerPlayFilled,
+  IconChevronUp,
+} from "@tabler/icons-react";
 
 import Image from "next/image";
 
@@ -40,7 +44,7 @@ export default function Footer() {
           cursor-pointer"
           aria-label="Back to top"
         >
-          <IconChevronUp className="scale-140" stroke={2}/>
+          <IconChevronUp className="scale-140" stroke={2} />
         </Button>
       )}
       <footer className="bg-[#00a0e9] text-white pt-6 pb-6 mt-0">
@@ -50,7 +54,7 @@ export default function Footer() {
               <h3 className="font-bold mb-4 text-base">Follow PSA-Khmer</h3>
               <div className="space-y-4 text-sm ">
                 <a
-                  href="https://www.facebook.com/khmer24.com"
+                  href="/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 rounded-full hover:underline"
@@ -61,7 +65,7 @@ export default function Footer() {
                   <span className="text-sm  text-white">Facebook</span>
                 </a>
                 <a
-                  href="https://www.youtube.com/@Khmer24app"
+                  href="/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 hover:underline"
@@ -129,7 +133,7 @@ export default function Footer() {
               <div className="flex gap-3">
                 <div className="bg-white p-1 rounded-sm">
                   <Image
-                    src="https://www.khmer24.com/v2026.05.28/icon/khmer24-qr-code.png"
+                    src="/icon/qr-code.png"
                     alt="QR"
                     width={100}
                     height={100}
@@ -140,7 +144,7 @@ export default function Footer() {
                 <div className="flex flex-col gap-2">
                   <Link href="/">
                     <Image
-                      src="https://www.khmer24.com/v2026.05.28/icon/appstore.png"
+                      src="/icon/appstore.webp"
                       alt="App Store"
                       width={120}
                       height={38}
@@ -150,17 +154,17 @@ export default function Footer() {
                   </Link>
                   <Link href="/">
                     <Image
-                      src="https://www.khmer24.com/v2026.05.28/icon/playstore.png"
+                      src="/icon/playstore.webp"
                       alt="Play Store"
                       width={120}
                       height={38}
                       unoptimized
-                      className="h-8 w-32"  
+                      className="h-8 w-32"
                     />
                   </Link>
                   <Link href="/">
                     <Image
-                      src="https://www.khmer24.com/v2026.05.28/icon/app-gallery.png"
+                      src="/icon/app-gallery.webp"
                       alt="App Gallery"
                       width={120}
                       height={38}
@@ -176,12 +180,12 @@ export default function Footer() {
           <div className="flex items-center mt-3 flex-wrap justify-end">
             <span className="text-sm">We Accept:</span>
             {[
-              "https://www.khmer24.com/icon/ABA.svg",
-              "https://www.khmer24.com/icon/khqr.svg",
-              "https://www.khmer24.com/icon/Visa.svg",
-              "https://www.khmer24.com/icon/Mastercard.svg",
-              "https://www.khmer24.com/icon/UPI.svg",
-              "https://www.khmer24.com/icon/JCB.svg",
+              "icon/ABA.svg",
+              "/icon/khqr.svg",
+              "/icon/Visa.svg",
+              "/icon/Mastercard.svg",
+              "/icon/UPI.svg",
+              "/icon/JCB.svg",
             ].map((src, i) => (
               <div
                 key={i}

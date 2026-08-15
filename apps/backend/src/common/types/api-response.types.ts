@@ -27,5 +27,5 @@ export interface PaginatedResponse<T> {
 
 export interface RequestUser {
   id: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'super_admin';
 }

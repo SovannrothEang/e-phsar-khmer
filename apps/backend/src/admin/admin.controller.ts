@@ -12,6 +12,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { RequestUser } from '../common/types/api-response.types';
 import { AdminService } from './admin.service';
 import { ListUsersDto } from './dto/list-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -20,7 +22,7 @@ import { TimeseriesQueryDto } from './dto/timeseries-query.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin')
+@Roles('admin', 'super_admin')
 @UseGuards(RolesGuard)
 @Controller('admin')
 export class AdminController {
@@ -54,14 +56,21 @@ export class AdminController {
 
   @Post('users')
   @ApiOperation({ summary: 'Create a user or admin (with password)' })
-  createUser(@Body() dto: CreateUserDto) {
-    return this.adminService.createUser(dto);
+  createUser(
+    @CurrentUser() requester: RequestUser,
+    @Body() dto: CreateUserDto,
+  ) {
+    return this.adminService.createUser(dto, requester);
   }
 
   @Patch('users/:id')
   @ApiOperation({ summary: 'Update a user (role/status/profile/password)' })
-  updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.adminService.updateUser(id, dto);
+  updateUser(
+    @CurrentUser() requester: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.adminService.updateUser(id, dto, requester);
   }
 
   @Delete('users/:id')

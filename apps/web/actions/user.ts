@@ -2,7 +2,36 @@
 
 import { deleteUserSchema, editUserSchema, usersSchema } from "@/schemas/user";
 import { serverFetch, ApiError } from "@/lib/api/client";
+import type { BackendUser } from "@/lib/api/adapters";
 import z from "zod";
+
+/** Profile fields the dashboard chrome (header avatar chip) needs. */
+export type CurrentUser = {
+  username: string;
+  role: string;
+  email: string;
+  profileImage: string;
+};
+
+/**
+ * Server-side read of the logged-in admin's profile. Returns null when there
+ * is no valid session — the proxy already guards /dashboard, but a null result
+ * keeps the header rendering gracefully on edge cases.
+ */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  try {
+    const res = await serverFetch<BackendUser>("/users/me");
+    return {
+      username: res.data.username ?? "",
+      role: res.data.role,
+      email: res.data.email ?? "",
+      profileImage: res.data.profilePhotoUrl ?? "",
+    };
+  } catch {
+    /* no valid session — chip stays hidden */
+    return null;
+  }
+}
 
 function splitName(name: string): {
   firstName: string | null;

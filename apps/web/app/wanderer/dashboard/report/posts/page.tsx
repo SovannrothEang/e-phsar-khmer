@@ -33,7 +33,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { ReportPost } from "@/types/reportpost";
 import {
   getListingReports,
@@ -119,6 +120,7 @@ export default function ReportPostsPage() {
     currentPage * rowsPerPage,
   );
   const router = useRouter();
+  const locale = useLocale();
   return (
     <div className="p-6">
       <div className="flex flex-col gap-1 mb-4">
@@ -270,12 +272,9 @@ export default function ReportPostsPage() {
                     <Button
                       size="sm"
                       onClick={() => {
-                        router.push({
-                          pathname: "/[slug]",
-                          params: {
-                            slug: `${listingTitle.replace(/\s+/g, "-").toLowerCase()}-adid-${report.postId}`,
-                          },
-                        });
+                        router.push(
+                          `/${locale}/${listingTitle.replace(/\s+/g, "-").toLowerCase()}-adid-${report.postId}`,
+                        );
                       }}
                       className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"
                     >

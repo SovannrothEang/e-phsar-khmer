@@ -5,14 +5,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { attributeOptions } from '../db/schema/attributes.schema';
 import type { AttributeOptionRow } from '../db/schema/attributes.schema';
+import { categories, subcategories } from '../db/schema/categories.schema';
 import type { CreateAttributeDto } from './dto/create-attribute.dto';
 import type { UpdateAttributeDto } from './dto/update-attribute.dto';
 import { FilesService } from '../files/files.service';
+
+const YEAR_MIN = 1980;
+const YEAR_CATEGORY_SLUG = 'cars-and-vehicles';
+const YEAR_SUB_SLUGS = ['cars-for-sale', 'motorcycles-for-sale'] as const;
 
 @Injectable()
 export class AttributesService {
@@ -22,6 +27,7 @@ export class AttributesService {
   ) {}
 
   list(type: string): Promise<AttributeOptionRow[]> {
+    if (type === 'years') return this.listYears();
     return this.db
       .select()
       .from(attributeOptions)
@@ -29,10 +35,60 @@ export class AttributesService {
       .orderBy(asc(attributeOptions.sortOrder));
   }
 
+  /**
+   * Years are generated deterministically (current year + 1 → YEAR_MIN) and
+   * are never stored in `attribute_options`. `id` is a display-only fake —
+   * writes for `years` are rejected, so it never reaches the API. Rows are
+   * returned newest-first; the category/subcategory link is resolved at read
+   * time (falls back to null/[] if the cars category is not seeded yet).
+   */
+  private async listYears(): Promise<AttributeOptionRow[]> {
+    const currentYear = new Date().getFullYear();
+
+    const [carCategory, subRows] = await Promise.all([
+      this.db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, YEAR_CATEGORY_SLUG))
+        .limit(1),
+      this.db
+        .select({ id: subcategories.id })
+        .from(subcategories)
+        .where(inArray(subcategories.slug, [...YEAR_SUB_SLUGS])),
+    ]);
+
+    const categoryId = carCategory[0]?.id ?? null;
+    const subIds = subRows.map((r) => r.id);
+    const now = new Date();
+
+    const rows: AttributeOptionRow[] = [];
+    for (let y = currentYear + 1; y >= YEAR_MIN; y--) {
+      rows.push({
+        id: `year-${y}`,
+        type: 'years',
+        slug: String(y),
+        name: String(y),
+        image: null,
+        categoryId,
+        subcategoryIds: categoryId ? subIds : [],
+        sortOrder: y - YEAR_MIN,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return rows;
+  }
+
   async create(
     type: string,
     dto: CreateAttributeDto,
   ): Promise<AttributeOptionRow> {
+    if (type === 'years') {
+      throw new BadRequestException(
+        'Years are generated automatically and cannot be modified',
+      );
+    }
     try {
       const [row] = await this.db
         .insert(attributeOptions)
@@ -58,6 +114,11 @@ export class AttributesService {
     id: string,
     dto: UpdateAttributeDto,
   ): Promise<AttributeOptionRow> {
+    if (type === 'years') {
+      throw new BadRequestException(
+        'Years are generated automatically and cannot be modified',
+      );
+    }
     const patch: Partial<AttributeOptionRow> = {};
     if (dto.name !== undefined) patch.name = dto.name;
     if (dto.slug !== undefined) patch.slug = dto.slug;
@@ -101,6 +162,11 @@ export class AttributesService {
   }
 
   async remove(type: string, id: string): Promise<{ id: string }> {
+    if (type === 'years') {
+      throw new BadRequestException(
+        'Years are generated automatically and cannot be modified',
+      );
+    }
     const [existing] = await this.db
       .select({ image: attributeOptions.image })
       .from(attributeOptions)

@@ -43,3 +43,28 @@ export async function signUpload(filename: string, scope: UploadScope) {
     };
   }
 }
+
+/**
+ * Delete previously-uploaded storage objects (by their storage `path`, as
+ * returned by `signUpload`). Used to clean up uploads that never made it into
+ * the DB — e.g. when an admin uploads an image and then cancels the dialog, or
+ * an image replaced within a session. The backend `DELETE /files` accepts
+ * storage paths (not public URLs).
+ */
+export async function deleteUploaded(
+  paths: string[],
+): Promise<{ success: boolean; error?: string }> {
+  if (paths.length === 0) return { success: true };
+  try {
+    await serverFetch("/files", {
+      method: "DELETE",
+      body: JSON.stringify({ paths }),
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Failed to delete files",
+    };
+  }
+}

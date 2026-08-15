@@ -17,7 +17,7 @@ import { UpdateBrandDto } from './dto/update-brand.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin')
+@Roles('admin', 'super_admin')
 @UseGuards(RolesGuard)
 @Controller('admin/brands')
 export class AdminBrandsController {

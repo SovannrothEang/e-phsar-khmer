@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import type { ComponentProps, ComponentType } from "react"
+import type { ComponentType } from "react";
 import {
   LayoutDashboard,
   Users,
@@ -10,28 +10,16 @@ import {
   Folder,
   FolderTreeIcon,
   Layers,
-} from "lucide-react"
+} from "lucide-react";
 import {
   IconCalendarDollar,
   IconMessageChatbot,
   IconCategory2,
   IconPackages,
   IconClockHour4,
-  IconCar,
   IconAccessPoint,
   IconCalendarStats,
-  IconPalette,
   IconBriefcase,
-  IconBed,
-  IconBath,
-  IconEngine,
-  IconScreenShare,
-  IconServer,
-  IconDeviceSdCard,
-  IconCpu,
-  IconCompass,
-  IconOutlet,
-  IconFileCv,
   IconCircleLetterB,
   IconCircleLetterM,
   IconCircleLetterT,
@@ -40,10 +28,9 @@ import {
   IconUserExclamation,
   IconCameraExclamation,
   IconUserCog,
-  IconUserDollar   
-
-} from '@tabler/icons-react';
-import { Link } from "@/i18n/routing";
+  IconUserDollar,
+} from "@tabler/icons-react";
+import Link from "next/link";
 import {
   Sidebar,
   SidebarContent,
@@ -57,100 +44,188 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  SidebarFooter
+  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import Image from "next/image"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import Image from "next/image";
+
 export type MenuItem = {
-  title: string
-  icon: ComponentType<{ className?: string }>
-  href: ComponentProps<typeof Link>["href"]
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  href: string;
   items?: {
-    title: string
-    icon: ComponentType<{ className?: string }>
-    href: ComponentProps<typeof Link>["href"]
-  }[]
-}
+    title: string;
+    icon: ComponentType<{ className?: string }>;
+    href: string;
+  }[];
+};
 export type DocumentItem = {
-  title: string
-  icon: ComponentType<{ className?: string }>
-  href: ComponentProps<typeof Link>["href"]
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  href: string;
   items?: {
-    title: string
-    icon: ComponentType<{ className?: string }>
-    href: ComponentProps<typeof Link>["href"]
-  }[]
-}
+    title: string;
+    icon: ComponentType<{ className?: string }>;
+    href: string;
+  }[];
+};
 
 export const menuItems: MenuItem[] = [
-  { title: "Dashboard", icon: LayoutDashboard, href: { pathname: "/dashboard" } },
-  { title: "Categories", icon: Folder, href: { pathname: "/dashboard/categories" } },
-  { title: "Subcategories", icon: FolderTreeIcon, href: { pathname: "/dashboard/subcategories" } },
+  {
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/wanderer/dashboard",
+  },
+  {
+    title: "Categories",
+    icon: Folder,
+    href: "/wanderer/dashboard/categories",
+  },
+  {
+    title: "Subcategories",
+    icon: FolderTreeIcon,
+    href: "/wanderer/dashboard/subcategories",
+  },
   // Group the attributes sub-items nested inside the main Attributes item!
   {
     title: "Attributes",
     icon: Layers,
-    href: { pathname: "/dashboard/attributes" },
+    href: "/wanderer/dashboard/attributes",
     items: [
-      { title: "Brands", icon: IconCircleLetterB, href: { pathname: "/dashboard/attributes/brands" } },
-      { title: "Models", icon: IconCircleLetterM, href: { pathname: "/dashboard/attributes/models" } },
-      { title: "Body Types", icon: IconCarOffRoad, href: { pathname: "/dashboard/attributes/bodytypes" } },
-      { title: "Engines Types", icon: IconEngine, href: { pathname: "/dashboard/attributes/enginetypes" } },
-      { title: "Vehicle Types", icon: IconCar, href: { pathname: "/dashboard/attributes/vehicletypes" } },
-      { title: "Accessories", icon: IconAdjustmentsShare, href: { pathname: "/dashboard/attributes/accessories" } },
-      { title: "Types", icon: IconCircleLetterT, href: { pathname: "/dashboard/attributes/types" } },
-      { title: "Job Types", icon: IconBriefcase, href: { pathname: "/dashboard/attributes/jobtypes" } },
-      { title: "Networks", icon: IconAccessPoint, href: { pathname: "/dashboard/attributes/networks" } },
-      { title: "Bedrooms", icon: IconBed, href: { pathname: "/dashboard/attributes/bedrooms" } },
-      { title: "Bathrooms", icon: IconBath, href: { pathname: "/dashboard/attributes/bathrooms" } },
-      { title: "Facings", icon: IconCompass, href: { pathname: "/dashboard/attributes/facings" } },
-      { title: "Experiences", icon: IconFileCv, href: { pathname: "/dashboard/attributes/experiences" } },
-      { title: "Storages", icon: IconServer, href: { pathname: "/dashboard/attributes/storages" } },
-      { title: "Screen Sizes", icon: IconScreenShare, href: { pathname: "/dashboard/attributes/screensizes" } },
-      { title: "RAMs", icon: IconDeviceSdCard, href: { pathname: "/dashboard/attributes/rams" } },
-      { title: "CPUs", icon: IconCpu, href: { pathname: "/dashboard/attributes/cpus" } },
-      { title: "VGAs", icon: IconOutlet, href: { pathname: "/dashboard/attributes/vgas" } },
-      { title: "Colors", icon: IconPalette, href: { pathname: "/dashboard/attributes/colors" } },
-      { title: "Years", icon: IconCalendarStats, href: { pathname: "/dashboard/attributes/years" } },
-    ]
+      {
+        title: "Brands",
+        icon: IconCircleLetterB,
+        href: "/wanderer/dashboard/attributes/brands",
+      },
+      {
+        title: "Models",
+        icon: IconCircleLetterM,
+        href: "/wanderer/dashboard/attributes/models",
+      },
+      {
+        title: "Body Types",
+        icon: IconCarOffRoad,
+        href: "/wanderer/dashboard/attributes/bodytypes",
+      },
+      {
+        title: "Accessories",
+        icon: IconAdjustmentsShare,
+        href: "/wanderer/dashboard/attributes/accessories",
+      },
+      {
+        title: "Types",
+        icon: IconCircleLetterT,
+        href: "/wanderer/dashboard/attributes/types",
+      },
+      {
+        title: "Job Types",
+        icon: IconBriefcase,
+        href: "/wanderer/dashboard/attributes/jobtypes",
+      },
+      {
+        title: "Networks",
+        icon: IconAccessPoint,
+        href: "/wanderer/dashboard/attributes/networks",
+      },
+      {
+        title: "Years",
+        icon: IconCalendarStats,
+        href: "/wanderer/dashboard/attributes/years",
+      },
+    ],
   },
-  { title: "Team", icon: Users, href: { pathname: "/dashboard/team" } },
-  { title: "Manage Users", icon: IconUserCog, href: { pathname: "/dashboard/users" },
+  {
+    title: "Team",
+    icon: Users,
+    href: "/wanderer/dashboard/team",
+  },
+  {
+    title: "Manage Users",
+    icon: IconUserCog,
+    href: "/wanderer/dashboard/users",
     items: [
-      { title: "Users", icon: Users, href: { pathname: "/dashboard/users" } },
-      { title: "Subscription Users", icon: IconUserDollar, href: { pathname: "/dashboard/users-subscription" } },
+      {
+        title: "Users",
+        icon: Users,
+        href: "/wanderer/dashboard/users",
+      },
+      {
+        title: "Subscription Users",
+        icon: IconUserDollar,
+        href: "/wanderer/dashboard/users-subscription",
+      },
     ],
   },
 ] as const;
 
 const subscriptionSubItems = [
-  { title: "Categories", icon: IconCategory2, href: { pathname: "/dashboard/subscription/categories" } },
-  { title: "Plans", icon: IconCalendarDollar, href: { pathname: "/dashboard/subscription/plans" } },
-  { title: "Packages", icon: IconPackages, href: { pathname: "/dashboard/subscription/packages" } },
-  { title: "Terms", icon: IconClockHour4, href: { pathname: "/dashboard/subscription/terms" } },
+  {
+    title: "Categories",
+    icon: IconCategory2,
+    href: "/wanderer/dashboard/subscription/categories",
+  },
+  {
+    title: "Plans",
+    icon: IconCalendarDollar,
+    href: "/wanderer/dashboard/subscription/plans",
+  },
+  {
+    title: "Packages",
+    icon: IconPackages,
+    href: "/wanderer/dashboard/subscription/packages",
+  },
+  {
+    title: "Terms",
+    icon: IconClockHour4,
+    href: "/wanderer/dashboard/subscription/terms",
+  },
 ] as const;
 
 const documentItems: DocumentItem[] = [
-  { title: "Reports", icon: FileText, href: { pathname: "/dashboard/report" },
+  {
+    title: "Reports",
+    icon: FileText,
+    href: "/wanderer/dashboard/report",
     items: [
-      { title: "Report Users", icon: IconUserExclamation, href: { pathname: "/dashboard/report/users" } },
-      { title: "Report Posts", icon: IconCameraExclamation, href: { pathname: "/dashboard/report/posts" } },
+      {
+        title: "Report Users",
+        icon: IconUserExclamation,
+        href: "/wanderer/dashboard/report/users",
+      },
+      {
+        title: "Report Posts",
+        icon: IconCameraExclamation,
+        href: "/wanderer/dashboard/report/posts",
+      },
     ],
   }, // Use object style here too
-  { title: "Feedback", icon: IconMessageChatbot, href: { pathname: "/dashboard/feedback" } },
+  {
+    title: "Feedback",
+    icon: IconMessageChatbot,
+    href: "/wanderer/dashboard/feedback",
+  },
 ] as const; // <--- Add this
 
-
-export function AppSidebar() {
-  
-  
+export function AppSidebar({ userRole }: { userRole: string }) {
+  // The Team management page is super_admin-only — hide it from the sidebar
+  // for regular admins.
+  const visibleMenuItems = menuItems.filter(
+    (item) => item.title !== "Team" || userRole === "super_admin",
+  );
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-between">
           {/* LEFT SIDE */}
 
-          <Link href="/" className="flex items-center gap-2 w-full justify-start overflow-hidden">
+          <Link
+            href="/"
+            className="flex items-center gap-2 w-full justify-start overflow-hidden"
+          >
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
               <Image
                 src="/logo/psa-npic.png"
@@ -165,8 +240,7 @@ export function AppSidebar() {
               <span className="text-[#00a0e9]">KHMER</span>
             </span>
           </Link>
-          <div className="group-data-[collapsible=icon]:hidden">
-          </div>
+          <div className="group-data-[collapsible=icon]:hidden"></div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -174,7 +248,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {visibleMenuItems.map((item) => {
                 // If the item has sub-items (like Attributes), render a Collapsible group
                 if (item.items) {
                   return (
@@ -297,13 +371,11 @@ export function AppSidebar() {
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-            </SidebarMenu>
+            <SidebarMenu></SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-2">
-      </SidebarFooter>
+      <SidebarFooter className="p-2"></SidebarFooter>
     </Sidebar>
-  )
+  );
 }

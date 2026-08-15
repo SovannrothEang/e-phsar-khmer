@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -25,7 +26,10 @@ import { users, userPhones } from '../db/schema/users.schema';
 import type { UserRow } from '../db/schema/users.schema';
 import { listings } from '../db/schema/listings.schema';
 import { userSubscriptions } from '../db/schema/subscriptions.schema';
-import type { PaginatedResponse } from '../common/types/api-response.types';
+import type {
+  PaginatedResponse,
+  RequestUser,
+} from '../common/types/api-response.types';
 import type { ListUsersDto } from './dto/list-users.dto';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
@@ -297,7 +301,15 @@ export class AdminService {
     return this.toPublic(user);
   }
 
-  async createUser(dto: CreateUserDto): Promise<PublicUser> {
+  async createUser(
+    dto: CreateUserDto,
+    requester: RequestUser,
+  ): Promise<PublicUser> {
+    // Only super_admin can assign admin or super_admin roles.
+    if (dto.role && dto.role !== 'user' && requester.role !== 'super_admin') {
+      throw new ForbiddenException('ONLY_SUPER_ADMIN_CAN_ASSIGN_ADMIN_ROLES');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const primaryPhone = dto.phones?.[0] ?? null;
 
@@ -336,7 +348,20 @@ export class AdminService {
     }
   }
 
-  async updateUser(id: string, dto: UpdateUserDto): Promise<PublicUser> {
+  async updateUser(
+    id: string,
+    dto: UpdateUserDto,
+    requester: RequestUser,
+  ): Promise<PublicUser> {
+    // Only super_admin can assign admin or super_admin roles.
+    if (
+      dto.role !== undefined &&
+      dto.role !== 'user' &&
+      requester.role !== 'super_admin'
+    ) {
+      throw new ForbiddenException('ONLY_SUPER_ADMIN_CAN_ASSIGN_ADMIN_ROLES');
+    }
+
     const patch: Partial<UserRow> = {};
     if (dto.username !== undefined) patch.username = dto.username;
     if (dto.role !== undefined) patch.role = dto.role;

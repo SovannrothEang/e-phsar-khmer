@@ -10,7 +10,10 @@ function makeDb() {
 }
 
 function makeService(db: ReturnType<typeof makeDb>) {
-  return new ListingsService(db as never);
+  const filesService = {
+    removeByPublicUrl: jest.fn().mockResolvedValue(undefined),
+  };
+  return new ListingsService(db as never, filesService as never);
 }
 
 // Builds a mock chain that terminates with .limit() → resolves to `result`.

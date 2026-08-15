@@ -1,10 +1,12 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { SupabaseService } from '../common/supabase/supabase.service';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
@@ -81,28 +83,63 @@ export class FilesService {
   }
 
   async remove(bucket: string, paths: string[]): Promise<void> {
-    await this.supabaseService.removeObjects(bucket, paths);
+    if (paths.length === 0) return;
+    const { error } = await this.supabaseService.removeObjects(bucket, paths);
+    if (error) {
+      // supabase-js resolves with { data, error } — it does not throw. Log the
+      // failure so orphaned objects are visible instead of silently dropped.
+      this.logger.warn(
+        `Failed to remove ${paths.length} object(s) from bucket "${bucket}": ${this.errorMessage(error)}`,
+      );
+    }
   }
 
   /**
    * Best-effort cleanup of the storage object backing a public URL. Derives the
    * object path from the URL (only matches URLs pointing into the default
    * bucket), silently skips non-storage values (e.g. "/placeholder.svg"), and
-   * swallows errors so a Supabase hiccup never fails a DB operation. Used by
-   * admin services when an icon/image leaves the DB (entity delete or replace).
+   * never throws, so a Supabase hiccup never fails a DB operation. Failures are
+   * logged. Used by admin services when an icon/image leaves the DB (entity
+   * delete or replace).
    */
   async removeByPublicUrl(publicUrl: string | null): Promise<void> {
     if (!publicUrl) return;
     const bucket = this.defaultBucket;
     const marker = `/object/public/${bucket}/`;
     const idx = publicUrl.indexOf(marker);
-    if (idx === -1) return;
-    const objectPath = publicUrl.slice(idx + marker.length);
-    try {
-      await this.supabaseService.removeObjects(bucket, [objectPath]);
-    } catch {
-      // Best-effort — don't surface storage failures from a delete/update.
+    if (idx === -1) {
+      if (publicUrl.startsWith('http')) {
+        // A stored http URL that is not in our public bucket can never be
+        // removed here — surface it so it can be traced back to its source.
+        this.logger.warn(
+          `Stored URL is not in the "${bucket}" public bucket; cannot clean up: ${publicUrl}`,
+        );
+      }
+      return;
     }
+    const objectPath = this.decodeObjectPath(
+      publicUrl.slice(idx + marker.length),
+    );
+    if (!objectPath) return;
+    await this.remove(bucket, [objectPath]);
+  }
+
+  /** Strips query params (e.g. Supabase cache-busting tokens) and URI-decodes the object path. */
+  private decodeObjectPath(raw: string): string {
+    const withoutQuery = raw.split('?')[0];
+    try {
+      return decodeURIComponent(withoutQuery);
+    } catch {
+      // Malformed percent-encoding — fall back to the raw path so cleanup
+      // still attempts (and logs) a best-effort removal.
+      return withoutQuery;
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    return typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message: unknown }).message)
+      : String(error);
   }
 
   private validateImage(file: Express.Multer.File) {

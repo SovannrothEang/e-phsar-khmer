@@ -18,6 +18,7 @@ import {
 } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
+import { FilesService } from '../files/files.service';
 import type { DbClient } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import type {
@@ -38,7 +39,10 @@ export interface ListingWithPhotos extends ListingRow {
 
 @Injectable()
 export class ListingsService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly filesService: FilesService,
+  ) {}
 
   async create(
     userId: string,
@@ -155,6 +159,13 @@ export class ListingsService {
 
     let photos: ListingPhotoRow[];
     if (dto.photos !== undefined) {
+      // Capture existing photo URLs so removed objects can be cleaned up
+      // after the row swap (removeByPublicUrl warns on error, never throws).
+      const existingPhotos = await this.db
+        .select({ url: listingPhotos.url })
+        .from(listingPhotos)
+        .where(eq(listingPhotos.listingId, id));
+
       await this.db
         .delete(listingPhotos)
         .where(eq(listingPhotos.listingId, id));
@@ -173,6 +184,14 @@ export class ListingsService {
       } else {
         photos = [];
       }
+
+      // Best-effort cleanup of photos dropped from the payload.
+      const keptUrls = new Set(dto.photos.map((p) => p.url));
+      await Promise.all(
+        existingPhotos
+          .filter((p) => !keptUrls.has(p.url))
+          .map((p) => this.filesService.removeByPublicUrl(p.url)),
+      );
     } else {
       photos = await this.db
         .select()

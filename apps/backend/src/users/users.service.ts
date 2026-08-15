@@ -20,6 +20,7 @@ import {
 } from '../db/schema/users.schema';
 import type { UserRow, UserPhoneRow } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
+import { FilesService } from '../files/files.service';
 import { ConfigService } from '@nestjs/config';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import type { AddPhoneDto } from './dto/add-phone.dto';
@@ -42,6 +43,7 @@ export class UsersService {
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
+    private readonly filesService: FilesService,
   ) {}
 
   async findById(id: string): Promise<PublicUser> {
@@ -295,11 +297,24 @@ export class UsersService {
     if (error) throw new ForbiddenException('Failed to upload profile photo');
 
     const { data } = this.supabaseService.getPublicUrl(bucket, path);
+
+    // Read the prior URL so the old avatar can be cleaned up after the swap.
+    const [prior] = await this.db
+      .select({ url: users.profilePhotoUrl })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
     const [updated] = await this.db
       .update(users)
       .set({ profilePhotoUrl: data.publicUrl, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
+
+    // Best-effort cleanup — removeByPublicUrl warns on error, never throws.
+    if (prior?.url && prior.url !== data.publicUrl) {
+      await this.filesService.removeByPublicUrl(prior.url);
+    }
 
     return this.toPublicUser(updated);
   }
@@ -322,11 +337,24 @@ export class UsersService {
     if (error) throw new ForbiddenException('Failed to upload cover photo');
 
     const { data } = this.supabaseService.getPublicUrl(bucket, path);
+
+    // Read the prior URL so the old cover can be cleaned up after the swap.
+    const [prior] = await this.db
+      .select({ url: users.coverPhotoUrl })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
     const [updated] = await this.db
       .update(users)
       .set({ coverPhotoUrl: data.publicUrl, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
+
+    // Best-effort cleanup — removeByPublicUrl warns on error, never throws.
+    if (prior?.url && prior.url !== data.publicUrl) {
+      await this.filesService.removeByPublicUrl(prior.url);
+    }
 
     return this.toPublicUser(updated);
   }

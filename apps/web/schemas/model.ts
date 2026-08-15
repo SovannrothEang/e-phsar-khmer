@@ -15,7 +15,6 @@ export const modelSchema = z.object({
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
       "Model slug must be lowercase with hyphens only (e.g. my-category)",
     ),
-  image: z.string(),
   brandId: z.string().min(1, "Brand ID is required"),
   categoryId: z.string().min(1, "Category ID is required"),
   subcategories: z.array(z.string()).min(1, "Select at least one subcategory"),

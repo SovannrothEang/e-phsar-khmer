@@ -16,7 +16,15 @@ function makeDb() {
 }
 
 function makeService(db: ReturnType<typeof makeDb>) {
-  const service = new UsersService(db as never, {} as never, {} as never);
+  const filesService = {
+    removeByPublicUrl: jest.fn().mockResolvedValue(undefined),
+  };
+  const service = new UsersService(
+    db as never,
+    {} as never,
+    {} as never,
+    filesService as never,
+  );
   (service as unknown as { db: unknown }).db = db;
   return service;
 }

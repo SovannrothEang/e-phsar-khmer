@@ -1,9 +1,9 @@
 import "server-only";
 import {
-  clearSession,
-  getAccessToken,
-  getRefreshToken,
-  setSession,
+  clearAdminSession,
+  getAdminAccessToken,
+  getAdminRefreshToken,
+  setAdminSession,
 } from "@/lib/auth/session";
 
 export const API_URL = process.env.API_URL ?? "http://localhost:3000/api/v1";
@@ -56,7 +56,7 @@ function rawFetch(
 }
 
 async function tryRefresh(): Promise<string | null> {
-  const refreshToken = await getRefreshToken();
+  const refreshToken = await getAdminRefreshToken();
   if (!refreshToken) return null;
 
   const res = await fetch(`${API_URL}/auth/refresh`, {
@@ -75,7 +75,7 @@ async function tryRefresh(): Promise<string | null> {
   try {
     // Cookie writes only succeed inside a Server Action / Route Handler; during
     // an RSC render this throws — swallow it so the retried request still works.
-    await setSession({
+    await setAdminSession({
       accessToken: body.data.accessToken,
       refreshToken: body.data.refreshToken ?? refreshToken,
     });
@@ -99,7 +99,7 @@ export async function serverFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<ApiResult<T>> {
-  let token = await getAccessToken();
+  let token = await getAdminAccessToken();
   let res = await rawFetch(path, init, token);
 
   if (res.status === 401) {
@@ -115,7 +115,7 @@ export async function serverFetch<T>(
   if (!res.ok || !body?.success) {
     if (res.status === 401) {
       try {
-        await clearSession();
+        await clearAdminSession();
       } catch {
         /* read-only context */
       }

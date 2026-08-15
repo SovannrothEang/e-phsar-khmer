@@ -5,7 +5,7 @@ import { serverFetch, ApiError } from "@/lib/api/client";
 import z from "zod";
 
 // The form's categoryId + subcategories are UI-only (they drive the cascade to
-// pick a brand); the backend model only needs brandId + slug + name + image.
+// pick a brand); the backend model only needs brandId + slug + name.
 
 export async function createModel(unsafeData: z.infer<typeof modelSchema>) {
   const parsed = modelSchema.safeParse(unsafeData);
@@ -18,7 +18,6 @@ export async function createModel(unsafeData: z.infer<typeof modelSchema>) {
         brandId: parsed.data.brandId,
         slug: parsed.data.slug,
         name: parsed.data.name,
-        image: parsed.data.image || null,
       }),
     });
     return { success: true };
@@ -43,7 +42,6 @@ export async function updateModel(
         brandId: parsed.data.brandId,
         slug: parsed.data.slug,
         name: parsed.data.name,
-        image: parsed.data.image || null,
       }),
     });
     return { success: true };

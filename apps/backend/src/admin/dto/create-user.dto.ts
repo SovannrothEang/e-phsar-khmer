@@ -18,8 +18,8 @@ export class CreateUserDto {
   password: string;
 
   @IsOptional()
-  @IsEnum(['user', 'admin'])
-  role?: 'user' | 'admin' = 'user';
+  @IsEnum(['user', 'admin', 'super_admin'])
+  role?: 'user' | 'admin' | 'super_admin' = 'user';
 
   @IsOptional()
   @IsString()

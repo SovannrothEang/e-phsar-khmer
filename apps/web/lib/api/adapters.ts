@@ -10,8 +10,9 @@ export interface BackendUser {
   lastName: string | null;
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
-  role: "user" | "admin";
+  role: "user" | "admin" | "super_admin";
   status: "active" | "suspended" | "deleted";
+  preferredLanguage: string;
   isBusiness: boolean;
   phoneVerifiedAt: string | null;
   emailVerifiedAt: string | null;

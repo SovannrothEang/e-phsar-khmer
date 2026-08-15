@@ -32,7 +32,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getUserReports,
@@ -79,6 +80,7 @@ export default function ReportUsersPage() {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [tab, setTab] = useState("all");
   const router = useRouter();
+  const locale = useLocale();
 
   const updateStatus = async (id: string, status: ReportUser["Status"]) => {
     const s = status.toLowerCase() as "pending" | "approved" | "rejected";
@@ -290,10 +292,7 @@ export default function ReportUsersPage() {
                           (report as ReportUserRow)._targetName
                             ?.replace(/\s+/g, "-")
                             .toLowerCase() + report.TargetUserID;
-                        router.push({
-                          pathname: `/[slug]`,
-                          params: { slug },
-                        });
+                        router.push(`/${locale}/${slug}`);
                       }}
                       className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"
                     >

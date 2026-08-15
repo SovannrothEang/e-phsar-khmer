@@ -19,12 +19,6 @@ interface BackendBrand {
   categoryId: string | null;
 }
 
-function iconToSrc(image: string | null | undefined): string {
-  if (image && (image.startsWith("/") || image.startsWith("http")))
-    return image;
-  return "/placeholder.svg";
-}
-
 export async function getAdminModels(): Promise<Model[]> {
   const [{ data: models }, { data: brands }] = await Promise.all([
     serverFetch<BackendModel[]>("/admin/models"),
@@ -41,7 +35,6 @@ export async function getAdminModels(): Promise<Model[]> {
       modelId: m.id,
       name: m.name,
       slug: m.slug,
-      image: iconToSrc(m.image),
       brandId: m.brandId,
       categoryId: b?.categoryId ?? "",
       subcategories: b?.subcategoryIds ?? [],

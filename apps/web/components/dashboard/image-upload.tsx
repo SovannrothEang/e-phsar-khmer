@@ -17,6 +17,10 @@ interface ImageUploadProps {
   label?: string;
   accept?: string;
   className?: string;
+  /** Called after a successful upload — lets the parent track uploads so it
+   *  can clean up files abandoned on cancel (the `path` is what `DELETE /files`
+   *  needs; the `url` identifies the upload in the form state). */
+  onUpload?: (upload: { path: string; url: string }) => void;
 }
 
 /**
@@ -33,6 +37,7 @@ export function ImageUpload({
   label = "Image",
   accept = "image/png,image/jpeg,image/webp",
   className,
+  onUpload,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -66,6 +71,7 @@ export function ImageUpload({
       }
 
       onChange(signed.data.publicUrl);
+      onUpload?.({ path: signed.data.path, url: signed.data.publicUrl });
       toast.success("Image uploaded");
     } catch {
       toast.error("Upload failed");

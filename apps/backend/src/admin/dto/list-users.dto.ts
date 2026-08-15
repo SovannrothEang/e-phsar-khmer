@@ -7,8 +7,8 @@ export class ListUsersDto {
   q?: string;
 
   @IsOptional()
-  @IsEnum(['user', 'admin'])
-  role?: 'user' | 'admin';
+  @IsEnum(['user', 'admin', 'super_admin'])
+  role?: 'user' | 'admin' | 'super_admin';
 
   @IsOptional()
   @IsEnum(['active', 'suspended', 'deleted'])

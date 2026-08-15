@@ -17,7 +17,7 @@ import { UpdateAttributeDto } from './dto/update-attribute.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin')
+@Roles('admin', 'super_admin')
 @UseGuards(RolesGuard)
 @Controller('admin/attributes/:type')
 export class AttributesController {

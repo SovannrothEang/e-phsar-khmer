@@ -1,6 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
-export const USER_ROLES = ["admin", "user"] as const
+export const USER_ROLES = ["super_admin", "admin", "user"] as const;
 
 export const usersSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -12,12 +12,12 @@ export const usersSchema = z.object({
     .array(
       z.object({
         phone: z.string().min(1, "Phone is required"),
-      })
+      }),
     )
     .min(1, "At least one phone number is required")
     .max(3, "Maximum 3 phone numbers"),
   role: z.enum(USER_ROLES),
-})
+});
 
 export const editUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,13 +29,13 @@ export const editUserSchema = z.object({
     .array(
       z.object({
         phone: z.string().min(1, "Phone is required"),
-      })
+      }),
     )
     .min(1, "At least one phone number is required")
     .max(3, "Maximum 3 phone numbers"),
   role: z.enum(USER_ROLES),
-})
+});
 
 export const deleteUserSchema = z.object({
   userId: z.string().min(1, "User ID is required"),
-})
+});

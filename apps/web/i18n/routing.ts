@@ -1,9 +1,7 @@
-
 import { defineRouting } from "next-intl/routing";
 import { createNavigation } from "next-intl/navigation";
 
 export const routing = defineRouting({
-
   locales: ["en", "km", "zh", "ko", "id", "vi"],
 
   defaultLocale: "en",
@@ -21,24 +19,18 @@ export const routing = defineRouting({
     "/register": {},
     "/forgot-password": {},
 
-    "/category": {
-    },
+    "/category": {},
 
-    "/category/[categorySlug]": {
-    },
+    "/category/[categorySlug]": {},
 
-    "/category/[categorySlug]/[subcategorySlug]": {
-    },
+    "/category/[categorySlug]/[subcategorySlug]": {},
 
-    "/category/[categorySlug]/[subcategorySlug]/[brandOrType]": {
-    },
+    "/category/[categorySlug]/[subcategorySlug]/[brandOrType]": {},
 
-    "/category/[categorySlug]/[subcategorySlug]/[brandOrType]/[modelSlug]": {
-    },
+    "/category/[categorySlug]/[subcategorySlug]/[brandOrType]/[modelSlug]": {},
 
     "/post": {},
-    "/[slug]": {
-    },
+    "/[slug]": {},
     "/sell": {},
 
     "/about": {},
@@ -54,45 +46,7 @@ export const routing = defineRouting({
       zh: "/all-ads",
     },
 
-    "/dashboard": {},
-    "/dashboard/categories": {},
-    "/dashboard/subcategories": {},
-    "/dashboard/attributes": {},
-    "/dashboard/attributes/brands": {},
-    "/dashboard/attributes/models": {},
-    "/dashboard/attributes/bodytypes": {},
-    "/dashboard/attributes/enginetypes": {},
-    "/dashboard/attributes/vehicletypes": {},
-    "/dashboard/attributes/accessories": {},
-    "/dashboard/attributes/types": {},
-    "/dashboard/attributes/jobtypes": {},
-    "/dashboard/attributes/networks": {},
-    "/dashboard/attributes/bathrooms": {},
-    "/dashboard/attributes/bedrooms": {},
-    "/dashboard/attributes/facings": {},
-    "/dashboard/attributes/experiences": {},
-    "/dashboard/attributes/storages": {},
-    "/dashboard/attributes/screensizes": {},
-    "/dashboard/attributes/rams": {},
-    "/dashboard/attributes/cpus": {},
-    "/dashboard/attributes/vgas": {},
-    "/dashboard/attributes/colors": {},
-    "/dashboard/attributes/years": {},
-    "/dashboard/team": {},
-    "/dashboard/users": {},
-    "/dashboard/users-subscription": {},
-    "/dashboard/subscription": {},
-    "/dashboard/subscription/categories": {},
-    "/dashboard/subscription/packages": {},
-    "/dashboard/subscription/terms": {},
-    "/dashboard/subscription/plans": {},
-    "/dashboard/report": {},
-    "/dashboard/report/users": {},
-    "/dashboard/report/posts": {},
-    "/dashboard/feedback": {},
-
-    "/me": {
-    },
+    "/me": {},
     "/me/about": {},
     "/me/applied-jobs": {},
     "/me/billing-addresses": {},
@@ -101,22 +55,13 @@ export const routing = defineRouting({
     "/me/saved": {},
     "/me/subscriptions": {},
 
-    "/[username]": {
+    "/[username]": {},
+    "/[username]/about": {},
+    "/membership": {},
 
-    },
-    "/[username]/about": {
-      
-    },
-    "/membership": {  
-     
-    },
+    "/premium-account": {},
 
-    "/premium-account": {
-     
-    },
-
-    "/premium-account/[category]": {
-    },
+    "/premium-account/[category]": {},
     "/checkout": {},
     "/settings": {},
     "/settings/edit-profile": {},
@@ -129,25 +74,20 @@ export const routing = defineRouting({
     "/billing-addresses": {},
     "/billing-addresses/add": {},
     "/notifications": {},
-    "/chats":{},
-    "/contact-us": {
-    },
+    "/chats": {},
+    "/contact-us": {},
 
-    "/account-deletion": {
-    },
-    "/privacy-policy": {
-    },
+    "/account-deletion": {},
+    "/privacy-policy": {},
 
     "/feedback": {},
 
-    "/posting-rule": {
-    },
+    "/posting-rule": {},
 
-    "/safety-tips": {
-    },
-
-  }
+    "/safety-tips": {},
+  },
 });
 
 export type Locale = (typeof routing.locales)[number];
-export const { Link, redirect, usePathname, useRouter, getPathname } = createNavigation(routing);
+export const { Link, redirect, usePathname, useRouter, getPathname } =
+  createNavigation(routing);

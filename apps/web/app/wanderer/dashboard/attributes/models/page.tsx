@@ -72,8 +72,6 @@ import { getAdminModels } from "@/actions/admin-models";
 import type { Brand } from "@/types/brand";
 import z from "zod";
 import { Model } from "@/types/model";
-import Image from "next/image";
-import { ImageUpload } from "@/components/dashboard/image-upload";
 
 type ModelFormData = z.infer<typeof modelSchema>;
 
@@ -128,7 +126,6 @@ function AddModelForm({
     defaultValues: {
       name: "",
       slug: "",
-      image: "",
       brandId: "",
       categoryId: "",
       subcategories: [] as string[],
@@ -160,17 +157,6 @@ function AddModelForm({
 
         <form.AppField name="slug">
           {(field) => <field.Input label="Slug" required />}
-        </form.AppField>
-
-        <form.AppField name="image">
-          {(field) => (
-            <ImageUpload
-              scope="model"
-              value={field.state.value}
-              onChange={(url) => form.setFieldValue("image", url)}
-              label="Image"
-            />
-          )}
         </form.AppField>
 
         {/* Step 1: Select Category */}
@@ -336,7 +322,6 @@ function EditModelForm({
     defaultValues: {
       name: model.name,
       slug: model.slug,
-      image: model.image,
       brandId: model.brandId,
       categoryId: model.categoryId,
       subcategories: model.subcategories,
@@ -368,17 +353,6 @@ function EditModelForm({
 
         <form.AppField name="slug">
           {(field) => <field.Input label="Slug" required />}
-        </form.AppField>
-
-        <form.AppField name="image">
-          {(field) => (
-            <ImageUpload
-              scope="model"
-              value={field.state.value}
-              onChange={(url) => form.setFieldValue("image", url)}
-              label="Image"
-            />
-          )}
         </form.AppField>
 
         {/* Step 1: Select Category */}
@@ -694,7 +668,6 @@ export default function ModelsPage() {
                   <TableHead className="text-center">ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Slug</TableHead>
-                  <TableHead className="text-start">Image</TableHead>
                   <TableHead>Brand</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Sub Category</TableHead>
@@ -727,16 +700,6 @@ export default function ModelsPage() {
                     <TableCell>{model.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {model.slug}
-                    </TableCell>
-                    <TableCell>
-                      <Image
-                        src={model.image}
-                        alt={model.name}
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 object-contain rounded border bg-muted/30 p-0.5"
-                        unoptimized
-                      />
                     </TableCell>
                     <TableCell>
                       {allBrands.find((b) => b.brandId === model.brandId)?.name}

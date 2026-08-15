@@ -1,14 +1,11 @@
-import { Link, routing } from "@/i18n/routing";
+import Link from "next/link";
 import { ATTRIBUTE_TYPES } from "@/lib/attribute-types";
 
-type Pathname = keyof typeof routing.pathnames;
-type AttributePathname = Extract<Pathname, `/dashboard/attributes/${string}`>;
-
 const ATTRIBUTES = [
-  { href: "/dashboard/attributes/brands", title: "Brands" },
-  { href: "/dashboard/attributes/models", title: "Models" },
+  { href: "/wanderer/dashboard/attributes/brands", title: "Brands" },
+  { href: "/wanderer/dashboard/attributes/models", title: "Models" },
   ...ATTRIBUTE_TYPES.map((a) => ({
-    href: `/dashboard/attributes/${a.type}` as AttributePathname,
+    href: `/wanderer/dashboard/attributes/${a.type}`,
     title: a.title,
   })),
 ] as const;

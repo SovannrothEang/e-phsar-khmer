@@ -586,7 +586,7 @@ export default function TeamPage({
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["admin", "team"],
-    queryFn: () => getAdminUsers({ role: "admin" }),
+    queryFn: () => getAdminUsers({ role: "super_admin" }),
     initialData,
   });
   const users = data?.users ?? [];

@@ -10,7 +10,7 @@ import type { RequestUser } from '../../common/types/api-response.types';
 
 interface JwtPayload {
   sub: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'super_admin';
 }
 
 @Injectable()
