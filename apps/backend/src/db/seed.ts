@@ -37,7 +37,7 @@ async function seed() {
       })
       .onConflictDoUpdate({
         target: categories.slug,
-        set: { sortOrder: cat.sortOrder, icon: cat.icon ?? null },
+        set: { sortOrder: cat.sortOrder },
       })
       .returning({ id: categories.id });
 

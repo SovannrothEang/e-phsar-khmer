@@ -42,7 +42,10 @@ export async function updatesubcategories(
         categoryId: parsed.data.categoryId,
         slug: parsed.data.slug,
         name: parsed.data.name,
-        icon: parsed.data.subIcon || null,
+        icon:
+          parsed.data.subIcon && parsed.data.subIcon !== "/placeholder.svg"
+            ? parsed.data.subIcon
+            : null,
       }),
     });
     return { success: true };

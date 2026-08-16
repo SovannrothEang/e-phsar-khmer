@@ -1,67 +1,34 @@
-# Changes: spec-detail-twelve (Foods field_schema)
+# Changes: Fix admin category/subcategory image disappearance
 
-**Date:** 2026-07-03
-**Branch:** `ship/spec-detail-eleven` (established workflow stacks spec-detail ships on one branch)
-**Spec:** `.pipeline/spec.md` (planner, no open questions)
-**Source:** `apps/backend/spec-detail-twelve.md` + `spec-detail-one.md` L197-208 (Foods = 10 subcategories, one shared form)
-
-## Summary
-
-Populated `fieldSchema` on all **10 Foods subcategories** in
-`apps/backend/src/categories/seeds/categories.seed.ts`. Every subcategory shares one
-identical listing-creation form (same pattern as Pets/Jobs/Services). Seed-data only — no
-schema change, no migration, no runtime code touched. **Foods was the last bare main
-category; with this ship all 12 main categories carry field schemas.**
-
-Implemented exactly as `spec.md` prescribed — the 11 fields written **inline** per the
-established convention (matching `wardrobe-and-cabinets` / the just-shipped Pets block).
-No deviation this time: the planner correctly prescribed inline (not a `commonListingFields`
-const reference), so the coder followed the spec as-written.
+Implements `.pipeline/spec.md`. Three files changed, minimal diff, no new dependencies, no API contract changes.
 
 ## Files modified
 
-- `apps/backend/src/categories/seeds/categories.seed.ts` — the `foods` category block
-  (last entry in the `CATEGORIES` array, previously ~L11403-11416). The 10 bare entries
-  (`{ slug, name, sortOrder }`) each gained an inline 11-field `fieldSchema` array.
-  `slug` / `name` / `sortOrder` preserved verbatim; the array-closing `];` and all other
-  categories are untouched.
+| File                              | Change                                                                                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/backend/src/db/seed.ts`     | Dropped `icon` from the category upsert `onConflictDoUpdate` SET clause (line 40). Insert-side `icon: cat.icon ?? null` (line 35) untouched. |
+| `apps/web/actions/category.ts`    | `updatecategories`: `icon` now maps `""` and `"/placeholder.svg"` → `null` instead of persisting the placeholder.                            |
+| `apps/web/actions/subcaetgory.ts` | `updatesubcategories`: same guard for `subIcon`.                                                                                             |
 
-## Field set (identical for all 10 subcats)
+## Behavioral diffs
 
-Order/values copied field-for-field from `commonListingFields` / the `wardrobe-and-cabinets`
-block:
+- Re-running `pnpm --filter backend db:seed` no longer executes the equivalent of `UPDATE categories SET icon = NULL` across all 12 seeded slugs; admin-uploaded category icons survive re-seeds (matches the existing subcategory upsert convention, which never had `icon` in SET — root cause of the categories-vs-subcategories asymmetry).
+- Editing an image-less category/subcategory (e.g. rename only) now PATCHes `icon: null` instead of writing the fake path `"/placeholder.svg"` into the DB (edit forms are seeded from `iconToSrc()` which returns the placeholder for null icons). Column pollution stops.
+- Already-polluted rows (`"/placeholder.svg"` in `icon`) self-heal to null on their next edit, with no storage side effects (`removeByPublicUrl` silently skips non-storage paths).
+- Create flows unchanged: forms start at `""`, which `|| null` already maps to null.
 
-| #   | key           | type     | required | notes                                     |
-| --- | ------------- | -------- | -------- | ----------------------------------------- |
-| 1   | photos        | photos   | false    | `max: 8` (spec: `Photo (0/8)`)            |
-| 2   | title         | text     | **true** |                                           |
-| 3   | price         | price    | **true** |                                           |
-| 4   | discount      | discount | false    |                                           |
-| 5   | description   | text     | false    |                                           |
-| 6   | location      | location | false    | absorbs "(set on Google Maps)"            |
-| 7   | address       | text     | false    |                                           |
-| 8   | deliveryFree  | boolean  | false    | label `Free Delivery` (spec: `Delivery`)  |
-| 9   | contactName   | contact  | false    | spec: `Name`                              |
-| 10  | contactPhones | contact  | false    | `max: 3` (spec: `Phone Number (up to 3)`) |
-| 11  | contactEmail  | contact  | false    | spec: `Email`                             |
+## Verification performed at implement time (coder)
 
-No `type` (Type) field and no `conditionField` — the Foods form has neither. Labels en-only.
+- Edit excerpts uniqueness-scoped (`method: "PATCH",` prefix) because the bare `icon:` line is byte-identical in create/update bodies of both action files.
+- Zod schemas: `cateIcon`/`subIcon` are `z.string()` — required, non-nullable, no transforms; `""` passes validation and still maps to null (X-remove path preserved).
+- Placeholder literal confirmed byte-identical in `admin-categories.ts:32` and `admin-subcategories.ts:33`.
+- Single caller per update action (form `onSubmit`); no other path sends placeholder values.
+- Backend tolerance of `icon: null` is a proven path (X-remove already PATCHes null; `UpdateCategoryDto.icon` is `@IsOptional() @IsString()`).
+- Seed premise re-confirmed: `categories.seed.ts` has exactly one `icon` occurrence (the optional type field, line 13) — no seed data sets icons.
 
-Subcats (slug / name / sortOrder, all preserved): `meat`/Meat/1, `seafood`/Seafood/2,
-`fruits`/Fruits/3, `vegetables`/Vegetables/4, `beverages`/Beverages/5, `grocery`/Grocery/6,
-`bread-and-bakery`/**Bread & Bakery**/7, `beer-and-wine`/**Beer & Wine**/8,
-`rice-and-cereal`/**Rice & Cereal**/9, `other-foods`/Other Foods/10.
+## Out of scope (tracked in spec follow-ups)
 
-## Care point: literal-`&` names
-
-Three subcategory names contain a literal ampersand (`Bread & Bakery`, `Beer & Wine`,
-`Rice & Cereal`). These were preserved exactly — **not** HTML-escaped. Verified post-edit:
-`grep -c "&amp;"` → 0, and each literal name (`en: 'Bread & Bakery'` etc.) → 1.
-
-## Verification (see `.pipeline/test-results.md` for full gate output)
-
-- `fieldSchema:` count 136 → **146** (+10).
-- Foods region: 10 fieldSchema arrays; each of the 11 keys appears exactly 10×;
-  `required: true` ×20 (title+price); `max: 8` ×10 (photos); `max: 3` ×10 (contactPhones);
-  `key: 'type'` ×0, `key: 'condition'` ×0; array closes cleanly with `];`.
-- Lint / build / test all green; `eslint --fix` made no change (block already prettier-clean).
+- One-off SQL cleanup for already-polluted `icon` columns.
+- `sortOrder` also resets on re-seed (same SET clauses) — same pattern if wanted later.
+- `deleteUploaded` dead code in `apps/web/actions/files.ts` (orphaned-upload leak) — separate ticket.
+- Manual re-linking of already-nulled category icons (storage objects still exist under `category/` in the bucket).

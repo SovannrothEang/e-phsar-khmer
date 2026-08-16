@@ -40,7 +40,10 @@ export async function updatecategories(
       body: JSON.stringify({
         slug: parsed.data.slug,
         name: parsed.data.name,
-        icon: parsed.data.cateIcon || null,
+        icon:
+          parsed.data.cateIcon && parsed.data.cateIcon !== "/placeholder.svg"
+            ? parsed.data.cateIcon
+            : null,
       }),
     });
     return { success: true };
