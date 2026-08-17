@@ -326,10 +326,12 @@ import { toast } from "sonner"
 import { z } from "zod"
 import { useAppForm } from "@/components/form/hooks"
 import {  FaTelegramPlane } from "react-icons/fa";
+import { useRouter } from "@/i18n/routing"
 
 type FormData = z.infer<typeof registerSchema>
 
 export function RegisterForm() {
+  const router = useRouter()
 
   const form = useAppForm({
     defaultValues: {
@@ -364,10 +366,8 @@ export function RegisterForm() {
 
       if (res.success) {
         form.reset()
-        toast.success("Register successfully!", {
-          description: JSON.stringify(registerData, null, 2),
-          className: "whitespace-pre-wrap font-mono",
-        })
+        toast.success("Registered successfully! We sent a verification code to your phone.")
+        router.push({ pathname: "/otp", query: { phone: value.phoneNumber } })
       } else {
         toast.error("Failed to register.")
       }

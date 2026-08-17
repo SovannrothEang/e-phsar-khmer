@@ -1,45 +1,45 @@
-# Review: Fix admin category/subcategory image disappearance
+# Review — OTP verification screen (feat/otp-verification-screen)
 
-## Verdict
+## Verdict: APPROVE WITH NOTES — implementation matches spec and captain's constraints exactly (4/4-line behavior-only register diff verified, 6×1-digit shadcn card, honest mock); notes are non-blocking mock-stage tradeoffs already tracked as follow-ups.
 
-APPROVE WITH NOTES — the diff is exactly the spec's three-line fix, the root cause is independently re-confirmed, and every claimed tolerance path checks out in code; notes are branch hygiene and follow-ups only.
+## Evidence examined (files/diffs/claims verified)
 
-## Evidence audit
-
-Independently re-verified (all file:line from the working tree on fix/image-disappear-after-upload):
-
-1. **Diff fidelity:** seed.ts:40 is now `set: { sortOrder: cat.sortOrder }`; insert-side `icon: cat.icon ?? null` at seed.ts:35 untouched. Web guards at apps/web/actions/category.ts:43-46 and apps/web/actions/subcaetgory.ts:45-48 match the spec verbatim. Nothing else in code changed (git diff main: only the 3 code files + .pipeline docs + tasks/todo.md + the pre-existing pnpm deletions).
-2. **Primary root cause CONFIRMED:** apps/backend/src/categories/seeds/categories.seed.ts has exactly one `icon` occurrence — line 13, the optional type field. No seed datum sets an icon, so the old `cat.icon ?? null` was always null → every db:seed re-ran `UPDATE categories SET icon = NULL` across the 12 seeded slugs.
-3. **Asymmetry explanation CONFIRMED:** subcategory upsert (seed.ts:69-75) SET is `{ fieldSchema, sortOrder }` — never contained icon. That is genuinely why subcategory icons survived.
-4. **Placeholder loop CONFIRMED:** iconToSrc returns "/placeholder.svg" for null icons (admin-categories.ts:28-33, admin-subcategories.ts:29-34 — literal byte-identical to both new guards); edit forms init from it (categories/page.tsx:140, SubCategoriesClient.tsx:188); old `|| null` persisted the truthy placeholder.
-5. **Backend null tolerance:** UpdateCategoryDto/UpdateSubcategoryDto `icon` is `@IsOptional() @IsString()`; service gate `if (dto.icon !== undefined) patch.icon = dto.icon` (admin-categories.service.ts:99, subcategories equivalent) writes null — pre-existing proven path (X-remove).
-6. **Self-heal storage safety:** polluted row healing fires the cleanup gate (`dto.icon !== undefined && oldIcon && dto.icon !== oldIcon`, admin-categories.service.ts:138-140), but removeByPublicUrl("/placeholder.svg") finds no `/object/public/<bucket>/` marker and doesn't start with http → silent return (files.service.ts:105-119). No storage side effect. Real-icon rename-only edits send the identical URL (iconToSrc pass-through) → gate skips → no delete.
-7. **Single callers:** updatecategories only at categories/page.tsx:147; updatesubcategories only at SubCategoriesClient.tsx:196. Only the four action files touch /admin/categories|subcategories in web. deleteUploaded (files.ts:54) has zero callers — dead-code claim confirmed.
-8. **Create flows:** create form defaults cateIcon:"" (page.tsx:65) / subIcon:"" (SubCategoriesClient.tsx:99) → existing `|| null` suffices; correctly no guard added. zod `cateIcon`/`subIcon` are bare `z.string()` — "" validates and maps to null (X-remove preserved; image-upload X button calls onChange("")).
-9. **isActive edge case:** absent from both insert values and SET clauses — admin toggles survive re-seed. Admin-created rows (non-seed slugs) never hit the conflict target — unaffected.
-10. **Gates:** not re-run by the reviewer (read-only); test-results.md claims are specific and internally consistent, and the lone lint-warning file (AdminLoginForm.tsx) is confirmed absent from the diff.
+- `.pipeline/spec.md`, `changes.md`, `test-results.md` — read in full; cross-checked against code below.
+- `git diff` working-tree vs HEAD — scope is exactly the 4 claimed web files (+ pipeline docs; the `pnpm-lock.yaml`/`pnpm-workspace.yaml` deletions are pre-existing on-branch, correctly called out in G0).
+- `apps/web/components/auth/RegisterForm.tsx` — numstat **4 insertions / 4 deletions** confirmed; hunks at `@@ -328`, `@@ -332`, `@@ -367` — all in live code (≥ 315); dead commented block (lines 1–314) untouched; **file still CRLF** (`file` reports CRLF terminators; diff lines carry `\r`). Diff content: import + `useRouter()` + success-branch toast/push only — **zero JSX/class changes, register design unchanged**. Bonus: removes the old toast that printed the password via `JSON.stringify(registerData)`.
+- `apps/web/i18n/routing.ts` — exactly one added line `"/otp": {},` after `"/register"`.
+- `apps/web/components/auth/OtpVerifyForm.tsx` (new) — matches spec plan point-by-point: `{ phone }` prop, single `InputOTPGroup` of 6 slots (no 3+3 separator, unlike the `OtpForm.tsx` template — spec decision 6 correctly applied), slot classes `h-12 w-12 text-xl`, demo code `123456` with visible hint, `<6` digits / wrong-code error toasts, empty-phone fallback card, resend mock toast (exact `OtpForm.tsx:89` pattern), back arrow + "Wrong number?" link to `/register`, success → `router.push("/login")`, plain `<form onSubmit>`.
+- `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx` (new) — matches the spec's code block verbatim (server component, `await searchParams` Next-16 convention, `phone ?? ""`).
+- `apps/web/components/auth/OtpForm.tsx` — untouched (absent from `git status`), per spec decision 5.
+- `apps/web/components/auth/LoginForm.tsx` — confirms the claimed `useRouter`/`Link` from `@/i18n/routing` idiom.
+- `apps/web/schemas/register.ts` — `phoneNumber` is a required validated field (`min(8).max(10)`), so `query: { phone: value.phoneNumber }` is always populated on the success path.
+- `apps/web/proxy.ts` — `/otp` is locale-prefixed user surface → routed through next-intl middleware; no guard interferes.
+- G4 static assertions independently re-run (numstat, hunk positions, `"/otp": {}` count, OtpForm diff empty) — all reproduce.
 
 ## Findings
 
-1. [note] Working tree also carries pre-existing deletions of apps/web/pnpm-lock.yaml + pnpm-workspace.yaml (present before this branch's work) plus tasks/todo.md and .pipeline docs. Committing the branch wholesale would ride those along — stage selectively when landing.
-2. [note] Legacy short-identifier icon values (not starting with "/" or "http") render as placeholder and now heal to null on edit instead of persisting "/placeholder.svg" — strictly better; pre-existing quirk already disclosed in test-results.md.
-3. [follow-up] Translations upsert clobbers admin renames on re-seed: seed.ts:47-56 and 84-91 `set: { name: value }` overwrite admin-edited 'en' names (admin update writes to category_translations/subcategory_translations locale 'en', admin-categories.service.ts:106-117). Same class of bug as the icon one — the next most impactful seed clobber.
-4. [follow-up] sortOrder still resets on re-seed (seed.ts:40 and 73) — spec flags it; confirmed still present (correctly left alone here).
+1. **[note] Spec deviation (typed-route push) is correctly handled and documented.** The spec's template-literal ``router.push(`/otp?phone=…`)`` fails next-intl's typed `Href`; the shipped object form `router.push({ pathname: "/otp", query: { phone: value.phoneNumber } })` is the documented next-intl 4.x API. Documented in `changes.md`, root-caused with verbatim error in `test-results.md` G1, fix re-run green. Deviation is an improvement, not a dodge.
+2. **[note] Phone number is carried in the URL query param and displayed unmasked.** Acceptable for a mock (survives refresh, debuggable — the spec's stated rationale), but phone numbers in URLs persist in browser history. When wiring the real flow, prefer masking the display (e.g. `•••• 123`) and passing the phone server-side or in POST body.
+3. **[note] `(Demo code: 123456)` is visible in production UI.** Intentional per spec decision 2 and honest about the mock; must be stripped when real verification lands. Also note the code itself (`value === "123456"`) is client-side — trivially bypassable; fine for mock, meaningless as security.
+4. **[note] "Login by phone" phrasing vs implemented flow.** The captain's step-by-step description ("user will register, with phone number on register, and after user click submit … redirect to otp screen") unambiguously describes the register→OTP flow, which is what shipped. There is **no OTP path at login** for existing users (`LoginForm` is username/password → `/`). The backend (`POST /auth/register` + `POST /auth/otp/verify`) supports both; if the captain also wants OTP at login time, that is a separate follow-up, not a gap in this spec.
+5. **[note] Back-arrow `Button` has no `aria-label`.** Copied from `OtpForm.tsx` (same omission), so consistent with sibling code; icon-only button is unnamed for screen readers. Fix opportunistically with the dead-code cleanup.
+6. **[note] Resend is a pure mock toast — no cooldown, no new code.** Spec decision 7, honest for mockup; follow-up already tracked.
+7. **[note] No browser-level verification exists** (repo has no e2e harness). G1's route manifest proves `/[locale]/otp` registered; the interactive behaviors (toast → redirect, per-locale render) are untested-but-type-checked. Consistent with repo norms; the "Not covered" list in `test-results.md` is accurate and appropriately scoped.
 
-No blockers.
+No blockers. Register design constraint honored (verified at diff level, not just claimed); no scope creep (dead code left alone, `OtpForm.tsx` untouched, no locale/backend edits); the four pipeline artifacts are mutually consistent — no claim in `changes.md`/`test-results.md` is contradicted by the code.
 
-## Follow-up tickets
+## Follow-up tickets (ready-to-file one-liners with suggested scope)
 
-1. One-off SQL cleanup: `UPDATE categories SET icon = NULL WHERE icon = '/placeholder.svg'` (same for subcategories); self-heal-on-edit only reaches rows someone edits.
-2. Ops script to re-link already-nulled category icons — the storage objects still exist under the `category/` scope in the bucket; the seed never deleted objects.
-3. Seed: drop `sortOrder` from the category/subcategory upsert SETs (seed.ts:40, 73) if admin manual ordering should survive re-seeds.
-4. Seed: stop clobbering admin-edited 'en' translations (seed.ts:47-56, 84-91) — e.g. onConflictDoNothing for translations, or a documented decision that seed names are authoritative.
-5. Remove or wire up dead `deleteUploaded` (apps/web/actions/files.ts:54) — orphaned-upload leak.
+- **Real OTP wiring (web+backend):** collapse register form to phone-first or extend `POST /api/v1/auth/register` to accept name/password, then call `POST /api/v1/auth/otp/verify` from `/otp`; remove demo code + hint from `OtpVerifyForm.tsx`. (Spec "Out of scope" #1.)
+- **User-surface session plumbing:** `setUserSession` + `userServerFetch` so a real verify lands the user in an authenticated state instead of routing to `/login`. (Spec "Out of scope" #2.)
+- **Login-time phone OTP:** if the captain wants OTP for existing users at login (the "after normal user login by phone number" reading), add an OTP step to the login flow — backend already supports it.
+- **Resend cooldown/countdown + real SMS/Telegram copy** once a provider is wired. (Spec "Out of scope" #3.)
+- **Dead-code cleanup:** delete unused `InputOTPForm` in `OtpForm.tsx` and the commented block in `RegisterForm.tsx` lines 1–314; add `aria-label` to icon-only back buttons while there. (Spec "Out of scope" #4.)
+- **Phone display masking + non-URL hand-off** when real PII is involved (finding 2).
 
-## Captain's morning-review summary
+## Answers to the captain's questions (concise recap)
 
-- What was broken: every `db:seed` re-run executed the equivalent of `UPDATE categories SET icon = NULL` — the seed defines no icons but its upsert SET included icon. Subcategories never had icon in their SET, which is exactly why they partially survived. Separately, editing any image-less row wrote the fake path "/placeholder.svg" into the DB because edit forms pre-fill from a placeholder fallback.
-- The fix is 3 changed lines across 3 files: drop icon from the seed's SET clause, and map ""/"/placeholder.svg" → null in both update server actions. No backend, DTO, dependency, or API-contract changes.
-- Nothing in storage was ever deleted by the bug — old category icons are still in the bucket and recoverable manually; polluted DB rows self-heal to null on their next edit with zero storage side effects.
-- Gates are green per the tester (149/149 backend tests, builds, lints; one pre-existing warning in an untouched file); the one live-DB re-seed check was not executed and is honestly disclosed as an uncovered risk.
-- Still manual after this ships: the one-off SQL cleanup for placeholder-polluted rows, re-linking the nulled icons, and the follow-up seed clobbers (sortOrder, en-translation names) plus the dead deleteUploaded action.
+- **Did we have an OTP screen after login/register by phone?** No — nothing existed on the user surface before this change; `OtpForm.tsx` was unused dead code with Telegram/email copy and parent-driven props.
+- **Did we have a page for it?** No — no `/otp` route existed. Now created: `app/[locale]/(user)/(auth)/otp/page.tsx` + locale-aware `"/otp"` in `i18n/routing.ts`.
+- **Was the existing form enough, even as mockup?** As a template yes, as the screen no — it had no route, no phone display, wrong copy, and expected a parent to own verification/navigation. The new `OtpVerifyForm` keeps its proven 6-slot UI (single group, one digit per box, shadcn card, orange Verify button) and is fully self-contained: demo code `123456`, success → `/login`, resend mocked, empty-phone fallback. Sufficient for mockup; real wiring needs the backend-contract follow-up above.
+- **Register design:** unchanged — verified 4-ins/4-del behavior-only diff (toast text + redirect); no JSX or styling touched.

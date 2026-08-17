@@ -17,6 +17,7 @@ export const routing = defineRouting({
     },
     "/login": {},
     "/register": {},
+    "/otp": {},
     "/forgot-password": {},
 
     "/category": {},

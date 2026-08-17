@@ -1,105 +1,75 @@
-# Spec: Fix admin category/subcategory image disappearance
+# Spec: OTP verification screen after phone-number registration (user surface, mock-wired)
 
-## Problem statement
+## Summary
 
-Admin-uploaded images for categories and subcategories (/wanderer/dashboard) vanish some time after upload. Categories lose ALL images at once ("complete nothing left"); subcategories keep some and lose others, losses observed around remove/edit operations. The DB `icon` column is the only thing the UI reads — when it is nulled or the storage object is deleted, the image disappears.
+After a user submits the register form, redirect them to a new `/otp` verification screen: a shadcn-style card with six input boxes accepting exactly one digit each. Verification is mocked at the client level (fixed demo code `123456`, no backend call, no SMS); success shows a toast and sends the user to `/login`. The register page's design is untouched — only the submit-success branch gains a redirect.
 
-## Root cause analysis
+## Current state (answers to the captain's questions)
 
-### Finding 1 (PRIMARY — categories mass wipe): seed re-run resets every category icon to NULL
+- **Do we have an OTP screen/page after login/register by phone?** No. The user surface has no OTP route. `apps/web/app/[locale]/(user)/(auth)/` contains only `login`, `register`, `forgot-password`, and `test` pages. `forgot-password/page.tsx` renders `ForgotPasswordForm` (`apps/web/components/auth/Forgot-PassowordForm.tsx`), which is a plain identifier input — no OTP step exists anywhere on the user surface.
+- **Do we have an OTP component?** Partially. `apps/web/components/auth/OtpForm.tsx` exports `InputOTPForm` — a 6-slot card built on the shadcn primitives in `apps/web/components/ui/input-otp.tsx` (`input-otp@^1.4.2` already in `apps/web/package.json` line 24 — not a new dependency). But it is dead code: nothing imports it, its copy is Telegram/email-specific ("sent a verification code via Telegram" lines 72-73; "I no longer have access to this email address" line 119), and its props (`expectedOtp`, `onSuccess`, `onBack` supplied by a parent, lines 28-33) do not fit a standalone page.
+- **Is the existing OtpForm enough, even as mockup?** As a structural template, yes — it proves the 6-slot one-digit-per-box UI works. As the actual screen, no: it has no route, no phone display, mismatched copy, and expects a parent to own verification and navigation. We build a purpose-built `OtpVerifyForm` modeled on it.
+- **Register today:** `apps/web/app/[locale]/(user)/(auth)/register/page.tsx` (server component, 12 lines) renders `RegisterForm` — the live code is `apps/web/components/auth/RegisterForm.tsx` lines 316-427 (the commented block above it, lines 1-314, is dead). Submit calls the `register()` server action (`apps/web/actions/register.ts`), a mock (`// Save to DB` then `{ success: true }`). On success it currently calls `form.reset()` and dumps the whole payload — including the password — into a toast (lines 365-370). No redirect exists.
+- **Backend contract mismatch (why mock):** backend `POST /api/v1/auth/register` accepts only `{ phone }`; the web form collects firstName/lastName/password/confirmPassword. The form cannot be persisted through the existing contract without backend changes (out of scope), and the captain explicitly accepted mockup.
+- **i18n reality:** auth pages use hardcoded English — `LoginForm.tsx`, `RegisterForm.tsx`, `Forgot-PassowordForm.tsx` contain no `useTranslations`, and `apps/web/messages/en.json` (59 lines) has only `HomePage` and `Card` sections. No auth/register message keys exist in any of the 6 locale files to mirror. New OTP copy therefore stays hardcoded English; no locale files change.
 
-`apps/backend/src/db/seed.ts:38-41`:
+## Decisions
 
-```ts
-.onConflictDoUpdate({
-  target: categories.slug,
-  set: { sortOrder: cat.sortOrder, icon: cat.icon ?? null },
-})
-```
+1. **Route: `/otp`** — page at `app/[locale]/(user)/(auth)/otp/page.tsx`, declared as `"/otp": {}` in `i18n/routing.ts` pathnames, mirroring the sibling `"/login"` / `"/register"` / `"/forgot-password"` entries (lines 18-20).
+2. **Wiring level: client-side mock.** Fixed demo code `123456`; no server action, no backend call, no SMS. Rationale: the register action is already a mock; the backend register endpoint cannot accept this form's payload; the captain explicitly allowed mockup ("even if it mock up?"). A small visible hint `(Demo code: 123456)` makes the mock testable.
+3. **Phone hand-off: query param** — `/otp?phone=<encodeURIComponent(phone)>`. Survives refresh, debuggable, no sessionStorage plumbing. The server page awaits `searchParams` (Next 16 Promise convention — `app/[locale]/layout.tsx` line 36 awaits `params` the same way) and passes `phone` as a prop, avoiding `useSearchParams` prerender/Suspense concerns.
+4. **Success redirect: `/login`.** The mock creates no session, and the register design already steers users to login. Locale-aware `router.push("/login")` via `useRouter` from `@/i18n/routing` (pattern: `LoginForm.tsx` lines 18, 43).
+5. **New component, not a retrofit.** `InputOTPForm` is unused dead code with Telegram/email copy and parent-driven props; a self-contained `{ phone }`-prop component fits a standalone page. `OtpForm.tsx` is left untouched (minimal diff).
+6. **Visual: shadcn card, one group of 6 slots.** `InputOTP` with `maxLength={6}` enforces exactly one digit per box (the library's core behavior — no extra code needed). Single `InputOTPGroup` of six `InputOTPSlot`s, no 3+3 separator ("simple and clean"); slot sizing `h-12 w-12 text-xl` copied from `OtpForm.tsx` lines 104/110. Card structure and container copied from `OtpForm.tsx`.
+7. **Resend + back affordances, mocked.** Resend Code button → `toast.success("Code resent successfully!")` (exact pattern `OtpForm.tsx` line 89). Back = ghost icon Button with ArrowLeft plus a "Wrong number?" `Link href="/register"` via `Link` from `@/i18n/routing` (`LoginForm.tsx` line 144 pattern).
+8. **i18n: hardcoded English**, matching every other auth component. No `messages/*.json` edits.
 
-- The seed data (`apps/backend/src/categories/seeds/categories.seed.ts`) defines NO icons — the only `icon` occurrence is the optional type field at line 13. So `cat.icon ?? null` is always `null`, and every `pnpm --filter backend db:seed` re-run executes the equivalent of `UPDATE categories SET icon = NULL` for all 12 seeded slugs.
-- `db:seed` is documented as idempotent and is re-run routinely (every field_schema ship re-seeds). Nothing automatic re-runs it (no CI/deploy config in repo; `apps/backend/package.json` `db:seed` is manual) — the wipe fires on each manual re-seed, which matches "after upload for a while disappear".
-- Storage objects are NOT deleted — they're orphaned in the bucket; only the DB column is nulled.
+## Implementation plan
 
-### Finding 2 (explains the asymmetry): the subcategory upsert omits `icon`
+1. **EDIT `apps/web/i18n/routing.ts`** — add `"/otp": {}` immediately after the `"/register": {}` entry (line 19). Empty object = identical path in all six locales.
 
-`apps/backend/src/db/seed.ts:69-75`:
+2. **NEW `apps/web/components/auth/OtpVerifyForm.tsx`** — `"use client"` component; copy card/slot/toast idioms from `components/auth/OtpForm.tsx`, router/Link idiom from `components/auth/LoginForm.tsx`.
+   - Props: `{ phone: string }` (may be empty string). State: `const [value, setValue] = useState("")`. `const router = useRouter()` from `@/i18n/routing`.
+   - `handleSubmit(e)`: `preventDefault()`; if `value.length < 6` → `toast.error("Please enter the complete 6-digit verification code.")`; else if `value === "123456"` → `toast.success("Phone number verified successfully!", { position: "top-right" })` then `router.push("/login")`; else → `toast.error("Invalid verification code. Please try again.")`.
+   - Empty-phone edge: if `!phone.trim()`, render the same Card with only a message ("No phone number to verify. Please register first.") and a Button/Link back to `/register` — no OTP input.
+   - Layout: `Card className="mx-auto max-w-md w-full bg-card p-2"`; CardHeader with back-arrow ghost Button (`onClick={() => router.push("/register")}`), CardTitle "Verify your phone", CardDescription "We sent a 6-digit verification code to {phone}. Enter it below to complete your registration. (Demo code: 123456)"; CardContent: `Field` + `FieldLabel` "Verification code" with right-aligned outline Resend Button (RefreshCwIcon, mock toast) + centered `InputOTP maxLength={6} required` holding six `InputOTPSlot`s in one `InputOTPGroup` (slot classes `*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-12 *:data-[slot=input-otp-slot]:text-xl`); CardFooter: full-width submit Button `bg-orange-500 hover:bg-orange-600 text-white h-10` labeled "Verify" (matches `OtpForm.tsx` line 125), and a muted "Wrong number? Go back to register" `Link href="/register"`.
+   - Plain `<form onSubmit={handleSubmit}>` exactly like `OtpForm.tsx` — no form library, no loading state (instant mock).
 
-```ts
-.onConflictDoUpdate({
-  target: [subcategories.categoryId, subcategories.slug],
-  set: {
-    fieldSchema: sub.fieldSchema ?? null,
-    sortOrder: sub.sortOrder ?? i,
-  },
-})
-```
+3. **NEW `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx`** — server component following `register/page.tsx` (metadata + single component render):
 
-No `icon` in SET → subcategory icons survive re-seeds. This is exactly why "subcategories some has the image" while categories lost everything. The fix is to make the category upsert match this convention.
+   ```tsx
+   import type { Metadata } from "next";
+   import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
 
-### Finding 3 (secondary, web): edit forms always send `icon`, seeded from a placeholder fallback — column pollution
+   export const metadata: Metadata = { title: "Verify Phone" };
 
-- `apps/web/actions/admin-categories.ts:28-33` and `apps/web/actions/admin-subcategories.ts:29-34`: `iconToSrc()` returns `"/placeholder.svg"` when the DB icon is null.
-- Edit forms initialize from that value: `apps/web/app/wanderer/dashboard/categories/page.tsx:140` (`cateIcon: category.cateIcon`), `apps/web/app/wanderer/dashboard/subcategories/SubCategoriesClient.tsx:188` (`subIcon: category.subIcon`).
-- Update actions always include icon in the PATCH: `apps/web/actions/category.ts:43` and `apps/web/actions/subcaetgory.ts:45` (`icon: parsed.data.X || null`).
-- Result: editing any image-less row (rename only) PATCHes `icon: "/placeholder.svg"` — a truthy string the backend accepts (`UpdateCategoryDto.icon` is bare `@IsOptional() @IsString()`, `apps/backend/src/admin/dto/update-category.dto.ts:25-27`) — writing a fake path into the DB. It does not delete real objects, but it pollutes the column and makes "has icon?" indeterminable.
-
-### Finding 4 (by-design deletions that match "disappear after remove")
-
-These are working as intended, not bugs — listed so the captain understands which losses are permanent by design:
-
-- X-remove + Save: `image-upload.tsx:103-106` sets `onChange("")` → PATCH `icon: null` → `admin-subcategories.service.ts:151-153` / `admin-categories.service.ts:138-140` delete the old storage object after commit.
-- Replace image + Save: same guard deletes the replaced object.
-- Category delete cascades ALL its subcategories (FK `onDelete: 'cascade'`, `categories.schema.ts:36-38`) and removes all their icon objects: `admin-categories.service.ts:158-171`. Deleting a category silently destroys every subcategory image under it.
-
-### Hypothesis verdicts
-
-1. Seed overwrite — CONFIRMED for categories (Finding 1); REFUTED for subcategories (Finding 2 shows the asymmetric SET clause).
-2. Cleanup misfire on update — REFUTED in current code. Both services read `oldIcon` BEFORE the tx update and gate on `dto.icon !== undefined && oldIcon && dto.icon !== oldIcon` (`admin-categories.service.ts:89-95,138-140`; `admin-subcategories.service.ts:100-106,151-153`). A name-only PATCH from a row with a real icon sends the identical URL → no delete.
-3. Signed vs public URL expiry — REFUTED. `ImageUpload` persists `signed.data.publicUrl` (`image-upload.tsx:73-74`); `getPublicUrl` (`supabase.service.ts:118-122`) returns a tokenless permanent `/object/public/<bucket>/<path>` URL. The signed URL is used only for the one-time PUT.
-4. Remove-button collateral — REFUTED. `removeByPublicUrl` (`files.service.ts:105-125`) matches the exact `/object/public/<bucket>/` marker and strips query params; paths are `scope/<uuid>-name` so no prefix collisions. `deleteUploaded` (`apps/web/actions/files.ts:54-70`) is dead code — never called anywhere — so no wrong-path batch deletes originate from the web.
-
-## Proposed fix
-
-1. `apps/backend/src/db/seed.ts:40` — drop `icon` from the category upsert SET clause:
-   - Before: `set: { sortOrder: cat.sortOrder, icon: cat.icon ?? null },`
-   - After: `set: { sortOrder: cat.sortOrder },`
-   - Keep the insert-side `icon: cat.icon ?? null` (line 35) — only affects brand-new rows. This matches the subcategory upsert convention and the documented "seeds never overwrite admin edits" philosophy (brands/models/attributes).
-2. `apps/web/actions/category.ts` (`updatecategories`, line 43) — stop persisting the placeholder:
-   ```ts
-   icon:
-     parsed.data.cateIcon && parsed.data.cateIcon !== "/placeholder.svg"
-       ? parsed.data.cateIcon
-       : null,
+   export default async function OtpPage({
+     searchParams,
+   }: {
+     searchParams: Promise<{ phone?: string }>;
+   }) {
+     const { phone } = await searchParams;
+     return <OtpVerifyForm phone={phone ?? ""} />;
+   }
    ```
-3. `apps/web/actions/subcaetgory.ts` (`updatesubcategories`, line 45) — same guard with `subIcon`.
 
-No backend DTO/service changes; no new dependencies; no API contract changes. Create actions need no guard (their forms start at `""`, which `|| null` already maps to null).
+   Renders inside the existing `(user)` NavBar/Footer layout (no new layout file; register renders there too).
 
-Edge cases: the placeholder literal `"/placeholder.svg"` is duplicated in `admin-categories.ts:32` and `admin-subcategories.ts:33` — the guard must match it exactly. `icon: null` already flows through today (X-remove path), so `@IsOptional()` + the service's `dto.icon !== undefined` check handle it: proven path.
+4. **EDIT `apps/web/components/auth/RegisterForm.tsx`** — behavior-only change, zero JSX/design edits:
+   - Add `import { useRouter } from "@/i18n/routing"` and `const router = useRouter()` inside `RegisterForm` (LoginForm lines 18/26 pattern).
+   - In `onSubmit`'s `if (res.success)` branch (lines 365-370): keep `form.reset()`; replace the JSON-dump toast (it renders the password on screen) with `toast.success("Registered successfully! We sent a verification code to your phone.")`; then add `router.push(`/otp?phone=${encodeURIComponent(value.phoneNumber)}`)`.
+   - Leave the mock `register()` action, validation, schema, and all JSX untouched.
 
-## Alternatives considered
+5. **Verify:** `pnpm --filter web build` (the type gate — web has no `check-types` script) and `pnpm --filter web lint`.
 
-- Backend DTO transform (`/placeholder.svg` → null): rejected — changes validation behavior/API surface; the web-side guard is sufficient.
-- Extract seed upserts into a testable helper + unit spec: rejected as beyond minimal — `seed.ts` is a top-level-runnable script (`seed().catch(...)` at module scope); restructuring it is a separate refactor.
-- Making edit forms omit `icon` when untouched (dirty tracking): rejected — bigger change; values already round-trip correctly with the guard.
+## Out of scope / follow-ups
 
-## Test plan
+- **Real backend wiring:** needs backend changes first — register accepts only `{ phone }` (no name/password), so either the backend grows a richer register contract or the web form collapses to phone-only before `POST /api/v1/auth/otp/verify` (which exists and returns tokens) can be called for real.
+- **User-surface session plumbing:** `setUserSession` + a user-surface fetch helper (`serverFetch` reads admin cookies only) so a real verify can log the user in directly instead of routing to `/login`.
+- **Resend cooldown/countdown and real SMS/Telegram channel copy** once a provider is wired.
+- **Cleanup of dead code:** `OtpForm.tsx`'s unused `InputOTPForm` and the commented block in `RegisterForm.tsx` lines 1-314 — separate ticket, not this diff.
+- **Locale translations** for OTP copy once the auth surface adopts next-intl keys (entire auth surface is English-only by current convention).
 
-- `pnpm --filter backend test` (existing suites; `files.service.spec.ts` covers `removeByPublicUrl`)
-- `pnpm --filter backend build` && `pnpm --filter backend lint`
-- `pnpm --filter web build` (web type gate — web has no check-types script) && `pnpm --filter web lint`
-- No new unit tests required: the seed change is in a non-importable script and the web change is in server actions (web has no jest setup). Model to follow if tests are later wanted: `apps/backend/src/brands/brands.service.spec.ts` (mock-drizzle pattern).
-- Optional manual verification (needs dev DB env): PATCH a category icon, run `pnpm --filter backend db:seed`, confirm `GET /admin/categories` still returns the icon.
-
-## Risks / follow-ups
-
-- Removing `icon` from the seed SET means a future seed-defined icon would not propagate on re-run. Acceptable — matches subcategory behavior.
-- Note: the same SET clauses also reset admin-edited `sortOrder` on re-seed (category line 40, subcategory line 73). Out of scope; same pattern if the captain wants it.
-- Lost category icons are recoverable only manually: the storage objects still exist under `category/` in the bucket (the seed never deleted objects, only nulled columns) — re-upload or write a one-off ops script to relink.
-- `deleteUploaded` in `apps/web/actions/files.ts` is dead code (documented cancel-cleanup never wired) — orphaned-upload leak, opposite problem; separate ticket.
-- Placeholder values already written into prod `icon` columns (`/placeholder.svg`) will need a one-off cleanup (`UPDATE categories SET icon = NULL WHERE icon = '/placeholder.svg'`, same for subcategories) — not part of this code fix.
-
-## OPEN QUESTIONS
+## Open questions
 
 None.

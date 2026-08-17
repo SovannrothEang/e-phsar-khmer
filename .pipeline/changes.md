@@ -1,34 +1,23 @@
-# Changes: Fix admin category/subcategory image disappearance
+# Changes — OTP verification screen after phone-number registration (mock-wired)
 
-Implements `.pipeline/spec.md`. Three files changed, minimal diff, no new dependencies, no API contract changes.
+Implements `.pipeline/spec.md`: after register submit, the user is redirected to a new `/otp` screen — a shadcn card with six one-digit input boxes. Verification is a client-side mock (demo code `123456`, no backend call, no SMS); success toasts and routes to `/login`.
 
-## Files modified
+## Files
 
-| File                              | Change                                                                                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/backend/src/db/seed.ts`     | Dropped `icon` from the category upsert `onConflictDoUpdate` SET clause (line 40). Insert-side `icon: cat.icon ?? null` (line 35) untouched. |
-| `apps/web/actions/category.ts`    | `updatecategories`: `icon` now maps `""` and `"/placeholder.svg"` → `null` instead of persisting the placeholder.                            |
-| `apps/web/actions/subcaetgory.ts` | `updatesubcategories`: same guard for `subIcon`.                                                                                             |
+- **NEW `apps/web/components/auth/OtpVerifyForm.tsx`** — `"use client"` component (`{ phone: string }` prop). Self-contained 6-slot OTP card modeled on the dead `OtpForm.tsx` (card/slot/toast idioms) with `useRouter`/`Link` from `@/i18n/routing`. Plain `<form onSubmit>`; <6 digits → error toast; `123456` → success toast + `router.push("/login")`; anything else → invalid-code toast. Resend button is a mock toast. Empty/missing phone renders a fallback card ("No phone number to verify. Please register first.") with a button back to `/register`. `OtpForm.tsx` itself is untouched.
+- **NEW `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx`** — server component; awaits `searchParams` (Next 16 Promise convention) and renders `<OtpVerifyForm phone={phone ?? ""} />`. Renders inside the existing `(user)` NavBar/Footer layout; `metadata.title = "Verify Phone"`.
+- **EDIT `apps/web/i18n/routing.ts`** — added `"/otp": {}` to the `pathnames` map (after `"/register"`), so the route is locale-aware in all six locales.
+- **EDIT `apps/web/components/auth/RegisterForm.tsx`** — behavior-only diff in the live code (lines 316+; the dead commented block above is untouched): added `useRouter` from `@/i18n/routing`; the `if (res.success)` branch now keeps `form.reset()` but replaces the JSON-dump toast (which printed the password on screen) with `toast.success("Registered successfully! We sent a verification code to your phone.")` followed by `router.push({ pathname: "/otp", query: { phone: value.phoneNumber } })`. No JSX/schema/action changes. (Deviation from spec: the spec's template-literal `/otp?phone=…` string form fails next-intl's typed `Href` — caught by the build gate and fixed with the typed object form; net file diff still 4 insertions / 4 deletions.)
 
-## Behavioral diffs
+## Behavioral diff
 
-- Re-running `pnpm --filter backend db:seed` no longer executes the equivalent of `UPDATE categories SET icon = NULL` across all 12 seeded slugs; admin-uploaded category icons survive re-seeds (matches the existing subcategory upsert convention, which never had `icon` in SET — root cause of the categories-vs-subcategories asymmetry).
-- Editing an image-less category/subcategory (e.g. rename only) now PATCHes `icon: null` instead of writing the fake path `"/placeholder.svg"` into the DB (edit forms are seeded from `iconToSrc()` which returns the placeholder for null icons). Column pollution stops.
-- Already-polluted rows (`"/placeholder.svg"` in `icon`) self-heal to null on their next edit, with no storage side effects (`removeByPublicUrl` silently skips non-storage paths).
-- Create flows unchanged: forms start at `""`, which `|| null` already maps to null.
+- Register submit (success path): before → form reset + toast dumping the full payload including password, stays on page. After → form reset + friendly toast + redirect to `/otp?phone=<encoded>`.
+- New route `/[locale]/otp?phone=…`: 6-slot verify card. `123456` → toast → `/login`. Wrong/short code → error toast, stays. Resend → mock success toast. Back arrow / "Wrong number?" link → `/register`. No `?phone` (or blank) → fallback card prompting registration.
+- No backend, session, locale-file, or register-design changes.
 
-## Verification performed at implement time (coder)
+## Risks / notes for the Tester
 
-- Edit excerpts uniqueness-scoped (`method: "PATCH",` prefix) because the bare `icon:` line is byte-identical in create/update bodies of both action files.
-- Zod schemas: `cateIcon`/`subIcon` are `z.string()` — required, non-nullable, no transforms; `""` passes validation and still maps to null (X-remove path preserved).
-- Placeholder literal confirmed byte-identical in `admin-categories.ts:32` and `admin-subcategories.ts:33`.
-- Single caller per update action (form `onSubmit`); no other path sends placeholder values.
-- Backend tolerance of `icon: null` is a proven path (X-remove already PATCHes null; `UpdateCategoryDto.icon` is `@IsOptional() @IsString()`).
-- Seed premise re-confirmed: `categories.seed.ts` has exactly one `icon` occurrence (the optional type field, line 13) — no seed data sets icons.
-
-## Out of scope (tracked in spec follow-ups)
-
-- One-off SQL cleanup for already-polluted `icon` columns.
-- `sortOrder` also resets on re-seed (same SET clauses) — same pattern if wanted later.
-- `deleteUploaded` dead code in `apps/web/actions/files.ts` (orphaned-upload leak) — separate ticket.
-- Manual re-linking of already-nulled category icons (storage objects still exist under `category/` in the bucket).
+- Mock is client-side only: nothing persists; refresh on `/otp` keeps working via the query param. Demo hint `(Demo code: 123456)` is intentionally visible per spec.
+- Verify the typed route: `router.push` with a query string against next-intl's `pathnames`-typed `Href` (expected to compile; fallback noted in the coder's self-check if the type gate complains).
+- Gates to run: `pnpm --filter web build` (the type gate — web has no `check-types` script) and `pnpm --filter web lint`.
+- Follow-ups (out of scope, per spec): real backend wiring, user-session plumbing, resend cooldown, dead-code cleanup (`OtpForm.tsx` + RegisterForm lines 1-314), locale translations.
