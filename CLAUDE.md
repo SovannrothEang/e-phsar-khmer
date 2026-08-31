@@ -68,7 +68,7 @@ pnpm --filter web build        # next build (includes full type-checking)
 pnpm --filter web lint         # eslint
 ```
 
-`web` is a full admin dashboard (Next.js 16 App Router + `next-intl` i18n). It imports `@repo/ui` for shared components and extends `@repo/typescript-config/nextjs.json` + `@repo/eslint-config/next-js`. There is no `check-types` script — `next build` is the type gate.
+`web` is a full user-facing marketplace + admin dashboard (Next.js 16 App Router + `next-intl` i18n). It is **standalone**: its `package.json` has no `@repo/*` deps, its `tsconfig.json` extends nothing from `@repo/typescript-config`, and its flat `eslint.config.js` uses `eslint-config-next` directly. The old nested `apps/web/pnpm-workspace.yaml` / `apps/web/pnpm-lock.yaml` are deleted (web resolves against the root workspace). There is no `check-types` script — `next build` is the type gate — and no web test framework (no vitest/jest, no `test` script); browser verification requires driving a real browser (the DOM is client-rendered — raw HTML/`curl` greps see only the flight payload). Worked recipe: `chromium --headless=new --no-sandbox --disable-gpu --blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=2,availableHoverTypes=2 --remote-debugging-port=9333 --user-data-dir=/tmp/<fresh-profile>` — the blink-settings force `(hover: hover)` (plain headless resolves `hover: none`, silently killing every `hover:*` utility), plus `Emulation.setDeviceMetricsOverride` (default viewport is 800×600 and clips mid-page, and the login form's focus-scroll survives client-side navigation — `window.scrollTo(0,0)` first) and `Emulation.setEmulatedMedia {prefers-color-scheme: light}`. Drive it with node's global WebSocket: Radix dropdown **triggers** open on pointerdown (dispatch `Input.dispatchMouseEvent` mousePressed, hold ~350 ms, mouseReleased — a synthetic `click()` does nothing) while **menu items** select on plain `click()`; the navbar avatar trigger is `[data-slot="dropdown-menu-trigger"].ml-2` (`.outline-none` matches every shadcn button — a language-switcher dropdown elsewhere in the navbar shares it); native setter + `new Event('input', {bubbles:true})` fills React inputs; wait ~10 s after navigation for hydration. Kill chromium with `pgrep -f "[r]emote-debugging-port=9333" | xargs -r kill -9` (bracket trick avoids self-match).
 
 ### Shared packages
 
@@ -115,14 +115,23 @@ Global prefix `api`, excluded for `GET /` and `GET /health`. URI versioning with
 - Dual tokens: short-lived `accessToken` (default 15 min) + long-lived `refreshToken` (default 30 d). `refreshToken` uses a separate `JWT_REFRESH_SECRET`.
 - Soft-delete is enforced at all three entry points: `loginWithPassword`, `refresh`, and `JwtStrategy.validate`.
 
-### Auth flow — phone registration
+### Auth flow — phone registration & login (OTP + password)
 
 ```
-POST /api/v1/auth/register   { phone }        → sends OTP via Supabase (or dev bypass)
-POST /api/v1/auth/otp/verify { phone, token } → creates user row, inserts user_phones, returns tokens
+POST /api/v1/auth/register   { phone }                        → sends OTP via Supabase (or dev bypass)
+POST /api/v1/auth/otp/request { phone }                       → re-sends OTP (public; E.164-validated via RequestOtpDto)
+POST /api/v1/auth/otp/login  { phone, password }              → login-mode: validates credentials, THEN sends OTP (unknown phone / wrong password → 401, no SMS)
+POST /api/v1/auth/otp/verify { phone, token, password,
+                              firstName?, lastName? }         → verifies OTP; creates the account (register) or logs in the existing user
 ```
 
-`mirrorSupabaseUser` in `auth.service.ts` upserts users without a Supabase-specific ID: phone auth conflicts on `primaryPhone`; social auth (Google/Facebook) conflicts on `email`. Both paths insert into `user_auth_providers` and `user_phones` (isPrimary: true) when a phone is present.
+`verifyPhoneOtp` is the single creation/login chokepoint. It looks up the active user by `primaryPhone` first:
+
+- **User exists** — the submitted `password` must match (`bcrypt.compare`); mismatch → 401 **before** any OTP is consumed. The conflict path can never overwrite credentials: payload extras land only in the INSERT `.values()`, while `onConflictDoUpdate.set` stays `{updatedAt}` (locked by a unit test). Even a replayed body with a fresh password/names/username is ignored.
+- **User absent or a legacy bare account** (null `passwordHash` — created before passwords were required) — the verify **completes the account in place**: bcrypt-hashes the password (10 rounds), stores `firstName`/`lastName`, and generates a unique username via `generateUniqueUsername(buildUsernameBase(first,last))` → `sokdara`, `sokdara2`, …. Names carry from the web register form; a phone-digit fallback is deliberately avoided so the nicer name-based handle stays free.
+- Verify **without** `password` is a 400 — there is no passwordless login path (the public `otp/request` resend can never be a backdoor).
+
+`mirrorSupabaseUser` in `auth.service.ts` upserts users without a Supabase-specific ID: phone auth conflicts on `primaryPhone`; social auth (Google/Facebook) conflicts on `email`. Both paths insert into `user_auth_providers` and `user_phones` (isPrimary: true) when a phone is present. Soft-deleted phones don't conflict (partial index with `WHERE deleted_at IS NULL`) — a fresh row is created with the extras.
 
 ### Database access
 
@@ -136,7 +145,7 @@ Schema files live in `src/db/schema/` and are re-exported from `src/db/schema/in
 
 `SupabaseModule` is `@Global()` — never import it in feature modules; inject `SupabaseService` directly. It exposes one admin client (service-role key) and a helper to create a user-scoped client. Auth (OTP, social OAuth, token validation) and storage operations go through `SupabaseService`.
 
-`signInWithOtp` and `verifyOtp` support a dev bypass via `DEV_OTP_TOKEN` env var — when set, no SMS is sent and that fixed token is accepted. The fake Supabase user ID is a deterministic SHA-256 UUID derived from the phone number.
+`signInWithOtp` and `verifyOtp` support a dev bypass via `DEV_OTP_TOKEN` env var — when set, no SMS is sent and that fixed token is accepted. Keep the value at 6 digits or fewer — the web OTP input (`apps/web/components/auth/OtpVerifyForm.tsx`) has 6 single-digit boxes, so a longer token can never be entered. Currently `000000` in `apps/backend/.env`; changing it requires a backend restart. In dev, the Supabase-side fake user id is the literal string `'dev'`; the local `users.id` is DB-random (`defaultRandom`), and repeat-login identity is guaranteed by the `primaryPhone` upsert in `mirrorSupabaseUser`.
 
 ### Response envelope
 
@@ -194,7 +203,7 @@ The `users` table relates to **six satellite tables**:
 
 Key columns on `users`:
 
-- `username / primaryPhone / email` — unique via **partial unique indexes** (`WHERE deleted_at IS NULL`), so soft-deleted users release their identifiers for re-registration. Upserts targeting these columns must pass `targetWhere: isNull(users.deletedAt)` (see `mirrorSupabaseUser`), and single-row lookups must filter `isNull(users.deletedAt)`. Username generation lives in `src/users/username.util.ts`.
+- `username / primaryPhone / email` — unique via **partial unique indexes** (`WHERE deleted_at IS NULL`), so soft-deleted users release their identifiers for re-registration. Upserts targeting these columns must pass `targetWhere: isNull(users.deletedAt)` (see `mirrorSupabaseUser`), and single-row lookups must filter `isNull(users.deletedAt)`. Username generation lives in `src/users/username.util.ts` — `buildUsernameBase(first,last)` (lowercase/NFC, space-stripped) feeds `generateUniqueUsername(db,base)`: probes `users.username`, suffixes `base, base2, base3…` (skips 1), caps at 50 chars; the probe checks ALL rows including soft-deleted (stricter than the partial index). Wired into: Telegram login insert, `updateProfile` lazy backfill (only while `username === null`), and phone-OTP registration. Check-then-insert → a 23505 race is possible (see Known gaps).
 - `provinceId / districtId / communeId` — nullable FKs to lookup tables (no cascade)
 - `deletedAt timestamp` — soft-delete; `status='deleted'` + `deletedAt=now()`
 - `preferredLanguage default('en').notNull()` — also drives the admin UI locale (the `/wanderer/*` surface reads it via an `admin_locale` cookie seeded at login; the in-dashboard `LocaleSwitcher` writes back via `PATCH /users/me`). DTO allowlist: `en, km, zh, ko, id, vi`.
@@ -233,9 +242,9 @@ GET /api/v1/brands?subcategory=<slug>     → brands linked to that subcategory 
 GET /api/v1/brands/:id/models             → active models for a brand ([] if none)
 ```
 
-Both endpoints are `@Public()`. Three DB tables: `brands`, `models`, `brand_subcategory_links` (junction). Brand seed lives in `src/brands/seeds/brands.seed.ts` — 67 brands covering phones, tablets, smart-watches, and computers-and-accessories subcategories. Car/motorcycle brands deferred (no brand list in spec yet).
+Both endpoints are `@Public()`. Three DB tables: `brands`, `models`, `brand_subcategory_links` (junction). The seed (`brands.seed.ts`) has two sets: `BRANDS` — 67 brands covering phones, tablets, smart-watches, and computers-and-accessories subcategories — plus `CAR_BRANDS` — 91 car brands (cars-and-vehicles → cars-for-sale), names/order taken from the web mock design (MG first), slug + icon derived from the app's local `/sub-img/car_vehicles/cars-for-sale/brands/*.png` design assets (interim icon source until these move to Supabase Storage; admins replace via the UI). `BrandSeed.icon?` lands only on INSERT — the brand `onConflictDoUpdate.set` never touches `icon`, so admin-uploaded icons survive re-seeds. A slug appearing in two sets is handled specially: the first occurrence upserts the row, later ones only wire `brand_subcategory_links` (+ null-icon backfill) so they can't clobber the earlier set's `sortOrder` (the one case: `xiaomi`, in both phones and cars; its car-grid position follows the phone order). Motorcycle brands not seeded yet.
 
-`sort_order` is manually assigned — not auto-increment. `Other` always gets `sortOrder: 999`. The `models` table is seeded with ~230 starter models (`MODEL_SEEDS` + `seedModels` in `brands.seed.ts`, insert-only) covering the major phone/laptop/printer/smartwatch brands; admins add the rest via the admin Models page (each model carries an optional image; old images are cleaned up on update/delete via `removeByPublicUrl`).
+`sort_order` is manually assigned — not auto-increment. `Other` always gets `sortOrder: 999` (phones set; the car set's `other-car-brand` is simply last in the design order). The `models` table is seeded with ~250 starter models (`MODEL_SEEDS` + `seedModels` in `brands.seed.ts`, insert-only) covering the major phone/laptop/printer/smartwatch brands plus car models for the design's model-bearing brands (mg/leapmotor/toyota — the mock's "Pirus" typo is seeded verbatim); admins add the rest via the admin Models page (each model carries an optional image; old images are cleaned up on update/delete via `removeByPublicUrl`). The brands list response shape is `{id, slug, name, icon, sortOrder}` — the field is `icon`, not `image` (models use `image`); brands do NOT nest models (`GET /brands/:id/models` is a separate call).
 
 ### Listings
 
@@ -243,7 +252,9 @@ Both endpoints are `@Public()`. Three DB tables: `brands`, `models`, `brand_subc
 
 **Feed filtering (`GET /api/v1/listings`):** `findFeed()` delegates slug resolution to a private `resolveQueryFilters(query)` helper. If any slug is not found, short-circuits with `{ data: [], meta: {...} }` — no error. The same pattern applies in `findMine()`.
 
-Supported query params: `categorySlug`, `subcategorySlug`, `provinceSlug`, `districtSlug`, `q` (title ilike), `minPrice`, `maxPrice`, `condition`. `districtSlug` without `provinceSlug` is silently ignored.
+Supported query params: `categorySlug`, `subcategorySlug`, `provinceSlug`, `districtSlug`, `q` (title ilike), `minPrice`, `maxPrice`, `condition`, `brand`, `bodyType`. `districtSlug` without `provinceSlug` is silently ignored. **`brand`/`bodyType` match the display names stored in the `attributes` JSONB** (`attributes->>'brand'` / `->>'bodyType'`) — the same names the post form writes; slugs on the web are mapped slug → name at the page boundary.
+
+**Ad creation** — `POST /api/v1/listings` (JWT): takes `categoryId`/`subcategoryId` as **UUIDs** (not slugs), inserts with `status='draft'`, `attributes` JSONB, `photos: [{url, path, sort}]` (max 8 — `url` = Supabase public URL, `path` = the `/files/sign` storage path; no upload tokens). `POST /api/v1/listings/:id/publish` (owner) flips to `status='active'` + `expiresAt = +30d`; the feed only shows `active` — a client post flow must call create **then** publish. Update/PATCH swaps `listing_photos` rows and best-effort cleans up dropped photos after commit.
 
 **Cursor pagination** (feed): cursor encodes `{ createdAt, id }` as base64 JSON. Invalid cursors are ignored.
 
@@ -330,12 +341,36 @@ Admin and user auth are **split onto separate surfaces**:
 
 **User (`/[locale]/login` — locale-prefixed):**
 
-1. `actions/login.ts` (server action) calls the same `POST /api/v1/auth/login`, accepts any authenticated user (no role gate), and redirects to the home page `/`. Users currently have no dashboard surface.
+1. `actions/login.ts` (server action) calls `POST /api/v1/auth/login` and accepts any authenticated user (no role gate). **Phone-shaped identifiers** (`^0\d{7,9}$` — local-only; typed `+855…` or `855…` is treated as a username and fails) route instead to `requestLoginOtp` (`actions/otp.ts` → `POST /auth/otp/login`), which validates the password first, then sends the OTP and redirects to `/{locale}/otp?phone=<E.164>`.
 2. **Distinct cookies:** admin and user sessions use separate httpOnly cookie pairs — `admin_access_token` / `admin_refresh_token` (admin) vs `user_access_token` / `user_refresh_token` (user). A user login cannot satisfy the proxy's admin-cookie guard, and `serverFetch` reads admin cookies only.
+3. **Post-login destination is `/me`.** Both the login form (password mode) and the OTP verify success handler push `/me` — after any successful user login/register the user lands on their account page first, never the home feed.
 
-`serverFetch<T>(path, init?)` in `lib/api/client.ts` reads the **admin** httpOnly cookie (`admin_access_token`), injects `Authorization: Bearer`, unwraps the `{success, data, meta}` envelope, and **transparently refreshes** on 401 (calls `POST /auth/refresh`, sets new cookies, retries once). On refresh failure, clears session. Throws `ApiError` on non-ok responses. When user-side server fetches are needed, a parallel `userServerFetch` reading `user_access_token` will be introduced.
+`serverFetch<T>(path, init?)` in `lib/api/client.ts` reads the **admin** httpOnly cookie (`admin_access_token`), injects `Authorization: Bearer`, unwraps the `{success, data, meta}` envelope, and **transparently refreshes** on 401 (calls `POST /auth/refresh`, sets new cookies, retries once). On refresh failure, clears session. Throws `ApiError` on non-ok responses. **`userServerFetch<T>(path, init?)` is the user-side twin** — identical behavior but reads USER cookies (`getUserAccessToken`/`getUserRefreshToken`) and clears the user session on refresh failure; same cookie-write-during-RSC-render caveat applies. `getCurrentUser(): SessionUser | null` (`lib/auth/current-user.ts`, server-only) is the fail-soft session reader used by the `(user)` layout — anonymous fast-path (`no access or refresh token`) returns `null` with zero backend calls; any error degrades to visitor chrome. `actions/logout.ts` exposes both `adminLogout()` and `userLogout()`.
 
 `clearAdminSession()` on 401 failure in `serverFetch` — cookie writes throw during RSC render (read-only context), which is caught and swallowed (token persists until next mutation).
+
+### Category + subcategory pages (backend-driven)
+
+`/[locale]/category/[categorySlug]` and `/[locale]/category/[categorySlug]/[subcategorySlug]` are **async RSC** fetching `GET /api/v1/categories/:slug` (one call each — the response nests subcategories, so the subcategory page `.find()`s by slug; both pages pass the locale via `Accept-Language` and render backend names directly). The data plumbing lives in `lib/api/categories.ts` (server-only — `CategoryGrid`-style raw `fetch`, `cache: "no-store"`, envelope unwrap, `null`/`[]` on failure):
+
+- `getCategoryWithSubcategories(slug, locale)` → `BackendCategory {id, slug, name, icon, subcategories: BackendSubcategory[]}` (BackendSubcategory has `id` — required: bodytype rows carry `subcategoryIds` as UUIDs)
+- `getBrandsForSubcategory(subSlug)` → `BackendBrand {id, slug, name, icon}` (map `icon` → OptionGrid's `image` at the page boundary)
+- `getBodyTypes()` → rows for the car body-type grids, filtered in the page by `row.subcategoryIds.includes(sub.id)`
+- `getModelsForBrand(brandId)` → the selected brand's model grid (brands never nest models)
+
+Grid components use **local minimal types**, never the mock `Category`/`Subcategory` types or backend DTOs: `SubcategoryGrid` takes `{slug, name, icon: string|null}[]` (null icon → text pill), `OptionGrid` takes `{slug, name, image?: string|null}` (images render **`unoptimized`** — admin Supabase URLs crash `next/image` otherwise), `SubcategoryContent` takes optional `brands`/`bodyTypes`/`models` props (~render only when `length > 0`). Brand/bodyType/model grids now work for any subcategory with linked data (cars: 91 brands + 9 bodytypes; phones/tablets/smart-watches phones-family brands; others none).
+
+**Filter bar / grid-list toggle:** the 4 category layouts (`components/category-layouts/*CategoryLayout.tsx`, chosen by slug) render only the title + the sticky filter bar (`sticky top-16 z-40`) using the **shared** `@/components/filter/*` components (`LocationSelectorFilter`/`SortFilter`/`PriceFilter`/`MoreFilters` — URL-param driven) plus the grid/list `TabsList`. The **category page owns the `Tabs` root** (the layouts are unwrapped so the bar's sticky containing block is tall): `TabsContent grid` = `GridCardSell` + `posts.map(GridCardPost)`, `TabsContent list` = `ListCardSell` + `posts.map(ListCardPost)` — the same feed as AllAds (`components/all-ads/AllAdsHeader.tsx` is the reference). The filter bar has a measured 8px gap on both sides (title→bar and bar→content) — keep it equal.
+
+### Real listing surfaces (Cars for Sale, wired 2026-08-27; detail surfaces extended 2026-08-29)
+
+The **cars-and-vehicles → cars-for-sale** branch is real end-to-end; every other category/subcategory keeps its mock path. Key module: `lib/api/categories.ts` is the server-only hub for both pages and actions.
+
+- **Post an ad:** `app/[locale]/(user)/post/(publish)/` — a route-group `layout.tsx` gates `/post` on the user session (`getCurrentUser` → `redirect('/login')`, same as `me/layout.tsx`); `/post/[slug]` stays public. `page.tsx` branches on `selectedSub.slug === "cars-for-sale"` → `components/post/CarsPostForm.tsx` (real form); every other subcategory keeps the mock `DynamicForm` + `lib/post-ad.ts` (dead-end submit by design). The form loads `actions/listings.ts` `getCarsForSaleConfig(locale)` (category/subcategory UUIDs + brands + bodyTypes/colors filtered by `subcategoryIds` + generated years + **contact prefill** from `/users/me/phones` + `/auth/me`, local-formatted) and `getCarModels(brandId)`; submit = `createListing(payload)` which POSTs `/listings` then POSTs `/listings/:id/publish`, redirecting to the new ad. Photos sign via `signUploadUser` (user session, in `actions/files.ts`) — the admin twin `signUpload` is used only by admin surfaces. The extracted `components/post/ImageUpload.tsx` takes `signFn`/`onSigned`; `onSigned` returns the storage `path` (required in `photos[]` — never reuse the public URL as the path).
+- **Feeds:** `getListingsFeed({categorySlug|subcategorySlug|brand|bodyType}, locale)` + `toCardPost()` (adapter into the shared `Post` shape — `post.postId` is `number | string`, UUIDs pass through, and the card link `title-adid-<uuid>` then resolves to the real detail). `category/cars-and-vehicles` and `/cars-for-sale` render real items through the existing card templates (`GridCardPost`/`ListCardPost`, `HighLightAds`/`NormalAd` with an optional `posts` prop); other categories keep their mock feeds. **Gotcha: `components/ads/AdsPhoto.tsx` is NOT a static banner — it maps all mock `posts` — never mix it into a real branch.** Card images render `unoptimized` (the Supabase hostname is not in `next.config` remotePatterns — required or dev crashes).
+- **Detail:** two entry points resolve real UUIDs through `buildRealDetailData(id, locale)` (listing + breadcrumb + seller) into the same `Post-Detail.tsx` template via its `real?: RealDetailData` prop: `[locale]/[slug]` (root `title-adid-<uuid>` — the card-link format, also what mock slugs and the ShareModal use) and `[locale]/post/[slug]`. Non-UUID slugs fall back to the mock render. The seller card is built from the **listing's contact fields** (`GET /users/:id` is JWT-protected — no anonymous seller profile); attribute breadcrumbs use display names.
+- **Contact-phone carrier icons (2026-08-29):** both phone surfaces on the detail page (`ContactUser.tsx`, `Profile-Sidebar.tsx`) show the carrier logo next to each number, derived from the 3-digit prefix via `utils/telecom.ts` — `detectCambodiaNetwork()` (Cellcard/Metfone/Smart/Seatel/Qube; **seatel is `['018']` only** — its original array was a duplicated `smart` list that made `018` resolve to Smart) and `carrierIconPath(phone)` (E.164-safe via `formatPhoneLocal`; maps the 4 carriers to the 64×64 `/icon/*.png` assets; Qube has no asset → no icon). `components/post/CarrierBadge.tsx` renders the icon (16px, `unoptimized`) or the site's S/C letter-badge as `fallback`. **Each phone row renders only when the number exists** — a single-phone user must not get an empty second row.
+- **Description specs grid (2026-08-29):** real listings render `components/post/ListingSpecs.tsx` between the `Description` h2 and the description text — fixed 8 rows (Main Category / Category / Brand / Model / Year / Tax Type / Condition / Color), grey labels over blue values, every value a link with underline on hover only (`hover:underline`). Targets: category/subcategory pages; brand `?ad_field=<slug>`; model `?ad_field=<slug>&ad_model=<slug>` (UI highlight only — never filters); the other 4 fields → the subcategory page. **`condition` is NOT inside `attributes`** — it is top-level `BackendListing.condition` (`new|used`), and `toPostView` drops both, so the grid reads only from `real.{cate,subcate,brand,model,listing.attributes,listing.condition}` — never the local `post`.
 
 ### Data fetching patterns
 
@@ -355,26 +390,31 @@ Admin pages under `app/wanderer/dashboard/` are `"use client"` components using:
 
 ### Key files
 
-| File                                  | Purpose                                                                                                                           |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/api/client.ts`                   | `serverFetch<T>()` — typed API client with auth + refresh                                                                         |
-| `lib/api/adapters.ts`                 | `BackendUser` interface + `toUiUser()` mapping                                                                                    |
-| `lib/auth/session.ts`                 | Cookie get/set/clear for access & refresh tokens                                                                                  |
-| `lib/auth/admin-locale.ts`            | `admin_locale` cookie helpers (resolve/set/clear) — drives the wanderer root layout locale                                        |
-| `proxy.ts`                            | Auth guard (`/wanderer/dashboard/**`) + `next-intl` middleware composition                                                        |
-| `app/providers.tsx`                   | `QueryClientProvider`                                                                                                             |
-| `app/wanderer/layout.tsx`             | Non-localized root `<html>` layout for admin (cookie-locale `NextIntlClientProvider`)                                             |
-| `actions/login.ts`                    | **User** login server action (any role → home)                                                                                    |
-| `actions/admin-login.ts`              | **Admin** login server action (`admin`/`super_admin` only → seeds `admin_locale`)                                                 |
-| `actions/admin-locale.ts`             | In-dashboard locale switch (cookie + `PATCH /users/me`)                                                                           |
-| `actions/logout.ts`                   | `adminLogout` — clears session + locale, redirects to `/wanderer/login`                                                           |
-| `actions/admin-users.ts`              | User CRUD actions                                                                                                                 |
-| `actions/admin-stats.ts`              | Dashboard stats + timeseries actions                                                                                              |
-| `actions/admin-categories.ts`         | Category CRUD actions                                                                                                             |
-| `actions/admin-subscriptions.ts`      | Subscription config CRUD (categories/plans/packages/terms)                                                                        |
-| `actions/admin-user-subscriptions.ts` | User subscription grant/delete actions                                                                                            |
-| `actions/admin-reports.ts`            | Report reasons + user/listing report actions                                                                                      |
-| `lib/attribute-types.ts`              | `ATTRIBUTE_TYPES` — the 6 admin-managed attribute types with `hasImage`/`readOnly` flags (drives the sidebar + `[type]/page.tsx`) |
+| File                                  | Purpose                                                                                                                                                                 |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/api/client.ts`                   | `serverFetch<T>()` — typed API client with auth + refresh                                                                                                               |
+| `lib/api/adapters.ts`                 | `BackendUser` interface + `toUiUser()` mapping                                                                                                                          |
+| `lib/auth/session.ts`                 | Cookie get/set/clear for access & refresh tokens                                                                                                                        |
+| `lib/auth/admin-locale.ts`            | `admin_locale` cookie helpers (resolve/set/clear) — drives the wanderer root layout locale                                                                              |
+| `proxy.ts`                            | Auth guard (`/wanderer/dashboard/**`) + `next-intl` middleware composition                                                                                              |
+| `app/providers.tsx`                   | `QueryClientProvider`                                                                                                                                                   |
+| `app/wanderer/layout.tsx`             | Non-localized root `<html>` layout for admin (cookie-locale `NextIntlClientProvider`)                                                                                   |
+| `actions/login.ts`                    | **User** login server action (any role → home)                                                                                                                          |
+| `actions/admin-login.ts`              | **Admin** login server action (`admin`/`super_admin` only → seeds `admin_locale`)                                                                                       |
+| `actions/admin-locale.ts`             | In-dashboard locale switch (cookie + `PATCH /users/me`)                                                                                                                 |
+| `actions/logout.ts`                   | `adminLogout` (admin) + `userLogout` (user) — clears session cookies; `userLogout` redirects locale-aware (`/[locale]/login`)                                           |
+| `lib/auth/current-user.ts`            | `getCurrentUser()` — server-only, fail-soft user-session reader (anonymous fast-path)                                                                                   |
+| `actions/otp.ts`                      | User OTP actions: `requestOtp`, `requestLoginOtp` (password-gated), `verifyOtp` (carries password/names)                                                                |
+| `lib/otp-registration.ts`             | sessionStorage handoff: password/names ride to the OTP verify call — never in a URL                                                                                     |
+| `lib/phone.ts`                        | `normalizePhone` / `formatPhoneLocal` / `isLocalPhone` — local `0…` ↔ E.164 `+855…`                                                                                     |
+| `actions/admin-users.ts`              | User CRUD actions                                                                                                                                                       |
+| `actions/admin-stats.ts`              | Dashboard stats + timeseries actions                                                                                                                                    |
+| `actions/admin-categories.ts`         | Category CRUD actions                                                                                                                                                   |
+| `actions/admin-subscriptions.ts`      | Subscription config CRUD (categories/plans/packages/terms)                                                                                                              |
+| `actions/admin-user-subscriptions.ts` | User subscription grant/delete actions                                                                                                                                  |
+| `actions/admin-reports.ts`            | Report reasons + user/listing report actions                                                                                                                            |
+| `lib/attribute-types.ts`              | `ATTRIBUTE_TYPES` — the 6 admin-managed attribute types with `hasImage`/`readOnly` flags (drives the sidebar + `[type]/page.tsx`)                                       |
+| `lib/api/categories.ts`               | Server-only fetchers for the backend-driven category/subcategory pages (`getCategoryWithSubcategories`, `getBrandsForSubcategory`, `getBodyTypes`, `getModelsForBrand`) |
 
 ## Schema domains beyond the core
 
@@ -401,11 +441,11 @@ Admin list endpoints batch-lookup user names (reporter + target) via `inArray` t
 
 ### Attributes (`attributes.schema.ts`)
 
-Single generic `attribute_options` table with a free-form `type` discriminator (`varchar(60)`, **not validated** — a typo'd type in the API silently creates a new set). Unique on `(type, slug)`. Optional `categoryId` FK + `subcategoryIds` JSONB (denormalized mirror of admin UI selections). Admin CRUD at `/admin/attributes/:type`, served by the standalone `AttributesModule` (`src/attributes/`, `@Roles('admin', 'super_admin')`).
+Single generic `attribute_options` table with a free-form `type` discriminator (`varchar(60)`, **not validated** — a typo'd type in the API silently creates a new set). Unique on `(type, slug)`. Optional `categoryId` FK + `subcategoryIds` JSONB (denormalized mirror of admin UI selections — **UUIDs, not slugs**, so client-side filtering must compare against the subcategory `id`). Admin CRUD at `/admin/attributes/:type`, served by the standalone `AttributesModule` (`src/attributes/`, `@Roles('admin', 'super_admin')`). The module also exposes a **public read**: `GET /api/v1/attributes/:type` (`PublicAttributesController`, `@Public()`, used by the web category pages for the car body-type grids). Note `AttributesService.list(type)` returns the full row (`id/type/slug/name/image/categoryId/subcategoryIds/sortOrder/isActive/…`) with **no `isActive` filter**, ordered by `sortOrder`.
 
 **Data is seeded** (`src/attributes/seeds/attributes.seed.ts`, **insert-only** `onConflictDoNothing` — admin edits survive re-seeds). 19 types seeded (~279 rows): `colors, rams, cpus, storage_phone, storage_computer, screensize_laptop, screensize_monitor, bodytypes, enginetypes, vehicletypes, accessories, jobtypes, networks, bedrooms, bathrooms, facings, experiences, vgas, types`. The `types` picklist spans computer parts / cameras / TVs-audio / property / fashion / furniture / musical instruments; rows sharing `(type, slug)` (e.g. the many "Other - ផ្សេងៗ" rows) are merged by the seed's dedupe pre-pass, unioning `subcategories`. Seed slugs must match the DTO `SLUG_RE` (dev-time assertion throws otherwise).
 
-**Images are never seeded** — every row starts `image: null`; admins upload via the admin UI (`ImageUpload` scope `attribute` → Supabase → public URL stored in `image`). Only 5 types are image-bearing (`hasImage: true`): `bodytypes, accessories, jobtypes, types, networks`.
+**Images are never seeded** — every row starts `image: null`; admins upload via the admin UI (`ImageUpload` scope `attribute` → Supabase → public URL stored in `image`). Only 5 types are image-bearing (`hasImage: true`): `bodytypes, accessories, jobtypes, types, networks`. The single exception: after the insert loop the seed **gap-fills car body-type icons** (null-only UPDATE for the 9 car slugs → the web app's local `/sub-img/car_vehicles/cars-for-sale/body_type/*.png` assets; the `other-type` row maps to `other.png`) — non-null images are never touched.
 
 **`years` is generated, not stored.** `AttributesService.list('years')` computes `currentYear+1 → 1980` descending at read time (`categoryId` = cars-and-vehicles, `subcategoryIds` = cars-for-sale/motorcycles-for-sale, falling back to null/[]); `create`/`update`/`remove` reject `type === 'years'` with a 400.
 
@@ -454,6 +494,11 @@ These are design reference, not runtime docs (the frontend forms are currently h
 - Express 5 changed wildcard routing: use `'{*splat}'` in `forRoutes()`, not bare `'*'`.
 - `@nestjs/jwt` uses `ms.StringValue` for `expiresIn`; cast runtime string values as `value as unknown as number` when passing to `jwtService.sign()`.
 
+## Tooling quirks
+
+- **Plain `grep` is a mise shim and breaks** (errors "unknown option '-G'") — use `git grep` or the Grep/Read tools.
+- **A PostToolUse hook runs prettier on every edited file** (repo style: double quotes, 2-space). A file that isn't prettier-clean gets rewritten right after the edit (quotes, array formatting), so when batching several edits to the same file, re-Read it after the first edit — later old_strings based on the pre-format text fail with "String to replace not found".
+
 ## Environment variables
 
 The backend requires a `.env` or `.env.local` file inside `apps/backend/`. Without it, `ConfigModule` throws at startup (Zod validation). Required vars:
@@ -488,9 +533,15 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 - **`PublicUser` over-exposes fields cross-user.** `GET /users/:id` returns `Omit<UserRow,'passwordHash'>`, exposing `deletedAt`, verification timestamps. Consider narrowing to an explicit allow-list.
 - **Communes not seeded.** `COMMUNES = []` in `cambodia-geography.seed.ts`. ~1600 Cambodian communes need to be added before `communeId` FK is useful.
 - **Attribute `:type` param is unvalidated.** Any string works against `attribute_options.type` (`varchar(60)`) — a typo'd type in the API silently creates a new attribute set. Consider validating against the seeded/admin type allowlist.
-- **Car/motorcycle brands not seeded.** `GET /brands?subcategory=cars-for-sale` returns `[]` until brand lists are defined and seeded.
+- **Motorcycle brands not seeded.** The car set is seeded (91 brands, cars-for-sale); motorcycles-for-sale has no brand list yet.
 - **No push notifications for chat.** New messages reach clients only via polling (`after=` deltas); no FCM/APNs/WebSocket layer exists. The chat schema needs no changes to add one later.
 - **Chat images are public-bucket URLs.** Same exposure as avatars/listing photos; switch to a private bucket + `createSignedDownloadUrl` if chat privacy is required.
 - **Inline `field_schema` duplication.** ~10 no-Type/no-Condition subcategory forms (all of Pets, Foods, and the no-Type Furniture blocks) are byte-identical to `commonListingFields` yet re-inline all 11 fields (~75 lines each) instead of referencing the const. Consistent by current convention but heavy; a one-time systemic refactor (e.g. `fieldSchema: [...commonListingFields]` for exact-match subcats) could DRY it. Non-blocking — do it once across all categories, never per-ship.
 - **`super_admin` vs `admin` permission gradation is role-assignment only.** `AdminService.createUser` and `updateUser` enforce that only `super_admin` can set `role` to `'admin'` or `'super_admin'` (`ForbiddenException` otherwise). The Team management page (`/wanderer/dashboard/team`) is super_admin-only — guarded at both the page level (`redirect` for non-super_admin) and the sidebar (the Team link is hidden from regular admins). Beyond role assignment, `admin` and `super_admin` are treated identically by all other `@Roles('admin', 'super_admin')` guards. Add finer-grained permission distinctions if needed later.
 - **Users page form shows `super_admin` option to regular admins.** `USER_ROLES` in `schemas/user.ts` includes `'super_admin'` so the Team page form can select it. The Users page form (`UserClient.tsx`) shares this constant and will render the option for regular admins too. The backend rejects unauthorized assignments with 403, but the UI should ideally hide the option for non-super_admin (follow-up).
+- **Most user-facing surfaces are mock data** — the real islands are: the `/me` header (`components/profile/MyProfileHeader`, real session via `me/layout.tsx`), the homepage **Browse By Category** grid, the **category/subcategory pages** (names/slugs/icons + live brand/bodyType/model option grids for cars & phones-family), and since 2026-08-27 the **cars-for-sale post flow + its category/subcategory feeds + real listing detail** (see "Real listing surfaces") — extended 2026-08-29 with contact-phone carrier icons and the Description specs grid. Still hardcoded: every `/me/*` subpage (they import the mock `currentUser` from `lib/user.ts`), the home feed + all non-car category feeds (`lib/posts.ts`), the non-car post forms (`lib/post-ad.ts` + `DynamicForm` — submit deliberately unwired), the `lib/categories.ts` mock consumed by `PostForm.tsx`, `SearchBar.tsx`, `AllAdsCategories.tsx`, `lib/data.ts`, and `/me`'s My Ads list (a posted car ad does NOT appear there yet). Phase C (mock → real for the profile surfaces) is the remaining user-account work.
+- **Brand/bodytype/subcategory icon storage objects missing.** As of 2026-08-25 the DB icon URLs for brands, bodytypes and subcategories return `NoSuchKey` from Supabase Storage (category icons exist; the 91 seeded car brands work because they point at the web app's local `/sub-img` assets). Affected tile grids degrade to broken `<img>` glyphs (`OptionGrid`/`SubcategoryGrid` count images by presence, not load success). Fix options: re-upload via the admin UI, restore the bucket objects, or add an `onError` → text-pill fallback (proposed, not implemented).
+- **Specs-grid brand links are best-effort.** `buildRealDetailData` derives brand slugs via `slugify(attribute name)` into `real.brand.slug`, which can diverge from backend `brands.slug` rows (e.g. `mercedes-benz` vs `mercedesbenz`) — the `?ad_field=` link then lands on the unfiltered subcategory page. Model links (`ad_model`) only highlight the model grid, never filter the feed. Carrier-icon detection covers only the 4 carriers that have `/icon` assets (Qube and unknown prefixes get the S/C letter-badge fallback).
+- **`generateUniqueUsername` race.** Check-then-insert with no 23505 retry — concurrent same-name creates (e.g. two OTP verifies at once) can 500. Add retry-on-unique-violation in the consumers (Telegram login, `updateProfile`, phone-OTP verify).
+- **`phoneVerifiedAt` is never written** though the column exists, and a soft-deleted user keeps its global-unique `user_phones` row so a re-registered active user ends up with `primaryPhone` but no `user_phones` row.
+- **Username login is case-sensitive** (`loginWithPassword` matches `users.username` exactly) while generated usernames are lowercase — typed-cased usernames fail. `UpdateProfileDto` first/last names have no `@MaxLength` (Postgres 22001 → 500 on overflow) while the column is `varchar(100)`.

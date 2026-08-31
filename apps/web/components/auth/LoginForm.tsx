@@ -3,6 +3,9 @@
 import { loginSchema } from "@/schemas/login";
 import { useAppForm } from "@/components/form/hooks";
 import { login } from "@/actions/login";
+import { requestLoginOtp } from "@/actions/otp";
+import { isLocalPhone, normalizePhone } from "@/lib/phone";
+import { storeOtpRegistration } from "@/lib/otp-registration";
 import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -35,12 +38,35 @@ export function LoginForm({
       onChange: loginSchema,
     },
     onSubmit: async ({ value }) => {
+      // Phone identifiers (local 0… format) log in via OTP — the backend
+      // validates the password first and only then sends the code.
+      if (isLocalPhone(value.login)) {
+        const phone = normalizePhone(value.login);
+        if (!phone) {
+          toast.error("Invalid phone number.");
+          return;
+        }
+        const result = await requestLoginOtp(phone, value.password);
+        if (result.success) {
+          storeOtpRegistration({
+            mode: "login",
+            phone,
+            password: value.password,
+          });
+          toast.success("Code sent to your phone.", { position: "top-right" });
+          router.push({ pathname: "/otp", query: { phone } });
+        } else {
+          toast.error(result.error || "Login failed.");
+        }
+        return;
+      }
+
       const result = await login(value);
 
       if (result.success) {
         form.reset();
         toast.success("Login successfully!", { position: "top-right" });
-        router.push("/");
+        router.push("/me");
       } else {
         toast.error(result.error || "Login failed.");
       }

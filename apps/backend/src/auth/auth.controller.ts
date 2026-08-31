@@ -6,8 +6,10 @@ import type { RequestUser } from '../common/types/api-response.types';
 import { AuthService } from './auth.service';
 import type { TelegramAuthPayload } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { LoginOtpDto } from './dto/login-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RequestOtpDto } from './dto/request-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 
@@ -33,8 +35,17 @@ export class AuthController {
   @Post('otp/request')
   @Public()
   @ApiOperation({ summary: 'Request OTP for phone' })
-  requestOtp(@Body() body: { phone: string }) {
-    return this.authService.requestPhoneOtp(body.phone);
+  requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestPhoneOtp(dto.phone);
+  }
+
+  @Post('otp/login')
+  @Public()
+  @ApiOperation({
+    summary: 'Login with phone + password (validates password, then sends OTP)',
+  })
+  requestLoginOtp(@Body() dto: LoginOtpDto) {
+    return this.authService.requestLoginOtp(dto);
   }
 
   @Post('otp/verify')

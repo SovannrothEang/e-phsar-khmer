@@ -1,11 +1,43 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
-import { categories } from "@/lib/categories";
-import { getTranslations } from "next-intl/server";
+import { API_URL } from "@/lib/api/client";
+import { getLocale, getTranslations } from "next-intl/server";
+import { LayoutGrid } from "lucide-react";
+
+/**
+ * Minimal slice of GET /api/v1/categories items. Deliberately local: the web
+ * app is standalone and the mock `Category` (cateId/cateIcon) must not be
+ * confused with this wire shape (id/icon).
+ */
+interface BackendCategory {
+  slug: string;
+  name: string;
+  icon: string | null;
+}
 
 export default async function CategoryGrid() {
+  const [t, locale] = await Promise.all([
+    getTranslations("HomePage.BrowseByCategory"),
+    getLocale(),
+  ]);
 
-  const t = await getTranslations("HomePage.BrowseByCategory");
+  let items: BackendCategory[] = [];
+  try {
+    const res = await fetch(`${API_URL}/categories`, {
+      headers: { "Accept-Language": locale },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as {
+      success: boolean;
+      data?: BackendCategory[];
+    };
+    items = body.success ? (body.data ?? []) : [];
+  } catch {
+    // backend unavailable — hide the section, never 500 the homepage
+    return null;
+  }
+  if (items.length === 0) return null;
 
   return (
     <div className="w-full flex justify-center mt-4">
@@ -14,27 +46,34 @@ export default async function CategoryGrid() {
           {t("title")}
         </h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-y-8 gap-x-8 px-2">
-          {categories.map((category) => (
+          {items.map((category) => (
             <Link
-              key={String(category.slug)}
+              key={category.slug}
               href={{
                 pathname: "/category/[categorySlug]",
-                params: { categorySlug: category.slug }
+                params: { categorySlug: category.slug },
               }}
               className="flex flex-col items-center text-center group"
             >
               <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 group-hover:bg-blue-200 transition">
-                <Image
-                  src={category.cateIcon}
-                  alt={category.name}
-                  width={120}
-                  height={120}
-                  unoptimized
-                  className="object-contain"  
-                />
+                {category.icon ? (
+                  <Image
+                    src={category.icon}
+                    alt={category.name}
+                    width={120}
+                    height={120}
+                    unoptimized
+                    className="object-contain"
+                  />
+                ) : (
+                  <LayoutGrid
+                    className="h-8 w-8 text-blue-500/70"
+                    aria-hidden
+                  />
+                )}
               </div>
-              <span className="mt-4 text-sm text-foreground  leading-tight">
-                {t(category.name)}
+              <span className="mt-4 text-sm text-foreground leading-tight">
+                {category.name}
               </span>
             </Link>
           ))}

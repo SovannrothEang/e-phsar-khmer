@@ -1,13 +1,15 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
+import { OtpPageClient } from "@/components/auth/OtpPageClient";
 
-export const metadata: Metadata = { title: "Verify Phone" };
+export const metadata: Metadata = {
+  title: "Verify your phone",
+};
 
-export default async function OtpPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ phone?: string }>;
-}) {
-  const { phone } = await searchParams;
-  return <OtpVerifyForm phone={phone ?? ""} />;
+export default function OtpPage() {
+  return (
+    <Suspense>
+      <OtpPageClient />
+    </Suspense>
+  );
 }

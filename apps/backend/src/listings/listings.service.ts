@@ -243,6 +243,16 @@ export class ListingsService {
     if (query.condition) {
       conditions.push(eq(listings.condition, query.condition));
     }
+    // Attribute filters match the display names stored in `attributes` JSONB
+    // (e.g. `attributes.brand = 'Toyota'`), which is what the post form writes.
+    if (query.brand) {
+      conditions.push(eq(sql`${listings.attributes}->>'brand'`, query.brand));
+    }
+    if (query.bodyType) {
+      conditions.push(
+        eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType),
+      );
+    }
 
     if (query.cursor) {
       try {

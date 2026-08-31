@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DbClient } from '../../db/drizzle.provider';
 import { attributeOptions } from '../../db/schema/attributes.schema';
 import { categories, subcategories } from '../../db/schema/categories.schema';
@@ -13,6 +13,9 @@ import { categories, subcategories } from '../../db/schema/categories.schema';
  * Images are never seeded — every row starts `image: null` and admins
  * upload images themselves through the admin UI (ImageUpload → Supabase
  * storage → public URL stored in `image`). The seed never overwrites them.
+ * The one exception: car body-type rows are gap-filled with the web app's
+ * local /sub-img design assets below — null-only, so admin uploads (non-null
+ * images) are never touched.
  *
  * Insert-only: rows are never overwritten on re-run, so admin edits to the
  * admin-managed types survive a re-seed.
@@ -703,6 +706,36 @@ export async function seedAttributes(db: DbClient): Promise<void> {
       .onConflictDoNothing();
 
     byType.set(seed.type, (byType.get(seed.type) ?? 0) + 1);
+  }
+
+  // Car body-type icons are the web app's local /sub-img design assets —
+  // interim until they move to Supabase storage. Gap-fills only null icons
+  // (admin-uploaded images are never overwritten); the insert-only loop
+  // above keeps every other row untouched.
+  const CAR_BODY_TYPE_FILES: Record<string, string> = {
+    sedan: 'sedan',
+    hatchback: 'hatchback',
+    pickup: 'pickup',
+    suv: 'suv',
+    convertible: 'convertible',
+    'mpv-minivan': 'mpv-minivan',
+    sports: 'sports',
+    'station-wagon': 'station-wagon',
+    'other-type': 'other',
+  };
+  for (const [slug, file] of Object.entries(CAR_BODY_TYPE_FILES)) {
+    await db
+      .update(attributeOptions)
+      .set({
+        image: `/sub-img/car_vehicles/cars-for-sale/body_type/${file}.png`,
+      })
+      .where(
+        and(
+          eq(attributeOptions.type, 'bodytypes'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.image),
+        ),
+      );
   }
 
   for (const [type, count] of byType) {

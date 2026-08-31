@@ -43,7 +43,6 @@ export function ListCardPost({ post }: { post: Post }) {
   return (
     <>
       <div className="relative flex items-stretch bg-card rounded-sm hover:bg-muted/20 transition-colors border cursor-pointer select-none w-full mt-4">
-
         {/* Full-card link */}
         <Link
           // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
@@ -54,12 +53,13 @@ export function ListCardPost({ post }: { post: Post }) {
         {/* ── LEFT: Image ── */}
         <div className="relative shrink-0 w-[200px] h-[180px] ">
           <Image
-            src={post.images[0]}
+            src={post.images[0] ?? "/placeholder.svg"}
             alt={post.title}
             fill
             className="object-cover rounded-l-sm"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             loading="eager"
+            unoptimized
           />
 
           {/* Discount badge — single pill, top-left, orange like khmer24 */}
@@ -102,20 +102,27 @@ export function ListCardPost({ post }: { post: Post }) {
                   </Link>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem asChild onSelect={(e) => e.preventDefault()} className="p-0">
+                <DropdownMenuItem
+                  asChild
+                  onSelect={(e) => e.preventDefault()}
+                  className="p-0"
+                >
                   <Toggle
                     pressed={isSaved}
                     onPressedChange={(value) => {
                       toast.promise(
                         new Promise((resolve) =>
-                          setTimeout(() => resolve(value ? "Saved" : "Removed"), 800)
+                          setTimeout(
+                            () => resolve(value ? "Saved" : "Removed"),
+                            800,
+                          ),
                         ),
                         {
                           loading: "Loading...",
                           success: (d) => `${d} successfully`,
                           error: "Error",
                           position: "top-right",
-                        }
+                        },
                       );
                       setIsSaved(value);
                     }}
@@ -174,7 +181,9 @@ export function ListCardPost({ post }: { post: Post }) {
                 })}
               </span>
               <DotIcon className="shrink-0 w-3 h-3" />
-              <span className="truncate">{post.proId},{post.disId}</span>
+              <span className="truncate">
+                {post.location ?? `${post.proId},${post.disId}`}
+              </span>
             </div>
 
             {/* Condition · Year · etc */}
@@ -211,14 +220,17 @@ export function ListCardPost({ post }: { post: Post }) {
               const willLike = !isLiked;
               toast.promise(
                 new Promise((resolve) =>
-                  setTimeout(() => resolve(willLike ? "Liked" : "Unliked"), 800)
+                  setTimeout(
+                    () => resolve(willLike ? "Liked" : "Unliked"),
+                    800,
+                  ),
                 ),
                 {
                   loading: "Processing...",
                   success: (msg) => `${msg} successfully`,
                   error: "Error",
                   position: "top-right",
-                }
+                },
               );
               setIsLiked(willLike);
             }}
@@ -237,7 +249,10 @@ export function ListCardPost({ post }: { post: Post }) {
 
       {/* Share dialog */}
       <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-        <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+        <DialogContent
+          className="sm:max-w-md"
+          onClick={(e) => e.stopPropagation()}
+        >
           <DialogHeader>
             <DialogTitle>Share link</DialogTitle>
             <DialogDescription>

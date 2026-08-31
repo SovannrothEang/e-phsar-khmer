@@ -15,7 +15,6 @@ import {
   BadgeDollarSign,
   Loader2,
 } from "lucide-react";
-import { User } from "@/lib/user";
 import { Button } from "../ui/button";
 import { Link, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,10 +27,44 @@ import "yet-another-react-lightbox/styles.css";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
 
+/**
+ * The subset of profile identity the header renders. Fed by the real
+ * logged-in session (`/me` layout); the `following`/`follower` numbers stay
+ * mock until the backend has that data (Phase C).
+ */
+export interface ProfileUser {
+  name: string;
+  username: string;
+  avatar: string;
+  cover: string;
+  following: number;
+  follower: number;
+  joinDate: string;
+}
+
 interface ProfileHeaderProps {
-  user: User;
+  user: ProfileUser;
   isOwnProfile: boolean;
 }
+
+const PROFILE_TABS = [
+  { value: "manage-ads", href: "/me", label: "Manage Ads", icon: FolderOpen },
+  { value: "about", href: "/me/about", label: "About", icon: Info },
+  {
+    value: "jobs",
+    href: "/me/job-applications",
+    label: "Jobs",
+    icon: BriefcaseBusiness,
+  },
+  { value: "saved", href: "/me/saved", label: "Saved", icon: Bookmark },
+  { value: "likes", href: "/me/likes", label: "Likes", icon: Heart },
+  {
+    value: "subscriptions",
+    href: "/me/subscriptions",
+    label: "Subscriptions",
+    icon: BadgeDollarSign,
+  },
+] as const;
 
 export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const [open, setOpen] = useState(false);
@@ -117,8 +150,20 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
       <div className="w-full mx-auto max-w-7xl">
         <div className=" bg-card">
           <div
-            onClick={() => handleImageClick(displayedCover)}
-            className="relative h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full bg-gradient from-blue-200 to-blue-100 cursor-pointer"
+            onClick={() => {
+              // With a cover, click to view (lightbox); empty cover + own
+              // profile, click opens the upload picker.
+              if (displayedCover) {
+                handleImageClick(displayedCover);
+              } else if (isOwnProfile) {
+                coverInputRef.current?.click();
+              }
+            }}
+            className={`relative h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full cursor-pointer ${
+              displayedCover
+                ? ""
+                : "bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5"
+            }`}
           >
             {displayedCover && (
               <Image
@@ -209,18 +254,18 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                   </div>
 
                   <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                    <Button className="flex items-center gap-2 px-4 h-11 bg-muted-foreground/60 hover:bg-gray-200 rounded-sm font-medium transition">
-                      <IdCard className="scale-125" />
+                    <Button className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer">
+                      <IdCard className="h-5 w-5" />
                       Resume (CV)
                     </Button>
-                    <Button className="flex items-center gap-2 px-4 h-11 bg-muted-foreground/60 hover:bg-gray-200 rounded-sm font-medium transition">
-                      <Forward className="scale-125" />
+                    <Button className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer">
+                      <Forward className="h-5 w-5" />
                     </Button>
                     <Button
                       onClick={() => router.replace("/settings")}
-                      className="p-2 h-11 w-12 bg-muted-foreground/60 hover:bg-gray-200 rounded-sm transition cursor-pointer"
+                      className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer"
                     >
-                      <Settings className="scale-125" />
+                      <Settings className="h-5 w-5" />
                     </Button>
                   </div>
                 </div>
@@ -229,62 +274,24 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs defaultValue="manage-ads">
-              <TabsList variant="line">
-                <TabsTrigger value="manage-ads">
-                  <Link
-                    href="/me"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
+            <Tabs defaultValue="manage-ads" className="flex-1">
+              <TabsList variant="line" className="w-full">
+                {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    asChild
+                    className="h-11 px-4 rounded-lg transition-colors hover:bg-[#00a0e9]/10 hover:text-[#00a0e9] data-active:text-[#00a0e9] data-active:hover:text-[#00a0e9] data-active:hover:bg-[#00a0e9]/10 data-active:after:bg-[#00a0e9] data-active:after:h-[3px]"
                   >
-                    <FolderOpen />
-                    Manage Ads
-                  </Link>
-                </TabsTrigger>
-                <TabsTrigger value="about">
-                  <Link
-                    href="/me/about"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
-                  >
-                    <Info />
-                    About
-                  </Link>
-                </TabsTrigger>
-                <TabsTrigger value="jobs">
-                  <Link
-                    href="/me/job-applications"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
-                  >
-                    <BriefcaseBusiness />
-                    Jobs
-                  </Link>
-                </TabsTrigger>
-                <TabsTrigger value="saved">
-                  <Link
-                    href="/me/saved"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
-                  >
-                    <Bookmark />
-                    Saved
-                  </Link>
-                </TabsTrigger>
-                <TabsTrigger value="liked">
-                  <Link
-                    href="/me/likes"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
-                  >
-                    <Heart />
-                    Likes
-                  </Link>
-                </TabsTrigger>
-                <TabsTrigger value="subscriptions">
-                  <Link
-                    href="/me/subscriptions"
-                    className="flex items-center gap-2 px-4 h-11  font-medium transition"
-                  >
-                    <BadgeDollarSign />
-                    Subscriptions
-                  </Link>
-                </TabsTrigger>
+                    <Link
+                      href={href}
+                      className="flex items-center gap-2 font-medium transition"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </Link>
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </Tabs>
             <Lightbox

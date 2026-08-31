@@ -54,4 +54,19 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   districtSlug?: string;
+
+  @ApiPropertyOptional({
+    description: "Filter by the ad's brand (listings.attributes->>'brand')",
+  })
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Filter by the ad's body type (listings.attributes->>'bodyType')",
+  })
+  @IsOptional()
+  @IsString()
+  bodyType?: string;
 }

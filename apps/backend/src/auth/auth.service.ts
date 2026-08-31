@@ -19,6 +19,7 @@ import {
 import type { UserRow } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import type { LoginDto } from './dto/login.dto';
+import type { LoginOtpDto } from './dto/login-otp.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { RefreshDto } from './dto/refresh.dto';
@@ -33,6 +34,9 @@ export interface AuthTokens {
   refreshToken: string;
   expiresIn: string;
 }
+
+/** Mirrors AdminService.createUser bcrypt cost. */
+const PASSWORD_SALT_ROUNDS = 10;
 
 export type PublicUser = Omit<UserRow, 'passwordHash'>;
 
@@ -94,6 +98,29 @@ export class AuthService {
   async verifyPhoneOtp(
     dto: VerifyOtpDto,
   ): Promise<AuthTokens & { user: PublicUser }> {
+    // Password is checked BEFORE the Supabase call so a wrong password
+    // never burns an OTP attempt. For an existing user this is a login
+    // (password must match); for an absent user this is a registration
+    // (the password becomes the account's passwordHash).
+    const [existing] = await this.db
+      .select()
+      .from(users)
+      .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
+      .limit(1);
+
+    // A legacy bare account (created before passwords were required) is
+    // COMPLETED in place: possessing the OTP proves phone ownership, so the
+    // submitted password (and names) become the account's. An account that
+    // already has a password must match it — credentials are never replaced
+    // through this endpoint.
+    const completingBareAccount =
+      existing !== undefined && !existing.passwordHash;
+
+    if (existing && existing.passwordHash) {
+      const valid = await bcrypt.compare(dto.password, existing.passwordHash);
+      if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
+
     const { data, error } = await this.supabaseService.verifyOtp(
       dto.phone,
       dto.token,
@@ -101,13 +128,78 @@ export class AuthService {
     if (error || !data.user)
       throw new UnauthorizedException('Invalid or expired OTP');
 
-    const user = await this.mirrorSupabaseUser(data.user, 'phone', dto.phone);
+    if (completingBareAccount) {
+      const updateData: Partial<typeof users.$inferInsert> = {
+        passwordHash: await bcrypt.hash(dto.password, PASSWORD_SALT_ROUNDS),
+        updatedAt: new Date(),
+      };
+      if (dto.firstName !== undefined) updateData.firstName = dto.firstName;
+      if (dto.lastName !== undefined) updateData.lastName = dto.lastName;
+      if (existing.username === null) {
+        const base = buildUsernameBase(
+          dto.firstName ?? existing.firstName,
+          dto.lastName ?? existing.lastName,
+        );
+        if (base !== null) {
+          updateData.username = await generateUniqueUsername(this.db, base);
+        }
+      }
+
+      const [row] = await this.db
+        .update(users)
+        .set(updateData)
+        .where(and(eq(users.id, existing.id), isNull(users.deletedAt)))
+        .returning();
+
+      const tokens = this.issueTokens(row);
+      return { ...tokens, user: this.toPublicUser(row) };
+    }
+
+    // Extras land ONLY in the INSERT values — the conflict path (existing
+    // user logging in) must never overwrite password/names/username.
+    const insertExtras: Partial<typeof users.$inferInsert> = {};
+    if (!existing) {
+      insertExtras.passwordHash = await bcrypt.hash(
+        dto.password,
+        PASSWORD_SALT_ROUNDS,
+      );
+      if (dto.firstName !== undefined) insertExtras.firstName = dto.firstName;
+      if (dto.lastName !== undefined) insertExtras.lastName = dto.lastName;
+      const base = buildUsernameBase(dto.firstName, dto.lastName);
+      if (base !== null) {
+        insertExtras.username = await generateUniqueUsername(this.db, base);
+      }
+    }
+
+    const user = await this.mirrorSupabaseUser(
+      data.user,
+      'phone',
+      dto.phone,
+      insertExtras,
+    );
     const tokens = this.issueTokens(user);
     return { ...tokens, user: this.toPublicUser(user) };
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
     await this.supabaseService.signInWithOtp(phone);
+    return { otpSent: true };
+  }
+
+  async requestLoginOtp(dto: LoginOtpDto): Promise<{ otpSent: true }> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
+      .limit(1);
+
+    if (!user || !user.passwordHash)
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
+
+    const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+
+    await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
 
@@ -263,6 +355,7 @@ export class AuthService {
     supabaseUser: { id: string; phone?: string; email?: string },
     provider: 'phone' | 'google' | 'facebook',
     phone?: string,
+    insertExtras?: Partial<typeof users.$inferInsert>,
   ): Promise<UserRow> {
     const resolvedPhone = phone ?? supabaseUser.phone ?? null;
 
@@ -271,7 +364,7 @@ export class AuthService {
     if (provider === 'phone') {
       const [row] = await this.db
         .insert(users)
-        .values({ primaryPhone: resolvedPhone })
+        .values({ primaryPhone: resolvedPhone, ...insertExtras })
         .onConflictDoUpdate({
           target: users.primaryPhone,
           targetWhere: isNull(users.deletedAt),

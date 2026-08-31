@@ -1,75 +1,265 @@
-# Spec: OTP verification screen after phone-number registration (user surface, mock-wired)
+# OTP verification page after phone registration (web)
 
-## Summary
+## Context
 
-After a user submits the register form, redirect them to a new `/otp` verification screen: a shadcn-style card with six input boxes accepting exactly one digit each. Verification is mocked at the client level (fixed demo code `123456`, no backend call, no SMS); success shows a toast and sends the user to `/login`. The register page's design is untouched — only the submit-success branch gains a redirect.
+After a user fills the register form and submits, the flow must continue to a
+6-digit OTP verification screen that confirms the phone number. The backend
+already implements phone-OTP auth (`POST /auth/register` sends the OTP,
+`POST /auth/otp/verify` creates the user and returns tokens). This change is
+web-only. Mockup-level wiring is approved: real backend calls with graceful
+error handling, no new product surfaces beyond the OTP page.
 
-## Current state (answers to the captain's questions)
+## Current state
 
-- **Do we have an OTP screen/page after login/register by phone?** No. The user surface has no OTP route. `apps/web/app/[locale]/(user)/(auth)/` contains only `login`, `register`, `forgot-password`, and `test` pages. `forgot-password/page.tsx` renders `ForgotPasswordForm` (`apps/web/components/auth/Forgot-PassowordForm.tsx`), which is a plain identifier input — no OTP step exists anywhere on the user surface.
-- **Do we have an OTP component?** Partially. `apps/web/components/auth/OtpForm.tsx` exports `InputOTPForm` — a 6-slot card built on the shadcn primitives in `apps/web/components/ui/input-otp.tsx` (`input-otp@^1.4.2` already in `apps/web/package.json` line 24 — not a new dependency). But it is dead code: nothing imports it, its copy is Telegram/email-specific ("sent a verification code via Telegram" lines 72-73; "I no longer have access to this email address" line 119), and its props (`expectedOtp`, `onSuccess`, `onBack` supplied by a parent, lines 28-33) do not fit a standalone page.
-- **Is the existing OtpForm enough, even as mockup?** As a structural template, yes — it proves the 6-slot one-digit-per-box UI works. As the actual screen, no: it has no route, no phone display, mismatched copy, and expects a parent to own verification and navigation. We build a purpose-built `OtpVerifyForm` modeled on it.
-- **Register today:** `apps/web/app/[locale]/(user)/(auth)/register/page.tsx` (server component, 12 lines) renders `RegisterForm` — the live code is `apps/web/components/auth/RegisterForm.tsx` lines 316-427 (the commented block above it, lines 1-314, is dead). Submit calls the `register()` server action (`apps/web/actions/register.ts`), a mock (`// Save to DB` then `{ success: true }`). On success it currently calls `form.reset()` and dumps the whole payload — including the password — into a toast (lines 365-370). No redirect exists.
-- **Backend contract mismatch (why mock):** backend `POST /api/v1/auth/register` accepts only `{ phone }`; the web form collects firstName/lastName/password/confirmPassword. The form cannot be persisted through the existing contract without backend changes (out of scope), and the captain explicitly accepted mockup.
-- **i18n reality:** auth pages use hardcoded English — `LoginForm.tsx`, `RegisterForm.tsx`, `Forgot-PassowordForm.tsx` contain no `useTranslations`, and `apps/web/messages/en.json` (59 lines) has only `HomePage` and `Card` sections. No auth/register message keys exist in any of the 6 locale files to mirror. New OTP copy therefore stays hardcoded English; no locale files change.
+- Register page `apps/web/app/[locale]/(user)/(auth)/register/page.tsx` renders
+  `RegisterForm` (`apps/web/components/auth/RegisterForm.tsx`), a TanStack Form
+  (`useAppForm`) + zod form. Its submit calls `register()` from
+  `apps/web/actions/register.ts`, which is a mock: it zod-parses and returns
+  `{ success: true }` with no API call. On success the form resets and shows a
+  toast that dumps the payload as JSON (RegisterForm.tsx:363-373).
+- No OTP page/route exists. `components/auth/OtpForm.tsx` is an unused mock
+  component (Telegram copy, `expectedOtp` prop, imported nowhere).
+- `input-otp@^1.4.2` is ALREADY a dependency (`apps/web/package.json:24`) and
+  the shadcn primitive `components/ui/input-otp.tsx` exists. Using it adds no
+  dependency.
+- Backend endpoints (`apps/backend/src/auth/auth.controller.ts`):
+  - `POST /auth/register` `{ phone }` → `{ otpSent: true }` (line 26)
+  - `POST /auth/otp/request` `{ phone }` → `{ otpSent: true }` (line 33) — resend
+  - `POST /auth/otp/verify` `{ phone, token }` →
+    `{ accessToken, refreshToken, expiresIn, user }` (line 40)
+  - Envelope `{ success, data }`; errors `{ success:false, error:{code,message} }`.
+  - Phone must match `^\+?[1-9]\d{6,14}$` (leading `0` rejected — the web form
+    collects local `0XXXXXXXXX` numbers, so normalization is required).
+  - Dev bypass: when `DEV_OTP_TOKEN` env is set, no SMS is sent and only that
+    fixed token verifies (`common/supabase/supabase.service.ts:45-59`).
+- User session: `setUserSession()` (`apps/web/lib/auth/session.ts:55-59`) sets
+  `user_access_token`/`user_refresh_token` httpOnly cookies from a server
+  action; `actions/login.ts:22-47` is the plain-fetch + envelope-unwrap pattern
+  to copy.
+- Routing: `apps/web/proxy.ts` guards only `/wanderer/dashboard/**`; all
+  `/[locale]/*` routes are public. Locale-aware navigation comes from
+  `@/i18n/routing` (`Link`, `useRouter`); route names must be registered in the
+  `pathnames` map (`apps/web/i18n/routing.ts:9-88`) or typed hrefs fail to
+  compile.
+- Auth pages are hardcoded English (no next-intl keys exist for login/register);
+  `messages/*.json` only contain `HomePage` and `Card` namespaces.
+
+## Goal
+
+1. Register submit fires the real `POST /auth/register` (sends OTP), then
+   redirects to the new OTP page carrying the phone number. Register page
+   DESIGN is untouched — only submit wiring changes.
+2. A new public, locale-prefixed OTP page at `/{locale}/otp?phone=...` with a
+   shadcn-style 6-box input (one digit per box), auto-advance/backspace/paste,
+   auto-submit at 6 digits, resend with cooldown, and real
+   `POST /auth/otp/verify` that logs the user in on success (same session
+   cookies as `actions/login.ts`).
+
+## Non-goals
+
+- No backend changes of any kind.
+- No change to register page layout, fields, or validation schema
+  (`schemas/register.ts` stays as-is).
+- No consumption of firstName/lastName/password by the backend (the backend
+  phone-OTP flow does not accept them; they remain collected-but-unused, same
+  as today).
+- No i18n message keys (auth surface is hardcoded English today; translating it
+  is a separate ticket covering all auth pages).
+- No changes to the orphaned `components/auth/OtpForm.tsx` (left untouched).
+- No new dependencies.
 
 ## Decisions
 
-1. **Route: `/otp`** — page at `app/[locale]/(user)/(auth)/otp/page.tsx`, declared as `"/otp": {}` in `i18n/routing.ts` pathnames, mirroring the sibling `"/login"` / `"/register"` / `"/forgot-password"` entries (lines 18-20).
-2. **Wiring level: client-side mock.** Fixed demo code `123456`; no server action, no backend call, no SMS. Rationale: the register action is already a mock; the backend register endpoint cannot accept this form's payload; the captain explicitly allowed mockup ("even if it mock up?"). A small visible hint `(Demo code: 123456)` makes the mock testable.
-3. **Phone hand-off: query param** — `/otp?phone=<encodeURIComponent(phone)>`. Survives refresh, debuggable, no sessionStorage plumbing. The server page awaits `searchParams` (Next 16 Promise convention — `app/[locale]/layout.tsx` line 36 awaits `params` the same way) and passes `phone` as a prop, avoiding `useSearchParams` prerender/Suspense concerns.
-4. **Success redirect: `/login`.** The mock creates no session, and the register design already steers users to login. Locale-aware `router.push("/login")` via `useRouter` from `@/i18n/routing` (pattern: `LoginForm.tsx` lines 18, 43).
-5. **New component, not a retrofit.** `InputOTPForm` is unused dead code with Telegram/email copy and parent-driven props; a self-contained `{ phone }`-prop component fits a standalone page. `OtpForm.tsx` is left untouched (minimal diff).
-6. **Visual: shadcn card, one group of 6 slots.** `InputOTP` with `maxLength={6}` enforces exactly one digit per box (the library's core behavior — no extra code needed). Single `InputOTPGroup` of six `InputOTPSlot`s, no 3+3 separator ("simple and clean"); slot sizing `h-12 w-12 text-xl` copied from `OtpForm.tsx` lines 104/110. Card structure and container copied from `OtpForm.tsx`.
-7. **Resend + back affordances, mocked.** Resend Code button → `toast.success("Code resent successfully!")` (exact pattern `OtpForm.tsx` line 89). Back = ghost icon Button with ArrowLeft plus a "Wrong number?" `Link href="/register"` via `Link` from `@/i18n/routing` (`LoginForm.tsx` line 144 pattern).
-8. **i18n: hardcoded English**, matching every other auth component. No `messages/*.json` edits.
+1. **Route: `/[locale]/(user)/(auth)/otp/page.tsx`** — lives beside
+   login/register in the `(auth)` group (NavBar/Footer from the `(user)`
+   layout, consistent with register). Register `"/otp": {}` in
+   `i18n/routing.ts` `pathnames` (required for typed hrefs; matches how
+   `/register` is registered at routing.ts:19). Public by default — proxy only
+   guards `/wanderer/dashboard/**`.
+2. **Phone transport: URL query param** `?phone=<E.164>` — stateless, survives
+   refresh, matches the `useSearchParams()` convention
+   (`category/[categorySlug]/page.tsx:21`). The register submit normalizes the
+   phone once and passes the SAME normalized value to the OTP page, so register
+   and verify keys always match. Missing/invalid phone on the OTP page →
+   `router.replace("/register")`.
+3. **Phone normalization: new helper `apps/web/lib/phone.ts`** —
+   `normalizePhone(raw: string): string`: trim; strip everything except digits
+   and a leading `+`; if it starts with `+` keep as-is; else drop a leading `0`
+   and prefix `+855` (Cambodian local format, matches the zod `min(8).max(10)`
+   local-number assumption); return `""` if the result has fewer than 8 digits.
+   Shared by the register action and the OTP page so both produce identical
+   E.164 values. The zod schema is NOT touched (design freeze).
+4. **OTP input: reuse `@/components/ui/input-otp`** — `input-otp` is already
+   installed (package.json:24), so this violates the no-dependency constraint
+   none; it is the shadcn-style primitive and provides the required UX for
+   free: one digit per box, auto-advance, backspace navigation, full-code
+   paste, fake-caret. Render ONE `InputOTPGroup` with 6 `InputOTPSlot`s (no
+   3+3 separator — single row of 6 boxes, simple and clean). Model the
+   component on `components/auth/OtpForm.tsx` (Card + Field + FieldLabel) but
+   with SMS copy instead of Telegram. Fallback (only if the captain later wants
+   the dependency dropped): hand-rolled 6-ref `<input maxLength={1}
+inputMode="numeric">` row implementing auto-advance, backspace-to-previous,
+   paste-splitting, auto-submit — behavior contract is identical.
+5. **Auto-submit**: `useEffect` fires verify when `value.length === 6` and not
+   already verifying; the explicit Verify button remains (disabled +
+   "Verifying…" while pending) as the accessible fallback.
+6. **Resend: real `POST /auth/otp/request` + 60s client-side cooldown** — the
+   endpoint exists precisely for this. Cooldown starts on page mount (the OTP
+   was just sent by register) and restarts on each resend; button shows the
+   remaining seconds, disabled during cooldown.
+7. **Verify wiring: real API + auto-login** — new server action calls
+   `POST /auth/otp/verify`; on success `setUserSession({accessToken,
+refreshToken})` (mirrors `actions/login.ts:47`), then the client toasts
+   success and `router.push("/")` (mirrors LoginForm.tsx:40-43). On failure:
+   toast the backend `error.message` (fallback "Invalid or expired code"),
+   clear the boxes, allow retry. Do NOT send `preferredLanguage` (backend
+   allows only en/km/zh; web locales include ko/id/vi — sending it would 400).
+8. **Register submit wiring (minimal diff)** — `actions/register.ts` gains the
+   real `POST /auth/register` call (plain fetch + envelope unwrap, copying
+   `actions/login.ts:22-43`); it keeps returning `{ success, error? }`.
+   `RegisterForm.tsx` onSubmit changes only: normalize phone via
+   `normalizePhone`, call `register({ phone: normalized })`, on success replace
+   the JSON-dump toast with a plain "Code sent" toast and
+   `router.push({ pathname: "/otp", query: { phone: normalized } })` using
+   `useRouter` from `@/i18n/routing`. Keep `form.reset()`. No JSX/layout edits.
+9. **i18n: no new keys** — all auth pages are hardcoded English today
+   (RegisterForm, LoginForm, OtpForm); the OTP page follows suit for
+   consistency. Translating the auth surface is a separate cross-page ticket.
+10. **Styling: existing primitives only** — Card/CardHeader/CardContent/
+    CardFooter, Field/FieldLabel/FieldDescription, Button, InputOTP from
+    `@/components/ui/*`; `cn` from `@/lib/utils`; orange submit button
+    (`bg-orange-500 hover:bg-orange-600 text-white h-10 w-full`) matching
+    login/register; centered `max-w-md` card on the page.
 
 ## Implementation plan
 
-1. **EDIT `apps/web/i18n/routing.ts`** — add `"/otp": {}` immediately after the `"/register": {}` entry (line 19). Empty object = identical path in all six locales.
+1. **NEW `apps/web/lib/phone.ts`** — `normalizePhone(raw: string): string`
+   per Decision 3. Pure function, no deps.
+2. **NEW `apps/web/actions/otp.ts`** (`"use server"`) — copy the fetch pattern
+   from `actions/login.ts`:
+   - `requestOtp(phone: string): Promise<{ success: boolean; error?: string }>`
+     → `POST ${API_URL}/auth/otp/request` body `{ phone }`.
+   - `verifyOtp(phone: string, token: string): Promise<
+    { success: true; user: { id: string; username: string | null; role: string } } |
+    { success: false; error: string }>` → `POST ${API_URL}/auth/otp/verify`;
+     on success call `setUserSession({ accessToken, refreshToken })`. Import
+     `API_URL` from `@/lib/api/client`, `setUserSession` from
+     `@/lib/auth/session`. Parse the envelope defensively
+     (`res.json().catch(() => null)`), exactly like login.ts:28-43.
+3. **MODIFY `apps/web/actions/register.ts`** — keep the zod safeParse gate;
+   normalize the phone with `normalizePhone`; `POST ${API_URL}/auth/register`
+   body `{ phone }`; return `{ success: false, error }` on !res.ok (map
+   error.message), `{ success: true }` on `{ otpSent: true }`.
+4. **NEW `apps/web/components/auth/OtpVerifyForm.tsx`** (`"use client"`) —
+   props `{ phone: string }`. State: `value` (6-digit string), `verifying`
+   (boolean), `cooldown` (number, starts 60), `resending` (boolean).
+   `useEffect` countdown timer (1s interval, cleaned up). Verify handler
+   shared by auto-submit effect and the button (guards: length 6, not already
+   verifying). Resend handler: `requestOtp(phone)`, restart cooldown, toast.
+   Structure modeled on `components/auth/OtpForm.tsx` (Card, Field,
+   FieldLabel, back-arrow Button linking to `/register` via `Link` from
+   `@/i18n/routing`): title "Verify your phone", description "We sent a
+   6-digit code via SMS to {phone}. Enter the code to finish creating your
+   account.", one `InputOTPGroup` of 6 slots (h-12 w-12 boxes), Resend button
+   beside the label, full-width orange Verify button, muted "Wrong number? Go
+   back to register" link. No `any` (strict lint).
+5. **NEW `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx`** — server
+   component; `metadata` title "Verify your phone"; renders a centered wrapper
+   (`container mx-auto my-6 px-4` — register sits inside NavBar/Footer, so a
+   lighter wrapper matches RegisterForm) around a small client shim
+   `OtpPageClient` that reads `useSearchParams().get("phone")`, normalizes +
+   validates it (`normalizePhone`, length ≥ 8), and renders `OtpVerifyForm` —
+   or `router.replace("/register")` when absent/invalid. (SearchParams access
+   must be client-side per the existing convention; wrap the shim in
+   `<Suspense>` if Next requires it for `useSearchParams` during static
+   prerender.)
+6. **MODIFY `apps/web/components/auth/RegisterForm.tsx`** — only the
+   `onSubmit` body: add `useRouter` from `@/i18n/routing`; normalize phone;
+   call the updated `register({ phone: normalized })`; on success
+   `toast.success("Code sent to your phone.")` + `router.push({ pathname:
+"/otp", query: { phone: normalized } })`; on failure
+   `toast.error(result.error ?? "Failed to send code.")`. Remove the
+   JSON.stringify toast description. Zero JSX changes.
+7. **MODIFY `apps/web/i18n/routing.ts`** — add `"/otp": {}` to `pathnames`
+   beside `/register` (line 19).
 
-2. **NEW `apps/web/components/auth/OtpVerifyForm.tsx`** — `"use client"` component; copy card/slot/toast idioms from `components/auth/OtpForm.tsx`, router/Link idiom from `components/auth/LoginForm.tsx`.
-   - Props: `{ phone: string }` (may be empty string). State: `const [value, setValue] = useState("")`. `const router = useRouter()` from `@/i18n/routing`.
-   - `handleSubmit(e)`: `preventDefault()`; if `value.length < 6` → `toast.error("Please enter the complete 6-digit verification code.")`; else if `value === "123456"` → `toast.success("Phone number verified successfully!", { position: "top-right" })` then `router.push("/login")`; else → `toast.error("Invalid verification code. Please try again.")`.
-   - Empty-phone edge: if `!phone.trim()`, render the same Card with only a message ("No phone number to verify. Please register first.") and a Button/Link back to `/register` — no OTP input.
-   - Layout: `Card className="mx-auto max-w-md w-full bg-card p-2"`; CardHeader with back-arrow ghost Button (`onClick={() => router.push("/register")}`), CardTitle "Verify your phone", CardDescription "We sent a 6-digit verification code to {phone}. Enter it below to complete your registration. (Demo code: 123456)"; CardContent: `Field` + `FieldLabel` "Verification code" with right-aligned outline Resend Button (RefreshCwIcon, mock toast) + centered `InputOTP maxLength={6} required` holding six `InputOTPSlot`s in one `InputOTPGroup` (slot classes `*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-12 *:data-[slot=input-otp-slot]:text-xl`); CardFooter: full-width submit Button `bg-orange-500 hover:bg-orange-600 text-white h-10` labeled "Verify" (matches `OtpForm.tsx` line 125), and a muted "Wrong number? Go back to register" `Link href="/register"`.
-   - Plain `<form onSubmit={handleSubmit}>` exactly like `OtpForm.tsx` — no form library, no loading state (instant mock).
+## Edge cases the implementation must handle
 
-3. **NEW `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx`** — server component following `register/page.tsx` (metadata + single component render):
+- Phone missing, empty, or non-normalizable on `/otp` → redirect to
+  `/register` (no crash, no dead UI).
+- Phone containing `+` in the URL — always `encodeURIComponent` when building
+  the link; `useSearchParams` decodes automatically.
+- Verify 401/400 (wrong or expired code) → toast backend message, clear input,
+  allow retry; never leave `verifying` stuck (finally-block reset).
+- Network failure / backend down → toast "Failed to verify. Please try again.";
+  input preserved for retry.
+- Double-submit: Verify button disabled while `verifying`; auto-submit effect
+  must not re-fire while verifying or after success navigation.
+- Resend during cooldown impossible (button disabled + countdown label);
+  resend failure shows toast but does NOT restart cooldown.
+- Pasting fewer/more than 6 digits: input-otp truncates to 6 — no manual
+  handling needed; non-digit input is filtered by the component.
+- Leading-zero local numbers (`0123456789`) and spaced input
+  (`012 345 678`) both normalize to `+855…`-style E.164 before any API call.
+- Dev flow: backend must run with `DEV_OTP_TOKEN` set; then any phone works
+  and the fixed token verifies (document in the report, not in UI copy).
 
-   ```tsx
-   import type { Metadata } from "next";
-   import { OtpVerifyForm } from "@/components/auth/OtpVerifyForm";
+## Verification plan
 
-   export const metadata: Metadata = { title: "Verify Phone" };
-
-   export default async function OtpPage({
-     searchParams,
-   }: {
-     searchParams: Promise<{ phone?: string }>;
-   }) {
-     const { phone } = await searchParams;
-     return <OtpVerifyForm phone={phone ?? ""} />;
-   }
-   ```
-
-   Renders inside the existing `(user)` NavBar/Footer layout (no new layout file; register renders there too).
-
-4. **EDIT `apps/web/components/auth/RegisterForm.tsx`** — behavior-only change, zero JSX/design edits:
-   - Add `import { useRouter } from "@/i18n/routing"` and `const router = useRouter()` inside `RegisterForm` (LoginForm lines 18/26 pattern).
-   - In `onSubmit`'s `if (res.success)` branch (lines 365-370): keep `form.reset()`; replace the JSON-dump toast (it renders the password on screen) with `toast.success("Registered successfully! We sent a verification code to your phone.")`; then add `router.push(`/otp?phone=${encodeURIComponent(value.phoneNumber)}`)`.
-   - Leave the mock `register()` action, validation, schema, and all JSX untouched.
-
-5. **Verify:** `pnpm --filter web build` (the type gate — web has no `check-types` script) and `pnpm --filter web lint`.
-
-## Out of scope / follow-ups
-
-- **Real backend wiring:** needs backend changes first — register accepts only `{ phone }` (no name/password), so either the backend grows a richer register contract or the web form collapses to phone-only before `POST /api/v1/auth/otp/verify` (which exists and returns tokens) can be called for real.
-- **User-surface session plumbing:** `setUserSession` + a user-surface fetch helper (`serverFetch` reads admin cookies only) so a real verify can log the user in directly instead of routing to `/login`.
-- **Resend cooldown/countdown and real SMS/Telegram channel copy** once a provider is wired.
-- **Cleanup of dead code:** `OtpForm.tsx`'s unused `InputOTPForm` and the commented block in `RegisterForm.tsx` lines 1-314 — separate ticket, not this diff.
-- **Locale translations** for OTP copy once the auth surface adopts next-intl keys (entire auth surface is English-only by current convention).
+- `pnpm --filter web lint` — clean.
+- `pnpm --filter web build` — clean (this is the web type gate; catches the
+  typed-href requirement for `/otp`).
+- Manual (dev, backend with `DEV_OTP_TOKEN` set): register → OTP page → wrong
+  code error → dev token auto-login → `/` with `user_access_token` cookie;
+  resend cooldown; no-`?phone` redirect; `/km/otp` locale route works.
+- Backend untouched: `git status` shows no `apps/backend/**` changes.
 
 ## Open questions
 
-None.
+None blocking. One flag for the captain: the "hand-roll, no input-otp"
+constraint was premised on the package being absent — it is already installed
+(package.json:24) with a shadcn primitive in the tree, so the spec reuses it
+(zero dependency change). If the dependency should still be avoided, the coder
+falls back to the hand-rolled 6-box input with the identical behavior contract
+(Decision 4).
+
+---
+
+## Revision R1 (2026-08-18): Cambodia-local phone input (captain-approved plan)
+
+Decision change: the register input accepts ONLY local `0XXXXXXXXX`
+(leading 0 mandatory; `^0\d{7,9}$`). `+855…` and no-leading-0 input are
+invalid ("Invalid phone number."). Option A locked: wire/DB stay E.164 —
+the system "makes up" the Cambodian number via the existing
+`normalizePhone`. OTP page displays the local form (`formatPhoneLocal`).
+Full approved plan: `~/.claude/plans/dynamic-kindling-platypus.md`.
+
+---
+
+## Revision R2 (2026-08-18): phone+password→OTP login; password/names/username at registration (approved plan rev 2)
+
+Captain decisions: phone input is local `0XXXXXXXXX` only, no exception
+frontend-wide; login form is correct as-is — phone + password always both
+required, OTP comes AFTER backend password validation; registration must
+set a password; usernames auto-generated unique at insert (names-based);
+login-mode rejects unknown phones. Backend extended: VerifyOtpDto gains
+required `password` + optional names (insert-only extras; conflict path
+never overwrites), new `POST /auth/otp/login` (password-gated OTP send),
+`RequestOtpDto` hygiene rider. Web: sessionStorage handoff for
+password/names (never URL), login submit branch for phone identifiers,
+OTP page mount-guard + mode-aware back navigation. Full approved plan:
+`~/.claude/plans/dynamic-kindling-platypus.md`.
+
+---
+
+## Revision R4 (2026-08-19): user account mode — Phase A (identity)
+
+Captain: "after login … we can use as user account … right now it like visitor
+mode." Phase A approved: web reads the USER session and renders identity.
+- `userServerFetch` (user-side twin of the admin client, transparent
+  refresh on 401, ApiError on failure).
+- `getCurrentUser()` fail-soft server helper (anonymous fast-path: no
+  tokens → null, zero backend calls).
+- `(user)/layout.tsx` session-aware → NavBar real identity; SocialBar real
+  avatar/name/username + real logout (`userLogout`); `/me` real account
+  card. Guest navbar unchanged. Phase B (post-an-ad) deferred by captain.

@@ -1,34 +1,62 @@
-import PostDetail from "@/components/post/Post-Detail"
+import PostDetail from "@/components/post/Post-Detail";
+import { buildRealDetailData, getListingById } from "@/lib/api/categories";
+import { getLocale } from "next-intl/server";
 import { posts } from "@/lib/posts";
 import type { Metadata } from "next";
 
-export async function generateMetadata(
-  { params }: { params: Promise<{ slug: string }> }
-): Promise<Metadata> {
-    const { slug } = await params;
-    // Extract actual ID if the URL has the slug format (e.g., "post-title-adid-123")
-    const actualId = slug?.includes("-adid-") ? slug.split("-adid-").pop() : slug;
-    const post = posts.find((p) => p.postId.toString() === actualId);
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    if (post) {
-        // Format: "Post Title - adid-ID"
-        return {
-            title: `${post.title} - adid-${post.postId}`,
-            description: post.description || "Post Detail",
-        };
-    }
-    return {
-        title: "Post Not Found - Psakhmer",
-        description: "Post Detail",
-    };
+// Extract the actual ID if the URL has the slug format (e.g., "post-title-adid-123")
+function extractId(slug: string): string {
+  return slug?.includes("-adid-") ? slug.split("-adid-").pop() || slug : slug;
 }
 
-export default async function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    // Extract actual ID if the URL has the slug format (e.g., "post-title-adid-123")
-    const actualId = id?.includes("-adid-") ? id.split("-adid-").pop() || id : id;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const actualId = extractId(slug);
 
-    return (
-      <PostDetail id={actualId} />
-    )
+  // Real listings are looked up by UUID; anything else falls back to the mock feed.
+  if (UUID_RE.test(actualId)) {
+    const listing = await getListingById(actualId, "en");
+    if (listing) {
+      return {
+        title: listing.title,
+        description: listing.description ?? "Post Detail",
+      };
+    }
+  }
+
+  const post = posts.find((p) => p.postId.toString() === actualId);
+  if (post) {
+    return {
+      title: `${post.title} - adid-${post.postId}`,
+      description: post.description || "Post Detail",
+    };
+  }
+  return {
+    title: "Post Not Found - Psakhmer",
+    description: "Post Detail",
+  };
+}
+
+export default async function PostDetailPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const actualId = extractId(slug);
+  const locale = await getLocale();
+
+  if (UUID_RE.test(actualId)) {
+    const real = await buildRealDetailData(actualId, locale);
+    if (real) return <PostDetail id={actualId} real={real} />;
+  }
+
+  return <PostDetail id={actualId} />;
 }

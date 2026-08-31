@@ -1,14 +1,14 @@
 export type Post = {
-  postId: number
-  userId: string 
-  title: string
-  images: string[]
-  imageCount?: number
-  price: number
-  cateId: string,
-  subId: string,
-  brandId?: string,
-  modelId?: string,
+  postId: number | string;
+  userId: string;
+  title: string;
+  images: string[];
+  imageCount?: number;
+  price: number;
+  cateId: string;
+  subId: string;
+  brandId?: string;
+  modelId?: string;
   bodyTypeId?: string;
   jobTypeId?: string;
   yearId?: string;
@@ -30,32 +30,34 @@ export type Post = {
   bathRoomId?: string;
   experienceId?: string;
   discountId?: string;
-  oldPrice?: number
-  discount?: string
-  description: string
-  createdat: Date
-  proId: string
-  disId: string
-  condition?: "New" | "Used" | "Rent" | "Sale"
-  freeDelivery?: boolean
-}
+  oldPrice?: number;
+  discount?: string;
+  description: string;
+  createdat: Date;
+  proId: string;
+  disId: string;
+  condition?: string;
+  freeDelivery?: boolean;
+  /** Free-form location line (backend listings) — overrides proId/disId */
+  location?: string;
+};
 export type Province = {
-  proId: string
-  name: string
-  slug: string
-  districts: District[]
-}
+  proId: string;
+  name: string;
+  slug: string;
+  districts: District[];
+};
 export type District = {
-  disId: string
-  name: string
-  slug: string
-  communes: Commune[]
-}
+  disId: string;
+  name: string;
+  slug: string;
+  communes: Commune[];
+};
 export type Commune = {
-  comId: string
-  name: string
-  slug: string
-}
+  comId: string;
+  name: string;
+  slug: string;
+};
 export interface RelatedPost {
   id: string;
   title: string;
@@ -83,7 +85,8 @@ export const posts: Post[] = [
     subId: "1",
     brandId: "1",
     modelId: "  ",
-    description: "This RX-7 is a 1988 FC generation, the second iteration of the RX-7 model line,\n which was produced from 1985 to 1992. Introduced as a successor to the first-generation SA22C/FB, the FC brought a more modern design, improved aerodynamics, and enhanced performance capabilities while maintaining the iconic rotary engine. The RX-7 FC featured a sleek and rounded body shape with hidden pop-up headlights, which gave it a futuristic and sporty appearance typical of 1980s sports cars. Its aerodynamic profile contributed to better handling and stability at high speeds. Internally, the FC boasted a driver-focused cockpit with bolstered sport seats, a three-spoke steering wheel, and a comprehensive instrument cluster, creating an immersive driving experience.  Powering the RX-7 FC was Mazda's signature Wankel rotary engine, specifically the 13B powerplant. This compact and lightweight engine produced a smooth and distinctive exhaust note, along with quick throttle response. Initially offered with a naturally aspirated 13B engine, Mazda introduced the more potent Turbo II variant in 1986. The Turbo II featured a turbocharger that significantly boosted horsepower and torque, transforming the RX-7 into a serious performance machine capable of competing with sports cars from Porsche, Nissan, and Chevrolet. The Turbo II also came with a sport-tuned suspension, larger brakes, and a limited-slip differential for enhanced handling and braking performance.  Throughout its production run, the RX-7 FC received various updates and improvements, including revised front and rear fascia designs, interior refinements, and engine enhancements. The car's lightweight construction, combined with its balanced weight distribution and precise handling characteristics, made it a favorite among driving enthusiasts and professional racers. The RX-7 FC gained international acclaim for its performance, reliability, and unique appeal, establishing itself as a cult classic and a significant model in Mazda's automotive history.  Beyond its production years, the RX-7 FC has remained popular in the aftermarket and tuning communities, with many owners modifying their cars for increased performance, improved handling, and updated aesthetics. Its distinctive styling and rotary engine heritage continue to attract collectors and enthusiasts who appreciate its timeless design and driving dynamics. Today, the RX-7 FC represents a blend of 1980s JDM sports car culture, Mazda's engineering innovation, and a passionate community of owners who preserve and celebrate this iconic vehicle.",
+    description:
+      "This RX-7 is a 1988 FC generation, the second iteration of the RX-7 model line,\n which was produced from 1985 to 1992. Introduced as a successor to the first-generation SA22C/FB, the FC brought a more modern design, improved aerodynamics, and enhanced performance capabilities while maintaining the iconic rotary engine. The RX-7 FC featured a sleek and rounded body shape with hidden pop-up headlights, which gave it a futuristic and sporty appearance typical of 1980s sports cars. Its aerodynamic profile contributed to better handling and stability at high speeds. Internally, the FC boasted a driver-focused cockpit with bolstered sport seats, a three-spoke steering wheel, and a comprehensive instrument cluster, creating an immersive driving experience.  Powering the RX-7 FC was Mazda's signature Wankel rotary engine, specifically the 13B powerplant. This compact and lightweight engine produced a smooth and distinctive exhaust note, along with quick throttle response. Initially offered with a naturally aspirated 13B engine, Mazda introduced the more potent Turbo II variant in 1986. The Turbo II featured a turbocharger that significantly boosted horsepower and torque, transforming the RX-7 into a serious performance machine capable of competing with sports cars from Porsche, Nissan, and Chevrolet. The Turbo II also came with a sport-tuned suspension, larger brakes, and a limited-slip differential for enhanced handling and braking performance.  Throughout its production run, the RX-7 FC received various updates and improvements, including revised front and rear fascia designs, interior refinements, and engine enhancements. The car's lightweight construction, combined with its balanced weight distribution and precise handling characteristics, made it a favorite among driving enthusiasts and professional racers. The RX-7 FC gained international acclaim for its performance, reliability, and unique appeal, establishing itself as a cult classic and a significant model in Mazda's automotive history.  Beyond its production years, the RX-7 FC has remained popular in the aftermarket and tuning communities, with many owners modifying their cars for increased performance, improved handling, and updated aesthetics. Its distinctive styling and rotary engine heritage continue to attract collectors and enthusiasts who appreciate its timeless design and driving dynamics. Today, the RX-7 FC represents a blend of 1980s JDM sports car culture, Mazda's engineering innovation, and a passionate community of owners who preserve and celebrate this iconic vehicle.",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -203,7 +206,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "2",
-    description: "Folding Bike Brompton For sale! \nNo time for riding this Beauty!",
+    description:
+      "Folding Bike Brompton For sale! \nNo time for riding this Beauty!",
     proId: "1",
     disId: "5",
     condition: "Used",
@@ -275,7 +279,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "3",
-    description: "Di jual motor ZX 10 2018 ( 1000 CC )\nLOKASI KPS TRIMULYA \nPRICE > 10.000 $ \nSURAT > FULL TAX\nTELEGRAM > @S1m0nt0p or @@Simooon0123\nPHONE > Cellcard 085372xxx \nClick To Call\nPHONE > Cellcard 0763571xxx \nClick To Call\n\nPemakaian hanya buat jalan malam , bukan pemakaian harian kantor \n\n- PART CARBON BANYAK \n- KANPOL AUSTIN RACING ORIGINAL\n- BAUT PROBOLT ALL\n- COVER JOK BELAKANG SINGLE ( ada gak ke foto )\n- KOPLING ACCOSSATO ORIGINAL\n- FREE PADOCK SILVER (gak ke foto)",
+    description:
+      "Di jual motor ZX 10 2018 ( 1000 CC )\nLOKASI KPS TRIMULYA \nPRICE > 10.000 $ \nSURAT > FULL TAX\nTELEGRAM > @S1m0nt0p or @@Simooon0123\nPHONE > Cellcard 085372xxx \nClick To Call\nPHONE > Cellcard 0763571xxx \nClick To Call\n\nPemakaian hanya buat jalan malam , bukan pemakaian harian kantor \n\n- PART CARBON BANYAK \n- KANPOL AUSTIN RACING ORIGINAL\n- BAUT PROBOLT ALL\n- COVER JOK BELAKANG SINGLE ( ada gak ke foto )\n- KOPLING ACCOSSATO ORIGINAL\n- FREE PADOCK SILVER (gak ke foto)",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -284,7 +289,8 @@ export const posts: Post[] = [
   {
     postId: 10,
     userId: "2",
-    title: "Porsche Super SUV Special discount 1220$ to 854$/1month ទំនេីប ផាសុខភាព បេីកបរនឹងណាស់",
+    title:
+      "Porsche Super SUV Special discount 1220$ to 854$/1month ទំនេីប ផាសុខភាព បេីកបរនឹងណាស់",
     images: [
       "/post-img/p1.png",
       "/post-img/p2.png",
@@ -300,7 +306,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "4",
-    description: "Porsche Cayenne Full Options Hybrid ជួល តំលៃពិសេសSpecial discount30%: 70$ to 49$/1day, 610$ to 427$/15days, 1220$ to 854$$/1month\n- សំរាប់បងប្អូនចង់បានបទពិសោធន៍បេីកបរបែបSport មានលំនឹងនិងសុវត្ថភាពបំផុត, ជួលទៅចូលរួមកម្មពិធីផ្សេងៗ, ដេីរលេងកំសាន្ត ជួបជុំគ្រួសារ \n- ស្ទុះខ្លាំងតែសុីសាំងតិច ប្រេីHYBRID 7-8L/100km\n(ចំពោះភ្ញៀវកក់ឡានទុកមុន មានចុះតំលៃជូនបន្ថែម)\nBooking now: Smart 098399xxx \n (Khmer), Smart 016595xxx \n (English) Thank you!",
+    description:
+      "Porsche Cayenne Full Options Hybrid ជួល តំលៃពិសេសSpecial discount30%: 70$ to 49$/1day, 610$ to 427$/15days, 1220$ to 854$$/1month\n- សំរាប់បងប្អូនចង់បានបទពិសោធន៍បេីកបរបែបSport មានលំនឹងនិងសុវត្ថភាពបំផុត, ជួលទៅចូលរួមកម្មពិធីផ្សេងៗ, ដេីរលេងកំសាន្ត ជួបជុំគ្រួសារ \n- ស្ទុះខ្លាំងតែសុីសាំងតិច ប្រេីHYBRID 7-8L/100km\n(ចំពោះភ្ញៀវកក់ឡានទុកមុន មានចុះតំលៃជូនបន្ថែម)\nBooking now: Smart 098399xxx \n (Khmer), Smart 016595xxx \n (English) Thank you!",
     proId: "1",
     disId: "7",
     brandId: "",
@@ -311,15 +318,14 @@ export const posts: Post[] = [
     postId: 11,
     userId: "2",
     title: "Prius 2014 including Comprehensive Insurance Options",
-    images: [
-      "/post-img/pirus-rent.png",
-    ],
+    images: ["/post-img/pirus-rent.png"],
     price: 550,
     imageCount: 1,
     createdat: new Date(),
     cateId: "1",
     subId: "1",
-    description: "Car for rent in Cambodia\nការជួសជុល ២៥ខេត្តក្រុង (លក្ខខណ្ឌផ្សេងៗត្រូវបានចែង)\nMaintenance and repairing services both Phnom Penh and provinces (terms and conditions apply)\nHenry Car Rental\nAll kinds of car for rent in Phnom Penh,Cambodia\nRight now, Customers can rent any kind of car with or without a driver upon your request. The hiring car is with Comprehensive or Full Insurance ONLY ONE in Cambodia.\nDear valued customers, \nរថយន្តជួល មានធានារ៉ាប់រងត្រឹមត្រូវ សំណងរហូតដល់ ១០០០០ ដុល្លារ អាស្រ័យលេីករណីនីមួយៗ។ សំខាន់ណាស់ អ្នកជួលឡាន ត្រូវទាមទាររកធានារ៉ាប់រងពេលលេញពីក្រុមហ៊ុនជួលរថយន្តដេីម្បីការពារទ្រព្យសម្បត្តិ និង ផលប្រោជន៍របស់លោកអ្នក។\nFORTE  Insurance is Fully included with the car you are using. It covers all risks ( third party, passengers, driver, own damage and theft).\nIt covers up to 10000$ depending on each case.\nIt is Very important for the car renter or car user to rent a car with FULL INSURANCE coverage. You need to claim the Comprehensive Insurance from car rental company or car agencies for your financial security if any accident happens. \nGreeting from HENRY CAR RENTAL, CAMBODIA.\nOur special promotion is a one year contract and car usage must be in Phnom Penh.\nStarting price is from 299 USD PER MONTH based on the car model and variety.\n1. LEXUS RX300 year 99-2023: 399 USD per month\n 2. HILANDER 2001-2007: 399 USD per month\n 4. HONDA CRV97-99: 299USD PER MONTH\n 5. CAMRY 2002: 399 USD PER MONTH\n 6. PRIUS year 2004-2005: 350$ per month \n  7. Prius year 2006-07: 360 USD PER MONTH\n 6. LEXUS LX470 : 700$ PER MONTH\n 7. LEXUS RX330: 600$ USD PER MONTH\n 8. Lexus Nx200T:1500USD PER MONTH \n 9. TACOMA 2005-2007:699 USD PER MONTH\n 11. Lexus rx350:1500$ per month\n 12. Starex 2008-2009:700$ per month\n 13. Nissan frontier2005:699$ per month\n 14. Ford ranger Xlt 2022:2000$ per month\n 15. Landcruiser 2008-2009:2500 USD PER MONTH\n 16. Lexus LX570:3000$ per month \n 17. Ford territory : 1500$ per month\n 18. Toyota Raize year 2022:1500$ per month\n 19. May Beach year 2015: 3999 usd per month \n 20. Alphard 2004: 700 usd per month \n 21.\tAlphard 2008-2010: 1200$ per month\n22. Sienna 2004 :800$ per month\n23. Hilander year 2008: 900$ Usd per month \n24. Tundra 2008: 900$ per month \n25. Xpander 2022: 1500$ per month\n26. Ford Ecosport 2022: 1200$ per month\n27. Bentley 2013:3500$ per month\n28. Ford Everest year 2023:2000$ per month\n29. Landcruiser up.2021: 1500$ per month\n 30. Fortuner 2018:1800$ per month\n 31. Alphard 2018 v6: 3300$ per month\n 32. Range Rover 2014: 2400$per month \n	33.\tLandcruiser 2022:5000$ per month \n	34.\tAudi year 2017: 2400$ per month \n	35.\tLexus rx300 year 2019: 2000$ per month \n	36.\tAlphard 2012: 1200 usd per month\n	37.\tAlphard 2013: 1350 usd per month \nFor company, factory and others, we can issue Tax Invoice or VAT to you. \nFull insurance covers 5 options as below\n	1.\tDriver\n	2.\tPassengers\n	3.\tThird party’s liability \n	4.\tOwn damages\n	5.\tTheft\nMAINTENANCE BASE in PNH is included.\nFor long term rental and mainly use in Pnh. It is for Company, factory, organisation, Immigrant, expat, school and others.",
+    description:
+      "Car for rent in Cambodia\nការជួសជុល ២៥ខេត្តក្រុង (លក្ខខណ្ឌផ្សេងៗត្រូវបានចែង)\nMaintenance and repairing services both Phnom Penh and provinces (terms and conditions apply)\nHenry Car Rental\nAll kinds of car for rent in Phnom Penh,Cambodia\nRight now, Customers can rent any kind of car with or without a driver upon your request. The hiring car is with Comprehensive or Full Insurance ONLY ONE in Cambodia.\nDear valued customers, \nរថយន្តជួល មានធានារ៉ាប់រងត្រឹមត្រូវ សំណងរហូតដល់ ១០០០០ ដុល្លារ អាស្រ័យលេីករណីនីមួយៗ។ សំខាន់ណាស់ អ្នកជួលឡាន ត្រូវទាមទាររកធានារ៉ាប់រងពេលលេញពីក្រុមហ៊ុនជួលរថយន្តដេីម្បីការពារទ្រព្យសម្បត្តិ និង ផលប្រោជន៍របស់លោកអ្នក។\nFORTE  Insurance is Fully included with the car you are using. It covers all risks ( third party, passengers, driver, own damage and theft).\nIt covers up to 10000$ depending on each case.\nIt is Very important for the car renter or car user to rent a car with FULL INSURANCE coverage. You need to claim the Comprehensive Insurance from car rental company or car agencies for your financial security if any accident happens. \nGreeting from HENRY CAR RENTAL, CAMBODIA.\nOur special promotion is a one year contract and car usage must be in Phnom Penh.\nStarting price is from 299 USD PER MONTH based on the car model and variety.\n1. LEXUS RX300 year 99-2023: 399 USD per month\n 2. HILANDER 2001-2007: 399 USD per month\n 4. HONDA CRV97-99: 299USD PER MONTH\n 5. CAMRY 2002: 399 USD PER MONTH\n 6. PRIUS year 2004-2005: 350$ per month \n  7. Prius year 2006-07: 360 USD PER MONTH\n 6. LEXUS LX470 : 700$ PER MONTH\n 7. LEXUS RX330: 600$ USD PER MONTH\n 8. Lexus Nx200T:1500USD PER MONTH \n 9. TACOMA 2005-2007:699 USD PER MONTH\n 11. Lexus rx350:1500$ per month\n 12. Starex 2008-2009:700$ per month\n 13. Nissan frontier2005:699$ per month\n 14. Ford ranger Xlt 2022:2000$ per month\n 15. Landcruiser 2008-2009:2500 USD PER MONTH\n 16. Lexus LX570:3000$ per month \n 17. Ford territory : 1500$ per month\n 18. Toyota Raize year 2022:1500$ per month\n 19. May Beach year 2015: 3999 usd per month \n 20. Alphard 2004: 700 usd per month \n 21.\tAlphard 2008-2010: 1200$ per month\n22. Sienna 2004 :800$ per month\n23. Hilander year 2008: 900$ Usd per month \n24. Tundra 2008: 900$ per month \n25. Xpander 2022: 1500$ per month\n26. Ford Ecosport 2022: 1200$ per month\n27. Bentley 2013:3500$ per month\n28. Ford Everest year 2023:2000$ per month\n29. Landcruiser up.2021: 1500$ per month\n 30. Fortuner 2018:1800$ per month\n 31. Alphard 2018 v6: 3300$ per month\n 32. Range Rover 2014: 2400$per month \n	33.\tLandcruiser 2022:5000$ per month \n	34.\tAudi year 2017: 2400$ per month \n	35.\tLexus rx300 year 2019: 2000$ per month \n	36.\tAlphard 2012: 1200 usd per month\n	37.\tAlphard 2013: 1350 usd per month \nFor company, factory and others, we can issue Tax Invoice or VAT to you. \nFull insurance covers 5 options as below\n	1.\tDriver\n	2.\tPassengers\n	3.\tThird party’s liability \n	4.\tOwn damages\n	5.\tTheft\nMAINTENANCE BASE in PNH is included.\nFor long term rental and mainly use in Pnh. It is for Company, factory, organisation, Immigrant, expat, school and others.",
     proId: "1",
     disId: "1",
     condition: "Rent",
@@ -344,7 +350,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "4",
-    description: "ឡាន H1 12កៅអី ឆ្នាំ 2019 ទ្វារអូតូស្លាយ នៅថ្មីស្អាត ម៉ាសុីនត្រជាក់ ត្រជាក់ខ្លាំង ស្រួលបើក មិនសុីសាំង មានសោរបញ្ឆេះឡានពីចម្ងាយបាន សម្រាប់ជួលជាថ្ងៃ មួយថ្ងៃ65$ (អត់តៃកុង )\n មួយខែ 950$ អត់តៃកុង  \nបើជាក្រុមហ៊ុន ធ្វើកុងត្រាយូរ អាចចុះបានទៀត\nទំនាក់ទំនងមកមើលឡានបាន នៅម្ដុំផ្សារខេសុីពោធន៍ចិនតុង telegram Smart 081888xxx \nClick To Call\n Smart 070777xxx \nClick To Call",
+    description:
+      "ឡាន H1 12កៅអី ឆ្នាំ 2019 ទ្វារអូតូស្លាយ នៅថ្មីស្អាត ម៉ាសុីនត្រជាក់ ត្រជាក់ខ្លាំង ស្រួលបើក មិនសុីសាំង មានសោរបញ្ឆេះឡានពីចម្ងាយបាន សម្រាប់ជួលជាថ្ងៃ មួយថ្ងៃ65$ (អត់តៃកុង )\n មួយខែ 950$ អត់តៃកុង  \nបើជាក្រុមហ៊ុន ធ្វើកុងត្រាយូរ អាចចុះបានទៀត\nទំនាក់ទំនងមកមើលឡានបាន នៅម្ដុំផ្សារខេសុីពោធន៍ចិនតុង telegram Smart 081888xxx \nClick To Call\n Smart 070777xxx \nClick To Call",
     proId: "1",
     disId: "1",
     condition: "Rent",
@@ -354,15 +361,14 @@ export const posts: Post[] = [
     postId: 13,
     userId: "2",
     title: "ឡាក់គីលក់និងប្តូរកញ្ចក់រថយន្តគ្រប់ប្រភេទ",
-    images: [
-      "/post-img/m1.png",
-    ],
+    images: ["/post-img/m1.png"],
     price: 10,
     imageCount: 1,
     createdat: new Date(),
     cateId: "1",
     subId: "5",
-    description: "ឡាក់គីប្តូរកញ្ចក់រថយន្តគ្រប់ប្រភេទគ្រប់ស៊េរី! 🚘🚗\n📍អាស័យដ្ឋាន៖ នៅផ្លូវ 2004, រាជធានីភ្នំពេញ\n@Luckyautoglasskh",
+    description:
+      "ឡាក់គីប្តូរកញ្ចក់រថយន្តគ្រប់ប្រភេទគ្រប់ស៊េរី! 🚘🚗\n📍អាស័យដ្ឋាន៖ នៅផ្លូវ 2004, រាជធានីភ្នំពេញ\n@Luckyautoglasskh",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -372,10 +378,7 @@ export const posts: Post[] = [
     postId: 14,
     userId: "2",
     title: "សោ Hyundai",
-    images: [
-      "/post-img/m2.png",
-      "/post-img/m3.png",
-    ],
+    images: ["/post-img/m2.png", "/post-img/m3.png"],
     price: 40,
     imageCount: 2,
     createdat: new Date(),
@@ -405,7 +408,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "6",
-    description: "សេវាកម្មអ៊ុតកញ្ចក់ឡានបែកប្រេះស្រាំ និង បិត UV ការពារកំដៅថ្ងៃ ( Windshield Repair, UV Protection Sticker ) អត្ថប្រយោជន៍គឺ៖\n១-ទប់មិនអោយកន្លែងបែករាលដាលទៅមុខទៀតបាន 90%\n២-លុបស្នាមបែកនៅសល់តូចជាងមុនចន្លោះពី 50% ដល់ 90%\nបើអតិថិជនមានបញ្ហាកញ្ចក់រថយន្តបែកប្រេះស្រាំ សូមទំនាក់ទំនងតាមលេខ៖ ទូរសព្ទ Cellcard 017575xxx\nClick To Call\n / Smart 098743xxx\nClick To Call\n Telegram https://t.me/sengvantha (មានសេវាអ៊ុតដល់ទីកន្លែង)\nFacebook Page: https://www.facebook.com/vcar007\n-មានសេវាអ៊ុត UV ការពារកំដៅថ្ងៃក្នុងរថយន្ត និងកញ្ចក់ផ្ទះឬអាគារ\n-មានសេវាដូរកញ្ចក់រថយន្តថ្មីតម្លៃសមរម្យ @followers\n#អ៊ុតកញ្ចក់ឡាន #អ៊ុតកញ្ចក់រថយន្ត #ជាងអ៊ុតកញ្ចក់,#ជំនាញអ៊ុតកញ្ចក់ឡាន #ជាងអ៊ុតកញ្ចក់រថយន្តបែក #ជំនាញអ៊ុតកញ្ចក់រថយន្តបែកប្រេះស្រាំ",
+    description:
+      "សេវាកម្មអ៊ុតកញ្ចក់ឡានបែកប្រេះស្រាំ និង បិត UV ការពារកំដៅថ្ងៃ ( Windshield Repair, UV Protection Sticker ) អត្ថប្រយោជន៍គឺ៖\n១-ទប់មិនអោយកន្លែងបែករាលដាលទៅមុខទៀតបាន 90%\n២-លុបស្នាមបែកនៅសល់តូចជាងមុនចន្លោះពី 50% ដល់ 90%\nបើអតិថិជនមានបញ្ហាកញ្ចក់រថយន្តបែកប្រេះស្រាំ សូមទំនាក់ទំនងតាមលេខ៖ ទូរសព្ទ Cellcard 017575xxx\nClick To Call\n / Smart 098743xxx\nClick To Call\n Telegram https://t.me/sengvantha (មានសេវាអ៊ុតដល់ទីកន្លែង)\nFacebook Page: https://www.facebook.com/vcar007\n-មានសេវាអ៊ុត UV ការពារកំដៅថ្ងៃក្នុងរថយន្ត និងកញ្ចក់ផ្ទះឬអាគារ\n-មានសេវាដូរកញ្ចក់រថយន្តថ្មីតម្លៃសមរម្យ @followers\n#អ៊ុតកញ្ចក់ឡាន #អ៊ុតកញ្ចក់រថយន្ត #ជាងអ៊ុតកញ្ចក់,#ជំនាញអ៊ុតកញ្ចក់ឡាន #ជាងអ៊ុតកញ្ចក់រថយន្តបែក #ជំនាញអ៊ុតកញ្ចក់រថយន្តបែកប្រេះស្រាំ",
     proId: "1",
     disId: "1",
     freeDelivery: false,
@@ -414,10 +418,7 @@ export const posts: Post[] = [
     postId: 16,
     userId: "2",
     title: "2025年，随车吊",
-    images: [
-      "/post-img/l1.png",
-      "/post-img/l2.png",
-    ],
+    images: ["/post-img/l1.png", "/post-img/l2.png"],
 
     price: 110000,
     imageCount: 2,
@@ -434,10 +435,7 @@ export const posts: Post[] = [
     postId: 17,
     userId: "2",
     title: "小松挖机225",
-    images: [
-      "/post-img/l3.png",
-      "/post-img/l4.png",
-    ],
+    images: ["/post-img/l3.png", "/post-img/l4.png"],
     price: 110000,
     imageCount: 2,
     createdat: new Date(),
@@ -453,11 +451,7 @@ export const posts: Post[] = [
     postId: 18,
     userId: "2",
     title: "山东临工装载机",
-    images: [
-      "/post-img/l5.png",
-      "/post-img/l6.png",
-      "/post-img/l7.png",
-    ],
+    images: ["/post-img/l5.png", "/post-img/l6.png", "/post-img/l7.png"],
     price: 52000,
     imageCount: 3,
     createdat: new Date(),
@@ -472,7 +466,8 @@ export const posts: Post[] = [
   {
     postId: 19,
     userId: "2",
-    title: "បញ្ចាំ /​ កម្ចី / ឥណទាន និង សេវាវាយតំលៃ អចលនាទ្រព្យគ្រប់ប្រភេទ PAWN SHOP",
+    title:
+      "បញ្ចាំ /​ កម្ចី / ឥណទាន និង សេវាវាយតំលៃ អចលនាទ្រព្យគ្រប់ប្រភេទ PAWN SHOP",
     images: [
       "/post-img/f1.png",
       "/post-img/f2.png",
@@ -497,15 +492,14 @@ export const posts: Post[] = [
     postId: 20,
     userId: "2",
     title: "ស្នើកំម្ចី ត្រឹមឯកសាររថយន្ត និងទទួលបានសាច់ប្រាក់ដល់ 80%",
-    images: [
-      "/post-img/f7.png",
-    ],
+    images: ["/post-img/f7.png"],
     price: 100000,
     imageCount: 1,
     createdat: new Date(),
     cateId: "1",
     subId: "7",
-    description: "ត្រឹមតែឯកសាររថយន្ត អាចធ្វើការស្នើសាច់ប្រាក់ដើម្បីបង្វិល រហូតដល់ 80% ជាមួយលក្ខខណ្ខ ងាយៗ ត្រឹមតែ 15នាទី អាចទទួលសាច់ប្រាក់បាន ។  \nទំនាក់ទំនង: Smart 070 775 xxx  Click To Call",
+    description:
+      "ត្រឹមតែឯកសាររថយន្ត អាចធ្វើការស្នើសាច់ប្រាក់ដើម្បីបង្វិល រហូតដល់ 80% ជាមួយលក្ខខណ្ខ ងាយៗ ត្រឹមតែ 15នាទី អាចទទួលសាច់ប្រាក់បាន ។  \nទំនាក់ទំនង: Smart 070 775 xxx  Click To Call",
     proId: "1",
     disId: "1",
   },
@@ -513,15 +507,14 @@ export const posts: Post[] = [
     postId: 21,
     userId: "2",
     title: "កម្ចីយានយន្ត",
-    images: [
-      "/post-img/f8.png",
-    ],
+    images: ["/post-img/f8.png"],
     price: 50000,
     imageCount: 1,
     createdat: new Date(),
     cateId: "1",
     subId: "7",
-    description: "🌿✨ ដើមទុនរឹងមាំ សម្រាប់អនាគតរីកចម្រើន!\n\n ត្រូវការកម្ចីពង្រីកអាជីវកម្ម?\n ជួសជុលផ្ទះ? ទិញយានយន្ត? ឬចំណាយបន្ទាន់?\n\n ✔️ អនុម័តឆាប់\n ✔️ លក្ខខណ្ឌងាយស្រួល\n✔️ ជម្រើសបត់បែនក្នុងការបង់សង់ត្រឡប់\n✔️ គ្រឹស្ថានស្របច្បាប់ ផ្តល់ទំនុកចិត្តខ្ពស់\n\n 💚 អុីស្ត មីក្រូ នៅក្បែរលោកអ្នក ជាមួយសេវាកម្មលឿន រហ័ស និងប្រកបដោយទំនុកចិត្តខ្ពស់!\n\n 💼 កម្ចីអាជីវកម្ម រហូតដល់ 70,000$\n 🏠 កម្ចីផ្ទាល់ខ្លួន រហូតដល់ 50,000$\n 🌾 កម្ចីកសិកម្ម រហូតដល់ 25,000$\n🚗 កម្ចីយានយន្ត រហូតដល់ 50,000$\n\n 📞 ទាក់ទងឥឡូវនេះ៖ Smart 081 284 xxx \n Click To Call\n | Smart 081 948 xxx \n Click To Call\n\n🌐 website : www.eastmicro.com.kh\n📩 Telegram: https://t.me/eastmfi",
+    description:
+      "🌿✨ ដើមទុនរឹងមាំ សម្រាប់អនាគតរីកចម្រើន!\n\n ត្រូវការកម្ចីពង្រីកអាជីវកម្ម?\n ជួសជុលផ្ទះ? ទិញយានយន្ត? ឬចំណាយបន្ទាន់?\n\n ✔️ អនុម័តឆាប់\n ✔️ លក្ខខណ្ឌងាយស្រួល\n✔️ ជម្រើសបត់បែនក្នុងការបង់សង់ត្រឡប់\n✔️ គ្រឹស្ថានស្របច្បាប់ ផ្តល់ទំនុកចិត្តខ្ពស់\n\n 💚 អុីស្ត មីក្រូ នៅក្បែរលោកអ្នក ជាមួយសេវាកម្មលឿន រហ័ស និងប្រកបដោយទំនុកចិត្តខ្ពស់!\n\n 💼 កម្ចីអាជីវកម្ម រហូតដល់ 70,000$\n 🏠 កម្ចីផ្ទាល់ខ្លួន រហូតដល់ 50,000$\n 🌾 កម្ចីកសិកម្ម រហូតដល់ 25,000$\n🚗 កម្ចីយានយន្ត រហូតដល់ 50,000$\n\n 📞 ទាក់ទងឥឡូវនេះ៖ Smart 081 284 xxx \n Click To Call\n | Smart 081 948 xxx \n Click To Call\n\n🌐 website : www.eastmicro.com.kh\n📩 Telegram: https://t.me/eastmfi",
     proId: "1",
     disId: "1",
   },
@@ -529,11 +522,7 @@ export const posts: Post[] = [
     postId: 22,
     userId: "2",
     title: "RE Baja 2017",
-    images: [
-      "/post-img/t1.png",
-      "/post-img/t2.png",
-      "/post-img/t3.png",
-    ],
+    images: ["/post-img/t1.png", "/post-img/t2.png", "/post-img/t3.png"],
     price: 650,
     imageCount: 3,
     createdat: new Date(),
@@ -547,34 +536,30 @@ export const posts: Post[] = [
     postId: 23,
     userId: "2",
     title: "កង់បីថ្មីឆ្នាំ២៦ បែកកញ្ចក់មុន",
-    images: [
-      "/post-img/t4.png",
-      "/post-img/t5.png",
-    ],
+    images: ["/post-img/t4.png", "/post-img/t5.png"],
     price: 3100,
     imageCount: 2,
     createdat: new Date(),
     cateId: "1",
     subId: "8",
-    description: "បងប្អូនមានតំរូវការចង់បានកង់បីម្ចាស់ដើមផ្ទាល់ \n គីឡូ៤០០០ ធននាស្អាតថ្មី តំលៃដាច់អត់ចុះ",
+    description:
+      "បងប្អូនមានតំរូវការចង់បានកង់បីម្ចាស់ដើមផ្ទាល់ \n គីឡូ៤០០០ ធននាស្អាតថ្មី តំលៃដាច់អត់ចុះ",
     proId: "1",
     disId: "1",
   },
   {
     postId: 24,
     userId: "2",
-    title: "2020ធានាម៉ាសុីងតាំងលក់1600$អត់បុកសាណុំស្អាតរៀបស្អាតអស់ហើយទិញជិះតែម្ដង016912567.0885241966",
-    images: [
-      "/post-img/t6.png",
-      "/post-img/t7.png",
-      "/post-img/t8.png",
-    ],
+    title:
+      "2020ធានាម៉ាសុីងតាំងលក់1600$អត់បុកសាណុំស្អាតរៀបស្អាតអស់ហើយទិញជិះតែម្ដង016912567.0885241966",
+    images: ["/post-img/t6.png", "/post-img/t7.png", "/post-img/t8.png"],
     price: 1600,
     imageCount: 3,
     createdat: new Date(),
     cateId: "1",
     subId: "8",
-    description: "2020ធានាម៉ាសុីងតាំងលក់1600$អត់បុកសាណុំស្អាតរៀបស្អាតអស់ហើយទិញជិះតែម្ដង016912567.0885241966",
+    description:
+      "2020ធានាម៉ាសុីងតាំងលក់1600$អត់បុកសាណុំស្អាតរៀបស្អាតអស់ហើយទិញជិះតែម្ដង016912567.0885241966",
     proId: "1",
     disId: "1",
   },
@@ -582,9 +567,7 @@ export const posts: Post[] = [
     postId: 25,
     userId: "2",
     title: "លក់កាង180 camro zl1",
-    images: [
-      "/post-img/a1.png",
-    ],
+    images: ["/post-img/a1.png"],
     price: 180,
     oldPrice: 32000,
     discount: "10%",
@@ -600,9 +583,7 @@ export const posts: Post[] = [
     postId: 26,
     userId: "2",
     title: "ដែនថែប លេង camro 2017 លក់50$",
-    images: [
-      "/post-img/a2.png",
-    ],
+    images: ["/post-img/a2.png"],
     price: 50,
     imageCount: 1,
     createdat: new Date(),
@@ -616,18 +597,15 @@ export const posts: Post[] = [
     postId: 27,
     userId: "2",
     title: "គ្រឿងឡើងសេរី Mercedes GL ពីឆ្នាំ 2013-16 ចង្កៀងស្រិន",
-    images: [
-      "/post-img/a3.png",
-      "/post-img/a4.png",
-      "/post-img/a5.png",
-    ],
+    images: ["/post-img/a3.png", "/post-img/a4.png", "/post-img/a5.png"],
 
     price: 1600,
     imageCount: 5,
     createdat: new Date(),
     cateId: "1",
     subId: "9",
-    description: "មានលក់គរឿងឡើងសេរី Mercedes GL ចាប់ពីឆ្នាំ 2013-2015 ទៅ2020 ជាមួយចង្កៀងស្រិន។",
+    description:
+      "មានលក់គរឿងឡើងសេរី Mercedes GL ចាប់ពីឆ្នាំ 2013-2015 ទៅ2020 ជាមួយចង្កៀងស្រិន។",
     proId: "1",
     disId: "1",
   },
@@ -651,7 +629,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "1",
     subId: "10",
-    description: "Speed boat for sale (fiberglass) 8m \n Engine Suzuki 2x250hp \nHave navigation and fishing equipment.\n 77000$ ",
+    description:
+      "Speed boat for sale (fiberglass) 8m \n Engine Suzuki 2x250hp \nHave navigation and fishing equipment.\n 77000$ ",
     proId: "1",
     disId: "1",
   },
@@ -659,9 +638,7 @@ export const posts: Post[] = [
     postId: 29,
     userId: "2",
     title: "រឺម៉កដុតគោមានម៉ូតូ",
-    images: [
-      "/post-img/other9.png",
-    ],
+    images: ["/post-img/other9.png"],
     price: 550,
     imageCount: 1,
     createdat: new Date(),
@@ -675,9 +652,7 @@ export const posts: Post[] = [
     postId: 30,
     userId: "2",
     title: "Original shark",
-    images: [
-      "/post-img/other10.png",
-    ],
+    images: ["/post-img/other10.png"],
     price: 180,
     imageCount: 1,
     createdat: new Date(),
@@ -690,16 +665,16 @@ export const posts: Post[] = [
   {
     postId: 31,
     userId: "2",
-    title: "iPhone 16 Plus 128G Color Pink 🩷 មួយទឹក ថ្ម100%🔋 lock sim ប្រើបានសុីម2សេវាដើរស្មូតល្អគ្រប់ប្រពន្ធ័",
-    images: [
-      "/post-img/phone1.png",
-    ],
+    title:
+      "iPhone 16 Plus 128G Color Pink 🩷 មួយទឹក ថ្ម100%🔋 lock sim ប្រើបានសុីម2សេវាដើរស្មូតល្អគ្រប់ប្រពន្ធ័",
+    images: ["/post-img/phone1.png"],
     price: 520,
     imageCount: 1,
     createdat: new Date(),
     cateId: "2",
     subId: "11",
-    description: "iPhone 16 Plus 128G Color Pink 🩷 មួយទឹក ថ្ម100%🔋 lock sim ប្រើបានសុីម2សេវាដើរស្មូតល្អគ្រប់ប្រពន្ធ័⭐️ \n🛍️🎁Free Caseការពារ\n🎁Screenការពារ\n🎁ឆ្នាំងសាក \n🎁ខ្សែរសាក\n🎁 លែនការពារ\n👍អ្វីដែលអ្នកឃើញគឺជាអ្វីដែលអ្នកទទួលបាន អីវ៉ាន់នៅក្នុងរូបយ៉ាងម៉េច នៅក្រៅគឺយ៉ាងនោះ។\n👉ធានាលើ ថាច់ និងម៉ាស៊ីន ១ខែ\n📍ទីតាំង ទឹកល្អក់៣ ទួលគោក ភ្នំពេញ",
+    description:
+      "iPhone 16 Plus 128G Color Pink 🩷 មួយទឹក ថ្ម100%🔋 lock sim ប្រើបានសុីម2សេវាដើរស្មូតល្អគ្រប់ប្រពន្ធ័⭐️ \n🛍️🎁Free Caseការពារ\n🎁Screenការពារ\n🎁ឆ្នាំងសាក \n🎁ខ្សែរសាក\n🎁 លែនការពារ\n👍អ្វីដែលអ្នកឃើញគឺជាអ្វីដែលអ្នកទទួលបាន អីវ៉ាន់នៅក្នុងរូបយ៉ាងម៉េច នៅក្រៅគឺយ៉ាងនោះ។\n👉ធានាលើ ថាច់ និងម៉ាស៊ីន ១ខែ\n📍ទីតាំង ទឹកល្អក់៣ ទួលគោក ភ្នំពេញ",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -709,15 +684,14 @@ export const posts: Post[] = [
     postId: 32,
     userId: "2",
     title: "650$ យកបាន 17 pro max",
-    images: [
-      "/post-img/phone2.png",
-    ],
+    images: ["/post-img/phone2.png"],
     price: 1295,
     imageCount: 1,
     createdat: new Date(),
     cateId: "2",
     subId: "11",
-    description: "សួស្តីបង🥰\n 🥰ចង់ ដូរឡេីង សេរី\n 🥰ចង់បង់រំលួស\n 🥰ចង់ទិញ\n 😁🥰កក់មុន 650$ យកបាន 17 pro max បានប្រេីភ្លាម",
+    description:
+      "សួស្តីបង🥰\n 🥰ចង់ ដូរឡេីង សេរី\n 🥰ចង់បង់រំលួស\n 🥰ចង់ទិញ\n 😁🥰កក់មុន 650$ យកបាន 17 pro max បានប្រេីភ្លាម",
     proId: "1",
     disId: "1",
     condition: "New",
@@ -727,9 +701,7 @@ export const posts: Post[] = [
     postId: 33,
     userId: "2",
     title: "400$ យកបាន 16 pro max ដាក់សុីមបានប្រេីភ្លាម",
-    images: [
-      "/post-img/phone3.png",
-    ],
+    images: ["/post-img/phone3.png"],
     price: 885,
     imageCount: 1,
     createdat: new Date(),
@@ -745,15 +717,14 @@ export const posts: Post[] = [
     postId: 34,
     userId: "2",
     title: "iPad Pro M2 -12.9” / 128GB Sim+wifi",
-    images: [
-      "/post-img/tablet1.png",
-    ],
+    images: ["/post-img/tablet1.png"],
     price: 730,
     imageCount: 1,
     createdat: new Date(),
     cateId: "2",
     subId: "12",
-    description: "iPad Pro M2 -12.9” /128GB Sim+wifi secondhand\n Space gray color original all",
+    description:
+      "iPad Pro M2 -12.9” /128GB Sim+wifi secondhand\n Space gray color original all",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -783,15 +754,14 @@ export const posts: Post[] = [
     postId: 36,
     userId: "2",
     title: "Ipad Pro M4 13 970$",
-    images: [
-      "/post-img/tablet5.png",
-    ],
+    images: ["/post-img/tablet5.png"],
     price: 970,
     imageCount: 1,
     createdat: new Date(),
     cateId: "2",
     subId: "12",
-    description: "-Ipad pro M4 13 256G សំណុំហ្សីន​ 100% តួស្អាត99%\n -Free​ ឆ្នាំសាក​ហ្សីន​ case ប៊ិច",
+    description:
+      "-Ipad pro M4 13 256G សំណុំហ្សីន​ 100% តួស្អាត99%\n -Free​ ឆ្នាំសាក​ហ្សីន​ case ប៊ិច",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -801,10 +771,7 @@ export const posts: Post[] = [
     postId: 37,
     userId: "2",
     title: "Varman Milky Way The Magic Gold",
-    images: [
-      "/post-img/w1.png",
-      "/post-img/w2.png",
-    ],
+    images: ["/post-img/w1.png", "/post-img/w2.png"],
     price: 150,
     oldPrice: 165,
     discount: "15$",
@@ -836,7 +803,8 @@ export const posts: Post[] = [
     createdat: new Date(),
     cateId: "2",
     subId: "13",
-    description: "Apple Watch Edition series 5 4mm ceramic នៅសានុំសុីន ស្អាត98.99% ថ្មី 1349$ all good",
+    description:
+      "Apple Watch Edition series 5 4mm ceramic នៅសានុំសុីន ស្អាត98.99% ថ្មី 1349$ all good",
     proId: "1",
     disId: "1",
     condition: "Used",
@@ -846,24 +814,20 @@ export const posts: Post[] = [
     postId: 39,
     userId: "2",
     title: "Instinct solar surf",
-    images: [
-      "/post-img/w10.png",
-      "/post-img/w11.png",
-      "/post-img/w12.png",
-    ],
+    images: ["/post-img/w10.png", "/post-img/w11.png", "/post-img/w12.png"],
     price: 110,
     imageCount: 3,
     createdat: new Date(),
     cateId: "2",
     subId: "13",
-    description: "Garmin Instinct solar surf \nFull box - used \n Have solar \n110$",
+    description:
+      "Garmin Instinct solar surf \nFull box - used \n Have solar \n110$",
     proId: "1",
     disId: "1",
     condition: "Used",
     freeDelivery: false,
   },
-]
-
+];
 
 export const TopPosts: Post[] = [
   {
@@ -871,14 +835,14 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "NISSAN GTR R 34  V-Spec II",
-    images: ["/post-img/r34.png",
+    images: [
+      "/post-img/r34.png",
       "/post-img/carforsale.png",
       "/post-img/carforsale.png",
       "/post-img/carforsale.png",
       "/post-img/carforsale.png",
       "/post-img/carforsale.png",
-      "/post-img/carforsale.png"
-
+      "/post-img/carforsale.png",
     ],
     price: 90000,
     oldPrice: 100000,
@@ -897,7 +861,8 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "IPHONE 17PRO MAX ORANGE 1T",
-    images: ["/post-img/17promax.png",
+    images: [
+      "/post-img/17promax.png",
       "/post-img/17pro.png",
       "/post-img/17pro.png",
       "/post-img/17pro.png",
@@ -919,7 +884,8 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "LAMBORGHINI 2016 WHITE V8",
-    images: ["/post-img/lamborghini.png",
+    images: [
+      "/post-img/lamborghini.png",
       "/post-img/lambor2.png",
       "/post-img/lambor2.png",
       "/post-img/lambor2.png",
@@ -939,11 +905,11 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "Honda X-ADV Istanbul, Turkey - August 20 2019",
-    images: ["/post-img/adv.png",
+    images: [
       "/post-img/adv.png",
       "/post-img/adv.png",
-      "/post-img/adv.png"
-
+      "/post-img/adv.png",
+      "/post-img/adv.png",
     ],
     price: 4800,
     oldPrice: 5000,
@@ -962,10 +928,11 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "New Apple Computers iPad Pro tablet",
-    images: ["/post-img/tablet.png",
+    images: [
       "/post-img/tablet.png",
       "/post-img/tablet.png",
-      "/post-img/tablet.png"
+      "/post-img/tablet.png",
+      "/post-img/tablet.png",
     ],
     price: 1200,
     createdat: new Date(),
@@ -982,7 +949,8 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "Villa in Krong Siem Reap",
-    images: ["/post-img/swimpool.png",
+    images: [
+      "/post-img/swimpool.png",
       "/post-img/swimpool.png",
       "/post-img/swimpool.png",
       "/post-img/swimpool.png",
@@ -1005,12 +973,13 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "Toyota Prius 2010 Option 4 White",
-    images: ["/post-img/pirus.png",
+    images: [
       "/post-img/pirus.png",
       "/post-img/pirus.png",
       "/post-img/pirus.png",
       "/post-img/pirus.png",
-      "/post-img/pirus.png"
+      "/post-img/pirus.png",
+      "/post-img/pirus.png",
     ],
     price: 15800,
     oldPrice: 16500,
@@ -1030,7 +999,8 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "Honda Dream 2024 Black Edition",
-    images: ["/post-img/honda.png",
+    images: [
+      "/post-img/honda.png",
       "/post-img/honda.png",
       "/post-img/honda.png",
       "/post-img/honda.png",
@@ -1051,14 +1021,15 @@ export const TopPosts: Post[] = [
     userId: "2",
 
     title: "Range Rover Autobiography 2021",
-    images: ["/post-img/rang_rover.png",
+    images: [
       "/post-img/rang_rover.png",
       "/post-img/rang_rover.png",
       "/post-img/rang_rover.png",
       "/post-img/rang_rover.png",
       "/post-img/rang_rover.png",
       "/post-img/rang_rover.png",
-      "/post-img/rang_rover.png"
+      "/post-img/rang_rover.png",
+      "/post-img/rang_rover.png",
     ],
     price: 155000,
     oldPrice: 160000,
@@ -1077,12 +1048,13 @@ export const TopPosts: Post[] = [
     postId: 10,
     userId: "2",
     title: "Mercedes-Benz G63 AMG 2023",
-    images: ["/post-img/mercedes.png",
+    images: [
       "/post-img/mercedes.png",
       "/post-img/mercedes.png",
       "/post-img/mercedes.png",
       "/post-img/mercedes.png",
-      "/post-img/mercedes.png"
+      "/post-img/mercedes.png",
+      "/post-img/mercedes.png",
     ],
     price: 566000,
     imageCount: 18,

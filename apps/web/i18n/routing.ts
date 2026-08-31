@@ -31,6 +31,7 @@ export const routing = defineRouting({
     "/category/[categorySlug]/[subcategorySlug]/[brandOrType]/[modelSlug]": {},
 
     "/post": {},
+    "/post/[slug]": {},
     "/[slug]": {},
     "/sell": {},
 

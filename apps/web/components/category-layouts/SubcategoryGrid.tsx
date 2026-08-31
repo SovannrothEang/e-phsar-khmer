@@ -3,12 +3,18 @@
 import { useState } from "react";
 import { Link } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
-import { Subcategory } from "@/types/category";
 import Image from "next/image";
+
+/** Minimal backend subcategory slice this grid renders (local type — web is standalone). */
+export interface SubcategoryTile {
+  slug: string;
+  name: string;
+  icon: string | null;
+}
 
 type Props = {
   categorySlug: string;
-  subcategories: Subcategory[];
+  subcategories: SubcategoryTile[];
   cols: number;
 };
 
@@ -21,9 +27,7 @@ export default function SubcategoryGrid({
   const searchParams = useSearchParams();
   const [showAll, setShowAll] = useState(false);
 
-  const visibleItems = showAll
-    ? subcategories
-    : subcategories.slice(0, LIMIT);
+  const visibleItems = showAll ? subcategories : subcategories.slice(0, LIMIT);
 
   return (
     <div className="rounded ">
@@ -47,17 +51,20 @@ export default function SubcategoryGrid({
             className="block h-full group bg-card rounded cursor-pointer active:opacity-50 p-3"
           >
             <div className="mx-auto bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <Image
-                src={sub.subcate}
-                alt={sub.name}
-                width={128} 
-                height={128}   
-                unoptimized    
-                className="object-contain"/>
+              {sub.icon ? (
+                <Image
+                  src={sub.icon}
+                  alt={sub.name}
+                  width={128}
+                  height={128}
+                  unoptimized
+                  className="object-contain"
+                />
+              ) : (
+                <span className="text-xs">{sub.name}</span>
+              )}
             </div>
-            <p className="mt-3 text-[14px] truncate w-full block">
-              {sub.name}
-            </p>
+            <p className="mt-3 text-[14px] truncate w-full block">{sub.name}</p>
           </Link>
         ))}
       </div>
@@ -72,7 +79,6 @@ export default function SubcategoryGrid({
           </button>
         </div>
       )}
-
     </div>
   );
 }

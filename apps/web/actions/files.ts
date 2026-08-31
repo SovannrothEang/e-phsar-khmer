@@ -1,6 +1,6 @@
 "use server";
 
-import { ApiError, serverFetch } from "@/lib/api/client";
+import { ApiError, serverFetch, userServerFetch } from "@/lib/api/client";
 
 /**
  * Upload scopes accepted by the backend `POST /files/sign` endpoint. Each scope
@@ -18,12 +18,22 @@ export type UploadScope =
   | "model"
   | "attribute";
 
-interface SignUploadResponse {
+export interface SignUploadResponse {
   signedUrl: string;
   path: string;
   token: string;
   publicUrl: string;
 }
+
+/** Shared shape of a sign action — lets a component take `signUpload` (admin
+ * session) or `signUploadUser` (user session) interchangeably. */
+export type UploadSignFn = (
+  filename: string,
+  scope: UploadScope,
+) => Promise<
+  | { success: true; data: SignUploadResponse }
+  | { success: false; error: string }
+>;
 
 /**
  * Request a Supabase signed upload URL for a file. The client then PUTs the
@@ -32,6 +42,32 @@ interface SignUploadResponse {
 export async function signUpload(filename: string, scope: UploadScope) {
   try {
     const { data } = await serverFetch<SignUploadResponse>("/files/sign", {
+      method: "POST",
+      body: JSON.stringify({ filename, scope }),
+    });
+    return { success: true as const, data };
+  } catch (err) {
+    return {
+      success: false as const,
+      error: err instanceof ApiError ? err.message : "Failed to sign upload",
+    };
+  }
+}
+
+/**
+ * User-session twin of {@link signUpload} — same contract, but signs with the
+ * USER access token (`userServerFetch`) instead of the admin session. Used by
+ * the user-facing post-an-ad photo upload; admin surfaces keep `signUpload`.
+ */
+export async function signUploadUser(
+  filename: string,
+  scope: UploadScope,
+): Promise<
+  | { success: true; data: SignUploadResponse }
+  | { success: false; error: string }
+> {
+  try {
+    const { data } = await userServerFetch<SignUploadResponse>("/files/sign", {
       method: "POST",
       body: JSON.stringify({ filename, scope }),
     });

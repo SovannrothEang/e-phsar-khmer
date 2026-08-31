@@ -1,87 +1,65 @@
-'use client'
-
-import { useParams } from "next/navigation";
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { categories } from "@/lib/categories";
-import { AspectRatio } from "@/components/ui/aspect-ratio"
-import { IconHome, IconChevronRightFilled } from '@tabler/icons-react';
+import { getLocale } from "next-intl/server";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
 import CommonCategoryLayout from "@/components/category-layouts/CommonCategoryLayout";
 import ServicesCategoryLayout from "@/components/category-layouts/ServicesCategoryLayout";
 import JobsCategoryLayout from "@/components/category-layouts/JobsCategoryLayout";
 import CarsCategoryLayout from "@/components/category-layouts/CarsCategoryLayout";
 import SubcategoryGrid from "@/components/category-layouts/SubcategoryGrid";
-import HighLightAds from "@/components/ads/HighLightAds";
-import NormalAd from "@/components/ads/NormalAd";
-import { useSearchParams } from "next/navigation";
-import OptionGrid from "@/components/subcategory-layouts/OptionGrid";
-export default function CategoryPage() {
-  const { categorySlug } = useParams<{ categorySlug: string }>();
-  const searchParams = useSearchParams();
-  const filterBarRef = useRef<HTMLDivElement>(null);
-  const [, setIsSticky] = useState(false);
+import { GridCardPost } from "@/components/ads/GridCardPost";
+import { GridCardSell } from "@/components/ads/GridCardSell";
+import { ListCardPost } from "@/components/ads/ListCardPost";
+import { ListCardSell } from "@/components/ads/ListCardSell";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import {
+  getCategoryWithSubcategories,
+  getListingsFeed,
+  toCardPost,
+} from "@/lib/api/categories";
+import { posts } from "@/lib/posts";
 
-  const SUBCATEGORY_LAYOUT: Record<string, number> = {
-    "cars-and-vehicles": 5,
-    "phones-tablets": 5,
-    "computers-accessories": 7,
-    "electronics-appliances": 6,
-    "house-land": 6,
-    "jobs": 8,
-    "services": 8,
-    "fashion-beauty": 6,
-    "furniture-decor": 5,
-    "books-sports-hobbies": 7,
-    "pets": 7,
-    "foods": 5,
-  }
-   const COMMON_CATEGORIES = [
-    "phones-tablets",
-    "computers-accessories",
-    "electronics-appliances",
-    "house-land",
-    "fashion-beauty",
-    "furniture-decor",
-    "books-sports-hobbies",
-    "pets",
-    "foods",
-  ];
-  
-  // Categories with special layouts
-   const CARS_CATEGORIES = ["cars-and-vehicles"];
-   const SERVICES_CATEGORIES = ["services"];
-   const JOBS_CATEGORIES = ["jobs"];
+const SUBCATEGORY_LAYOUT: Record<string, number> = {
+  "cars-and-vehicles": 5,
+  "phones-and-tablets": 5,
+  "computers-and-accessories": 7,
+  "electronics-and-appliances": 6,
+  "home-and-land": 6,
+  jobs: 8,
+  services: 8,
+  "fashion-and-beauty": 6,
+  "furniture-and-decor": 5,
+  "books-sports-and-hobbies": 7,
+  pets: 7,
+  foods: 5,
+};
 
-  const adField = searchParams.get("ad_field");
+// Categories with special layouts
+const COMMON_CATEGORIES = [
+  "phones-and-tablets",
+  "computers-and-accessories",
+  "electronics-and-appliances",
+  "home-and-land",
+  "fashion-and-beauty",
+  "furniture-and-decor",
+  "books-sports-and-hobbies",
+  "pets",
+  "foods",
+];
+const CARS_CATEGORIES = ["cars-and-vehicles"];
+const SERVICES_CATEGORIES = ["services"];
+const JOBS_CATEGORIES = ["jobs"];
 
-  let Layout;
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ categorySlug: string }>;
+}) {
+  const { categorySlug } = await params;
+  const locale = await getLocale();
 
-  if (COMMON_CATEGORIES.includes(categorySlug)) {
-    Layout = CommonCategoryLayout;
-  } else if (SERVICES_CATEGORIES.includes(categorySlug)) {
-    Layout = ServicesCategoryLayout;
-  } else if (JOBS_CATEGORIES.includes(categorySlug)) {
-    Layout = JobsCategoryLayout;
-  } else if (CARS_CATEGORIES.includes(categorySlug)) {
-    Layout = CarsCategoryLayout;
-  } else {
-    Layout = CommonCategoryLayout;
-  }
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!filterBarRef.current) return;
-      const offsetTop =
-        filterBarRef.current.getBoundingClientRect().top + window.scrollY;
-      setIsSticky(window.scrollY > offsetTop - 16);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const category = categories.find((cat) => cat.slug === categorySlug);
+  const category = await getCategoryWithSubcategories(categorySlug, locale);
 
   if (!category) {
     return (
@@ -89,15 +67,62 @@ export default function CategoryPage() {
     );
   }
 
+  let Layout;
+
+  if (COMMON_CATEGORIES.includes(category.slug)) {
+    Layout = CommonCategoryLayout;
+  } else if (SERVICES_CATEGORIES.includes(category.slug)) {
+    Layout = ServicesCategoryLayout;
+  } else if (JOBS_CATEGORIES.includes(category.slug)) {
+    Layout = JobsCategoryLayout;
+  } else if (CARS_CATEGORIES.includes(category.slug)) {
+    Layout = CarsCategoryLayout;
+  } else {
+    Layout = CommonCategoryLayout;
+  }
+
   //  FIXED
   const cols = SUBCATEGORY_LAYOUT[category.slug] ?? 6;
+
+  // Real active listings feed for the cars category; every other category
+  // keeps the mock post feed. Cards render through the existing GridCardPost /
+  // ListCardPost templates via the toCardPost adapter.
+  const isCars = category.slug === "cars-and-vehicles";
+  const feedPosts = isCars
+    ? ((await getListingsFeed({ categorySlug }, locale))?.items ?? []).map(
+        toCardPost,
+      )
+    : posts;
+
+  // Same content as the All Ads feed: Sell-banner card + the posts feed, rendered
+  // as grid cards (grid view) or list cards (list view).
+  const gridSections = (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <GridCardSell />
+      {feedPosts.map((post) => (
+        <GridCardPost key={post.postId} post={post} />
+      ))}
+    </div>
+  );
+
+  const listSections = (
+    <>
+      <ListCardSell />
+      {feedPosts.map((post) => (
+        <ListCardPost key={post.postId} post={post} />
+      ))}
+    </>
+  );
 
   return (
     <main className="min-h-screen flex flex-col bg-muted">
       <div className="w-full flex justify-center py-6">
         <div className="w-full max-w-4xl">
           <Link href="/" target="_blank">
-            <AspectRatio ratio={4} className="bg-muted rounded-none cursor-pointer">
+            <AspectRatio
+              ratio={4}
+              className="bg-muted rounded-none cursor-pointer"
+            >
               <Image
                 src="/ads/landforsale.jpg"
                 alt="Photo"
@@ -115,87 +140,47 @@ export default function CategoryPage() {
           <nav className="flex items-center gap-2 text-base">
             <Link
               href="/"
-              className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300">
-              <IconHome size={18} className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300" />
-              <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">Home</span>
+              className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
+            >
+              <IconHome
+                size={18}
+                className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300"
+              />
+              <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
+                Home
+              </span>
             </Link>
-            <IconChevronRightFilled size={16} className="block mt-1 text-gray-500" />
-            <h1 className="text-gray-500 dark:text-gray-400">{category.name} <span>in Cambodia</span></h1>
+            <IconChevronRightFilled
+              size={16}
+              className="block mt-1 text-gray-500"
+            />
+            <h1 className="text-gray-500 dark:text-gray-400">
+              {category.name} <span>in Cambodia</span>
+            </h1>
           </nav>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto w-full pb-2">
-        <div className="mb-3">
-          <Layout category={category} />
+      {/* The grid/list toggle in the layout above drives these two views:
+          grid → grid post cards, list → list post cards (All Ads behaviour).
+          The layout is NOT wrapped in a short div — the bar inside it is
+          sticky and needs the tall Tabs root as its containing block. */}
+      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
+        <Layout category={category} />
+        <div>
+          <SubcategoryGrid
+            categorySlug={category.slug}
+            subcategories={category.subcategories}
+            cols={cols}
+          />
         </div>
-        <SubcategoryGrid
-          categorySlug={category.slug}
-          subcategories={category.subcategories}
-          cols={cols}
-        />
-        {category.slug === "Jobs" && !adField && category.subcategories[0]?.bodyTypes && (
-          <div className="mt-2">
-            <OptionGrid
-              options={category.subcategories[0].bodyTypes}
-              baseHref={`/category/${category.slug}`}
-              paramKey="brand"
-            />
-          </div>
-        )}
-      </div>
-      {/*  SMALL BANNER — SAME WIDTH AS CATEGORY CARD */}
-      <div className="max-w-7xl mx-auto px-4 py-1 relative z-20">
-        {/* <SmallAdBanner
-          imagePath="/ads/carforsale.gif"
-          altText="Car For Sale Banner"
-          link="/"
-        /> */}
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-1">
-        <div className="max-w-6xl mx-auto w-full pb-1">
-          <NormalAd />
-        </div>
-      </div>
-      <div className="max-w-7xl mx-auto px-4 py-2 relative z-20">
-        {/* <SmallAdBanner
-          imagePath="/ads/jobfinder.png"
-          altText="Job Finder Banner"
-          link="/"
-        /> */}
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-1">
-        <div className="max-w-7xl mx-auto w-full  pb-1">
-          <NormalAd />
-        </div>
-      </div>
-      <div className="max-w-7xl mx-auto px-4 py-2 relative z-20">
-        {/* <SmallAdBanner
-          imagePath="/ads/findproduct.png"
-          altText="Find Product Banner"
-          link="/"
-        /> */}
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-4">
-        <div className="max-w-6xl mx-auto w-full px-8 pb-1">
-          {/* <AdsPhoto /> */}
-        </div>
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-4">
-        <div className="max-w-6xl mx-auto w-full px-8 pb-1">
-          <HighLightAds />
-        </div>
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-4">
-        <div className="max-w-6xl mx-auto w-full px-8 pb-1">
-          {/* <AdsPhoto /> */}
-        </div>
-      </div>
-      <div className="px-6 py-8 md:px-12 md:py-4">
-        <div className="max-w-6xl mx-auto w-full px-8 pb-1">
-          <HighLightAds />
-        </div>
-      </div>
+        <TabsContent value="grid" className="mt-4">
+          {gridSections}
+        </TabsContent>
+        <TabsContent value="list" className="mt-4">
+          {listSections}
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }
