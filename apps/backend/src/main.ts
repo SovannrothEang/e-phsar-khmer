@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { WsAdapter } from '@nestjs/platform-ws';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -34,6 +35,8 @@ async function bootstrap() {
     origin: frontendOrigins.length ? frontendOrigins : true,
     credentials: true,
   });
+
+  app.useWebSocketAdapter(new WsAdapter(app));
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('psa-npic API')

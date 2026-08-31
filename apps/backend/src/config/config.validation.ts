@@ -21,6 +21,11 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   DEV_OTP_TOKEN: z.string().optional(),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().default(24),
+  OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1500),
+  OUTBOX_RECLAIM_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+  OUTBOX_STALE_LOCK_SECONDS: z.coerce.number().int().positive().default(300),
   THROTTLE_TTL: z.coerce.number().default(60),
   THROTTLE_LIMIT: z.coerce.number().default(100),
 });

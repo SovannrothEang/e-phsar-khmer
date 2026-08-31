@@ -51,8 +51,70 @@
     }
   },
   "Card": {
-      "title": "Ingin melihat iklan Anda di sini?",
-      "des": "Dapatkan uang ekstra dengan berjualan\ndi Psakhmer. Ayo coba, prosesnya cepat dan\nmudah.",
-      "button_post_ad": "Jual"
+    "title": "Ingin melihat iklan Anda di sini?",
+    "des": "Dapatkan uang ekstra dengan berjualan\ndi Psakhmer. Ayo coba, prosesnya cepat dan\nmudah.",
+    "button_post_ad": "Jual"
+  },
+  "Chat": {
+    "unknownUser": "Pengguna tidak dikenal",
+    "messageSeller": "Hubungi penjual",
+    "auth": {
+      "requiredTitle": "Masuk untuk melihat pesan Anda",
+      "requiredDescription": "Anda memerlukan akun untuk mengobrol dengan penjual.",
+      "signIn": "Masuk"
+    },
+    "inbox": {
+      "title": "Pesan",
+      "emptyTitle": "Belum ada pesan",
+      "emptyDescription": "Saat Anda menghubungi penjual, percakapan akan muncul di sini.",
+      "loadMore": "Muat lebih banyak",
+      "previewEmpty": "Belum ada pesan",
+      "previewImage": "Foto",
+      "previewListing": "Iklan",
+      "unreadCount": "{count} pesan belum dibaca"
+    },
+    "thread": {
+      "back": "Kembali",
+      "selectPrompt": "Pilih percakapan untuk mulai membaca",
+      "emptyTitle": "Mulai percakapan dengan {name}",
+      "loadOlder": "Muat pesan sebelumnya",
+      "attachingListing": "Tentang iklan ini",
+      "blocked": "Anda tidak dapat lagi mengirim pesan ke pengguna ini.",
+      "blockedByMe": "Anda memblokir pengguna ini.",
+      "notFoundTitle": "Percakapan tidak ditemukan",
+      "notFoundDescription": "Percakapan ini tidak ada atau Anda tidak memiliki akses."
+    },
+    "message": {
+      "imageAlt": "Foto terkirim",
+      "read": "Dibaca",
+      "sent": "Terkirim",
+      "sending": "Mengirim…",
+      "retry": "Coba lagi"
+    },
+    "composer": {
+      "placeholder": "Tulis pesan…",
+      "send": "Kirim",
+      "attachImage": "Lampirkan gambar",
+      "removeImage": "Hapus gambar",
+      "stagedImageAlt": "Gambar yang akan dikirim",
+      "disabled": "Pesan tidak tersedia.",
+      "blocked": "Anda tidak dapat mengirim pesan ke pengguna ini.",
+      "blockedByMe": "Anda memblokir pengguna ini. Buka blokir untuk mengirim pesan.",
+      "blockedError": "Pesan tidak dapat dikirim.",
+      "uploadFailed": "Gagal mengunggah gambar.",
+      "imageSizeError": "Gambar terlalu besar.",
+      "imageTypeError": "Jenis gambar tidak didukung."
+    },
+    "listing": {
+      "noPrice": "Harga nego",
+      "unavailable": "Iklan ini sudah tidak tersedia"
+    },
+    "errors": {
+      "generic": "Terjadi kesalahan.",
+      "loadFailed": "Tidak dapat memuat pesan.",
+      "loadFailedTitle": "Terjadi kesalahan",
+      "sendFailed": "Pesan gagal dikirim.",
+      "rateLimited": "Anda mengirim pesan terlalu cepat. Tunggu sebentar."
     }
+  }
 }

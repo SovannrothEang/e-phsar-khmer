@@ -33,6 +33,13 @@ export default () => {
     idempotency: {
       ttlHours: env.IDEMPOTENCY_TTL_HOURS,
     },
+    outbox: {
+      concurrency: env.OUTBOX_CONCURRENCY,
+      batchSize: env.OUTBOX_BATCH_SIZE,
+      pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
+      reclaimIntervalMs: env.OUTBOX_RECLAIM_INTERVAL_MS,
+      staleLockSeconds: env.OUTBOX_STALE_LOCK_SECONDS,
+    },
     throttle: {
       ttl: env.THROTTLE_TTL,
       limit: env.THROTTLE_LIMIT,

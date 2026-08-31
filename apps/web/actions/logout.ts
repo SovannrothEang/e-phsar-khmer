@@ -1,6 +1,9 @@
 "use server";
 
-import { clearAdminSession, clearUserSession } from "@/lib/auth/session";
+import {
+  clearAdminSession,
+  clearUserSession,
+} from "@/lib/auth/session";
 import { clearAdminLocale } from "@/lib/auth/admin-locale";
 import { redirect } from "next/navigation";
 import { redirect as i18nRedirect } from "@/i18n/routing";

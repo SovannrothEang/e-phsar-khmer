@@ -1,9 +1,8 @@
 {
   "HomePage": {
-   "welcome": {
+    "welcome": {
       "title": "Welcome to psakhmer, the biggest online market in Cambodia."
     },
-    
     "BrowseByCategory": {
       "title": "Browse By Category",
       "Cars and Vehicles": "Car and Vehicle",
@@ -55,5 +54,67 @@
     "title": "Want to see your ads here?",
     "des": "Make some extra cash by selling this\nin Psakhmer. Go on, it's quick and\neasy.",
     "button_post_ad": "Sell"
+  },
+  "Chat": {
+    "unknownUser": "Unknown user",
+    "messageSeller": "Message seller",
+    "auth": {
+      "requiredTitle": "Sign in to view your messages",
+      "requiredDescription": "You need an account to chat with sellers.",
+      "signIn": "Sign in"
+    },
+    "inbox": {
+      "title": "Messages",
+      "emptyTitle": "No messages yet",
+      "emptyDescription": "When you contact a seller, your conversations appear here.",
+      "loadMore": "Load more",
+      "previewEmpty": "No messages yet",
+      "previewImage": "Photo",
+      "previewListing": "Listing",
+      "unreadCount": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}"
+    },
+    "thread": {
+      "back": "Back",
+      "selectPrompt": "Select a conversation to start reading",
+      "emptyTitle": "Start a conversation with {name}",
+      "loadOlder": "Load earlier messages",
+      "attachingListing": "About this listing",
+      "blocked": "You can no longer message this user.",
+      "blockedByMe": "You blocked this user.",
+      "notFoundTitle": "Conversation not found",
+      "notFoundDescription": "This conversation doesn't exist or you don't have access to it."
+    },
+    "message": {
+      "imageAlt": "Sent photo",
+      "read": "Read",
+      "sent": "Sent",
+      "sending": "Sending…",
+      "retry": "Retry"
+    },
+    "composer": {
+      "placeholder": "Write a message…",
+      "send": "Send",
+      "attachImage": "Attach image",
+      "removeImage": "Remove image",
+      "stagedImageAlt": "Image to send",
+      "disabled": "Messaging is unavailable.",
+      "blocked": "You can't message this user.",
+      "blockedByMe": "You blocked this user. Unblock them to send a message.",
+      "blockedError": "Messaging unavailable.",
+      "uploadFailed": "Image upload failed.",
+      "imageSizeError": "Image is too large.",
+      "imageTypeError": "Unsupported image type."
+    },
+    "listing": {
+      "noPrice": "Price on request",
+      "unavailable": "This listing is no longer available"
+    },
+    "errors": {
+      "generic": "Something went wrong.",
+      "loadFailed": "Couldn't load messages.",
+      "loadFailedTitle": "Something went wrong",
+      "sendFailed": "Message not sent.",
+      "rateLimited": "You're sending messages too quickly. Please wait a moment."
+    }
   }
 }

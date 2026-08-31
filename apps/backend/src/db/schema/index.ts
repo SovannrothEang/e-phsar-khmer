@@ -7,3 +7,4 @@ export * from './subscriptions.schema';
 export * from './reports.schema';
 export * from './idempotency.schema';
 export * from './chat.schema';
+export * from './outbox.schema';

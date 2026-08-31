@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
     qualities: [25, 50, 75, 100],
     remotePatterns: [
       { protocol: "https", hostname: "ui-avatars.com" },
+      { protocol: "https", hostname: "gikdqkuogotpoydbfonn.supabase.co" },
       ...(supabaseHost
         ? [
             {
@@ -30,6 +31,7 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
+  allowedDevOrigins: ["*.trycloudflare.com", "*.lhr.life"]
 };
 
 export default withNextIntl(nextConfig);

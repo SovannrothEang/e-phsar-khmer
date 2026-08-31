@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validate } from './config/config.validation';
@@ -28,6 +29,7 @@ import { ChatModule } from './chat/chat.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -46,6 +48,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
         },
       ],
     }),
+    EventEmitterModule.forRoot(),
     SupabaseModule,
     DbModule,
     AuthModule,
@@ -60,6 +63,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
     ChatModule,
     AttributesModule,
     AdminModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [

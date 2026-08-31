@@ -2,6 +2,7 @@
 
 import { deleteUserSchema, editUserSchema, usersSchema } from "@/schemas/user";
 import { serverFetch, ApiError } from "@/lib/api/client";
+import { userServerFetch } from "@/lib/api/user-client";
 import type { BackendUser } from "@/lib/api/adapters";
 import z from "zod";
 
@@ -11,6 +12,9 @@ export type CurrentUser = {
   role: string;
   email: string;
   profileImage: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
 };
 
 /**
@@ -26,9 +30,34 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       role: res.data.role,
       email: res.data.email ?? "",
       profileImage: res.data.profilePhotoUrl ?? "",
+      firstName: res.data.firstName,
+      lastName: res.data.lastName,
+      profilePhotoUrl: res.data.profilePhotoUrl,
     };
   } catch {
     /* no valid session — chip stays hidden */
+    return null;
+  }
+}
+
+/**
+ * User-facing read of the logged-in user's profile. Uses `userServerFetch`
+ * (reads `user_access_token` cookie) — NOT `serverFetch` which reads the admin
+ * cookie. Returns null when there is no valid user session.
+ */
+export async function getUserProfile(): Promise<CurrentUser | null> {
+  try {
+    const res = await userServerFetch<BackendUser>("/users/me");
+    return {
+      username: res.data.username ?? "",
+      role: res.data.role,
+      email: res.data.email ?? "",
+      profileImage: res.data.profilePhotoUrl ?? "",
+      firstName: res.data.firstName,
+      lastName: res.data.lastName,
+      profilePhotoUrl: res.data.profilePhotoUrl,
+    };
+  } catch {
     return null;
   }
 }

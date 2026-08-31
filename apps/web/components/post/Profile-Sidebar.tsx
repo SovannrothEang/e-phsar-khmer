@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircleMore, UserPlus, UserCheck } from "lucide-react";
+import { UserPlus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
@@ -10,13 +10,16 @@ import { getUserById } from "@/lib/data";
 import { type User } from "@/lib/user";
 import { IconPhoneCall, IconWorld, IconMail } from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
+import { ContactSellerButton } from "@/components/chat/contact-seller-button";
 
 export default function ProfileSidebar({
   userId,
   user: userProp,
+  listingId,
 }: {
   userId: string;
   user?: User;
+  listingId?: string;
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -187,10 +190,11 @@ export default function ProfileSidebar({
           </div>
           <div className="border-t border-muted-foreground/30" />
 
-          <Button className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base flex items-center justify-center gap-2 cursor-pointer">
-            <MessageCircleMore className="!w-6 !h-6" />
-            Chat
-          </Button>
+          <ContactSellerButton
+            sellerId={userId}
+            listingId={listingId}
+            className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base cursor-pointer"
+          />
         </div>
       </div>
       <div className="bg-card rounded-sm border border-border p-4 shadow-sm">
