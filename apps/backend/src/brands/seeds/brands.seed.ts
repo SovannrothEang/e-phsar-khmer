@@ -1,4 +1,4 @@
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DbClient } from '../../db/drizzle.provider';
 import {
   brands,
@@ -10,6 +10,7 @@ import { subcategories } from '../../db/schema/categories.schema';
 interface BrandSeed {
   slug: string;
   name: string;
+  icon?: string;
   subcategories: string[];
   sortOrder: number;
 }
@@ -190,6 +191,26 @@ const MODEL_SEEDS: Record<string, string[]> = {
   htc: ['HTC U23 Pro', 'HTC Desire 22'],
   ulefone: ['Ulefone Armor 26', 'Ulefone Power Armor 18'],
   yealink: ['Yealink SIP-T31G', 'Yealink WH62'],
+  // car-brand models per the mock design (insert-only; the mock's "Pirus"
+  // typo is seeded verbatim)
+  mg: [
+    '3',
+    '6',
+    '7',
+    'D60',
+    'GS',
+    'GT',
+    'HS',
+    'Marvel R',
+    'RX5',
+    'RX8',
+    'RX9',
+    'T60',
+    'ZS',
+    'Other',
+  ],
+  leapmotor: ['B10', 'C10'],
+  toyota: ['Camry', 'Pirus'],
 };
 
 export const BRANDS: BrandSeed[] = [
@@ -622,27 +643,705 @@ export const BRANDS: BrandSeed[] = [
   },
 ];
 
+/**
+ * Car brands per the mock design (91, order is the design order — MG first).
+ * Icon paths are the web app's local /sub-img design assets — interim until
+ * these logos move to Supabase storage (admins replace icons via the UI; the
+ * seed's onConflictDoUpdate never overwrites existing icons).
+ */
+export const CAR_BRANDS: BrandSeed[] = [
+  {
+    slug: 'mg',
+    name: 'MG',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mg.png',
+    sortOrder: 0,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'leapmotor',
+    name: 'Leapmotor',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/leapmotor.png',
+    sortOrder: 1,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'toyota',
+    name: 'Toyota',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/toyota.png',
+    sortOrder: 2,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'lexus',
+    name: 'Lexus',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/lexus.png',
+    sortOrder: 3,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'kia',
+    name: 'Kia',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/kia.png',
+    sortOrder: 4,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'ford',
+    name: 'Ford',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/ford.png',
+    sortOrder: 5,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'land-rover',
+    name: 'Land Rover',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/land-rover.png',
+    sortOrder: 6,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'mercedes-benz',
+    name: 'Mercedes-Benz',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mercedes-benz.png',
+    sortOrder: 7,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'audi',
+    name: 'Audi',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/audi.png',
+    sortOrder: 8,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'bmw',
+    name: 'BMW',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/bmw.png',
+    sortOrder: 9,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'byd',
+    name: 'BYD',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/byd.png',
+    sortOrder: 10,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'chevrolet',
+    name: 'Chevrolet',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/chevrolet.png',
+    sortOrder: 11,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'gac',
+    name: 'GAC',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/gac.png',
+    sortOrder: 12,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'honda',
+    name: 'Honda',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/honda.png',
+    sortOrder: 13,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'hyundai',
+    name: 'Hyundai',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/hyundai.png',
+    sortOrder: 14,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'mazda',
+    name: 'Mazda',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mazda.png',
+    sortOrder: 15,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'nissan',
+    name: 'Nissan',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/nissan.png',
+    sortOrder: 16,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'porsche',
+    name: 'Porsche',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/porsche.png',
+    sortOrder: 17,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'denza',
+    name: 'Denza',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/denza.png',
+    sortOrder: 18,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'mitsubishi',
+    name: 'Mitsubishi',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mitsubishi.png',
+    sortOrder: 19,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'ssang-yong',
+    name: 'SsangYong',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/ssang-yong.png',
+    sortOrder: 20,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'avatar',
+    name: 'Avatar',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/avatar.png',
+    sortOrder: 21,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'cadillac',
+    name: 'Cadillac',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/cadillac.png',
+    sortOrder: 22,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'changan',
+    name: 'Changan',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/changan.png',
+    sortOrder: 23,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'jeep',
+    name: 'Jeep',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/jeep.png',
+    sortOrder: 24,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'tesla',
+    name: 'Tesla',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/tesla.png',
+    sortOrder: 25,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'volkswagen',
+    name: 'Volkswagen',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/volkswagen.png',
+    sortOrder: 26,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: '212',
+    name: '212',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/212.png',
+    sortOrder: 27,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'aeolus',
+    name: 'AEOLUS',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/aeolus.png',
+    sortOrder: 28,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'aion',
+    name: 'AION',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/aion.png',
+    sortOrder: 29,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'aiqar',
+    name: 'AIQAR',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/aiqar.png',
+    sortOrder: 30,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'aito',
+    name: 'AITO',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/aito.png',
+    sortOrder: 31,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'alfa-romeo',
+    name: 'Alfa Romeo',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/alfa-romeo.png',
+    sortOrder: 32,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'aston-martin',
+    name: 'Aston Martin',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/aston-martin.png',
+    sortOrder: 33,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'baic',
+    name: 'BAIC',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/baic.png',
+    sortOrder: 34,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'baw',
+    name: 'BAW',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/baw.png',
+    sortOrder: 35,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'bentley',
+    name: 'Bentley',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/bentley.png',
+    sortOrder: 36,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'bestune',
+    name: 'BESTUNE',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/bestune.png',
+    sortOrder: 37,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'buick',
+    name: 'Buick',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/buick.png',
+    sortOrder: 38,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'changhe',
+    name: 'Changhe',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/changhe.png',
+    sortOrder: 39,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'chery',
+    name: 'CHERY',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/chery.png',
+    sortOrder: 40,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'chrysler',
+    name: 'Chrysler',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/chrysler.png',
+    sortOrder: 41,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'daewoo',
+    name: 'Daewoo',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/daewoo.png',
+    sortOrder: 42,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'daihatsu',
+    name: 'Daihatsu',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/daihatsu.png',
+    sortOrder: 43,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'dfsk',
+    name: 'DFSK',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/dfsk.png',
+    sortOrder: 44,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'dodge',
+    name: 'Dodge',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/dodge.png',
+    sortOrder: 45,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'ferrari',
+    name: 'Ferrari',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/ferrari.png',
+    sortOrder: 46,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'forthing',
+    name: 'FORTHING',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/forthing.png',
+    sortOrder: 47,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'foton',
+    name: 'foton',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/foton.png',
+    sortOrder: 48,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'geely',
+    name: 'GEELY',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/geely.png',
+    sortOrder: 49,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'gmc',
+    name: 'GMC',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/gmc.png',
+    sortOrder: 50,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'great-wall',
+    name: 'Great Wall',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/great-wall.png',
+    sortOrder: 51,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'gtv',
+    name: 'GTV',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/gtv.png',
+    sortOrder: 52,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'gwm',
+    name: 'GWM',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/gwm.png',
+    sortOrder: 53,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'hawtai-motor',
+    name: 'Hawtai Motor',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/hawtai-motor.png',
+    sortOrder: 54,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'hongqi',
+    name: 'HONGQI',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/hongqi.png',
+    sortOrder: 55,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'hummer',
+    name: 'HUMMER',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/hummer.png',
+    sortOrder: 56,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'icar',
+    name: 'ICAR',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/icar.png',
+    sortOrder: 57,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'im',
+    name: 'IM',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/im.png',
+    sortOrder: 58,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'infiniti',
+    name: 'Infiniti',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/infiniti.png',
+    sortOrder: 59,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'isuzu',
+    name: 'Isuzu',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/isuzu.png',
+    sortOrder: 60,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'jac',
+    name: 'JAC',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/jac.png',
+    sortOrder: 61,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'jaguar',
+    name: 'Jaguar',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/jaguar.png',
+    sortOrder: 62,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'jetour',
+    name: 'JETOUR',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/jetour.png',
+    sortOrder: 63,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'jmc',
+    name: 'JMC',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/jmc.png',
+    sortOrder: 64,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'lamborghini',
+    name: 'Lamborghini',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/lamborghini.png',
+    sortOrder: 65,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'li',
+    name: 'Li',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/li.png',
+    sortOrder: 66,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'lotus',
+    name: 'Lotus',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/lotus.png',
+    sortOrder: 67,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'maserati',
+    name: 'Maserati',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/maserati.png',
+    sortOrder: 68,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'maxus',
+    name: 'MAXUS',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/maxus.png',
+    sortOrder: 69,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'mclaren',
+    name: 'Mclaren',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mclaren.png',
+    sortOrder: 70,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'mini',
+    name: 'MINI',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/mini.png',
+    sortOrder: 71,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'ora',
+    name: 'ORA',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/ora.png',
+    sortOrder: 72,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'peugeot',
+    name: 'Peugeot',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/peugeot.png',
+    sortOrder: 73,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'ram',
+    name: 'Ram',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/ram.png',
+    sortOrder: 74,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'renault',
+    name: 'Renault',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/renault.png',
+    sortOrder: 75,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'rivian',
+    name: 'Rivian',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/rivian.png',
+    sortOrder: 76,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'rolls-royce',
+    name: 'Rolls-Royce',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/rolls-royce.png',
+    sortOrder: 77,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'soueast',
+    name: 'Soueast',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/soueast.png',
+    sortOrder: 78,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'subaru',
+    name: 'Subaru',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/subaru.png',
+    sortOrder: 79,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'suzuki',
+    name: 'Suzuki',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/suzuki.png',
+    sortOrder: 80,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'venucia',
+    name: 'VENUCIA',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/venucia.png',
+    sortOrder: 81,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'volvo',
+    name: 'Volvo',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/volvo.png',
+    sortOrder: 82,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'voyah',
+    name: 'VOYAH',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/voyah.png',
+    sortOrder: 83,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'wuling',
+    name: 'WULING',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/wuling.png',
+    sortOrder: 84,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'xiaomi',
+    name: 'Xiaomi',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/xiaomi.png',
+    sortOrder: 85,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'xpeng',
+    name: 'XPENG',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/xpeng.png',
+    sortOrder: 86,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'zeekr',
+    name: 'ZEEKR',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/zeekr.png',
+    sortOrder: 87,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'zotye',
+    name: 'ZOTYE',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/zotye.png',
+    sortOrder: 88,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'zx-auto',
+    name: 'ZX AUTO',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/zx-auto.png',
+    sortOrder: 89,
+    subcategories: ['cars-for-sale'],
+  },
+  {
+    slug: 'other-car-brand',
+    name: 'Other',
+    icon: '/sub-img/car_vehicles/cars-for-sale/brands/other-car-brand.png',
+    sortOrder: 90,
+    subcategories: ['cars-for-sale'],
+  },
+];
+
 export async function seedBrands(db: DbClient): Promise<void> {
-  const slugs = [...new Set(BRANDS.flatMap((b) => b.subcategories))];
+  const slugs = [
+    ...new Set([...BRANDS, ...CAR_BRANDS].flatMap((b) => b.subcategories)),
+  ];
   const subRows = await db
     .select({ id: subcategories.id, slug: subcategories.slug })
     .from(subcategories)
     .where(inArray(subcategories.slug, slugs));
   const subSlugToId = new Map(subRows.map((r) => [r.slug, r.id]));
 
-  for (const brand of BRANDS) {
-    const [{ id: brandId }] = await db
-      .insert(brands)
-      .values({
-        slug: brand.slug,
-        name: brand.name,
-        sortOrder: brand.sortOrder,
-      })
-      .onConflictDoUpdate({
-        target: brands.slug,
-        set: { name: brand.name, sortOrder: brand.sortOrder, isActive: true },
-      })
-      .returning({ id: brands.id });
+  const seenSlugs = new Set<string>();
+
+  for (const brand of [...BRANDS, ...CAR_BRANDS]) {
+    // brands.slug is globally unique. xiaomi appears in both the phones and
+    // the cars sets: the first occurrence creates/upserts the row; later
+    // occurrences must NOT re-upsert (their sortOrder would clobber the
+    // earlier set's ordering) — they only wire links + backfill a null icon.
+    let brandId: string;
+    if (seenSlugs.has(brand.slug)) {
+      const [existing] = await db
+        .select({ id: brands.id, icon: brands.icon })
+        .from(brands)
+        .where(eq(brands.slug, brand.slug))
+        .limit(1);
+      if (!existing) {
+        throw new Error(
+          `expected existing brand row for duplicate slug: ${brand.slug}`,
+        );
+      }
+      brandId = existing.id;
+      if (!existing.icon && brand.icon) {
+        await db
+          .update(brands)
+          .set({ icon: brand.icon })
+          .where(eq(brands.id, brandId));
+      }
+    } else {
+      const [{ id }] = await db
+        .insert(brands)
+        .values({
+          slug: brand.slug,
+          name: brand.name,
+          sortOrder: brand.sortOrder,
+          ...(brand.icon ? { icon: brand.icon } : {}),
+        })
+        .onConflictDoUpdate({
+          target: brands.slug,
+          set: { name: brand.name, sortOrder: brand.sortOrder, isActive: true },
+        })
+        .returning({ id: brands.id });
+      brandId = id;
+      seenSlugs.add(brand.slug);
+    }
 
     for (const subcategorySlug of brand.subcategories) {
       const subcategoryId = subSlugToId.get(subcategorySlug);
@@ -654,7 +1353,7 @@ export async function seedBrands(db: DbClient): Promise<void> {
     }
   }
 
-  console.log(`  ✓ seeded ${BRANDS.length} brands`);
+  console.log(`  ✓ seeded ${BRANDS.length + CAR_BRANDS.length} brands`);
 }
 
 /**

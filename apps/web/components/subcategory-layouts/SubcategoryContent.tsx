@@ -1,59 +1,65 @@
+"use client";
+
 import { useSearchParams } from "next/navigation";
 import OptionGrid from "./OptionGrid";
-import type { Subcategory } from "@/types/category";
+
+/** Minimal option row shape (web standalone; backend rows mapped at the page boundary). */
+export interface OptionRow {
+  slug: string;
+  name: string;
+  image?: string | null;
+}
 
 type Props = {
   categorySlug: string;
   subcategorySlug: string;
-  subcategory: Subcategory;
+  /** Brand options (cars) — null when the subcategory has no live brands. */
+  brands?: OptionRow[] | null;
+  /** Body-type options (cars) — null when no rows apply. */
+  bodyTypes?: OptionRow[] | null;
+  /** Models of the selected brand — null unless a brand is selected. */
+  models?: OptionRow[] | null;
 };
 
 export default function SubcategoryContent({
   categorySlug,
   subcategorySlug,
-  subcategory,
+  brands,
+  bodyTypes,
+  models,
 }: Props) {
+  const baseHref = `/category/${categorySlug}/${subcategorySlug}`;
+  const searchParams = useSearchParams();
 
-const baseHref = `/category/${categorySlug}/${subcategorySlug}`;
-const searchParams = useSearchParams();
+  const brandSlug = searchParams.get("ad_field");
+  const bodyType = searchParams.get("ad_type");
 
-const brandSlug = searchParams.get("ad_field");
-const bodyType = searchParams.get("ad_type");
-
-// 1. Force lowercase comparison to avoid "Kia" vs "kia" issues
-const selectedBrand = subcategory.brands?.find(
-  (b: { slug: string }) => b.slug.toLowerCase() === brandSlug?.toLowerCase()
-);
+  // Force lowercase comparison to avoid "Kia" vs "kia" issues
+  const selectedBrand = brands?.find(
+    (b) => b.slug.toLowerCase() === brandSlug?.toLowerCase(),
+  );
 
   return (
     <>
       {/* BRAND GRID: Show when no brand is selected */}
-      {!selectedBrand && subcategory.brands && (
-        <OptionGrid
-          options={subcategory.brands}
-          baseHref={baseHref}
-          paramKey="brand"
-        />
+      {!selectedBrand && !!brands?.length && (
+        <OptionGrid options={brands} baseHref={baseHref} paramKey="brand" />
       )}
 
       {/* MODEL GRID: Show when a brand is selected */}
-      {selectedBrand && selectedBrand.model && (
-        <OptionGrid
-          options={selectedBrand.model}
-          baseHref={baseHref}
-          paramKey="model"
-        />
+      {selectedBrand && !!models?.length && (
+        <OptionGrid options={models} baseHref={baseHref} paramKey="model" />
       )}
 
       {/* TYPE GRID: Show when no type is selected */}
-      {!(categorySlug === "jobs" ? brandSlug : bodyType) && subcategory.bodyTypes && (
-        <OptionGrid
-          options={subcategory.bodyTypes}
-          baseHref={baseHref}
-          paramKey={categorySlug === "jobs" ? "brand" : "body_type"}
-        />
-      )}
-
+      {!(categorySlug === "jobs" ? brandSlug : bodyType) &&
+        !!bodyTypes?.length && (
+          <OptionGrid
+            options={bodyTypes}
+            baseHref={baseHref}
+            paramKey={categorySlug === "jobs" ? "brand" : "body_type"}
+          />
+        )}
     </>
   );
 }

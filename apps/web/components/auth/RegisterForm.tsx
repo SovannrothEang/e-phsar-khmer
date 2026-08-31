@@ -79,17 +79,17 @@
 
 //   return (
 //     <div className=" pt-6 pb-30 px-4">
-    
+
 //       <div className="w-full max-w-[580px] mx-auto bg-card rounded-sm shadow-sm border border-border p-8">
 //       <div className="mb-6">
 //         <h1 className="text-lg font-semibold text-center mb-4 text-foreground">
 //           Register to post free ad
 //         </h1>
 //         <div className="border-b border-border w-full">
-          
+
 //         </div>
 //         </div>
-       
+
 //         <form onSubmit={handleSubmit} className="space-y-6">
 //           {/* First Name Field */}
 //           <div>
@@ -313,23 +313,23 @@
 //   );
 // }
 
-"use client"
+"use client";
 
-import { register } from "@/actions/register"
-import { Button } from "@/components/ui/button"
-import {
-  FieldGroup,
-  FieldSeparator,
-} from "@/components/ui/field"
-import { registerSchema } from "@/schemas/register"
-import { toast } from "sonner"
-import { z } from "zod"
-import { useAppForm } from "@/components/form/hooks"
-import {  FaTelegramPlane } from "react-icons/fa";
+import { register } from "@/actions/register";
+import { storeOtpRegistration } from "@/lib/otp-registration";
+import { useRouter } from "@/i18n/routing";
+import { Button } from "@/components/ui/button";
+import { FieldGroup, FieldSeparator } from "@/components/ui/field";
+import { registerSchema } from "@/schemas/register";
+import { toast } from "sonner";
+import { z } from "zod";
+import { useAppForm } from "@/components/form/hooks";
+import { FaTelegramPlane } from "react-icons/fa";
 
-type FormData = z.infer<typeof registerSchema>
+type FormData = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
+  const router = useRouter();
 
   const form = useAppForm({
     defaultValues: {
@@ -338,90 +338,87 @@ export function RegisterForm() {
       phoneNumber: "",
       password: "",
       confirmPassword: "",
-
-
     } satisfies FormData as FormData,
     validators: {
       onSubmit: registerSchema,
       onChange: registerSchema,
     },
     onSubmit: async ({ value }) => {
-
-      const name = `${value.firstName} ${value.lastName}`.trim()
-
-      const username =
-        `${value.firstName}${value.lastName}`
-          .replace(/\s+/g, "")
-          .toLowerCase()
-
-      const registerData = {
-        ...value,
-        name,
-        username,
-      }
-
-      const res = await register(registerData)
+      const res = await register(value);
 
       if (res.success) {
-        form.reset()
-        toast.success("Register successfully!", {
-          description: JSON.stringify(registerData, null, 2),
-          className: "whitespace-pre-wrap font-mono",
-        })
+        // The password/names reach the verify call via sessionStorage —
+        // never through the URL.
+        storeOtpRegistration({
+          mode: "register",
+          phone: res.phone,
+          firstName: value.firstName.trim(),
+          lastName: value.lastName.trim(),
+          password: value.password,
+        });
+        form.reset();
+        toast.success("Code sent to your phone.");
+        router.push({ pathname: "/otp", query: { phone: res.phone } });
       } else {
-        toast.error("Failed to register.")
+        toast.error(res.error ?? "Failed to send code.");
       }
     },
-  })
+  });
 
   return (
-
     <div className="container px-4 mx-auto my-6 pb-30">
       <div className="w-full max-w-[580px] mx-auto bg-card rounded-sm shadow-sm border border-border p-8">
         <div className="mb-6">
           <h1 className="text-lg font-semibold text-center mb-4 text-foreground">
             Register to post free ad
           </h1>
-           <FieldSeparator />
+          <FieldSeparator />
         </div>
-       
+
         <form
-          onSubmit={e => {
-            e.preventDefault()
-            form.handleSubmit()
+          onSubmit={(e) => {
+            e.preventDefault();
+            form.handleSubmit();
           }}
         >
           <FieldGroup>
             <form.AppField name="firstName">
-              {field => <field.Input label="First Name"  required={true} />}
+              {(field) => <field.Input label="First Name" required={true} />}
             </form.AppField>
 
             <form.AppField name="lastName">
-              {field => <field.Input label="Last Name"  required={true} />}
+              {(field) => <field.Input label="Last Name" required={true} />}
             </form.AppField>
 
             <form.AppField name="phoneNumber">
-              {field => <field.Input label="Phone Number" />}
+              {(field) => <field.Input label="Phone Number" type="tel" />}
             </form.AppField>
 
             <form.AppField name="password">
-              {field => <field.Input label="Password" />}
+              {(field) => <field.Input label="Password" />}
             </form.AppField>
 
             <form.AppField name="confirmPassword">
-              {field => <field.Input label="Confirm Password" />}
+              {(field) => <field.Input label="Confirm Password" />}
             </form.AppField>
-            <Button type="submit" className="bg-orange-500 text-white w-full hover:bg-orange-600 hover:text-white cursor-pointer">Submit</Button>
+            <Button
+              type="submit"
+              className="bg-orange-500 text-white w-full hover:bg-orange-600 hover:text-white cursor-pointer"
+            >
+              Submit
+            </Button>
 
             <FieldSeparator>Or</FieldSeparator>
-            <Button type="button" className="bg-sky-600 text-white w-full hover:bg-sky-600 hover:text-white cursor-pointer flex items-center gap-2">
+            <Button
+              type="button"
+              className="bg-sky-600 text-white w-full hover:bg-sky-600 hover:text-white cursor-pointer flex items-center gap-2"
+            >
               <FaTelegramPlane className="text-white text-2xl" />
               Sign in or register with Telegram
             </Button>
-
           </FieldGroup>
         </form>
       </div>
     </div>
-  )
+  );
 }

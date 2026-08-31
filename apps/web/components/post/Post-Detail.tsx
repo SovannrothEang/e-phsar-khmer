@@ -21,21 +21,89 @@ import LoanCalculator from "./LoanCalculator";
 import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
 import PostImage from "./PostImage";
+import ListingSpecs from "./ListingSpecs";
+import type { BackendListing } from "@/lib/api/categories";
+import type { Post } from "@/lib/posts";
+import type { User } from "@/lib/user";
+import { deriveOldPrice } from "@/lib/utils";
 
-export default function PostDetail({ id }: { id: string }) {
-  const post = getPostById(id);
+/**
+ * Real-listing data slotted into this template. The page (RSC) builds this from
+ * `GET /listings/:id` + the categories list (breadcrumb) + the listing's own
+ * contact fields (seller card), so the SAME design renders for real and mock
+ * posts.
+ */
+export interface RealDetailData {
+  listing: BackendListing;
+  cate?: { slug: string; name: string };
+  subcate?: { slug: string; name: string };
+  brand?: { slug: string; name: string };
+  model?: { slug: string; name: string };
+  seller: User;
+}
+
+/** Adapt a backend listing into the template's local `Post` shape. */
+function toPostView(l: BackendListing): Post {
+  const price = l.price !== null ? Number(l.price) : 0;
+  const discount =
+    l.discountValue !== null && l.discountType !== null
+      ? `${Number(l.discountValue)}${l.discountType === "percent" ? "%" : " $"}`.trim()
+      : undefined;
+  return {
+    postId: l.id,
+    userId: l.userId,
+    title: l.title,
+    images: l.photos.map((p) => p.url),
+    imageCount: l.photos.length,
+    price: Number.isFinite(price) ? price : 0,
+    cateId: "",
+    subId: "",
+    brandId: undefined,
+    modelId: undefined,
+    // Mockup shows current + strikethrough old price + discount badge —
+    // derive the old price from price + discountValue/discountType.
+    oldPrice: deriveOldPrice(
+      Number.isFinite(price) ? price : 0,
+      l.discountValue,
+      l.discountType,
+    ),
+    discount,
+    description: l.description ?? "",
+    createdat: new Date(l.createdAt),
+    proId: "",
+    disId: "",
+    freeDelivery: l.deliveryFree,
+  };
+}
+
+export default function PostDetail({
+  id,
+  real,
+}: {
+  id: string;
+  real?: RealDetailData;
+}) {
+  const isReal = !!real;
+  const post = isReal ? toPostView(real.listing) : getPostById(id);
   if (!post) return notFound();
-  const user = getUserById(post.userId);
+  const user = isReal ? real.seller : getUserById(post.userId);
   if (!user) return null;
-  const province = getProvinceById(post.proId);
-  const district = getDistrictById(post.proId, post.disId);
-  const cate = getCategoryById(post.cateId);
-  const subcate = getSubCategoryById(post.subId);
-  const brand = getBrandById(post.brandId ?? "");
-  const model = getModelById(post.modelId ?? "");
+  const province = isReal ? undefined : getProvinceById(post.proId);
+  const district = isReal ? undefined : getDistrictById(post.proId, post.disId);
+  const cate = isReal ? real.cate : getCategoryById(post.cateId);
+  const subcate = isReal ? real.subcate : getSubCategoryById(post.subId);
+  const brand = isReal ? real.brand : getBrandById(post.brandId ?? "");
+  const model = isReal ? real.model : getModelById(post.modelId ?? "");
 
   const hasBrand = !!brand;
   const hasModel = !!model;
+
+  const displayId = isReal
+    ? real.listing.id.slice(0, 8).toUpperCase()
+    : post.postId;
+  const locationLine = isReal
+    ? [real.listing.location, real.listing.address].filter(Boolean).join(", ")
+    : [district?.name, province?.name].filter(Boolean).join(", ");
 
   return (
     <main className="min-h-screen flex flex-col bg-muted block pt-6">
@@ -139,10 +207,10 @@ export default function PostDetail({ id }: { id: string }) {
                   {post.title}
                 </h1>
                 <div className="flex flex-wrap items-center gap-4 text-[13px] text-foreground mt-2">
-                  <p>ID {post.postId}</p>
+                  <p>ID {displayId}</p>
                   <div className="flex items-center">
                     <IconMapPin className="w-4 h-4 mr-1" />
-                    {district?.name}, {province?.name}
+                    {locationLine}
                   </div>
                   <div className="flex items-center">
                     <IconClockHour4 className="w-4 h-4 mr-1" />
@@ -178,12 +246,22 @@ export default function PostDetail({ id }: { id: string }) {
                 <h2 className="text-xl font-semibold text-foreground mb-4">
                   Description
                 </h2>
+                {isReal && (
+                  <ListingSpecs
+                    cate={real.cate}
+                    subcate={real.subcate}
+                    brand={real.brand}
+                    model={real.model}
+                    attributes={real.listing.attributes}
+                    condition={real.listing.condition}
+                  />
+                )}
                 <p className="whitespace-pre-line leading-10">
                   {post.description}
                 </p>
                 <ContactUser
                   user={user}
-                  district={district}
+                  district={isReal ? { name: locationLine } : district}
                   province={province}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
@@ -218,7 +296,7 @@ export default function PostDetail({ id }: { id: string }) {
           {/* Sidebar */}
           <aside className="w-full md:w-[400px] shrink-0">
             <div className="sticky top-20 space-y-2">
-              <ProfileSidebar userId={post.userId} />
+              <ProfileSidebar userId={post.userId} user={user} />
             </div>
           </aside>
         </div>

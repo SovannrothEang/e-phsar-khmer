@@ -16,7 +16,11 @@ import { toSlug } from "@/lib/utils";
 
 const MAX_THUMBS = 7;
 
-export default function PostImage({ post }: { post: Post }) {
+export default function PostImage({
+  post,
+}: {
+  post: Pick<Post, "images" | "title" | "postId">;
+}) {
   const [shareOpen, setShareOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -403,7 +407,7 @@ export default function PostImage({ post }: { post: Post }) {
   return (
     <>
       {renderGrid()}
-        <Lightbox
+      <Lightbox
         open={open}
         close={() => setOpen(false)}
         index={lightboxIndex}
@@ -424,29 +428,40 @@ export default function PostImage({ post }: { post: Post }) {
           showToggle: false,
         }}
         fullscreen={{ ref: fullscreenRef }}
- 
         on={{
           view: ({ index: currentIndex }) => {
             setLightboxIndex(currentIndex);
             setSelectedImage(currentIndex);
           },
         }}
- 
         animation={{ fade: 300, zoom: 300 }}
- 
         render={{
           // "1 / 18" counter in top-left like Khmer24
           iconPrev: () => (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
-              className="w-6 h-6">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-6 h-6"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
           ),
           iconNext: () => (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
-              className="w-6 h-6">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-6 h-6"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           ),

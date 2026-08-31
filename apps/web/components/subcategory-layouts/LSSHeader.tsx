@@ -1,4 +1,4 @@
-
+"use client";
 
 import { useState } from "react";
 
@@ -20,7 +20,6 @@ interface Filters {
 }
 
 export default function LSSHeader({ title }: { title: string }) {
-
   const [filters, setFilters] = useState<Filters>({
     search: "",
     province: "",
@@ -28,7 +27,7 @@ export default function LSSHeader({ title }: { title: string }) {
     commune: "",
     sort: "latest",
     price: 0,
-    salary:0,
+    salary: 0,
     minPrice: "",
     maxPrice: "",
     priceRange: "",
@@ -50,24 +49,31 @@ export default function LSSHeader({ title }: { title: string }) {
     if (filters.province === "siem-reap") return "Siem Reap";
     if (filters.province === "battambang") return "Battambang";
     if (filters.province === "sihanoukville") return "Sihanoukville";
-    return filters.province.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    return filters.province
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   const getSortLabel = () => {
-    if (filters.sort === 'latest') return 'Sort';
-    if (filters.sort === 'oldest') return 'Oldest First';
-    if (filters.sort === 'price-low') return 'Price: Low to High';
-    if (filters.sort === 'price-high') return 'Price: High to Low';
-    return 'Sort';
+    if (filters.sort === "latest") return "Sort";
+    if (filters.sort === "oldest") return "Oldest First";
+    if (filters.sort === "price-low") return "Price: Low to High";
+    if (filters.sort === "price-high") return "Price: High to Low";
+    return "Sort";
   };
 
   const getSalaryLabel = () => {
-    if (!filters.priceRange) return 'Salary';
+    if (!filters.priceRange) return "Salary";
     switch (filters.priceRange) {
-      case 'under-100': return 'Under $100';
-      case '100-500': return '$100-$500';
-      case '500-plus': return '$500+';
-      default: return 'Salary';
+      case "under-100":
+        return "Under $100";
+      case "100-500":
+        return "$100-$500";
+      case "500-plus":
+        return "$500+";
+      default:
+        return "Salary";
     }
   };
 
@@ -80,10 +86,7 @@ export default function LSSHeader({ title }: { title: string }) {
         </h1>
 
         {/* Right Icons */}
-        <div className="flex gap-2">
-          {/* 💰 Price Icon */}
-          
-        </div>
+        <div className="flex gap-2">{/* 💰 Price Icon */}</div>
       </div>
 
       {/* FILTER BAR */}
@@ -93,23 +96,29 @@ export default function LSSHeader({ title }: { title: string }) {
           <button
             onClick={() => setShowLocationDropdown(!showLocationDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.province 
-                ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                : 'text-gray-700'}`}
+              ${
+                filters.province
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
             <i className="bi bi-geo-alt text-sm"></i>
-            <span className="font-medium whitespace-nowrap">{getProvinceLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showLocationDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getProvinceLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showLocationDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showLocationDropdown && (
             <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Locations' },
-                { val: 'phnom-penh', label: 'Phnom Penh' },
-                { val: 'siem-reap', label: 'Siem Reap' },
-                { val: 'battambang', label: 'Battambang' },
-                { val: 'sihanoukville', label: 'Sihanoukville' }
+                { val: "", label: "All Locations" },
+                { val: "phnom-penh", label: "Phnom Penh" },
+                { val: "siem-reap", label: "Siem Reap" },
+                { val: "battambang", label: "Battambang" },
+                { val: "sihanoukville", label: "Sihanoukville" },
               ].map((loc) => (
                 <button
                   key={loc.val}
@@ -134,21 +143,27 @@ export default function LSSHeader({ title }: { title: string }) {
           <button
             onClick={() => setShowSortDropdown(!showSortDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.sort !== 'latest'
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.sort !== "latest"
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getSortLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showSortDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getSortLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showSortDropdown && (
             <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: 'latest', label: 'Newest First' },
-                { val: 'oldest', label: 'Oldest First' },
-                { val: 'price-low', label: 'Price: Low to High' },
-                { val: 'price-high', label: 'Price: High to Low' }
+                { val: "latest", label: "Newest First" },
+                { val: "oldest", label: "Oldest First" },
+                { val: "price-low", label: "Price: Low to High" },
+                { val: "price-high", label: "Price: High to Low" },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -173,21 +188,27 @@ export default function LSSHeader({ title }: { title: string }) {
           <button
             onClick={() => setShowSalaryDropdown(!showSalaryDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.priceRange
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.priceRange
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getSalaryLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showSalaryDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getSalaryLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showSalaryDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showSalaryDropdown && (
             <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Prices' },
-                { val: 'under-100', label: 'Under $100' },
-                { val: '100-500', label: '$100 - $500' },
-                { val: '500-plus', label: '$500+' }
+                { val: "", label: "All Prices" },
+                { val: "under-100", label: "Under $100" },
+                { val: "100-500", label: "$100 - $500" },
+                { val: "500-plus", label: "$500+" },
               ].map((opt) => (
                 <button
                   key={opt.val}

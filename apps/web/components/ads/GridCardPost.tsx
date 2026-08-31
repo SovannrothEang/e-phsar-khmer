@@ -4,14 +4,8 @@ import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
-import { getProvinceById, getDistrictById, getUserById } from "@/lib/data";
-import {
-  DotIcon,
-  ImageIcon,
-  TruckIcon,
-  HeartIcon,
-  Play,
-} from "lucide-react";
+import { getProvinceById, getDistrictById } from "@/lib/data";
+import { DotIcon, ImageIcon, TruckIcon, HeartIcon, Play } from "lucide-react";
 import { useState } from "react";
 import {
   Card,
@@ -24,9 +18,6 @@ import { ThreeDotPost } from "../Card/ThreeDotPost";
 
 export function GridCardPost({ post }: { post: Post }) {
   const [isLiked, setIsLiked] = useState(false);
-
-  const user = getUserById(post.userId);
-  if (!user) return null;
 
   const province = getProvinceById(post.proId);
   const district = getDistrictById(post.proId, post.disId);
@@ -46,11 +37,12 @@ export function GridCardPost({ post }: { post: Post }) {
       />
       <div className="relative h-52 w-full bg-zinc-100">
         <Image
-          src={post.images[0]}
+          src={post.images[0] ?? "/placeholder.svg"}
           alt={post.title}
           fill
           className="object-cover"
           priority={false}
+          unoptimized
         />
         {post.oldPrice && (
           <div className="absolute top-2 left-2 z-30 flex flex-col items-start gap-1">
@@ -86,7 +78,6 @@ export function GridCardPost({ post }: { post: Post }) {
           {post.video && (
             <span className="bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
               <Play size={14} />
-              
             </span>
           )}
         </div>
@@ -103,7 +94,8 @@ export function GridCardPost({ post }: { post: Post }) {
             </span>
             <DotIcon className="scale-120" />
             <span className="truncate">
-              {province?.name}, {district?.name}
+              {post.location ??
+                [province?.name, district?.name].filter(Boolean).join(", ")}
             </span>
           </div>
           <div className="text-sm font-medium text-muted-foreground">
@@ -147,10 +139,11 @@ export function GridCardPost({ post }: { post: Post }) {
             className="h-9 w-9 z-30  rounded-full bg-card hover:bg-black/10 flex items-center justify-center cursor-pointer"
           >
             <HeartIcon
-              className={`h-6 w-6 transition ${isLiked
+              className={`h-6 w-6 transition ${
+                isLiked
                   ? "fill-blue-500 text-blue-500 scale-110"
                   : "text-gray-400 group-hover:text-blue-500 group-hover:scale-110"
-                }`}
+              }`}
             />
           </button>
         </div>

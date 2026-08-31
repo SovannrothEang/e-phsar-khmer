@@ -1,41 +1,190 @@
-# Review: spec-detail-twelve (Foods field_schema)
+# Review
 
-**Branch:** `ship/spec-detail-eleven` **Date:** 2026-07-03 **Change class:** seed-data only (no migration / no runtime / no schema change)
+## Verdict
 
-**VERDICT: APPROVE**
+**APPROVE WITH NOTES** — Spec-faithful, race-safe implementation with a clean
+register design freeze; only note-level hardening items and one outstanding
+manual-verification pass remain.
 
-## Summary
+## Evidence
 
-Seed-data-only change: `fieldSchema` was added to all 10 Foods subcategories in `apps/backend/src/categories/seeds/categories.seed.ts` (the final category block, L11399-12155). Each subcategory received one identical inline 11-field form matching the module-level `commonListingFields` const verbatim — no Type field, no Condition field, `photos.max = 8`, `contactPhones.max = 3`, labels en-only. No migration, no runtime code, no schema change. This maps exactly to `spec-detail-twelve.md` and to the spec/changes/test artifacts. Foods was the last bare main category; all 12 main categories now carry field schemas. I verified everything independently (the spec's `136→146` before-count is not diffable since `apps/backend/` is untracked, but the +10 delta and structural checks are fully consistent with only Foods being added).
+**Pipeline docs read**
 
-## Verified (actual observed numbers)
+- `.pipeline/spec.md` (Decisions 1-10, edge cases, verification plan)
+- `.pipeline/changes.md` (documents the one deviation: normalization in the
+  action, not the form)
+- `.pipeline/test-results.md` (lint/build PASS; manual flows honestly marked
+  NOT executed)
 
-- [x] `grep -c "fieldSchema:"` → **146** (matches expected 136→146, +10).
-- [x] `grep -c "fieldSchema: \["` → **146** — every schema is an inline array literal.
-- [x] `grep -c "fieldSchema: commonListingFields"` → **0** — no bare const references (const only ever spread).
-- [x] `grep -c "commonListingFields.filter"` → **10** — the photos-spread sites are untouched.
-- [x] `grep -c "&amp;"` → **0**; `grep -cF "gt;"` → **0** — no HTML-escape leakage.
-- [x] Foods region (slug L11399 → EOF L12155): **10** `fieldSchema: [` arrays at L11407, 11482, 11557, 11632, 11707, 11782, 11857, 11932, 12007, 12082 — uniform +75-line spacing proves identical block length.
-- [x] `meat` (L11407-11476) and `other-foods` (L12082-12151) are **byte-identical** to `commonListingFields` (L18-72) and to the `wardrobe-and-cabinets` inline block (L9716-9785): same field set, order, labels, types, `required`, `max`.
-- [x] `key: 'condition'` appears **only** at L75 (the `conditionField` const def) — **0** in any fieldSchema, 0 in Foods.
-- [x] `key: 'type'` last occurrence L10338 (< 11399) — **0** in Foods region.
-- [x] `required: true` in Foods = **20** (title+price ×10; last at L12100 = `other-foods` price). `max: 8` = **10** (photos), `max: 3` = **10** (contactPhones) in-region; Pets-boundary occurrences (L11331/11386) correctly fall in the neighboring block.
-- [x] Literal ampersand names intact, once each: `Bread & Bakery` (L11855), `Beer & Wine` (L11930), `Rice & Cereal` (L12005) — not escaped.
-- [x] `CATEGORIES` array closes cleanly: L12151 `],` → L12152 `},` → L12153 `],` → L12154 `},` → L12155 `];`.
-- [x] Neighbor **Pets** (detail-eleven, slug L10867) intact with **7** fieldSchema arrays (L10875-11325, `other-pets` last); same form shape, no Type key leaked in.
-- [x] Spec mapping vs `spec-detail-twelve.md`: `Photo (0/8)`→`photos max:8`; `Delivery`→`deliveryFree` ("Free Delivery"); `Phone Number 1 (up to 3)`→`contactPhones max:3`; `Address` + `(Set location on google maps)`→`location` + `address`; no Type/Condition. Foods = 10 subcategories per `spec-detail-one.md` L197-208.
-- [x] Gates (from `.pipeline/test-results.md`): lint / build (tsc) / test (13 suites, 97 tests) all green. Type literals all valid `FieldDef` members, confirmed by a passing build.
+**Working tree inspected (read-only)**
 
-## Correctness / consistency notes
+- `apps/web/lib/phone.ts` — traced `normalizePhone` against every weird input:
+  `""`→`""`; `"+"`→`""` (digits empty); `"0"`→`""` (3 digits < 8);
+  `"0000000000"`→`+855000000000` (12 digits, passes); `"012 345 678"`→
+  `+85512345678`; `"+85512345678"`→passthrough; `"abcdefgh"`→`""`→action
+  returns "Invalid phone number". Algorithm matches spec Decision 3 exactly
+  (single leading `0` strip).
+- `apps/web/actions/otp.ts` — envelope parsing is a faithful copy of the
+  `login.ts` pattern (`res.json().catch(() => null)`, `!res.ok ||
+!body?.success`), plus a stricter `!body.data` guard; `setUserSession`
+  awaited before returning success (legal cookie write from a server action,
+  same as login.ts:47).
+- `apps/web/actions/register.ts` — zod gate kept, normalize before fetch,
+  `{ phone }` body only. Sends no `preferredLanguage` — correct, since
+  `RegisterDto` is `@IsIn(['en','km','zh'])` while web locales include
+  ko/id/vi (spec Decision 7 honored).
+- `apps/web/components/auth/OtpVerifyForm.tsx` — race analysis: `inFlightRef`
+  set synchronously before the await (single-threaded, so button/Enter/
+  auto-submit double-fire is impossible), `doneRef` blocks re-fire after
+  success navigation, `finally` resets both `inFlightRef` and `verifying`
+  (never stuck). Cooldown timer is a per-tick `setTimeout` with cleanup — no
+  interval leak; resend failure only toasts, does not restart cooldown (spec
+  edge case honored). Failure path clears input; catch path preserves it
+  (spec distinction honored).
+- `apps/web/components/auth/OtpPageClient.tsx` +
+  `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx` — client-side
+  `useSearchParams` (matches `category/[categorySlug]/page.tsx:21`
+  convention), `<Suspense>` wrapper, redirect-then-null on bad phone; build
+  listed `/[locale]/otp` as dynamic, consistent.
+- **Register design freeze verified**: whitespace-insensitive diff of
+  `git show HEAD:apps/web/components/auth/RegisterForm.tsx` vs working tree
+  shows the only semantic deltas are the `useRouter` import, the onSubmit body
+  (dead `name`/`username` construction from HEAD removed, new `register(value)`
+  wiring, `router.push({ pathname: "/otp", query: { phone: res.phone } })`),
+  and the toast copy. The JSX tree (container divs, FieldGroup, five
+  AppFields, both Buttons with identical className strings) and the
+  commented-out legacy block (lines 1-315) are unchanged — the 841-line diff
+  is genuinely the formatter, exactly as changes.md claims.
+- `apps/web/i18n/routing.ts:20` — `"/otp": {}` present; `git diff HEAD` on
+  the file is empty (net-zero confirmed).
+- **Backend contract**: `register.dto.ts:6` and `verify-otp.dto.ts:6` both
+  enforce `^\+?[1-9]\d{6,14}$`; `verify-otp.dto.ts:13` `@Length(4, 8)` on
+  token — 6-digit InputOTP output fits. `auth.controller.ts:33` confirms
+  `POST /auth/otp/request` exists. `idempotency.middleware.ts:35-38`
+  confirms POSTs without an `Idempotency-Key` header pass through — so
+  omitting the header (like `login.ts`) is consistent, not a bug.
+- **Hygiene**: grep of all five new/rewritten files found zero `any`-types
+  and zero secrets/env reads. `Button` `size="xs"` exists (`button.tsx:26`).
+  The `(user)` layout wraps the OTP page in NavBar/Footer as spec Decision 1
+  asserts. Old `OtpForm.tsx` untouched (absent from git status).
+  `git diff HEAD -- apps/backend` = 0 files.
 
-- **`Meat` vs `Meats`:** the spec header (`spec-detail-twelve.md` L1) says "Meats" but the seed name is `Meat` (L11405). This is a deliberate, documented decision (spec.md: keep the seed's "Meat") and is consistent with `spec-detail-one.md` L198. Not a defect.
-- No seed-content test exists (the 97-test suite is a regression guard only). This is consistent with every prior spec-detail ship and acceptable for static seed data with no runtime consumer; the risk surface is a compile-time type check plus the structural grep gates, all of which pass. Nothing here warrants blocking.
-- No security/performance surface: static literal data, idempotent upsert (`field_schema` written on conflict), not read at runtime.
+## Findings
+
+1. **note — Garbage-tolerant phone normalization.** `apps/web/lib/phone.ts:18-22`:
+   `"0000000000"` normalizes to `+855000000000`, which _passes_ the backend
+   regex (OTP dispatched to a nonexistent number), and `"+0123456"` passes
+   the helper but is rejected by the backend's `[1-9]` anchor (surfaces as an
+   error toast — acceptable). Inherent to the spec's own Decision 3 algorithm
+   plus the frozen `min(8).max(10)` zod schema (`schemas/register.ts:6`,
+   untouched per non-goal). No security impact; tighten in a later pass if
+   SMS costs matter.
+2. **note — Hand-edited raw `+` in the URL double-prefixes.** A manually typed
+   `?phone=+855…` (unencoded `+`) is decoded as a leading space by
+   `useSearchParams`; `normalizePhone` trims it, sees no `+`, and produces
+   `+855855…` (wrong number). App-generated links always encode via the
+   router query object, so only hand-mangled URLs hit this. Hardening option:
+   treat digits already starting with `855` after local-strip, or compare
+   against the register-step value — file under follow-up, not blocking.
+3. **note — Register network failure has no user-visible toast.**
+   `RegisterForm.tsx:345-355` does not try/catch `register(value)`; if the
+   backend is unreachable the server action rejects and TanStack Form
+   swallows it into form error state (no crash, but no toast). `OtpVerifyForm`
+   got the defensive catch because the spec's edge-case list required it
+   there. Identical to the existing `login.ts`/`LoginForm` behavior —
+   consistent, optional hardening.
+4. **note — `required` on the visually-hidden OTP input.**
+   `OtpVerifyForm.tsx:154` passes `required` to `InputOTP`; if a form submit
+   ever fires with < 6 digits, native validation on the collapsed input can
+   produce a "not focusable" console warning instead of the old toast.
+   Practically unreachable (submit button disabled at `value.length !== 6`),
+   informational only.
+5. **note — Pipeline docs omit the pre-existing working-tree deletions.**
+   `apps/web/pnpm-lock.yaml` and `apps/web/pnpm-workspace.yaml` are
+   deleted-but-uncommitted in the working tree (intentional from the earlier
+   standalone-deps session, not this ship). Neither changes.md nor
+   test-results.md mentions them, and changes.md's "git status confirms"
+   framing could lead a committer to sweep them into this ship's commit with
+   `git add -A`. Call them out or commit them separately.
+6. **note — Spec deviation is an improvement.** Normalization living in
+   `actions/register.ts:21` with the E.164 value returned to the form
+   (`res.phone`) guarantees the register key and the verify key are
+   byte-identical by construction — strictly safer than the form normalizing
+   and the action re-normalizing independently. Deviation is documented in
+   changes.md. Accepted.
 
 ## Follow-up tickets
 
-1. **DRY the inline `fieldSchema` duplication (carried forward from the detail-eleven review — still applies, scope grew).** With Foods, the file now holds **146** inline `fieldSchema` arrays; the 10 Foods forms (plus Pets, `wardrobe-and-cabinets`, and every other exact-match category) are byte-identical to `commonListingFields` yet re-inline it rather than referencing it (~75 duplicated lines each). This ship added 10 more copies. **Non-blocking** — inline is the deliberate, planner-prescribed, repo-wide convention and this PR follows it faithfully. Recommend a **single systemic refactor ticket** (e.g. `fieldSchema: commonListingFields` for exact-match subcats), done once across all categories — not per-ship. It should not gate this or any individual spec-detail ship.
-2. **(Pre-existing known gap, out of scope)** No `km`/`zh` translations for Foods subcategory names — en-only, consistent with all other categories; already tracked in the CLAUDE.md known-gaps list.
-3. **(Pre-existing design note)** `field_schema` is not consumed at runtime (frontend forms hardcoded). Informational only; no action for this PR.
+1. **Manual OTP flow verification** (spec's verification plan, 6 flows listed
+   in `test-results.md`): run the 10-minute pass with backend under
+   `DEV_OTP_TOKEN` — register→OTP page with `+855…` param, wrong-code
+   toast+clear+retry, dev-token auto-login + `user_access_token` cookie + `/`
+   redirect, resend cooldown, no-`?phone` redirect, `/km/otp` locale route.
+   None were executed at runtime.
+2. **Phone validation hardening** — `apps/web/lib/phone.ts`: reject all-zero
+   digit runs and consider handling an `855`-prefixed local body; also decide
+   policy for hand-edited raw-`+` URLs (finding 2). Small, self-contained,
+   testable.
+3. **Failure-toast parity for register** — wrap the `register(value)` call in
+   `RegisterForm.tsx` onSubmit with a catch → `toast.error("Failed to send
+code. Please try again.")`, mirroring `OtpVerifyForm.tsx:64-66`. Apply the
+   same to `actions/login.ts`/`LoginForm.tsx` in one sweep if touching it.
+4. **Commit hygiene** — land the `apps/web/pnpm-lock.yaml` /
+   `apps/web/pnpm-workspace.yaml` deletions (or restore them) in a separate
+   commit so this ship's diff stays web-auth-scoped (finding 5).
 
-**Bottom line:** the code matches the spec field-for-field, touches only the 10 Foods subcategories, preserves slugs/names/sortOrder (including literal `&`), and leaves every other category and the array-closing `];` intact. Ship it.
+## R1 addendum (2026-08-18)
+
+Follow-up patch (Cambodia-local phone input) executed under a
+captain-approved plan (plan mode): exploration + independent design check
+both returned SOUND (zod 4.4.3 `.trim().regex` chaining verified;
+blur-gated error display verified in form-core 1.33.2; `^0\d{7,9}$`
+checked against the `utils/telecom.ts` prefix map; empty ripple surface —
+`registerSchema` consumed only by RegisterForm + actions/register, no web
+tests exist). Gates green. Full agent review not re-run for this ~10-line
+patch; captain's morning review is the gate. New follow-ups: telecom.ts
+Seatel prefix duplication; i18n pass for schema messages; optional vitest
+spec for phone helpers; optional `inputMode` via FormControlProps.
+
+## R2 addendum (2026-08-18)
+
+Executed under captain-approved plan rev 2 (plan mode; two exploration
+passes + design check). Gates green (backend 159/159 tests, lint, build;
+web lint, build). LIVE smoke test verified the full backend contract
+including the two security invariants: verify requires a password (400
+without), and the conflict path ignores crafted replay payloads. The
+browser-side flows (LoginForm branch, sessionStorage handoff, OTP-page
+guards) are gate-verified but not browser-tested — flagged for the
+morning pass. API contract change: `/auth/otp/verify` now REQUIRES
+`password` — backend+web must deploy together (forbidNonWhitelisted).
+New follow-ups: 23505 retry in generateUniqueUsername consumers;
+UpdateProfileDto name length caps; phoneVerifiedAt never written;
+public otp/request SMS-abuse surface.
+
+## Post-review follow-up resolved (2026-08-25): /me design restoration + real identity
+
+Captain's morning-review catch: R4's /me change had replaced the designed
+Manage Ads page with a minimal account card ("why the /me change the
+'manage ads'?" — expected the tabbed design with Total Ads 0/5, Renews
+0/5, Active/Expired, No Result!/Sell your stuff per reference image).
+Resolved with an approved plan (plan mode): restored `page.tsx` →
+`<ManageAds />`; `me/layout.tsx` now gates on `getCurrentUser()` (redirect
+to `/[locale]/login`) and feeds the real session into `MyProfileHeader`
+via a narrowed `ProfileUser` prop (name/@username/avatar/cover/joined
+date; following/follower + Resume button stay mock — no backend data yet,
+Phase C). `SessionUser` gained `coverPhotoUrl`. The R4 account card is
+removed.
+
+Also fixed while E2E-testing: `userLogout()` redirected to bare `/login`,
+which 404s under `/ [locale]/` routing — now locale-aware
+(`getLocale()` + i18n `redirect`). THIS was introduced by R4 and never
+browser-tested until now.
+
+Verification: web lint 0 errors (1 pre-existing AdminLoginForm warning);
+web build PASS; full browser E2E 20/20 (fresh chromium, DEV_OTP_TOKEN,
+register → OTP → /me → design + identity markers → refresh → dropdown
+Sign out → /en/login → visitor chrome). E2E how-to notes recorded in
+tasks/todo.md (avatar trigger class `.ml-2`; Radix pointerdown for
+triggers, click for items; "Sell your stuff" (captain-confirmed text)).
+No new follow-ups; remaining work: Phase B (post-an-ad), Phase C
+(subpages/feed), following/follower backend.

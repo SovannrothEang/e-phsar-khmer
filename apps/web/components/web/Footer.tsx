@@ -47,7 +47,7 @@ export default function Footer() {
           <IconChevronUp className="scale-140" stroke={2} />
         </Button>
       )}
-      <footer className="bg-[#00a0e9] text-white pt-6 pb-6 mt-0">
+      <footer className="bg-[rgb(2,102,154)] text-white pt-6 pb-6 mt-0">
         <div className="max-w-7xl mx-auto px-4 md:px-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>

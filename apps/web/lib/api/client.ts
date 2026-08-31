@@ -1,9 +1,13 @@
 import "server-only";
 import {
   clearAdminSession,
+  clearUserSession,
   getAdminAccessToken,
   getAdminRefreshToken,
+  getUserAccessToken,
+  getUserRefreshToken,
   setAdminSession,
+  setUserSession,
 } from "@/lib/auth/session";
 
 export const API_URL = process.env.API_URL ?? "http://localhost:3000/api/v1";
@@ -116,6 +120,77 @@ export async function serverFetch<T>(
     if (res.status === 401) {
       try {
         await clearAdminSession();
+      } catch {
+        /* read-only context */
+      }
+    }
+    throw new ApiError(
+      res.status,
+      body?.error?.code ?? "REQUEST_FAILED",
+      body?.error?.message ?? res.statusText,
+      body?.error?.details,
+    );
+  }
+
+  return { data: body.data as T, meta: body.meta };
+}
+
+async function tryUserRefresh(): Promise<string | null> {
+  const refreshToken = await getUserRefreshToken();
+  if (!refreshToken) return null;
+
+  const res = await fetch(`${API_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+    cache: "no-store",
+  });
+  const body = (await res.json().catch(() => null)) as Envelope<{
+    accessToken: string;
+    refreshToken?: string;
+  }> | null;
+
+  if (!res.ok || !body?.success || !body.data) return null;
+
+  try {
+    // Cookie writes only succeed inside a Server Action / Route Handler; during
+    // an RSC render this throws — swallow it so the retried request still works.
+    await setUserSession({
+      accessToken: body.data.accessToken,
+      refreshToken: body.data.refreshToken ?? refreshToken,
+    });
+  } catch {
+    /* read-only context (RSC render) — token persists on next mutation */
+  }
+  return body.data.accessToken;
+}
+
+/**
+ * User-side twin of {@link serverFetch}: injects the USER session's httpOnly
+ * access token, transparently refreshes once on 401, unwraps the
+ * `{success,data,meta}` envelope, and throws {@link ApiError} on failure.
+ */
+export async function userServerFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<ApiResult<T>> {
+  let token = await getUserAccessToken();
+  let res = await rawFetch(path, init, token);
+
+  if (res.status === 401) {
+    const refreshed = await tryUserRefresh();
+    if (refreshed) {
+      token = refreshed;
+      res = await rawFetch(path, init, token);
+    }
+  }
+
+  const body = (await res.json().catch(() => null)) as Envelope<T> | null;
+
+  if (!res.ok || !body?.success) {
+    if (res.status === 401) {
+      try {
+        await clearUserSession();
       } catch {
         /* read-only context */
       }

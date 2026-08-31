@@ -6,32 +6,15 @@ import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { FaCamera } from "react-icons/fa";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
-import LocalSelector from "../LocalSelector"
+import LocalSelector from "../LocalSelector";
 import { useLocale } from "next-intl";
-import { useEffect, useState } from "react"
+import type { SessionUser } from "@/lib/auth/current-user";
 
-type User = {
-  username: string
-  role: string
-  email: string
-  profileImage: string
-}
+export function NavBar({ user }: { user: SessionUser | null }) {
+  const locale = useLocale();
 
-export function NavBar({ }) {
-
-  const [user, setUser] = useState<User | null>(null)
-  const locale = useLocale()
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      // Hydrate once from localStorage (client-only data source).
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUser(JSON.parse(storedUser))
-    }
-  }, [])
-
-  // 2. Dynamically determine login status based on state
+  // Session truth comes from the server layout (cookie-driven) — the old
+  // localStorage mock is gone.
   const isLoggedIn = !!user;
 
   return (
@@ -60,14 +43,13 @@ export function NavBar({ }) {
             }
           >
             {isLoggedIn ? (
-              <SocialBar />
+              <SocialBar user={user} />
             ) : (
               <div className="flex items-center">
                 <Button
                   asChild
                   variant="ghost"
                   className="h-[42px] px-4 rounded text-base font-medium rounded text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
-
                 >
                   <Link href="/login">Login</Link>
                 </Button>

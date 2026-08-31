@@ -1,4 +1,4 @@
-
+"use client";
 
 import { useState } from "react";
 
@@ -22,7 +22,10 @@ interface LSPYCEHeaderProps {
   onShowFilters?: () => void;
 }
 
-export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps) {
+export default function LSPYCEHeader({
+  title,
+  onShowFilters,
+}: LSPYCEHeaderProps) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filters, setFilters] = useState<Filters>({
     search: "",
@@ -53,47 +56,54 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
     if (filters.province === "siem-reap") return "Siem Reap";
     if (filters.province === "battambang") return "Battambang";
     if (filters.province === "sihanoukville") return "Sihanoukville";
-    return filters.province.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    return filters.province
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   const getSortLabel = () => {
-    if (filters.sort === 'latest') return 'Sort';
-    if (filters.sort === 'oldest') return 'Oldest First';
-    if (filters.sort === 'price-low') return 'Price: Low to High';
-    if (filters.sort === 'price-high') return 'Price: High to Low';
-    return 'Sort';
+    if (filters.sort === "latest") return "Sort";
+    if (filters.sort === "oldest") return "Oldest First";
+    if (filters.sort === "price-low") return "Price: Low to High";
+    if (filters.sort === "price-high") return "Price: High to Low";
+    return "Sort";
   };
 
   const getPriceLabel = () => {
-    if (!filters.priceRange) return 'Price';
+    if (!filters.priceRange) return "Price";
     switch (filters.priceRange) {
-      case 'under-100': return 'Under $100';
-      case '100-500': return '$100-$500';
-      case '500-plus': return '$500+';
-      default: return 'Price';
+      case "under-100":
+        return "Under $100";
+      case "100-500":
+        return "$100-$500";
+      case "500-plus":
+        return "$500+";
+      default:
+        return "Price";
     }
   };
 
   const getConditionLabel = () => {
-    if (!filters.condition) return 'Condition';
-    if (filters.condition === 'new') return 'New';
-    if (filters.condition === 'used') return 'Used';
-    if (filters.condition === 'refurbished') return 'Refurbished';
-    return 'Condition';
+    if (!filters.condition) return "Condition";
+    if (filters.condition === "new") return "New";
+    if (filters.condition === "used") return "Used";
+    if (filters.condition === "refurbished") return "Refurbished";
+    return "Condition";
   };
 
   const getYearLabel = () => {
-    if (!filters.year) return 'Year';
+    if (!filters.year) return "Year";
     return filters.year;
   };
 
   const getEngineLabel = () => {
-    if (!filters.engine) return 'Engine Type';
-    if (filters.engine === 'gasoline') return 'Gasoline';
-    if (filters.engine === 'diesel') return 'Diesel';
-    if (filters.engine === 'electric') return 'Electric';
-    if (filters.engine === 'hybrid') return 'Hybrid';
-    return 'Engine Type';
+    if (!filters.engine) return "Engine Type";
+    if (filters.engine === "gasoline") return "Gasoline";
+    if (filters.engine === "diesel") return "Diesel";
+    if (filters.engine === "electric") return "Electric";
+    if (filters.engine === "hybrid") return "Hybrid";
+    return "Engine Type";
   };
 
   const handleMoreFilters = () => {
@@ -143,23 +153,29 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowLocationDropdown(!showLocationDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.province 
-                ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                : 'text-gray-700'}`}
+              ${
+                filters.province
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
             <i className="bi bi-geo-alt text-sm"></i>
-            <span className="font-medium whitespace-nowrap">{getProvinceLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showLocationDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getProvinceLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showLocationDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showLocationDropdown && (
             <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Locations' },
-                { val: 'phnom-penh', label: 'Phnom Penh' },
-                { val: 'siem-reap', label: 'Siem Reap' },
-                { val: 'battambang', label: 'Battambang' },
-                { val: 'sihanoukville', label: 'Sihanoukville' }
+                { val: "", label: "All Locations" },
+                { val: "phnom-penh", label: "Phnom Penh" },
+                { val: "siem-reap", label: "Siem Reap" },
+                { val: "battambang", label: "Battambang" },
+                { val: "sihanoukville", label: "Sihanoukville" },
               ].map((loc) => (
                 <button
                   key={loc.val}
@@ -184,21 +200,27 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowSortDropdown(!showSortDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.sort !== 'latest'
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.sort !== "latest"
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getSortLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showSortDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getSortLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showSortDropdown && (
             <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: 'latest', label: 'Newest First' },
-                { val: 'oldest', label: 'Oldest First' },
-                { val: 'price-low', label: 'Price: Low to High' },
-                { val: 'price-high', label: 'Price: High to Low' }
+                { val: "latest", label: "Newest First" },
+                { val: "oldest", label: "Oldest First" },
+                { val: "price-low", label: "Price: Low to High" },
+                { val: "price-high", label: "Price: High to Low" },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -223,21 +245,27 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowPriceDropdown(!showPriceDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.priceRange
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.priceRange
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getPriceLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showPriceDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getPriceLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showPriceDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showPriceDropdown && (
             <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Prices' },
-                { val: 'under-100', label: 'Under $100' },
-                { val: '100-500', label: '$100 - $500' },
-                { val: '500-plus', label: '$500+' }
+                { val: "", label: "All Prices" },
+                { val: "under-100", label: "Under $100" },
+                { val: "100-500", label: "$100 - $500" },
+                { val: "500-plus", label: "$500+" },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -262,23 +290,29 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowYearDropdown(!showYearDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.year
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.year
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getYearLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showYearDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getYearLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showYearDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showYearDropdown && (
             <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Years' },
-                { val: '2024', label: '2024' },
-                { val: '2023', label: '2023' },
-                { val: '2022', label: '2022' },
-                { val: '2021', label: '2021' },
-                { val: '2020', label: '2020 & Older' }
+                { val: "", label: "All Years" },
+                { val: "2024", label: "2024" },
+                { val: "2023", label: "2023" },
+                { val: "2022", label: "2022" },
+                { val: "2021", label: "2021" },
+                { val: "2020", label: "2020 & Older" },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -303,21 +337,27 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowConditionDropdown(!showConditionDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.condition
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.condition
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getConditionLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showConditionDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getConditionLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showConditionDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showConditionDropdown && (
             <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Conditions' },
-                { val: 'new', label: 'New' },
-                { val: 'used', label: 'Used' },
-                { val: 'refurbished', label: 'Refurbished' }
+                { val: "", label: "All Conditions" },
+                { val: "new", label: "New" },
+                { val: "used", label: "Used" },
+                { val: "refurbished", label: "Refurbished" },
               ].map((opt) => (
                 <button
                   key={opt.val}
@@ -342,22 +382,28 @@ export default function LSPYCEHeader({ title, onShowFilters }: LSPYCEHeaderProps
           <button
             onClick={() => setShowEngineDropdown(!showEngineDropdown)}
             className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${filters.engine
-                ? 'bg-blue-50 border-blue-300 text-blue-700'
-                : 'text-gray-700'}`}
+              ${
+                filters.engine
+                  ? "bg-blue-50 border-blue-300 text-blue-700"
+                  : "text-gray-700"
+              }`}
           >
-            <span className="font-medium whitespace-nowrap">{getEngineLabel()}</span>
-            <i className={`bi bi-chevron-down text-xs transition-transform ${showEngineDropdown ? 'rotate-180' : ''}`}></i>
+            <span className="font-medium whitespace-nowrap">
+              {getEngineLabel()}
+            </span>
+            <i
+              className={`bi bi-chevron-down text-xs transition-transform ${showEngineDropdown ? "rotate-180" : ""}`}
+            ></i>
           </button>
 
           {showEngineDropdown && (
             <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
               {[
-                { val: '', label: 'All Engine Types' },
-                { val: 'gasoline', label: 'Gasoline' },
-                { val: 'diesel', label: 'Diesel' },
-                { val: 'electric', label: 'Electric' },
-                { val: 'hybrid', label: 'Hybrid' }
+                { val: "", label: "All Engine Types" },
+                { val: "gasoline", label: "Gasoline" },
+                { val: "diesel", label: "Diesel" },
+                { val: "electric", label: "Electric" },
+                { val: "hybrid", label: "Hybrid" },
               ].map((opt) => (
                 <button
                   key={opt.val}
