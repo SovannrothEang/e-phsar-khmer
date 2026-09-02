@@ -92,6 +92,13 @@
       "when": 1786075444083,
       "tag": "0012_blushing_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788332999979,
+      "tag": "0013_absent_tarantula",
+      "breakpoints": true
     }
   ]
 }

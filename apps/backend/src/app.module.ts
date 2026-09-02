@@ -5,6 +5,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
@@ -25,6 +26,7 @@ import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
+import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
@@ -37,6 +39,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
       validate,
       envFilePath: ['.env', '.env.local'],
     }),
+    EventEmitterModule.forRoot(),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => [
@@ -58,6 +61,7 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
     HealthModule,
     ActivityModule,
     ChatModule,
+    OutboxModule,
     AttributesModule,
     AdminModule,
   ],

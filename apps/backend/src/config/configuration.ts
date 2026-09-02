@@ -37,5 +37,17 @@ export default () => {
       ttl: env.THROTTLE_TTL,
       limit: env.THROTTLE_LIMIT,
     },
+    outbox: {
+      workerEnabled: env.OUTBOX_WORKER_ENABLED,
+      workerConcurrency: env.OUTBOX_WORKER_CONCURRENCY,
+      pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
+      batchSize: env.OUTBOX_BATCH_SIZE,
+      maxAttempts: env.OUTBOX_MAX_ATTEMPTS,
+      leaseTimeoutSeconds: env.OUTBOX_LEASE_TIMEOUT_SECONDS,
+      backoffBaseMs: env.OUTBOX_BACKOFF_BASE_MS,
+      backoffFactor: env.OUTBOX_BACKOFF_FACTOR,
+      backoffMaxMs: env.OUTBOX_BACKOFF_MAX_MS,
+      retentionDays: env.OUTBOX_RETENTION_DAYS,
+    },
   };
 };
