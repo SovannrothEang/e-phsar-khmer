@@ -5,8 +5,8 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validate } from './config/config.validation';
@@ -26,10 +26,10 @@ import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
+import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
-import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -39,6 +39,7 @@ import { QueueModule } from './queue/queue.module';
       validate,
       envFilePath: ['.env', '.env.local'],
     }),
+    EventEmitterModule.forRoot(),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => [
@@ -48,7 +49,6 @@ import { QueueModule } from './queue/queue.module';
         },
       ],
     }),
-    EventEmitterModule.forRoot(),
     SupabaseModule,
     DbModule,
     AuthModule,
@@ -61,9 +61,9 @@ import { QueueModule } from './queue/queue.module';
     HealthModule,
     ActivityModule,
     ChatModule,
+    OutboxModule,
     AttributesModule,
     AdminModule,
-    QueueModule,
   ],
   controllers: [AppController],
   providers: [

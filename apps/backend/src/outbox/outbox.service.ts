@@ -1,211 +1,217 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { hostname } from 'node:os';
 import { DRIZZLE } from '../db/drizzle.provider';
-import type { DbClient, DbExecutor } from '../db/drizzle.provider';
-import { outboxMessages } from '../db/schema';
+import type { DbClient } from '../db/drizzle.provider';
+import { outboxEvents } from '../db/schema/outbox.schema';
+import type { OutboxEventRow } from '../db/schema/outbox.schema';
 import { OUTBOX_WAKEUP_EVENT } from './outbox-events';
-import type { OutboxWakeupEvent } from './outbox-events';
+import type { DbExecutor, IntegrationEvent } from './outbox.types';
 
 /**
- * Backoff: `min(BACKOFF_CAP_SECONDS, 2^attempts)` seconds, jittered by
- * ±25%. `attempts` is already incremented by claimBatch, so the first
- * failure waits ~2s, then ~4s, ~8s, ~16s … With the default maxAttempts of 5
- * a message is retried for well under a minute before going `dead`, while a
- * message configured with a large maxAttempts settles at the cap instead of
- * growing unbounded. The jitter keeps a batch that failed together (e.g. a
- * provider outage) from stampeding back at the same instant.
+ * Every read and write against `outbox_events`.
+ *
+ * All timestamps come from `now()` rather than the Node clock: rows are
+ * claimed by comparing `available_at` to the database's clock, so writing
+ * a JS `Date` into it would make backoff depend on how far each app
+ * instance's clock has drifted from Postgres.
  */
-const BACKOFF_CAP_SECONDS = 300;
-
-/** `last_error` is diagnostics, not storage — keep pathological stacks out. */
-const MAX_ERROR_LENGTH = 2000;
-
-export interface EnqueueOutboxMessage {
-  topic: string;
-  payload: Record<string, unknown>;
-  /** Partition/ordering key, typically the userId. */
-  aggregateId?: string | null;
-  /** Optional idempotency key — a repeated enqueue with the same key is a no-op. */
-  dedupeKey?: string | null;
-  /** Higher runs sooner. */
-  priority?: number;
-  maxAttempts?: number;
-  /** Delay first delivery until this instant. */
-  availableAt?: Date;
-}
-
-/** The subset of a claimed row the dispatcher needs. */
-export interface OutboxRecord {
-  id: string;
-  topic: string;
-  aggregateId: string | null;
-  payload: Record<string, unknown>;
-  attempts: number;
-  maxAttempts: number;
-}
-
-/** Raw `RETURNING *` shape — postgres-js hands back snake_case columns. */
-interface ClaimedRow extends Record<string, unknown> {
-  id: string;
-  topic: string;
-  aggregate_id: string | null;
-  payload: Record<string, unknown>;
-  attempts: number;
-  max_attempts: number;
-}
-
 @Injectable()
 export class OutboxService {
+  /** Lease attribution — shows up in `locked_by` for debugging a stuck row. */
+  readonly instanceId = `${hostname()}:${process.pid}:${randomUUID().slice(0, 8)}`;
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
-   * Insert an outbox row using the CALLER'S transaction handle, so the message
-   * is committed atomically with the business write that produced it. That
-   * atomicity is the entire point of the outbox — never pass `this.db` here
-   * when a surrounding transaction exists.
-   *
-   * Call `wakeupAfterCommit()` once the transaction has committed.
+   * Records an integration event. Pass the transaction that is performing
+   * the domain write as `executor` — the event is only durable, and only
+   * visible to a dispatcher, if it commits with that write.
    */
-  async enqueue(tx: DbExecutor, msg: EnqueueOutboxMessage): Promise<void> {
-    await tx
-      .insert(outboxMessages)
+  async enqueue(
+    executor: DbExecutor,
+    event: IntegrationEvent,
+  ): Promise<OutboxEventRow> {
+    const maxAttempts =
+      event.maxAttempts ??
+      this.configService.get<number>('outbox.maxAttempts') ??
+      5;
+
+    const [row] = await executor
+      .insert(outboxEvents)
       .values({
-        topic: msg.topic,
-        payload: msg.payload,
-        aggregateId: msg.aggregateId ?? null,
-        dedupeKey: msg.dedupeKey ?? null,
-        priority: msg.priority ?? 0,
-        maxAttempts: msg.maxAttempts ?? 5,
-        // Omitted unless explicitly delayed, so the column default (`now()` on
-        // the DB clock) applies rather than this process's clock.
-        ...(msg.availableAt ? { nextAttemptAt: msg.availableAt } : {}),
+        eventType: event.eventType,
+        aggregateType: event.aggregateType,
+        aggregateId: event.aggregateId,
+        dedupeKey: event.dedupeKey,
+        payload: event.payload,
+        maxAttempts,
       })
-      // dedupeKey is nullable and Postgres treats NULLs as distinct, so rows
-      // without a key never collide.
-      .onConflictDoNothing({ target: outboxMessages.dedupeKey });
+      .onConflictDoNothing({ target: outboxEvents.dedupeKey })
+      .returning();
+
+    if (row) {
+      return row;
+    }
+
+    // No row back means the dedupe key collided — someone already enqueued
+    // this exact event. Return theirs so the caller still has an id to
+    // dispatch against. Only a keyed enqueue can land here.
+    const [existing] = event.dedupeKey
+      ? await executor
+          .select()
+          .from(outboxEvents)
+          .where(eq(outboxEvents.dedupeKey, event.dedupeKey))
+          .limit(1)
+      : [];
+
+    if (!existing) {
+      throw new Error(
+        `Failed to enqueue outbox event ${event.eventType} for ${event.aggregateType}:${event.aggregateId}`,
+      );
+    }
+
+    return existing;
   }
 
   /**
-   * Nudge the dispatcher. Call after the enclosing transaction commits —
-   * waking it earlier would race the commit and find nothing to claim.
-   */
-  wakeupAfterCommit(source: OutboxWakeupEvent['source'] = 'transaction'): void {
-    const event: OutboxWakeupEvent = { source };
-    this.eventEmitter.emit(OUTBOX_WAKEUP_EVENT, event);
-  }
-
-  /**
-   * Atomically take ownership of up to `limit` due messages.
+   * Wakes the worker pool after the producer's transaction has committed.
    *
-   * `FOR UPDATE SKIP LOCKED` on the inner SELECT is what makes the worker pool
-   * safe: concurrent claimers lock disjoint row sets, so no two workers — in
-   * this process or any other instance — can ever claim the same row.
+   * Must be called *after* the transaction commits, never inside it: a wakeup
+   * emitted before commit could send a worker looking for a row that is not
+   * visible yet. The signal is local and non-durable; the poll fallback is
+   * the safety net for a lost wakeup.
    */
-  async claimBatch(limit: number, workerId: string): Promise<OutboxRecord[]> {
-    const rows = await this.db.execute<ClaimedRow>(sql`
-      update outbox_messages set
-        status = 'processing',
-        attempts = outbox_messages.attempts + 1,
-        locked_by = ${workerId},
-        locked_at = now()
-      where outbox_messages.id in (
-        select m.id from outbox_messages m
-        where m.status = 'pending' and m.next_attempt_at <= now()
-        order by m.priority desc, m.created_at
-        limit ${limit}
-        for update skip locked
-      )
-      returning *
-    `);
-
-    return rows.map((row) => ({
-      id: row.id,
-      topic: row.topic,
-      aggregateId: row.aggregate_id,
-      payload: row.payload,
-      attempts: row.attempts,
-      maxAttempts: row.max_attempts,
-    }));
+  wakeupAfterCommit(): void {
+    this.eventEmitter.emit(OUTBOX_WAKEUP_EVENT);
   }
 
   /**
-   * Mark delivered and DROP THE PAYLOAD. OTP codes, reset links and other
-   * short-lived secrets transit this table; once delivered there is no reason
-   * for them to keep sitting in a durable, admin-readable row. Only the
-   * envelope (topic, aggregate, timings) is retained for debugging.
+   * Claims up to `limit` rows that are due, marking them `processing` under
+   * this instance's lease.
+   *
+   * `FOR UPDATE SKIP LOCKED` is what makes this safe to run from every app
+   * instance at once: a row already being claimed elsewhere is stepped over
+   * rather than waited on, so dispatchers never queue behind each other.
    */
-  async markPublished(id: string): Promise<void> {
+  claimDue(limit: number): Promise<OutboxEventRow[]> {
+    return this.claim(this.dueCondition(), limit);
+  }
+
+  /**
+   * Claims one specific event, if it is still unclaimed and due.
+   *
+   * Returns `undefined` when a worker got there first — the caller has
+   * nothing to do, which is exactly the guarantee that keeps the inline
+   * send path from double-delivering.
+   */
+  async claimById(eventId: string): Promise<OutboxEventRow | undefined> {
+    const [row] = await this.claim(
+      and(eq(outboxEvents.id, eventId), this.dueCondition())!,
+      1,
+    );
+    return row;
+  }
+
+  async markPublished(
+    eventId: string,
+    redactedPayload?: unknown,
+  ): Promise<void> {
     await this.db
-      .update(outboxMessages)
+      .update(outboxEvents)
       .set({
         status: 'published',
         publishedAt: sql`now()`,
-        payload: {},
-        lockedBy: null,
         lockedAt: null,
+        lockedBy: null,
         lastError: null,
+        ...(redactedPayload === undefined ? {} : { payload: redactedPayload }),
       })
-      .where(eq(outboxMessages.id, id));
+      .where(eq(outboxEvents.id, eventId));
+  }
+
+  /** Returns the row to `pending`, invisible to claims until the backoff passes. */
+  async markRetry(
+    eventId: string,
+    lastError: string,
+    delayMs: number,
+  ): Promise<void> {
+    await this.db
+      .update(outboxEvents)
+      .set({
+        status: 'pending',
+        availableAt: sql`now() + make_interval(secs => ${delayMs / 1000})`,
+        lockedAt: null,
+        lockedBy: null,
+        lastError,
+      })
+      .where(eq(outboxEvents.id, eventId));
+  }
+
+  async markFailed(
+    eventId: string,
+    lastError: string,
+    redactedPayload?: unknown,
+  ): Promise<void> {
+    await this.db
+      .update(outboxEvents)
+      .set({
+        status: 'failed',
+        lockedAt: null,
+        lockedBy: null,
+        lastError,
+        ...(redactedPayload === undefined ? {} : { payload: redactedPayload }),
+      })
+      .where(eq(outboxEvents.id, eventId));
+  }
+
+  private claim(where: SQL, limit: number): Promise<OutboxEventRow[]> {
+    return this.db
+      .update(outboxEvents)
+      .set({
+        status: 'processing',
+        // Counted at claim time, not on completion, so a dispatcher that
+        // dies mid-send still burns an attempt. Otherwise an event that
+        // reliably crashes its handler would be retried forever.
+        attempts: sql`${outboxEvents.attempts} + 1`,
+        lockedAt: sql`now()`,
+        lockedBy: this.instanceId,
+      })
+      .where(
+        sql`${outboxEvents.id} in (
+          select ${outboxEvents.id} from ${outboxEvents}
+          where ${where}
+          order by ${outboxEvents.availableAt}
+          for update skip locked
+          limit ${limit}
+        )`,
+      )
+      .returning();
   }
 
   /**
-   * Release a failed message. Exhausted (or explicitly terminal, e.g. an
-   * unroutable topic) messages become `dead` and are never retried again;
-   * everything else goes back to `pending` with exponential backoff.
+   * Due = waiting and off backoff, or holding a lease that has gone stale.
+   * The second half is crash recovery: a dispatcher that died between
+   * claiming and finishing left a row in `processing` that nothing else
+   * would ever look at again.
    */
-  async markFailed(id: string, error: string, terminal = false): Promise<void> {
-    await this.db.execute(sql`
-      update outbox_messages set
-        status = (
-          case
-            when cast(${terminal} as boolean) or attempts >= max_attempts
-              then 'dead'
-            else 'pending'
-          end
-        )::outbox_status,
-        next_attempt_at = now() + (
-          least(
-            cast(${BACKOFF_CAP_SECONDS} as double precision),
-            power(2, attempts)
-          ) * (0.75 + random() * 0.5)
-        ) * interval '1 second',
-        last_error = ${error.slice(0, MAX_ERROR_LENGTH)},
-        locked_by = null,
-        locked_at = null
-      where id = ${id}
-    `);
-  }
+  private dueCondition(): SQL {
+    const leaseSeconds =
+      this.configService.get<number>('outbox.leaseTimeoutSeconds') ?? 60;
 
-  /**
-   * Recover rows whose owner died mid-dispatch: they are stuck in
-   * `processing` with nobody to finish them. The claim already consumed an
-   * attempt, so a message that crashes its worker every time still exhausts
-   * its budget instead of looping forever.
-   *
-   * Returns the number of rows recovered.
-   */
-  async reclaimStale(olderThanSeconds: number): Promise<number> {
-    const rows = await this.db.execute<{ id: string }>(sql`
-      update outbox_messages set
-        status = (
-          case when attempts >= max_attempts then 'dead' else 'pending' end
-        )::outbox_status,
-        locked_by = null,
-        locked_at = null,
-        last_error = coalesce(
-          last_error,
-          'reclaimed: processing lock went stale'
-        )
-      where status = 'processing'
-        and locked_at < now()
-          - cast(${olderThanSeconds} as double precision) * interval '1 second'
-      returning id
-    `);
-
-    return rows.length;
+    return sql`(
+      (${outboxEvents.status} = 'pending' and ${outboxEvents.availableAt} <= now())
+      or (
+        ${outboxEvents.status} = 'processing'
+        and ${outboxEvents.lockedAt} < now() - make_interval(secs => ${leaseSeconds})
+      )
+    )`;
   }
 }

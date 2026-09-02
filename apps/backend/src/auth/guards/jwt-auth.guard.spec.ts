@@ -21,7 +21,11 @@ describe('JwtAuthGuard', () => {
   it('bypasses the guard for @Public() routes', () => {
     const reflector = guard['reflector'] as jest.Mocked<Reflector>;
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(true);
-    const ctx = { getHandler: () => ({}), getClass: () => ({}) };
+    const ctx = {
+      getType: () => 'http',
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    };
     expect(guard.canActivate(ctx as unknown as ExecutionContext)).toBe(true);
   });
 

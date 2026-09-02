@@ -21,13 +21,27 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   DEV_OTP_TOKEN: z.string().optional(),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().default(24),
-  OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(5),
-  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(100),
-  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1500),
-  OUTBOX_RECLAIM_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
-  OUTBOX_STALE_LOCK_SECONDS: z.coerce.number().int().positive().default(300),
   THROTTLE_TTL: z.coerce.number().default(60),
   THROTTLE_LIMIT: z.coerce.number().default(100),
+  // Outbox worker pool. Every instance drains by default — claiming is
+  // atomic, so more pollers just drain faster. Set false to run an instance
+  // API-only.
+  OUTBOX_WORKER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  OUTBOX_WORKER_CONCURRENCY: z.coerce.number().default(5),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(2000),
+  OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
+  OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(5),
+  // How long a claim is honoured before another dispatcher may steal the
+  // row. Must exceed the slowest realistic handler, or two dispatchers will
+  // work the same event.
+  OUTBOX_LEASE_TIMEOUT_SECONDS: z.coerce.number().default(60),
+  OUTBOX_BACKOFF_BASE_MS: z.coerce.number().default(1000),
+  OUTBOX_BACKOFF_FACTOR: z.coerce.number().default(5),
+  OUTBOX_BACKOFF_MAX_MS: z.coerce.number().default(900000),
+  OUTBOX_RETENTION_DAYS: z.coerce.number().default(7),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -1,18 +1,30 @@
 import { Module } from '@nestjs/common';
+import { OutboxDispatcher } from './outbox-dispatcher.service';
+import { OutboxRegistry } from './outbox-registry.service';
 import { OutboxService } from './outbox.service';
-import { OutboxDispatcher } from './outbox.dispatcher';
-import { OutboxHandlerRegistry } from './outbox-handler.registry';
 import { OutboxWakeupListener } from './outbox-wakeup.listener';
+import { OutboxWorker } from './outbox-worker.service';
 
+/**
+ * Transactional outbox + its Postgres-backed worker pool.
+ *
+ * Generic infrastructure: it knows how to store, claim, retry and abandon an
+ * integration event, and nothing about what any event means. Producers import
+ * this module, enqueue inside their own transaction, and register a handler
+ * with `OutboxRegistry`.
+ *
+ * Not `@Global()` — unlike `DbModule`, an importer is making a real
+ * architectural choice (this module now produces or consumes events), and
+ * that should be visible in its imports.
+ */
 @Module({
   providers: [
     OutboxService,
-    OutboxHandlerRegistry,
+    OutboxRegistry,
     OutboxDispatcher,
+    OutboxWorker,
     OutboxWakeupListener,
   ],
-  // OutboxService so features can enqueue inside their own transaction;
-  // OutboxHandlerRegistry so they can register a handler for their topic.
-  exports: [OutboxService, OutboxHandlerRegistry],
+  exports: [OutboxService, OutboxRegistry, OutboxDispatcher, OutboxWorker],
 })
 export class OutboxModule {}

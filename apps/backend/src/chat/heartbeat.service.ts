@@ -1,5 +1,5 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
-import { ConnectionRegistry } from "./connection-registry";
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConnectionRegistry } from './connection-registry';
 
 @Injectable()
 export class HeartbeatService implements OnModuleInit {
@@ -15,7 +15,10 @@ export class HeartbeatService implements OnModuleInit {
   private sweep() {
     const now = Date.now();
     for (const conn of this.registry.allConnections()) {
-      if (now - conn.lastPongAt > this.PING_INTERVAL_MS + this.PONG_TIMEOUT_MS) {
+      if (
+        now - conn.lastPongAt >
+        this.PING_INTERVAL_MS + this.PONG_TIMEOUT_MS
+      ) {
         conn.socket.close();
         continue;
       }

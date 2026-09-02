@@ -5,7 +5,6 @@ import {
   jsonb,
   pgEnum,
   pgTable,
-  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -13,56 +12,72 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const outboxStatusEnum = pgEnum('outbox_status', [
+/**
+ * Lifecycle of one outbox row.
+ *
+ * `processing` is a lease, not a state a row rests in: a dispatcher stamps
+ * `lockedAt`/`lockedBy` when it claims the row and moves it off `processing`
+ * before it finishes. A row stuck in `processing` past the lease timeout is
+ * reclaimable — that is how a crashed dispatcher's work is recovered.
+ */
+export const outboxEventStatusEnum = pgEnum('outbox_event_status', [
   'pending',
   'processing',
   'published',
-  'dead',
+  'failed',
 ]);
 
 /**
- * Transactional outbox. Rows are written inside the caller's business
- * transaction, then drained asynchronously by OutboxDispatcher.
+ * Transactional outbox for integration events.
+ *
+ * Postgres is both the durable event log and the queue: a domain write and
+ * its event commit in the same transaction, and dispatchers claim rows with
+ * `FOR UPDATE SKIP LOCKED` so many instances can drain the table without
+ * coordinating. Redis is deliberately not involved — it is the throttler's
+ * store, never the delivery ledger.
  */
-export const outboxMessages = pgTable(
-  'outbox_messages',
+export const outboxEvents = pgTable(
+  'outbox_events',
   {
+    /** Also the integration event's id — consumers dedupe on this. */
     id: uuid('id').defaultRandom().primaryKey(),
-    topic: varchar('topic', { length: 80 }).notNull(),
-    // Partition / ordering key — typically the userId the message belongs to.
-    aggregateId: uuid('aggregate_id'),
-    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
-    status: outboxStatusEnum('status').default('pending').notNull(),
-    // Higher runs sooner (see the claim ORDER BY).
-    priority: smallint('priority').default(0).notNull(),
+    // Dotted namespace, e.g. 'chat.message.sent'. Free text rather
+    // than a pgEnum so a new event type is a code change, not a migration.
+    eventType: varchar('event_type', { length: 80 }).notNull(),
+    aggregateType: varchar('aggregate_type', { length: 40 }).notNull(),
+    aggregateId: uuid('aggregate_id').notNull(),
+    /**
+     * Optional producer-side idempotency key. Postgres unique indexes ignore
+     * NULLs, so events that don't set one never collide with each other.
+     */
+    dedupeKey: varchar('dedupe_key', { length: 200 }),
+    payload: jsonb('payload').notNull(),
+    status: outboxEventStatusEnum('status').default('pending').notNull(),
     attempts: integer('attempts').default(0).notNull(),
     maxAttempts: integer('max_attempts').default(5).notNull(),
-    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true })
+    /** Backoff gate: a pending row is invisible to claims until this passes. */
+    availableAt: timestamp('available_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
-    // Optional idempotent-enqueue key; unique, so a repeated enqueue is a no-op.
-    dedupeKey: varchar('dedupe_key', { length: 160 }),
-    lockedBy: varchar('locked_by', { length: 64 }),
     lockedAt: timestamp('locked_at', { withTimezone: true }),
+    lockedBy: varchar('locked_by', { length: 100 }),
     lastError: text('last_error'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
   },
   (t) => [
-    // Serves the claim query's predicate (status = 'pending' AND
-    // next_attempt_at <= now()) and its leading ORDER BY key.
-    index('outbox_messages_claim_idx')
-      .on(t.priority.desc(), t.nextAttemptAt)
-      .where(sql`status = 'pending'`),
-    uniqueIndex('outbox_messages_dedupe_key_uq').on(t.dedupeKey),
-    // Retention sweep of already-delivered rows.
-    index('outbox_messages_published_idx')
+    // The claim query's index: ordered scan of what is due, by status.
+    index('outbox_events_status_available_at_idx').on(t.status, t.availableAt),
+    index('outbox_events_aggregate_idx').on(t.aggregateType, t.aggregateId),
+    uniqueIndex('outbox_events_dedupe_key_idx').on(t.dedupeKey),
+    // Retention sweep: rows in a terminal state are purged by `publishedAt`.
+    index('outbox_events_published_at_idx')
       .on(t.publishedAt)
-      .where(sql`status = 'published'`),
+      .where(sql`status in ('published','failed')`),
   ],
 );
 
-export type OutboxMessageRow = typeof outboxMessages.$inferSelect;
-export type NewOutboxMessage = typeof outboxMessages.$inferInsert;
+export type OutboxEventRow = typeof outboxEvents.$inferSelect;
+export type NewOutboxEvent = typeof outboxEvents.$inferInsert;

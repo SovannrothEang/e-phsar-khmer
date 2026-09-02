@@ -1,3 +1,3 @@
 export class ClientEnvelope {
-  payload: any;
+  payload: unknown;
 }

@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import type WebSocket from 'ws';
 
-type ConnectionInfo = {
+export type ConnectionInfo = {
   socket: WebSocket;
   userId: string;
   lastPongAt: number;
@@ -31,6 +31,6 @@ export class ConnectionRegistry {
   }
 
   allConnections(): ConnectionInfo[] {
-    return [...this.byUser.values()].flatMap(set => [...set]);
+    return [...this.byUser.values()].flatMap((set) => [...set]);
   }
 }

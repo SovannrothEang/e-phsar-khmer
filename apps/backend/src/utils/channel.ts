@@ -1,6 +1,12 @@
 /**
- *  This is the custom Channel<T> implementation in TypeScript, which is similar to the System.Threading.Channels.Channel<T> in C#.
- *  Usage:
+ * A bounded in-process channel, similar in spirit to .NET's
+ * `System.Threading.Channels.Channel<T>`.
+ *
+ * It is the execution mechanism for the outbox worker's wakeup signal only:
+ * capacity-1 wakeup tokens plus bounded buffering. It is never durable — every
+ * unit of work the worker performs is recoverable from `outbox_events`, so
+ * anything lost in this structure is re-claimed from Postgres on the next
+ * poll (spec §29).
  */
 
 interface ChannelReader<T> {
@@ -20,6 +26,7 @@ interface ReadWaiter {
   resolve: (value: boolean) => void;
   reject: (error: Error) => void;
 }
+
 export class Channel<T> {
   private readonly buffer: T[] = [];
 

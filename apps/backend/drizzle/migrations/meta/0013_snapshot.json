@@ -1,5 +1,5 @@
 {
-  "id": "0a2d2064-7005-41ba-9969-01db6555a168",
+  "id": "579548a1-e366-4178-972c-470bcd6b9834",
   "prevId": "852a83d4-6a44-481b-a34d-6dbee271b987",
   "version": "7",
   "dialect": "postgresql",
@@ -3619,8 +3619,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.outbox_messages": {
-      "name": "outbox_messages",
+    "public.outbox_events": {
+      "name": "outbox_events",
       "schema": "",
       "columns": {
         "id": {
@@ -3630,15 +3630,27 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "topic": {
-          "name": "topic",
+        "event_type": {
+          "name": "event_type",
           "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aggregate_type": {
+          "name": "aggregate_type",
+          "type": "varchar(40)",
           "primaryKey": false,
           "notNull": true
         },
         "aggregate_id": {
           "name": "aggregate_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dedupe_key": {
+          "name": "dedupe_key",
+          "type": "varchar(200)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3650,18 +3662,11 @@
         },
         "status": {
           "name": "status",
-          "type": "outbox_status",
+          "type": "outbox_event_status",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
           "default": "'pending'"
-        },
-        "priority": {
-          "name": "priority",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
         },
         "attempts": {
           "name": "attempts",
@@ -3677,28 +3682,22 @@
           "notNull": true,
           "default": 5
         },
-        "next_attempt_at": {
-          "name": "next_attempt_at",
+        "available_at": {
+          "name": "available_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "dedupe_key": {
-          "name": "dedupe_key",
-          "type": "varchar(160)",
+        "locked_at": {
+          "name": "locked_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
         "locked_by": {
           "name": "locked_by",
-          "type": "varchar(64)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "locked_at": {
-          "name": "locked_at",
-          "type": "timestamp with time zone",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3708,45 +3707,65 @@
           "primaryKey": false,
           "notNull": false
         },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "published_at": {
-          "name": "published_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
-        "outbox_messages_claim_idx": {
-          "name": "outbox_messages_claim_idx",
+        "outbox_events_status_available_at_idx": {
+          "name": "outbox_events_status_available_at_idx",
           "columns": [
             {
-              "expression": "priority",
+              "expression": "status",
               "isExpression": false,
-              "asc": false,
+              "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "next_attempt_at",
+              "expression": "available_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "status = 'pending'",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "outbox_messages_dedupe_key_uq": {
-          "name": "outbox_messages_dedupe_key_uq",
+        "outbox_events_aggregate_idx": {
+          "name": "outbox_events_aggregate_idx",
+          "columns": [
+            {
+              "expression": "aggregate_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "aggregate_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "outbox_events_dedupe_key_idx": {
+          "name": "outbox_events_dedupe_key_idx",
           "columns": [
             {
               "expression": "dedupe_key",
@@ -3760,8 +3779,8 @@
           "method": "btree",
           "with": {}
         },
-        "outbox_messages_published_idx": {
-          "name": "outbox_messages_published_idx",
+        "outbox_events_published_at_idx": {
+          "name": "outbox_events_published_at_idx",
           "columns": [
             {
               "expression": "published_at",
@@ -3771,7 +3790,7 @@
             }
           ],
           "isUnique": false,
-          "where": "status = 'published'",
+          "where": "status in ('published','failed')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3893,14 +3912,14 @@
         "failed"
       ]
     },
-    "public.outbox_status": {
-      "name": "outbox_status",
+    "public.outbox_event_status": {
+      "name": "outbox_event_status",
       "schema": "public",
       "values": [
         "pending",
         "processing",
         "published",
-        "dead"
+        "failed"
       ]
     }
   },

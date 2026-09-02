@@ -8,6 +8,7 @@ import {
 } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
 import { ConnectionRegistry } from './connection-registry';
+import type { ConnectionInfo } from './connection-registry';
 import { ChatService } from './chat.service';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type WebSocket from 'ws';
@@ -20,6 +21,8 @@ interface ClientEnvelope {
 export class ChatGateway
   implements OnGatewayConnection<WebSocket>, OnGatewayDisconnect<WebSocket>
 {
+  private readonly conns = new WeakMap<WebSocket, ConnectionInfo>();
+
   constructor(
     private readonly registry: ConnectionRegistry,
     private readonly auth: JwtService,
@@ -32,10 +35,14 @@ export class ChatGateway
       // 1. ?token= query param (explicit)
       // 2. Authorization header (non-browser clients)
       // 3. user_access_token httpOnly cookie (same-origin WS upgrades send cookies)
-      const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-      const token = url.searchParams.get('token')
-        ?? this.extractBearerToken(req.headers.authorization)
-        ?? this.extractCookieToken(req.headers.cookie);
+      const url = new URL(
+        req.url ?? '/',
+        `http://${req.headers.host ?? 'localhost'}`,
+      );
+      const token =
+        url.searchParams.get('token') ??
+        this.extractBearerToken(req.headers.authorization) ??
+        this.extractCookieToken(req.headers.cookie);
 
       if (!token) {
         socket.close(4001, 'Missing token');
@@ -43,8 +50,12 @@ export class ChatGateway
       }
 
       const claims = this.auth.verify<{ sub: string }>(token);
-      const conn = { socket, userId: claims.sub, lastPongAt: Date.now() };
-      (socket as any)._conn = conn;
+      const conn: ConnectionInfo = {
+        socket,
+        userId: claims.sub,
+        lastPongAt: Date.now(),
+      };
+      this.conns.set(socket, conn);
       this.registry.add(claims.sub, conn);
     } catch {
       socket.close(4001, 'Invalid token');
@@ -63,13 +74,14 @@ export class ChatGateway
   }
 
   handleDisconnect(socket: WebSocket) {
-    const conn = (socket as any)._conn;
+    const conn = this.conns.get(socket);
     if (conn) this.registry.remove(conn.userId, conn);
   }
 
   @SubscribeMessage('send_message')
   async onSendMessage(socket: WebSocket, envelope: ClientEnvelope) {
-    const conn = (socket as any)._conn;
+    const conn = this.conns.get(socket);
+    if (!conn) return;
     const result = await this.core.sendMessage(conn.userId, envelope.payload);
     const message = result.message;
 
