@@ -18,7 +18,6 @@ import {
   getListingsFeed,
   toCardPost,
 } from "@/lib/api/categories";
-import { posts } from "@/lib/posts";
 
 const SUBCATEGORY_LAYOUT: Record<string, number> = {
   "cars-and-vehicles": 5,
@@ -84,15 +83,11 @@ export default async function CategoryPage({
   //  FIXED
   const cols = SUBCATEGORY_LAYOUT[category.slug] ?? 6;
 
-  // Real active listings feed for the cars category; every other category
-  // keeps the mock post feed. Cards render through the existing GridCardPost /
-  // ListCardPost templates via the toCardPost adapter.
-  const isCars = category.slug === "cars-and-vehicles";
-  const feedPosts = isCars
-    ? ((await getListingsFeed({ categorySlug }, locale))?.items ?? []).map(
-        toCardPost,
-      )
-    : posts;
+  // Real active listings feed for every category. Cards render through the
+  // existing GridCardPost / ListCardPost templates via the toCardPost adapter.
+  const feedPosts = (
+    (await getListingsFeed({ categorySlug }, locale))?.items ?? []
+  ).map(toCardPost);
 
   // Same content as the All Ads feed: Sell-banner card + the posts feed, rendered
   // as grid cards (grid view) or list cards (list view).

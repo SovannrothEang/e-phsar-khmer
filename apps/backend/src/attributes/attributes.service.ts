@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { attributeOptions } from '../db/schema/attributes.schema';
@@ -33,6 +33,24 @@ export class AttributesService {
       .from(attributeOptions)
       .where(eq(attributeOptions.type, type))
       .orderBy(asc(attributeOptions.sortOrder));
+  }
+
+  /**
+   * Every attribute row linked to a subcategory (the denormalized
+   * `subcategoryIds` mirror). The web browse pages fetch this once instead
+   * of one call per attribute type — the per-type endpoints stay for the
+   * admin pages. Rows are ordered by type then sortOrder.
+   */
+  listBySubcategory(subcategoryId: string): Promise<AttributeOptionRow[]> {
+    return this.db
+      .select()
+      .from(attributeOptions)
+      .where(
+        sql`${attributeOptions.subcategoryIds} @> ${JSON.stringify([
+          subcategoryId,
+        ])}::jsonb`,
+      )
+      .orderBy(asc(attributeOptions.type), asc(attributeOptions.sortOrder));
   }
 
   /**

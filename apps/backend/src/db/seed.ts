@@ -13,6 +13,7 @@ import { seedBrands, seedModels } from '../brands/seeds/brands.seed';
 import { seedAttributes } from '../attributes/seeds/attributes.seed';
 import { seedAdmin } from './seeds/admin.seed';
 import { seedReports } from './seeds/reports.seed';
+import { seedListings } from '../listings/seeds/listings.seed';
 import * as schema from './schema';
 
 async function seed() {
@@ -108,6 +109,9 @@ async function seed() {
 
   console.log('Seeding reports...');
   await seedReports(db);
+
+  console.log('Seeding demo listings...');
+  await seedListings(db);
 
   console.log('Seed complete.');
   await client.end();
