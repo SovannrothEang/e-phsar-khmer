@@ -35,9 +35,9 @@ export class OutboxService {
    * the domain write as `executor` — the event is only durable, and only
    * visible to a dispatcher, if it commits with that write.
    */
-  async enqueue(
+  async enqueue<TPayload>(
     executor: DbExecutor,
-    event: IntegrationEvent,
+    event: IntegrationEvent<TPayload>,
   ): Promise<OutboxEventRow> {
     const maxAttempts =
       event.maxAttempts ??

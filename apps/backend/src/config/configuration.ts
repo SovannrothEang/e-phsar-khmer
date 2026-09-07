@@ -49,5 +49,17 @@ export default () => {
       backoffMaxMs: env.OUTBOX_BACKOFF_MAX_MS,
       retentionDays: env.OUTBOX_RETENTION_DAYS,
     },
+    queue: {
+      host: env.QUEUE_HOST,
+      port: env.QUEUE_PORT,
+      password: env.QUEUE_PASSWORD,
+      db: env.QUEUE_DB,
+      prefix: env.QUEUE_PREFIX,
+    },
+    payment: {
+      jobAttempts: env.PAYMENT_JOB_ATTEMPTS,
+      jobBackoffMs: env.PAYMENT_JOB_BACKOFF_MS,
+      workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
+    },
   };
 };

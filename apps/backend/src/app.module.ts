@@ -30,6 +30,7 @@ import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -48,6 +49,21 @@ import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor
           limit: configService.get<number>('throttle.limit') ?? 100,
         },
       ],
+    }),
+    // Shared BullMQ connection. Read through ConfigService rather than
+    // process.env so the Zod-validated (and coerced) values are used — a
+    // raw env port is a string, and Redis options are typed for a number.
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('queue.host') ?? 'localhost',
+          port: configService.get<number>('queue.port') ?? 6379,
+          password: configService.get<string>('queue.password'),
+          db: configService.get<number>('queue.db') ?? 0,
+        },
+        prefix: configService.get<string>('queue.prefix') ?? 'psa',
+      }),
     }),
     SupabaseModule,
     DbModule,

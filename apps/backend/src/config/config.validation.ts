@@ -42,6 +42,25 @@ const envSchema = z.object({
   OUTBOX_BACKOFF_FACTOR: z.coerce.number().default(5),
   OUTBOX_BACKOFF_MAX_MS: z.coerce.number().default(900000),
   OUTBOX_RETENTION_DAYS: z.coerce.number().default(7),
+
+  // BullMQ queue configuration
+  QUEUE_HOST: z.string().default('localhost'),
+  QUEUE_PORT: z.coerce.number().default(6379),
+  // Coerced to undefined when blank: an empty `QUEUE_PASSWORD=` line in a
+  // .env would otherwise be sent to Redis as an empty password and fail auth.
+  QUEUE_PASSWORD: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
+  QUEUE_DB: z.coerce.number().default(0),
+  // Namespaces every BullMQ key, so a shared Redis can host more than one
+  // environment without one draining the other's jobs.
+  QUEUE_PREFIX: z.string().default('psa'),
+
+  // Payment job retry policy (BullMQ-side, distinct from the outbox budget)
+  PAYMENT_JOB_ATTEMPTS: z.coerce.number().default(3),
+  PAYMENT_JOB_BACKOFF_MS: z.coerce.number().default(5000),
+  PAYMENT_WORKER_CONCURRENCY: z.coerce.number().default(5),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
