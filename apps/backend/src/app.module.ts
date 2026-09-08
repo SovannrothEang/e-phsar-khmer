@@ -31,6 +31,7 @@ import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { BullModule } from '@nestjs/bullmq';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { BullModule } from '@nestjs/bullmq';
     OutboxModule,
     AttributesModule,
     AdminModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [
