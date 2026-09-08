@@ -66,6 +66,15 @@ erDiagram
   `payment_transaction` update. It is not for gateway-facing traffic; that's
   what `payment_provider_events` is for. **Not wired yet** — see
   [Current state](#current-state).
+- **Notification emission is end-of-life only, and it's asymmetric with the
+  outbox.** On the happy path, settlement writes an `outbox_event` _and_
+  emits a notification — the outbox row is the durable "something happened"
+  fact other modules can subscribe to later; the notification emit is the
+  immediate "tell this user now" side effect. On the terminal-failure path
+  there's no ledger posting, so there's no `outbox_event` either — failure
+  notifications are emitted directly off the queue. A retryable failure
+  (new `payment_attempt`, transaction still `pending`) never notifies; the
+  transaction hasn't reached end-of-life yet.
 
 ### Balance invariant
 
@@ -79,35 +88,49 @@ debit/credit pairs inside one DB transaction.
 ```mermaid
 sequenceDiagram
     participant Client
-    participant API as PaymentsController
-    participant Queue as BullMQ (payments)
-    participant Gateway as Provider
-    participant DB as Postgres
+    participant PaymentsController
+    participant BullMQ as BullMQ (payments)
+    participant Provider
+    participant Postgres
     participant Ledger as Ledger posting
+    participant Notifier as Notification / Outbox
 
-    Client->>API: POST /payments
-    API->>DB: insert payment_transaction (pending)
-    API->>DB: insert payment_attempt (pending)
-    API->>Queue: enqueue attempt job
-    API-->>Client: 202 (transaction id)
+    Client->>PaymentsController: POST /payments
+    PaymentsController->>Postgres: insert payment_transaction (pending)
+    PaymentsController->>Postgres: insert payment_attempt (pending)
+    PaymentsController->>BullMQ: enqueue attempt job
+    PaymentsController-->>Client: 202 (transaction id)
 
-    Queue->>Gateway: charge request
-    Gateway-->>Queue: sync response / redirect
-    Queue->>DB: update payment_attempt (status, response)
+    %% === Attempt processing ===
+    BullMQ->>Provider: charge request
+    Provider-->>BullMQ: sync response / redirect
+    BullMQ->>Postgres: update payment_attempt (status, response)
 
-    Gateway--)API: webhook (async, possibly duplicated)
-    API->>DB: insert payment_provider_event (dedupe on providerEventId)
-    API->>Queue: enqueue event-processing job
+    %% === Webhook path (async, possibly duplicated) ===
+    Provider-->>PaymentsController: webhook (async)
+    PaymentsController->>Postgres: insert payment_provider_event<br/>(dedupe on providerEventId)
+    PaymentsController->>BullMQ: enqueue event-processing job
 
-    Queue->>DB: insert payment_status_history (pending -> succeeded)
-    Queue->>DB: update payment_transaction (succeeded, completedAt)
+    %% === Event processing job ===
+    BullMQ->>Postgres: insert payment_status_history
 
-    Queue->>Ledger: post settlement
-    Ledger->>DB: insert ledger_transaction (posted)
-    Ledger->>DB: insert ledger_entry x2 (debit + credit, balanced)
-    Ledger->>DB: insert outbox_event (payment.succeeded)
+    alt Happy path (attempt succeeded)
+        BullMQ->>Postgres: update payment_transaction<br/>(succeeded, completedAt)
+        BullMQ->>Ledger: post settlement
+        Ledger->>Postgres: insert ledger_transaction (posted)
+        Ledger->>Postgres: insert ledger_entry x2 (debit + credit)
+        Ledger->>Postgres: insert outbox_event (payment.succeeded)
+        Ledger->>Notifier: emit notification (payment.succeeded)
+    else Attempt failed (retryable)
+        Note over BullMQ,Postgres: Loop back — create new payment_attempt<br/>(transaction stays pending)
+        BullMQ->>Postgres: insert payment_attempt (pending)
+        BullMQ->>BullMQ: enqueue new attempt job
+    else Terminal failure (max attempts / hard fail / expired)
+        BullMQ->>Postgres: update payment_transaction<br/>(failed / expired / cancelled)
+        BullMQ->>Notifier: emit notification (payment.failed)
+    end
 
-    Note over Queue,DB: a failed attempt loops back to a new<br/>payment_attempt instead of touching the ledger
+    Note over Client,Notifier: Notification is emitted only when<br/>payment_transaction reaches end-of-life<br/>(happy or sad path)
 ```
 
 Key properties this gives us:
@@ -122,17 +145,27 @@ Key properties this gives us:
 - **Webhook idempotency is structural, not application logic.** The unique
   index on `(provider, providerEventId)` in `payment_provider_events` is
   what makes a duplicated webhook a no-op.
+- **A retryable failure is invisible outside the processing layer.** It
+  produces a new `payment_attempt` row and nothing else — no status
+  history entry beyond the attempt itself, no notification, no ledger
+  touch. Only a transition of the `payment_transaction` row itself (to
+  `succeeded`, `failed`, `expired`, or `cancelled`) is end-of-life.
+- **The notification fires exactly once per transaction, on exactly one of
+  two paths.** Success routes through the ledger (outbox row + notify);
+  terminal failure notifies directly off the queue, with no ledger or
+  outbox involvement — there's nothing to post.
 
 ## Current state
 
-| Piece                                   | Status                                                              |
-| --------------------------------------- | ------------------------------------------------------------------- |
-| Entities (`entity/*.ts`)                | Done — all 9 tables, wired into `src/db/schema/index.ts`, migrated. |
-| `PaymentsController` / DTOs / service   | Not started — controller is an empty stub.                          |
-| BullMQ `payments` queue                 | Registered, no processor/consumer yet.                              |
-| Provider integration (gateway client)   | Not started.                                                        |
-| Outbox integration (`payment.*` events) | Not started.                                                        |
-| Ledger posting service                  | Not started.                                                        |
+| Piece                                     | Status                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| Entities (`entity/*.ts`)                  | Done — all 9 tables, wired into `src/db/schema/index.ts`, migrated.       |
+| `PaymentsController` / DTOs / service     | Not started — controller is an empty stub.                                |
+| BullMQ `payments` queue                   | Registered, no processor/consumer yet.                                    |
+| Provider integration (gateway client)     | Not started.                                                              |
+| Outbox integration (`payment.*` events)   | Not started.                                                              |
+| Ledger posting service                    | Not started.                                                              |
+| Notification emission (success / failure) | Not started — no `Notifier`/consumer exists; diagram is the target shape. |
 
 ## Open items
 
@@ -140,3 +173,9 @@ Key properties this gives us:
   — there's no `tenants` or `orders` table in this codebase yet.
 - No admin/reporting surface for the ledger (e.g. a trial-balance view) —
   out of scope until the posting service exists.
+- **Notification delivery mechanism is undecided.** The lifecycle diagram
+  fixes _when_ a notification fires (once, at end-of-life, on either the
+  success or terminal-failure path) but not _how_ — whether "Notifier" ends
+  up being a consumer of `outbox_events`, a direct call from the queue
+  processor, or its own module. The failure path in particular has no
+  outbox row to key off, so it can't simply be "subscribe to the outbox."
