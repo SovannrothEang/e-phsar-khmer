@@ -285,6 +285,10 @@ Send rejections: self (400), no body & no imagePath (400), imagePath outside `ch
 
 **Image cleanup on replace/delete:** `FilesService.removeByPublicUrl(publicUrl)` (`files.service.ts:105-125`) derives the storage path from a public URL, silently skips non-storage values (`/placeholder.svg`, foreign URLs), and warns-but-never-throws. The established pattern: read the prior `image`/`icon` inside the DB op, call `removeByPublicUrl(old)` **after commit**, gated on the value actually changing. Currently wired for: attributes, brands, models, categories/subcategories (icons), user avatar, user cover, and listing photos (removed-from-payload diff). **Not** wired for: admin user soft-delete (avatar/cover stay live in storage), chat images (no message-delete endpoint exists by design), and listing soft-delete (restore must work).
 
+### Payments
+
+`PaymentModule` (`src/payment/`) — gateway-agnostic payment processing feeding a double-entry ledger; the full design (table layout, entity map, outbox/queue placement, lifecycle sequence, current status) lives in [`src/payment/README.md`](apps/backend/src/payment/README.md), the canonical Module README example. One thing that README won't flag because it's a backend-wide convention question, not a module detail: **this module's use-cases are written in [Effect](https://effect.website) (`effect` npm package), not plain async/await NestJS services.** `use-cases/*.use-case.ts` are `Effect.fn`-wrapped generators that `yield*` a `DbClientTag` (`src/db/db.provider.ts` — an Effect `Context.Service` wrapping the same Drizzle client the `DRIZZLE` token provides everywhere else) and fail with `Schema.TaggedError` subclasses (`use-cases/errors.ts`) instead of throwing. `PaymentsController` is the only bridge back to NestJS: its private `run()` helper provides `DbClientTag.layer(this.db)`, runs the effect with `Effect.runPromiseExit`, and maps a typed failure to an `HttpException` via a `switch` on `error._tag`; an unmodeled defect falls through to `GlobalExceptionFilter` as a 500. This pattern is currently unique to `payment/` — don't reach for `effect` in other modules without a deliberate decision to extend the convention.
+
 ### Adding a new feature module
 
 1. Create `src/<feature>/{feature}.module.ts`, `.service.ts`, `.controller.ts`.
@@ -514,6 +518,7 @@ These are design reference, not runtime docs (the frontend forms are currently h
 ## TypeScript constraints
 
 - `tsconfig.json` sets `module: nodenext` with no `"type":"module"` in `package.json` → CJS output. Do **not** add `.js` extensions to relative imports.
+- `strict: true` is enabled (with `strictPropertyInitialization: false` to keep NestJS DI-injected class fields declarable without an initializer). Full strict null-checks apply everywhere else.
 - `noImplicitAny: true` and ESLint `@typescript-eslint/no-explicit-any: error` are enforced. Use typed interfaces or `unknown` instead of `any`. For Supabase client, use `type AnySupabaseClient = SupabaseClient` and add explicit return-type annotations on storage methods to avoid TS2742.
 - Express 5 changed wildcard routing: use `'{*splat}'` in `forRoutes()`, not bare `'*'`.
 - `@nestjs/jwt` uses `ms.StringValue` for `expiresIn`; cast runtime string values as `value as unknown as number` when passing to `jwtService.sign()`.
@@ -569,3 +574,4 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 - **`generateUniqueUsername` race.** Check-then-insert with no 23505 retry — concurrent same-name creates (e.g. two OTP verifies at once) can 500. Add retry-on-unique-violation in the consumers (Telegram login, `updateProfile`, phone-OTP verify).
 - **`phoneVerifiedAt` is never written** though the column exists, and a soft-deleted user keeps its global-unique `user_phones` row so a re-registered active user ends up with `primaryPhone` but no `user_phones` row.
 - **Username login is case-sensitive** (`loginWithPassword` matches `users.username` exactly) while generated usernames are lowercase — typed-cased usernames fail. `UpdateProfileDto` first/last names have no `@MaxLength` (Postgres 22001 → 500 on overflow) while the column is `varchar(100)`.
+- **`src/tenant/` is a design doc, not code.** `tenant/README.md` sketches a proposed `tenants`/`tenant_members` schema meant to eventually back `payment_transactions.tenantId` (currently a bare, FK-less UUID — see the Payments section) and possibly scope `user_subscriptions`. No schema file, migration, or `src/db/schema/index.ts` export exists yet — treat it as a proposal to reference, not something implemented.
