@@ -1,6 +1,6 @@
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { paymentTransactionStatusEnum } from '../entity/payment-transaction';
+import { paymentTransactionStatusEnum } from '../entity';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListPaymentsQueryDto {

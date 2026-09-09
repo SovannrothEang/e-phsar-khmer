@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -8,6 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { paymentAttemptMethodEnum } from '../entity/payment-attempt';
 
 export class CreatePaymentDto {
   @IsString()
@@ -37,6 +39,21 @@ export class CreatePaymentDto {
     description: 'The currency of the payment in ISO 4217 format',
   })
   currency: string;
+
+  @IsString()
+  @MinLength(1)
+  @ApiProperty({
+    description:
+      'The payment gateway provider to attempt this payment against (e.g. aba_payway)',
+  })
+  provider: string;
+
+  @IsIn(paymentAttemptMethodEnum.enumValues)
+  @ApiProperty({
+    description: 'The payment method for this attempt',
+    enum: paymentAttemptMethodEnum.enumValues,
+  })
+  method: (typeof paymentAttemptMethodEnum.enumValues)[number];
 
   @IsOptional()
   @IsUUID()

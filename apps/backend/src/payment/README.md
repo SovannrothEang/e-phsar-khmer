@@ -34,6 +34,24 @@ while it's still in flight.
 
 Full field-level definitions are in [`entity/`](./entity).
 
+Two more folders round out the module: [`use-cases/`](./use-cases) is the
+actual business logic — `Effect.fn`-wrapped generators (create/check/list/
+upsert a transaction; create/list an attempt; enqueue a job; create a
+provider event) that `yield*` `DbClientTag` (`../db/db.provider.ts`) and
+`PaymentQueueTag` (`./queue/payment-queue.provider.ts`) instead of taking a
+Drizzle client or a BullMQ `Queue` as a plain parameter, and fail with the
+`Schema.TaggedError` classes in `use-cases/errors.ts` instead of throwing.
+`PaymentsController` is the only bridge back to NestJS: its `run()` helper
+provides both tags' layers from the injected `DRIZZLE`/`@InjectQueue`
+instances, runs the effect with `Effect.runPromiseExit`, and maps a typed
+failure to an `HttpException` via a `switch` on `error._tag` — an unmodeled
+defect falls through to `GlobalExceptionFilter` as a 500. [`providers/`](./providers)
+is the gateway abstraction (`PaymentGatewayProvider` interface +
+`PaymentGatewayRegistry`, resolving by the plain `provider` string already
+on `payment_attempts`) — no concrete bank implementation is registered yet,
+so `PAYMENT_GATEWAY_PROVIDERS` is `[]` and the registry would throw if
+anything tried to resolve a provider today.
+
 ### Entity map
 
 ```mermaid
@@ -51,14 +69,19 @@ erDiagram
 
 ### Where the queue and the outbox fit
 
-- **BullMQ `payments` queue** (`PAYMENT_QUEUE`, registered in
-  `payment.module.ts` against the shared Redis connection from
-  `app.module.ts`) is the async work queue for gateway calls and webhook
-  handling — dispatching a `payment_attempt`, processing a
-  `payment_provider_event`, retrying a failed attempt. Its retry policy
-  (`PAYMENT_JOB_ATTEMPTS` / `PAYMENT_JOB_BACKOFF_MS` /
-  `PAYMENT_WORKER_CONCURRENCY`) is BullMQ-side and independent of the
-  outbox's own attempt budget.
+- **BullMQ `payments` queue** (`PAYMENT_QUEUE`, defined in
+  `payment.constants.ts` — deliberately not `payment.module.ts`, see Open
+  items — against the shared Redis connection from `app.module.ts`) is the
+  async work queue for gateway calls and webhook handling. The **producer**
+  side is real: `PaymentsController.create()` enqueues a
+  `process-attempt` job right after inserting the transaction and its first
+  attempt, and `POST /payments/webhook` enqueues a `process-provider-event`
+  job for every genuinely new event (never for a duplicate). There is
+  **no consumer** — no `@Processor(PAYMENT_QUEUE)` class exists, so jobs sit
+  in Redis unconsumed. `defaultJobOptions` (attempts + exponential backoff)
+  are wired from `PAYMENT_JOB_ATTEMPTS` / `PAYMENT_JOB_BACKOFF_MS`;
+  `PAYMENT_WORKER_CONCURRENCY` stays unused until a worker exists to read
+  it.
 - **The transactional outbox** (`outbox_events`, `src/outbox/`) is how a
   settled payment tells the rest of the system — e.g. an
   `payment.succeeded` / `payment.refunded` event that notifications or other
@@ -98,10 +121,14 @@ sequenceDiagram
     Client->>PaymentsController: POST /payments
     PaymentsController->>Postgres: insert payment_transaction (pending)
     PaymentsController->>Postgres: insert payment_attempt (pending)
-    PaymentsController->>BullMQ: enqueue attempt job
-    PaymentsController-->>Client: 202 (transaction id)
+    PaymentsController->>BullMQ: enqueue process-attempt job
+    PaymentsController-->>Client: 201 { transaction, attempt }
 
-    %% === Attempt processing ===
+    Note over Client,BullMQ: Implemented — PaymentsController.create(),<br/>createPayment/createPaymentAttempt/enqueuePaymentAttempt
+
+    Note over BullMQ,Provider: Not built — no @Processor(PAYMENT_QUEUE) consumer exists.<br/>Jobs enqueued above sit in Redis unconsumed.
+
+    %% === Attempt processing (NOT BUILT — no @Processor(PAYMENT_QUEUE)) ===
     BullMQ->>Provider: charge request
     Provider-->>BullMQ: sync response / redirect
     BullMQ->>Postgres: update payment_attempt (status, response)
@@ -109,9 +136,14 @@ sequenceDiagram
     %% === Webhook path (async, possibly duplicated) ===
     Provider-->>PaymentsController: webhook (async)
     PaymentsController->>Postgres: insert payment_provider_event<br/>(dedupe on providerEventId)
-    PaymentsController->>BullMQ: enqueue event-processing job
+    PaymentsController->>BullMQ: enqueue process-provider-event job<br/>(only when genuinely new)
+    PaymentsController-->>Provider: 201 { received, eventId, isNew }
 
-    %% === Event processing job ===
+    Note over Provider,BullMQ: Implemented — PaymentsController.webhook(),<br/>createPaymentProviderEvent/enqueuePaymentProviderEvent
+
+    Note over BullMQ,Ledger: Not built — same missing consumer. Everything from<br/>here down (status history, ledger, notification) is aspirational.
+
+    %% === Event processing job (NOT BUILT — no consumer) ===
     BullMQ->>Postgres: insert payment_status_history
 
     alt Happy path (attempt succeeded)
@@ -157,20 +189,28 @@ Key properties this gives us:
 
 ## Current state
 
-| Piece                                     | Status                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| Entities (`entity/*.ts`)                  | Done — all 9 tables, wired into `src/db/schema/index.ts`, migrated.       |
-| `PaymentsController` / DTOs / service     | Not started — controller is an empty stub.                                |
-| BullMQ `payments` queue                   | Registered, no processor/consumer yet.                                    |
-| Provider integration (gateway client)     | Not started.                                                              |
-| Outbox integration (`payment.*` events)   | Not started.                                                              |
-| Ledger posting service                    | Not started.                                                              |
-| Notification emission (success / failure) | Not started — no `Notifier`/consumer exists; diagram is the target shape. |
+| Piece                                        | Status                                                                                                                                                                |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entities (`entity/*.ts`)                     | Done — all 9 tables, wired into `src/db/schema/index.ts`, migrated.                                                                                                   |
+| Payment transaction lifecycle (`use-cases/`) | Done — create/check/list/upsert on `payment_transactions`, create/list on `payment_attempts`, all Effect-typed, `tsc`/`nest build`-verified.                          |
+| `PaymentsController` (REST surface)          | Done — `POST/GET /payments`, `GET /payments/:id`, `GET /payments/:id/attempts`, `PATCH /payments/:id` (admin-only), `POST /payments/webhook` (public).                |
+| Webhook intake (dedupe + enqueue)            | Done — `createPaymentProviderEvent` dedupes on `(provider, providerEventId)` via `onConflictDoNothing`; a duplicate never re-enqueues.                                |
+| BullMQ `payments` queue — producer           | Done — `process-attempt` enqueued from `create()`, `process-provider-event` enqueued from `webhook()`. `defaultJobOptions` wired from config.                         |
+| BullMQ `payments` queue — consumer           | Not started — no `@Processor(PAYMENT_QUEUE)` class; enqueued jobs are never picked up.                                                                                |
+| Provider gateway abstraction (`providers/`)  | Scaffolded, unwired — `PaymentGatewayProvider` interface + `PaymentGatewayRegistry` exist; `PAYMENT_GATEWAY_PROVIDERS` is `[]`, no bank implemented.                  |
+| Outbox integration (`payment.*` events)      | Not started.                                                                                                                                                          |
+| Ledger posting service                       | Not started.                                                                                                                                                          |
+| Notification emission (success / failure)    | Not started — no `Notifier`/consumer exists; diagram is the target shape.                                                                                             |
+| Automated tests                              | Not started — no unit or e2e tests exist for any use-case, the controller, or the queue producer. Verification so far is `tsc` + `nest build` + one manual boot test. |
 
 ## Open items
 
 - `payment_transactions.tenantId` and `.orderId` are plain UUIDs with no FK
-  — there's no `tenants` or `orders` table in this codebase yet.
+  — there's no `tenants` or `orders` table in this codebase yet (see
+  [`../tenant/README.md`](../tenant/README.md)). `PaymentsController.create()`
+  currently writes a hardcoded `DEFAULT_TENANT_ID` placeholder
+  (`00000000-…`) to every transaction — real values only make sense once a
+  `tenants` table exists.
 - No admin/reporting surface for the ledger (e.g. a trial-balance view) —
   out of scope until the posting service exists.
 - **Notification delivery mechanism is undecided.** The lifecycle diagram
@@ -179,3 +219,30 @@ Key properties this gives us:
   up being a consumer of `outbox_events`, a direct call from the queue
   processor, or its own module. The failure path in particular has no
   outbox row to key off, so it can't simply be "subscribe to the outbox."
+- **No test coverage anywhere in this module.** Every use-case is a pure
+  `Effect.fn` taking its dependencies through `DbClientTag`/`PaymentQueueTag`
+  specifically so a fake layer can be swapped in for testing without a real
+  Postgres or Redis — that seam has never actually been exercised by a test.
+  Confidence today rests on `tsc`, `nest build`, and one manual boot check,
+  not on anything that runs the code.
+- **Transaction + attempt insert is atomic via `runInTransaction`.** `create()`
+  wraps `createPayment` and `createPaymentAttempt` inside `runInTransaction`
+  (`../../db/db.provider.ts`), enabled by typing `DbClientTag` against `DbExecutor`
+  instead of `DbClient`. A failure during attempt creation rolls back the DB
+  transaction, preventing orphaned `payment_transaction` rows, and the job is
+  only enqueued to BullMQ once the transaction has committed.
+- **A module↔controller circular import previously broke queue injection
+  silently.** `PAYMENT_QUEUE` used to live in `payment.module.ts`, which
+  `payment.controller.ts` imported while `payment.module.ts` imported the
+  controller back — `@InjectQueue(PAYMENT_QUEUE)` evaluated before the
+  constant was assigned, silently binding to BullMQ's `"default"` queue
+  instead of `"payments"` (no compile error; only visible at boot as
+  `UnknownDependenciesException`). Fixed by moving the constant to
+  `payment.constants.ts`, a leaf file both sides import — keep any future
+  cross-file constant shared between a module and its own controller in a
+  leaf file, not in whichever of the two files feels more natural.
+- **`CreatePaymentDto.provider` is an unvalidated free string.** There's no
+  real gateway registered yet (`PAYMENT_GATEWAY_PROVIDERS` is `[]`), so
+  nothing checks the client's `provider` value against
+  `PaymentGatewayRegistry` — any string is accepted at creation time and
+  would only fail once something actually tries to resolve it.

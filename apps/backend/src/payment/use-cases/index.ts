@@ -3,3 +3,8 @@ export * from './create-payment.use-case';
 export * from './check-payment.use-case';
 export * from './list-payments.use-case';
 export * from './upsert-payment.use-case';
+export * from './create-payment-attempt.use-case';
+export * from './list-payment-attempts.use-case';
+export * from './enqueue-payment-attempt.use-case';
+export * from './create-payment-provider-event.use-case';
+export * from './enqueue-payment-provider-event.use-case';

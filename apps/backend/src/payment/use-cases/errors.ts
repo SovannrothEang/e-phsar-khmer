@@ -33,8 +33,15 @@ export class PaymentPersistenceError extends Schema.TaggedError<PaymentPersisten
   { cause: Schema.Defect() },
 ) {}
 
+/** The BullMQ `payments` queue rejected or failed to accept a job (e.g. Redis unreachable). */
+export class PaymentQueueError extends Schema.TaggedError<PaymentQueueError>()(
+  'PaymentQueueError',
+  { cause: Schema.Defect() },
+) {}
+
 export type PaymentUseCaseError =
   | PaymentTransactionNotFoundError
   | DuplicateIdempotencyKeyError
   | PaymentTransactionConflictError
-  | PaymentPersistenceError;
+  | PaymentPersistenceError
+  | PaymentQueueError;
