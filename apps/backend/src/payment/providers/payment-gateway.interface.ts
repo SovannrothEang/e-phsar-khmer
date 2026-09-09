@@ -17,6 +17,17 @@ export interface PaymentGatewayProvider {
 
   charge(request: ChargeRequest): Promise<ChargeResult>;
 
+  /**
+   * Asks the provider what it currently knows about an already-created
+   * attempt, keyed by the id `charge()` sent as the provider-facing
+   * reference. Two callers: corroborating a webhook that carries no
+   * signature (a provider may not sign its callbacks at all), and
+   * recovering a checkout after an ambiguous `charge()` failure before
+   * risking a second charge opportunity on retry. Optional — omit for a
+   * provider with no such lookup.
+   */
+  reconcile?(providerTransactionId: string): Promise<ChargeResult>;
+
   verifyWebhookSignature(
     rawBody: Buffer | string,
     headers: Record<string, string>,

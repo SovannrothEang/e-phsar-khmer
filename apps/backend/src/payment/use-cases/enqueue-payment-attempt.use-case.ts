@@ -1,25 +1,44 @@
 import { Effect } from 'effect';
-import { PaymentQueueTag } from '../queue/payment-queue.provider';
-import {
-  PAYMENT_ATTEMPT_JOB,
-  type ProcessAttemptJobData,
-} from '../queue/payment-queue.types';
+import { DbClientTag } from '../../db/db.provider';
+import type { OutboxService } from '../../outbox/outbox.service';
+import { PAYMENT_ATTEMPT_OUTBOX_EVENT_TYPE } from '../outbox/payment-outbox-events';
+import type { ProcessAttemptJobData } from '../queue/payment-queue.types';
 import { PaymentQueueError } from './errors';
 
 type EnqueuePaymentAttemptError = PaymentQueueError;
 
 /**
- * Hands a payment_attempt off to the `payments` queue for processing.
- * This is the last step of the create flow — nothing here calls a provider;
- * that's the (not yet built) processor's job once it picks the job up.
+ * Durably hands a payment_attempt off for processing. Writes an
+ * `outbox_events` row rather than calling BullMQ directly — this must run
+ * *inside* the same DB transaction as the attempt's own insert (i.e. inside
+ * `runInTransaction`, so the ambient `DbClientTag` resolves to that open
+ * transaction), which is what makes the handoff durable: the outbox row and
+ * the attempt commit together or not at all.
+ *
+ * `outbox` is a plain parameter, not an Effect requirement: `runInTransaction`
+ * re-runs its inner effect with *only* `DbClientTag` provided (see
+ * `../../db/db.provider.ts`'s `withTransaction`), so anything this needs
+ * beyond the transaction executor has to arrive as an ordinary closure value
+ * from the caller, not via `yield*` on another service tag.
+ *
+ * A `PaymentAttemptOutboxHandler` (`../outbox/payment-attempt-outbox-handler.ts`)
+ * is what actually calls `queue.add()` once this row is claimed.
  */
 export const enqueuePaymentAttempt = Effect.fn('enqueuePaymentAttempt')(
   function* (
+    outbox: OutboxService,
     input: ProcessAttemptJobData,
-  ): Effect.fn.Return<void, EnqueuePaymentAttemptError, PaymentQueueTag> {
-    const queue = yield* PaymentQueueTag;
+  ): Effect.fn.Return<void, EnqueuePaymentAttemptError, DbClientTag> {
+    const db = yield* DbClientTag;
     yield* Effect.tryPromise({
-      try: () => queue.add(PAYMENT_ATTEMPT_JOB, input),
+      try: () =>
+        outbox.enqueue(db, {
+          eventType: PAYMENT_ATTEMPT_OUTBOX_EVENT_TYPE,
+          aggregateType: 'payment_attempt',
+          aggregateId: input.paymentAttemptId,
+          payload: input,
+          dedupeKey: `payment-attempt-requested:${input.paymentAttemptId}`,
+        }),
       catch: (cause) => new PaymentQueueError({ cause }),
     });
   },

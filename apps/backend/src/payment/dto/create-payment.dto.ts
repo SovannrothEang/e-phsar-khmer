@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Length,
   Min,
@@ -68,4 +69,16 @@ export class CreatePaymentDto {
     description: 'A description for the payment',
   })
   description?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  @ApiPropertyOptional({
+    description:
+      "Where the payer's browser is redirected after completing checkout " +
+      'at the provider (e.g. ABA PayWay `continue_success_url`). This is ' +
+      'NOT a webhook/callback URL — the server-to-server payment-result ' +
+      'notification target is fixed server config, never client input, ' +
+      'so a caller can never redirect that notification elsewhere.',
+  })
+  browserReturnUrl?: string;
 }

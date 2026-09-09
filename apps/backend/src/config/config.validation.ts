@@ -61,6 +61,23 @@ const envSchema = z.object({
   PAYMENT_JOB_ATTEMPTS: z.coerce.number().default(3),
   PAYMENT_JOB_BACKOFF_MS: z.coerce.number().default(5000),
   PAYMENT_WORKER_CONCURRENCY: z.coerce.number().default(5),
+
+  // ABA PayWay gateway credentials. Optional so build/tests don't require
+  // sandbox access — AbaPaywayProvider fails fast with a clear message if
+  // charge()/reconcile() is actually called unconfigured.
+  ABA_PAYWAY_API_KEY: z.string().optional().default(''),
+  ABA_PAYWAY_MERCHANT_ID: z.string().optional().default(''),
+  ABA_PAYWAY_BASE_URL: z
+    .string()
+    .default('https://checkout-sandbox.abapayway.com'),
+  // The `return_url` ABA PayWay is told to POST payment results to on
+  // every purchase call — this backend's own public
+  // /api/v1/payments/aba-payway/webhook route. Must be a publicly
+  // reachable absolute URL (ABA calls it server-to-server); optional so
+  // build/tests don't require one, but charge() refuses to call ABA
+  // without it configured — silently omitting it would mean ABA has
+  // nowhere to report a payment outcome to.
+  ABA_PAYWAY_WEBHOOK_URL: z.string().optional().default(''),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

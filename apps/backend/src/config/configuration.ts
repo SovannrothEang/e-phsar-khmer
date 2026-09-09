@@ -61,5 +61,11 @@ export default () => {
       jobBackoffMs: env.PAYMENT_JOB_BACKOFF_MS,
       workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
     },
+    abaPayway: {
+      apiKey: env.ABA_PAYWAY_API_KEY,
+      merchantId: env.ABA_PAYWAY_MERCHANT_ID,
+      baseUrl: env.ABA_PAYWAY_BASE_URL,
+      webhookUrl: env.ABA_PAYWAY_WEBHOOK_URL,
+    },
   };
 };
