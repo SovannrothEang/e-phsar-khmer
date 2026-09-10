@@ -10,7 +10,8 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { paymentAttemptMethodEnum } from '../entity/payment-attempt';
+import { paymentAttemptMethodEnum } from '../entity';
+import { PAYMENT_PROVIDER_NAMES, type PaymentProviderName } from '../providers';
 
 export class CreatePaymentDto {
   @IsString()
@@ -41,13 +42,12 @@ export class CreatePaymentDto {
   })
   currency: string;
 
-  @IsString()
-  @MinLength(1)
+  @IsIn(PAYMENT_PROVIDER_NAMES)
   @ApiProperty({
-    description:
-      'The payment gateway provider to attempt this payment against (e.g. aba_payway)',
+    description: 'The payment gateway provider to attempt this payment against',
+    enum: PAYMENT_PROVIDER_NAMES,
   })
-  provider: string;
+  provider: PaymentProviderName;
 
   @IsIn(paymentAttemptMethodEnum.enumValues)
   @ApiProperty({

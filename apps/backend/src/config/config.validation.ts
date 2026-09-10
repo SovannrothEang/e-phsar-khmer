@@ -78,6 +78,40 @@ const envSchema = z.object({
   // without it configured — silently omitting it would mean ABA has
   // nowhere to report a payment outcome to.
   ABA_PAYWAY_WEBHOOK_URL: z.string().optional().default(''),
+
+  // Bakong KHQR credentials/merchant identity. Unlike ABA, Bakong has no
+  // server-side "create transaction" call — BakongProvider.charge() builds
+  // the KHQR string locally via the bakong-khqr SDK using these fields, and
+  // only BAKONG_API_KEY (a bearer token issued from Bakong's developer
+  // portal) is used for a real network call, to check_transaction_by_md5.
+  // All optional so build/tests don't require real Bakong credentials —
+  // BakongProvider fails fast with a clear message if charge()/reconcile()
+  // is actually called unconfigured.
+  BAKONG_BASE_URL: z.string().default('https://api-bakong.nbc.gov.kh'),
+  BAKONG_API_KEY: z.string().optional().default(''),
+  // 'individual' needs only BAKONG_ACCOUNT_ID + BAKONG_MERCHANT_NAME (a
+  // personal Bakong account alias — no business registration). 'merchant'
+  // additionally needs BAKONG_MERCHANT_ID + BAKONG_ACQUIRING_BANK, issued
+  // by a participating bank/PSP through merchant onboarding. Defaults to
+  // 'individual' since that's the zero-setup path for local dev/testing.
+  BAKONG_MERCHANT_TYPE: z
+    .enum(['individual', 'merchant'])
+    .default('individual'),
+  BAKONG_MERCHANT_ID: z.string().optional().default(''),
+  BAKONG_ACCOUNT_ID: z.string().optional().default(''),
+  BAKONG_MERCHANT_NAME: z.string().optional().default(''),
+  BAKONG_MERCHANT_CITY: z.string().optional().default('Phnom Penh'),
+  BAKONG_ACQUIRING_BANK: z.string().optional().default(''),
+  // How long a generated KHQR stays scannable before Bakong considers it
+  // expired — bakong-khqr requires an expirationTimestamp for any KHQR that
+  // carries an amount (a "dynamic" QR), so this always applies here.
+  BAKONG_QR_EXPIRY_SECONDS: z.coerce.number().default(300),
+  // Bakong delivers no webhooks — this is the delay between poll-attempt
+  // jobs re-checking check_transaction_by_md5 (see
+  // src/payment/providers/bakong/README.md). Short enough that a payer
+  // sees their payment confirmed quickly, long enough not to hammer
+  // Bakong's API for the several minutes a KHQR stays valid.
+  BAKONG_POLL_INTERVAL_MS: z.coerce.number().default(4000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

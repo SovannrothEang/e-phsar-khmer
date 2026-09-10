@@ -100,4 +100,8 @@ export type PaymentProcessingError =
   | PaymentGatewayNotRegisteredError
   | PaymentGatewayCallError
   | PaymentTransactionConflictError
-  | PaymentPersistenceError;
+  | PaymentPersistenceError
+  // Scheduling the next reconcile() poll (see poll-payment-attempt.use-case.ts)
+  // writes an outbox row like any other durable handoff in this module —
+  // this is that write failing, thrown up to ask BullMQ to retry the job.
+  | PaymentQueueError;

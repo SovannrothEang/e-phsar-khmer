@@ -9,6 +9,21 @@ export type PaymentAttemptOutcome =
   (typeof paymentAttemptStatusEnum.enumValues)[number];
 
 /**
+ * Every provider name a `payment_attempts.provider` row may actually
+ * contain — the single source of truth for what `CreatePaymentDto.provider`
+ * accepts and what `PaymentGatewayProvider.name` is allowed to be. The
+ * column itself stays plain `text` (not a pg enum — see
+ * `PaymentGatewayProvider`'s own doc comment), so this list, not the
+ * schema, is what closes the "any string is accepted" gap.
+ *
+ * Add a new provider here in the same change that registers it in
+ * `PAYMENT_GATEWAY_PROVIDERS` (`payment.module.ts`) — the two are meant to
+ * stay in lockstep; nothing enforces that automatically.
+ */
+export const PAYMENT_PROVIDER_NAMES = ['aba_payway', 'bakong'] as const;
+export type PaymentProviderName = (typeof PAYMENT_PROVIDER_NAMES)[number];
+
+/**
  * What PaymentProcessorService hands a provider to start a charge. Mirrors
  * the payment_attempts row already inserted (pending) before the provider
  * call is made — a provider never creates its own attempt record, it only
@@ -42,6 +57,21 @@ export interface ChargeResult {
   failureCode?: string;
   failureMessage?: string;
   rawResponse: unknown;
+  /**
+   * Set by a provider with no webhook channel at all (e.g. Bakong) on a
+   * `pending` result, asking `processPaymentAttempt` to schedule a
+   * `reconcile()` poll instead of waiting for a callback that will never
+   * arrive. Absent (the default) means no polling is scheduled — a provider
+   * that gets webhooks (ABA) drives its own transitions via
+   * `processProviderEvent` instead. See `providers/bakong/README.md` for
+   * the full polling architecture this drives.
+   */
+  poll?: {
+    /** Delay in ms before the next `reconcile()` poll. */
+    intervalMs: number;
+    /** Absolute epoch ms after which polling gives up and the attempt fails as expired. */
+    expiresAt: number;
+  };
 }
 
 export interface WebhookVerification {

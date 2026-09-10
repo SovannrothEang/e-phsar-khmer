@@ -5,10 +5,12 @@ import { PaymentsController } from './payment.controller';
 import { PAYMENT_GATEWAY_PROVIDERS, PaymentGatewayRegistry } from './providers';
 import { AbaPaywayController } from './providers/aba-payway/aba-payway.controller';
 import { AbaPaywayProvider } from './providers/aba-payway/aba-payway.provider';
+import { BakongProvider } from './providers/bakong/bakong.provider';
 import { PAYMENT_QUEUE } from './payment.constants';
 import { PaymentEffectRunner } from './payment-effect-runner.service';
 import { PaymentAttemptOutboxHandler } from './outbox/payment-attempt-outbox-handler';
 import { PaymentEventOutboxHandler } from './outbox/payment-event-outbox-handler';
+import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
 import { OutboxModule } from '../outbox/outbox.module';
 
@@ -36,17 +38,22 @@ import { OutboxModule } from '../outbox/outbox.module';
   providers: [
     PaymentGatewayRegistry,
     AbaPaywayProvider,
+    BakongProvider,
     {
       provide: PAYMENT_GATEWAY_PROVIDERS,
-      inject: [AbaPaywayProvider],
-      useFactory: (abaPayway: AbaPaywayProvider) => [abaPayway],
+      inject: [AbaPaywayProvider, BakongProvider],
+      useFactory: (abaPayway: AbaPaywayProvider, bakong: BakongProvider) => [
+        abaPayway,
+        bakong,
+      ],
     },
     PaymentEffectRunner,
-    // Publish the two outbox event types this module produces to BullMQ —
+    // Publish the three outbox event types this module produces to BullMQ —
     // register themselves with OutboxRegistry from onModuleInit.
     PaymentAttemptOutboxHandler,
     PaymentEventOutboxHandler,
-    // Consumes both BullMQ job kinds — the first @Processor in this repo.
+    PaymentPollOutboxHandler,
+    // Consumes all three BullMQ job kinds — the first @Processor in this repo.
     PaymentProcessor,
   ],
   // BullModule re-exported so any future module (e.g. a subscription

@@ -24,6 +24,7 @@ import {
   createPaymentProviderEvent,
   enqueuePaymentAttempt,
   enqueuePaymentProviderEvent,
+  findPaymentTransactionDetail,
   listPaymentAttempts,
   listPayments,
   upsertPayment,
@@ -104,14 +105,36 @@ export class PaymentsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Check a payment transaction by id (owner only)' })
+  @ApiOperation({
+    summary:
+      'Check a payment transaction by id (owner only). `checkout` carries ' +
+      "the gateway's checkout artifact (QR string, redirect URL, raw " +
+      'response) once charge() has produced one, and is `null` until then ' +
+      '— charge() runs asynchronously via the outbox/queue, so a client ' +
+      'that just POSTed should poll this endpoint rather than expect the ' +
+      'artifact in the creation response itself.',
+  })
   async check(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     const transaction = await this.effectRunner.run(checkPayment(id));
     if (transaction.customerId !== user.id) {
       // 404, not 403 — don't confirm another user's transaction exists.
       throw new NotFoundException('Payment transaction not found');
     }
-    return transaction;
+    const detail = await this.effectRunner.run(
+      findPaymentTransactionDetail(id),
+    );
+    return {
+      ...transaction,
+      checkout: detail
+        ? {
+            providerTransactionId: detail.providerTransactionId,
+            paymentMethodType: detail.paymentMethodType,
+            maskedAccount: detail.maskedAccount,
+            redirectUrl: detail.redirectUrl,
+            rawResponse: detail.rawResponse,
+          }
+        : null,
+    };
   }
 
   @Get(':id/attempts')

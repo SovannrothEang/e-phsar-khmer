@@ -67,5 +67,17 @@ export default () => {
       baseUrl: env.ABA_PAYWAY_BASE_URL,
       webhookUrl: env.ABA_PAYWAY_WEBHOOK_URL,
     },
+    bakong: {
+      baseUrl: env.BAKONG_BASE_URL,
+      apiKey: env.BAKONG_API_KEY,
+      merchantType: env.BAKONG_MERCHANT_TYPE,
+      merchantId: env.BAKONG_MERCHANT_ID,
+      accountId: env.BAKONG_ACCOUNT_ID,
+      merchantName: env.BAKONG_MERCHANT_NAME,
+      merchantCity: env.BAKONG_MERCHANT_CITY,
+      acquiringBank: env.BAKONG_ACQUIRING_BANK,
+      qrExpirySeconds: env.BAKONG_QR_EXPIRY_SECONDS,
+      pollIntervalMs: env.BAKONG_POLL_INTERVAL_MS,
+    },
   };
 };

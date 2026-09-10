@@ -1,10 +1,13 @@
 import { Effect } from 'effect';
 import { DbClientTag, runInTransaction } from '../../db/db.provider';
+import type { OutboxService } from '../../outbox/outbox.service';
 import type { paymentTransactionStatusEnum } from '../entity/payment-transaction';
 import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
 import type { ProcessAttemptJobData } from '../queue/payment-queue.types';
 import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
 import type { PaymentProcessingError } from './errors';
+import { enqueuePaymentAttemptPoll } from './enqueue-payment-attempt-poll.use-case';
+import { failPaymentAttempt } from './fail-payment-attempt.use-case';
 import { findPaymentAttempt } from './find-payment-attempt.use-case';
 import { checkPayment } from './check-payment.use-case';
 import { updatePaymentAttempt } from './update-payment-attempt.use-case';
@@ -41,9 +44,17 @@ function nextTransactionStatus(
  * something a retry can never fix. A gateway call that produces no answer
  * (network error, timeout) *is* thrown, via `PaymentGatewayCallError` —
  * that's what asks BullMQ's own backoff to try again.
+ *
+ * `outbox` is a plain parameter (same convention as `enqueuePaymentAttempt`
+ * — see its doc comment) so a `pending` result carrying `ChargeResult.poll`
+ * (a provider with no webhook, e.g. Bakong — see
+ * `../providers/bakong/README.md`) can durably schedule the first
+ * `reconcile()` poll round in the same transaction as this attempt's own
+ * status write.
  */
 export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
   function* (
+    outbox: OutboxService,
     input: ProcessAttemptJobData,
   ): Effect.fn.Return<
     ProcessPaymentAttemptOutcome,
@@ -69,24 +80,11 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
 
     if (!provider) {
       yield* runInTransaction(
-        Effect.gen(function* () {
-          yield* updatePaymentAttempt({
-            id: attempt.id,
-            status: 'failed',
-            failureCode: 'PROVIDER_NOT_REGISTERED',
-            failureMessage: `No payment gateway registered for provider "${attempt.provider}"`,
-          });
-          yield* upsertPayment({
-            id: transaction.id,
-            expectedVersion: transaction.version,
-            status: 'failed',
-          });
-          yield* recordPaymentStatusHistory({
-            paymentTransactionId: transaction.id,
-            fromStatus: transaction.status,
-            toStatus: 'failed',
-            reason: `No payment gateway registered for provider "${attempt.provider}"`,
-          });
+        failPaymentAttempt({
+          attempt,
+          transaction,
+          failureCode: 'PROVIDER_NOT_REGISTERED',
+          failureMessage: `No payment gateway registered for provider "${attempt.provider}"`,
         }),
         (cause) => new PaymentPersistenceError({ cause }),
       );
@@ -144,6 +142,15 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
             paymentTransactionId: transaction.id,
             fromStatus: transaction.status,
             toStatus,
+          });
+        }
+
+        if (result.status === 'pending' && result.poll) {
+          yield* enqueuePaymentAttemptPoll(outbox, {
+            paymentTransactionId: transaction.id,
+            paymentAttemptId: attempt.id,
+            intervalMs: result.poll.intervalMs,
+            expiresAt: result.poll.expiresAt,
           });
         }
       }),

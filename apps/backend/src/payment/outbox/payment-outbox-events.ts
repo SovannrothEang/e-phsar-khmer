@@ -12,3 +12,13 @@
 export const PAYMENT_ATTEMPT_OUTBOX_EVENT_TYPE = 'payment.attempt.requested';
 export const PAYMENT_PROVIDER_EVENT_OUTBOX_EVENT_TYPE =
   'payment.provider_event.received';
+/**
+ * One round of "schedule the next reconcile() poll" for a provider with no
+ * webhook (see `../providers/bakong/README.md`). Unlike the two events
+ * above, a single attempt can produce many of these over its lifetime — one
+ * per poll round — so producers deliberately omit `dedupeKey` (see
+ * `OutboxService.enqueue`'s doc comment: no key means every call is a
+ * distinct event, which is exactly what a repeating poll needs).
+ */
+export const PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE =
+  'payment.attempt.poll_requested';

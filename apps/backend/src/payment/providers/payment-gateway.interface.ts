@@ -2,6 +2,7 @@ import type {
   ChargeRequest,
   ChargeResult,
   ParsedProviderEvent,
+  PaymentProviderName,
   WebhookVerification,
 } from './payment-gateway.types';
 
@@ -10,10 +11,13 @@ import type {
  * `name` must match the plain `provider` text column already stored on
  * payment_attempts / payment_transaction_details / payment_provider_events —
  * PaymentGatewayRegistry resolves on it, so it's the provider's own identity,
- * not a display label.
+ * not a display label. Typed against `PaymentProviderName` rather than
+ * `string` so a new provider can't silently drift from the allowlist
+ * `CreatePaymentDto.provider` validates against — registering one means
+ * adding its name to `PAYMENT_PROVIDER_NAMES` first, or this won't compile.
  */
 export interface PaymentGatewayProvider {
-  readonly name: string;
+  readonly name: PaymentProviderName;
 
   charge(request: ChargeRequest): Promise<ChargeResult>;
 
