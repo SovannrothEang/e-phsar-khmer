@@ -1,12 +1,6 @@
-import {
-  jsonb,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { jsonb, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { paymentTransactions } from './payment-transaction';
+import { paymentSchema } from './payment.pg-schema';
 
 /**
  * 1:1 satellite for bulky/sensitive provider payload — masked account,
@@ -16,7 +10,7 @@ import { paymentTransactions } from './payment-transaction';
  * unique here because a provider may not distinguish a capture/refund
  * response's own id from the parent transaction's.
  */
-export const paymentTransactionDetails = pgTable(
+export const paymentTransactionDetails = paymentSchema.table(
   'payment_transaction_details',
   {
     id: uuid('id').defaultRandom().primaryKey(),

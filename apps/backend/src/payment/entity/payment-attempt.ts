@@ -1,26 +1,16 @@
-import {
-  index,
-  numeric,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { index, numeric, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { paymentTransactions } from './payment-transaction';
+import { paymentSchema } from './payment.pg-schema';
 
-export const paymentAttemptMethodEnum = pgEnum('payment_attempt_method', [
-  'card',
-  'bank',
-  'wallet',
-  'other',
-]);
+export const paymentAttemptMethodEnum = paymentSchema.enum(
+  'payment_attempt_method',
+  ['card', 'bank', 'wallet', 'other'],
+);
 
-export const paymentAttemptStatusEnum = pgEnum('payment_attempt_status', [
-  'pending',
-  'succeeded',
-  'failed',
-]);
+export const paymentAttemptStatusEnum = paymentSchema.enum(
+  'payment_attempt_status',
+  ['pending', 'succeeded', 'failed'],
+);
 
 /**
  * One try against a provider for a payment_transaction. A single transaction
@@ -28,7 +18,7 @@ export const paymentAttemptStatusEnum = pgEnum('payment_attempt_status', [
  * timed-out attempt retried after backoff. This is where "which attempt
  * actually succeeded" lives; the transaction's own status is the aggregate.
  */
-export const paymentAttempts = pgTable(
+export const paymentAttempts = paymentSchema.table(
   'payment_attempts',
   {
     id: uuid('id').defaultRandom().primaryKey(),

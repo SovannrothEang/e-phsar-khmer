@@ -3,16 +3,15 @@ import {
   check,
   index,
   jsonb,
-  pgEnum,
-  pgTable,
   text,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { paymentTransactions } from './payment-transaction';
 import { paymentAttempts } from './payment-attempt';
+import { paymentSchema } from './payment.pg-schema';
 
-export const paymentLogLevelEnum = pgEnum('payment_log_level', [
+export const paymentLogLevelEnum = paymentSchema.enum('payment_log_level', [
   'debug',
   'info',
   'warn',
@@ -25,7 +24,7 @@ export const paymentLogLevelEnum = pgEnum('payment_log_level', [
  * records a business-state transition. Scoped to a transaction and/or a
  * specific attempt; at least one must be set.
  */
-export const paymentLogs = pgTable(
+export const paymentLogs = paymentSchema.table(
   'payment_logs',
   {
     id: uuid('id').defaultRandom().primaryKey(),

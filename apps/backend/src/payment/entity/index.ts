@@ -1,3 +1,4 @@
+export * from './payment.pg-schema';
 export * from './payment-transaction';
 export * from './payment-attempt';
 export * from './payment-status-history';

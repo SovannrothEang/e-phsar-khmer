@@ -28,15 +28,6 @@ export type CreateTransactionResult =
 
 const khqr = new BakongKHQR();
 
-/**
- * The KHQR spec's hard cap on the `billNumber` additional-data field
- * (`emv.INVALID_LENGTH.BILL_NUMBER` in `bakong-khqr`, not exported so
- * duplicated here) — `payment_transactions.id` is a 36-character UUID,
- * which always exceeded it before this was added, failing every Bakong
- * charge with "Bill Name Length is invalid" regardless of merchant config.
- */
-const BILL_NUMBER_MAX_LENGTH = 25;
-
 function toBakongCurrency(currency: string): number {
   return currency.toUpperCase() === 'USD'
     ? khqrData.currency.usd
@@ -84,11 +75,6 @@ export const createBakongTransaction = Effect.fn('createBakongTransaction')(
     const optional = {
       currency: toBakongCurrency(request.currency),
       amount: Number(request.amount),
-      // Bakong's own reference for this QR — round-trips nowhere on our
-      // side (reconcile correlates on `md5`, not this), but gives the
-      // payer's banking app a human-readable bill reference. Truncated:
-      // the full UUID (36 chars) always exceeds BILL_NUMBER_MAX_LENGTH.
-      // billNumber: request.transactionId.slice(0, BILL_NUMBER_MAX_LENGTH),
       expirationTimestamp: expiresAt,
     };
 

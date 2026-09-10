@@ -1,22 +1,15 @@
-import {
-  index,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { index, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import {
   paymentTransactions,
   paymentTransactionStatusEnum,
 } from './payment-transaction';
 import { users } from '../../db/schema/users.schema';
+import { paymentSchema } from './payment.pg-schema';
 
-export const paymentStatusActorTypeEnum = pgEnum('payment_status_actor_type', [
-  'system',
-  'webhook',
-  'admin',
-]);
+export const paymentStatusActorTypeEnum = paymentSchema.enum(
+  'payment_status_actor_type',
+  ['system', 'webhook', 'admin'],
+);
 
 /**
  * Business-state audit trail: every status transition on a payment_transaction,
@@ -24,7 +17,7 @@ export const paymentStatusActorTypeEnum = pgEnum('payment_status_actor_type', [
  * noise) — this only ever records a status change, so "why is this
  * REFUND_PENDING" is answerable months later without grepping logs.
  */
-export const paymentStatusHistory = pgTable(
+export const paymentStatusHistory = paymentSchema.table(
   'payment_status_history',
   {
     id: uuid('id').defaultRandom().primaryKey(),

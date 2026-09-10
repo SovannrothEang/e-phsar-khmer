@@ -2,23 +2,20 @@ import {
   index,
   integer,
   numeric,
-  pgEnum,
-  pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from '../../db/schema/users.schema';
+import { paymentSchema } from './payment.pg-schema';
 
-export const paymentTransactionTypeEnum = pgEnum('payment_transaction_type', [
-  'payment',
-  'refund',
-  'capture',
-  'void',
-]);
+export const paymentTransactionTypeEnum = paymentSchema.enum(
+  'payment_transaction_type',
+  ['payment', 'refund', 'capture', 'void'],
+);
 
-export const paymentTransactionStatusEnum = pgEnum(
+export const paymentTransactionStatusEnum = paymentSchema.enum(
   'payment_transaction_status',
   [
     'pending',
@@ -40,7 +37,7 @@ export const paymentTransactionStatusEnum = pgEnum(
  * `version` is optimistic-locking for concurrent status updates (e.g. a
  * webhook and a client poll racing).
  */
-export const paymentTransactions = pgTable(
+export const paymentTransactions = paymentSchema.table(
   'payment_transactions',
   {
     id: uuid('id').defaultRandom().primaryKey(),

@@ -1,16 +1,15 @@
 import {
   index,
   jsonb,
-  pgEnum,
-  pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { paymentAttempts } from './payment-attempt';
+import { paymentSchema } from './payment.pg-schema';
 
-export const paymentProviderEventStatusEnum = pgEnum(
+export const paymentProviderEventStatusEnum = paymentSchema.enum(
   'payment_provider_event_status',
   ['received', 'processed', 'ignored', 'failed'],
 );
@@ -23,7 +22,7 @@ export const paymentProviderEventStatusEnum = pgEnum(
  * is nullable and SET NULL on delete: an event can arrive before it's been
  * correlated to an attempt, and the raw payload must survive either way.
  */
-export const paymentProviderEvents = pgTable(
+export const paymentProviderEvents = paymentSchema.table(
   'payment_provider_events',
   {
     id: uuid('id').defaultRandom().primaryKey(),

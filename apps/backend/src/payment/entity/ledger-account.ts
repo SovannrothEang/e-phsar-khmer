@@ -1,15 +1,14 @@
 import {
   boolean,
   index,
-  pgEnum,
-  pgTable,
   timestamp,
   uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { paymentSchema } from './payment.pg-schema';
 
-export const ledgerAccountTypeEnum = pgEnum('ledger_account_type', [
+export const ledgerAccountTypeEnum = paymentSchema.enum('ledger_account_type', [
   'asset',
   'liability',
   'equity',
@@ -17,11 +16,10 @@ export const ledgerAccountTypeEnum = pgEnum('ledger_account_type', [
   'expense',
 ]);
 
-export const ledgerAccountOwnerTypeEnum = pgEnum('ledger_account_owner_type', [
-  'system',
-  'customer',
-  'merchant',
-]);
+export const ledgerAccountOwnerTypeEnum = paymentSchema.enum(
+  'ledger_account_owner_type',
+  ['system', 'customer', 'merchant'],
+);
 
 /**
  * Chart of accounts: what a ledger_entry can post against. System accounts
@@ -30,7 +28,7 @@ export const ledgerAccountOwnerTypeEnum = pgEnum('ledger_account_owner_type', [
  * `users` here on purpose — an owner account can outlive the concept it was
  * opened for, and the ledger must never cascade-delete on a user change.
  */
-export const ledgerAccounts = pgTable(
+export const ledgerAccounts = paymentSchema.table(
   'ledger_accounts',
   {
     id: uuid('id').defaultRandom().primaryKey(),

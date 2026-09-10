@@ -2,16 +2,15 @@ import {
   index,
   integer,
   numeric,
-  pgEnum,
-  pgTable,
   timestamp,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 import { ledgerTransactions } from './ledger-transaction';
 import { ledgerAccounts } from './ledger-account';
+import { paymentSchema } from './payment.pg-schema';
 
-export const ledgerEntryTypeEnum = pgEnum('ledger_entry_type', [
+export const ledgerEntryTypeEnum = paymentSchema.enum('ledger_entry_type', [
   'debit',
   'credit',
 ]);
@@ -23,7 +22,7 @@ export const ledgerEntryTypeEnum = pgEnum('ledger_entry_type', [
  * `sequence` fixes line order for display/replay without relying on
  * insertion order.
  */
-export const ledgerEntries = pgTable(
+export const ledgerEntries = paymentSchema.table(
   'ledger_entries',
   {
     id: uuid('id').defaultRandom().primaryKey(),

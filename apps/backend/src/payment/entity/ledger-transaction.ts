@@ -1,24 +1,16 @@
-import {
-  index,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-} from 'drizzle-orm/pg-core';
+import { index, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { paymentTransactions } from './payment-transaction';
+import { paymentSchema } from './payment.pg-schema';
 
-export const ledgerTransactionTypeEnum = pgEnum('ledger_transaction_type', [
-  'payment',
-  'transfer',
-  'adjustment',
-]);
+export const ledgerTransactionTypeEnum = paymentSchema.enum(
+  'ledger_transaction_type',
+  ['payment', 'transfer', 'adjustment'],
+);
 
-export const ledgerTransactionStatusEnum = pgEnum('ledger_transaction_status', [
-  'posted',
-  'reversed',
-]);
+export const ledgerTransactionStatusEnum = paymentSchema.enum(
+  'ledger_transaction_status',
+  ['posted', 'reversed'],
+);
 
 /**
  * A posted unit of double-entry bookkeeping. Created once, when a
@@ -26,7 +18,7 @@ export const ledgerTransactionStatusEnum = pgEnum('ledger_transaction_status', [
  * is corrected by posting a new reversing ledger_transaction, never by
  * editing this row or its entries in place.
  */
-export const ledgerTransactions = pgTable(
+export const ledgerTransactions = paymentSchema.table(
   'ledger_transactions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
