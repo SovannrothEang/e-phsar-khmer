@@ -1,0 +1,21 @@
+# Normalize all text files to LF (checked out as LF on every platform).
+* text=auto eol=lf
+
+# Explicit binary types (kept for safety; text=auto detects most).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.lock binary

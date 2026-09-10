@@ -24,10 +24,18 @@ import { FaCamera } from "react-icons/fa";
 import { ChartNoAxesCombined, ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Link, useRouter } from "@/i18n/routing";
+import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { userLogout } from "@/actions/logout";
-import type { SessionUser } from "@/lib/auth/current-user";
 
-export function SocialBar({ user }: { user: SessionUser }) {
+interface SocialBarUser {
+  username: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  profilePhotoUrl?: string | null;
+  profileImage?: string;
+}
+
+export function SocialBar({ user }: { user: SocialBarUser }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const displayName =
@@ -58,6 +66,7 @@ export function SocialBar({ user }: { user: SessionUser }) {
         className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconMessageFilled className="scale-150" />
+        <ChatUnreadBadge />
       </Button>
       {/* User Dropdown */}
       <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>

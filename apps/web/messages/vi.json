@@ -48,11 +48,73 @@
       "Svay Rieng": "Svay Rieng",
       "Takeo": "Takeo",
       "Tboung Khmum": "Tboung Khmum"
-    }   
+    }
   },
   "Card": {
-      "title": "Bạn muốn thấy quảng cáo của mình ở đây?",
-      "des": "Kiếm thêm thu nhập bằng cách bán hàng\ntrên Psakhmer. Thử ngay nào, rất nhanh chóng và\ndễ dàng.",
-      "button_post_ad": "Bán"
+    "title": "Bạn muốn thấy quảng cáo của mình ở đây?",
+    "des": "Kiếm thêm thu nhập bằng cách bán hàng\ntrên Psakhmer. Thử ngay nào, rất nhanh chóng và\ndễ dàng.",
+    "button_post_ad": "Bán"
+  },
+  "Chat": {
+    "unknownUser": "Người dùng không xác định",
+    "messageSeller": "Nhắn tin cho người bán",
+    "auth": {
+      "requiredTitle": "Đăng nhập để xem tin nhắn của bạn",
+      "requiredDescription": "Bạn cần tài khoản để trò chuyện với người bán.",
+      "signIn": "Đăng nhập"
+    },
+    "inbox": {
+      "title": "Tin nhắn",
+      "emptyTitle": "Chưa có tin nhắn",
+      "emptyDescription": "Khi bạn liên hệ người bán, cuộc trò chuyện sẽ hiển thị ở đây.",
+      "loadMore": "Tải thêm",
+      "previewEmpty": "Chưa có tin nhắn",
+      "previewImage": "Ảnh",
+      "previewListing": "Tin đăng",
+      "unreadCount": "{count} tin nhắn chưa đọc"
+    },
+    "thread": {
+      "back": "Quay lại",
+      "selectPrompt": "Chọn một cuộc trò chuyện để bắt đầu đọc",
+      "emptyTitle": "Bắt đầu trò chuyện với {name}",
+      "loadOlder": "Tải tin nhắn cũ hơn",
+      "attachingListing": "Về tin đăng này",
+      "blocked": "Bạn không thể nhắn tin cho người dùng này nữa.",
+      "blockedByMe": "Bạn đã chặn người dùng này.",
+      "notFoundTitle": "Không tìm thấy cuộc trò chuyện",
+      "notFoundDescription": "Cuộc trò chuyện không tồn tại hoặc bạn không có quyền truy cập."
+    },
+    "message": {
+      "imageAlt": "Ảnh đã gửi",
+      "read": "Đã xem",
+      "sent": "Đã gửi",
+      "sending": "Đang gửi…",
+      "retry": "Thử lại"
+    },
+    "composer": {
+      "placeholder": "Nhập tin nhắn…",
+      "send": "Gửi",
+      "attachImage": "Đính kèm ảnh",
+      "removeImage": "Xóa ảnh",
+      "stagedImageAlt": "Ảnh sẽ gửi",
+      "disabled": "Không thể gửi tin nhắn.",
+      "blocked": "Bạn không thể nhắn tin cho người dùng này.",
+      "blockedByMe": "Bạn đã chặn người dùng này. Bỏ chặn để gửi tin nhắn.",
+      "blockedError": "Không thể gửi tin nhắn.",
+      "uploadFailed": "Tải ảnh lên thất bại.",
+      "imageSizeError": "Ảnh quá lớn.",
+      "imageTypeError": "Định dạng ảnh không được hỗ trợ."
+    },
+    "listing": {
+      "noPrice": "Giá thương lượng",
+      "unavailable": "Tin đăng này không còn khả dụng"
+    },
+    "errors": {
+      "generic": "Đã xảy ra lỗi.",
+      "loadFailed": "Không thể tải tin nhắn.",
+      "loadFailedTitle": "Đã xảy ra lỗi",
+      "sendFailed": "Không gửi được tin nhắn.",
+      "rateLimited": "Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi một lát."
     }
+  }
 }

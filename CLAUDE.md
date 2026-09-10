@@ -222,7 +222,7 @@ Key columns on `users`:
 
 **Activity tracking:** `LastSeenInterceptor` (global `APP_INTERCEPTOR`) calls `ActivityService.touch(userId)` on every authenticated request. `touch` is fire-and-forget with a 5-minute in-memory throttle per user.
 
-**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0012` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (categories/subcategories, users, listings, brands/models, idempotency_keys); `0001`–`0002` alter `users`; `0003` adds `listing_photos`; `0004_premium_mephisto` swaps `users` uniques for partial indexes + listing CHECK constraints; `0005_nosy_monster_badoon` adds chat tables + `user_blocks`; `0006_overjoyed_doorman` narrows chat timestamps to `timestamp(3)`; `0007_far_pet_avengers` adds `attribute_options`; `0008_legal_barracuda` adds subscription tables (4-tier hierarchy: categories→plans→packages→terms + `user_subscriptions`); `0009_tidy_screwball` adds report tables (`report_reasons`, `user_reports`, `listing_reports`); `0010`–`0011` are prior uncommitted migrations; `0012_blushing_sentinel` extends `user_role` enum with `'super_admin'` (`ALTER TYPE … ADD VALUE`).
+**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0016` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (categories/subcategories, users, listings, brands/models, idempotency_keys); `0001`–`0002` alter `users`; `0003` adds `listing_photos`; `0004_premium_mephisto` swaps `users` uniques for partial indexes + listing CHECK constraints; `0005_nosy_monster_badoon` adds chat tables + `user_blocks`; `0006_overjoyed_doorman` narrows chat timestamps to `timestamp(3)`; `0007_far_pet_avengers` adds `attribute_options`; `0008_legal_barracuda` adds subscription tables (4-tier hierarchy: categories→plans→packages→terms + `user_subscriptions`); `0009_tidy_screwball` adds report tables (`report_reasons`, `user_reports`, `listing_reports`); `0010`–`0011` are prior uncommitted migrations; `0012_blushing_sentinel` extends `user_role` enum with `'super_admin'` (`ALTER TYPE … ADD VALUE`); `0013_absent_tarantula` adds `outbox_events` (the transactional outbox — see `src/outbox/`); `0014_add_payment_ledger_entities` creates the 9 payment/ledger tables (still in `public` at this point); `0015_move_payment_tables_to_payment_schema` moves all 9 of those tables (+ their enums) from `public` into a dedicated `payment` Postgres schema — see the Payments section; `0016_move_chat_tables_to_chat_schema` does the same for `conversations`/`messages`, moving them into a dedicated `chat` Postgres schema (`src/db/schema/chat.pg-schema.ts`, mirroring `payment.pg-schema.ts`) — cross-schema FKs into `public.users`/`public.listings` are unaffected, Postgres and Drizzle both handle those with no special casing.
 
 **Cambodian geography seed** (`src/db/seeds/cambodia-geography.seed.ts`): 25 provinces, 25 districts (one per province), 0 communes.
 
@@ -292,6 +292,10 @@ Send rejections: self (400), no body & no imagePath (400), imagePath outside `ch
 **Upload scopes** (`POST /files/sign`, `SignUploadDto.scope`): `avatar | cover | listing | chat | category | subcategory | brand | model | attribute` — `chat` paths are per-user (`chat/{userId}/…`) so ChatService can verify `imagePath` ownership by prefix. `DELETE /files` takes `{ paths: string[] }` for path-based deletion.
 
 **Image cleanup on replace/delete:** `FilesService.removeByPublicUrl(publicUrl)` (`files.service.ts:105-125`) derives the storage path from a public URL, silently skips non-storage values (`/placeholder.svg`, foreign URLs), and warns-but-never-throws. The established pattern: read the prior `image`/`icon` inside the DB op, call `removeByPublicUrl(old)` **after commit**, gated on the value actually changing. Currently wired for: attributes, brands, models, categories/subcategories (icons), user avatar, user cover, and listing photos (removed-from-payload diff). **Not** wired for: admin user soft-delete (avatar/cover stay live in storage), chat images (no message-delete endpoint exists by design), and listing soft-delete (restore must work).
+
+### Payments
+
+`PaymentModule` (`src/payment/`) — gateway-agnostic payment processing feeding a double-entry ledger; the full design (table layout, entity map, outbox/queue placement, lifecycle sequence, current status) lives in [`src/payment/README.md`](apps/backend/src/payment/README.md), the canonical Module README example. One thing that README won't flag because it's a backend-wide convention question, not a module detail: **this module's use-cases are written in [Effect](https://effect.website) (`effect` npm package), not plain async/await NestJS services.** `use-cases/**/*.use-case.ts` (split into `use-cases/payments/` — payment_transaction/payment_attempt/provider-event lifecycle — and `use-cases/ledgers/` — double-entry posting, mirroring the processing/ledger table split; the top-level `use-cases/index.ts` re-exports both so every consumer still imports from one place) are `Effect.fn`-wrapped generators that `yield*` a `DbClientTag` (`src/db/db.provider.ts` — an Effect `Context.Service` wrapping the same Drizzle client the `DRIZZLE` token provides everywhere else) and fail with `Schema.TaggedError` subclasses (`use-cases/payments/errors.ts` / `use-cases/ledgers/errors.ts`) instead of throwing. `PaymentsController` is the only bridge back to NestJS: its private `run()` helper provides `DbClientTag.layer(this.db)`, runs the effect with `Effect.runPromiseExit`, and maps a typed failure to an `HttpException` via a `switch` on `error._tag`; an unmodeled defect falls through to `GlobalExceptionFilter` as a 500. This pattern is currently unique to `payment/` — don't reach for `effect` in other modules without a deliberate decision to extend the convention.
 
 ### Adding a new feature module
 
@@ -479,6 +483,30 @@ The `.pipeline/` directory tracks feature changes through a structured four-phas
 
 The `planner`, `coder`, `tester`, and `reviewer` agent types work through this pipeline in order. For new features, start with the planner agent to produce `spec.md`.
 
+## Module README convention
+
+A request like "give me the README for `<module>`" or "let's do a README for `src/<module>`" means: write `src/<module>/README.md` in the fixed shape below, so module docs stay comparable to each other instead of drifting into whatever shape felt natural that day. `apps/backend/src/payment/README.md` and `apps/backend/src/chat/README.md` are the canonical examples — re-read both for tone and depth before writing a new one; this section describes their shape, not a substitute for looking at them.
+
+**Sections, in this order:**
+
+1. Title + a one-to-two sentence purpose statement.
+2. `## Architecture`
+   - An opening subsection whose heading names the module's actual core design idea (`The ledger boundary`, `REST is authoritative, the socket is a shortcut`) — never a generic `### Overview`.
+   - A table: one row per file for a thin/service-style module, or one row per DB table for a schema-heavy one. One-line purpose per row.
+   - `### Entity map` — a `mermaid erDiagram` of the tables the module owns (fields + FK relationships). Skip this subsection entirely if the module owns no tables.
+   - A short subsection on how the module relates to this backend's two standing cross-cutting mechanisms — the transactional outbox (`src/outbox/`) and BullMQ queues. State plainly which ones it uses and which it deliberately skips, and why (chat skips both; payment is designed around both).
+3. `## Lifecycle, end to end` — one or more `mermaid sequenceDiagram` blocks tracing the module's real request/data flow (not a generic CRUD sketch), followed by a short `Key properties this gives us` bullet list pulling out the non-obvious invariants the diagram makes visible.
+4. `## Current state` — a table of piece vs. status (`Done` / `Not started` / partial with a caveat). Be honest: a mostly-unbuilt module should read as mostly-unbuilt, not padded out to look further along.
+5. `## Open items` — real findings from reading the actual code (a structural gap, a guard that isn't applied consistently, a doc that's gone stale), each with why it matters. No filler items. Carry forward anything from this file's `Known gaps` section that applies to the module, plus whatever new gaps surfaced while writing the README.
+
+**Process, before and while writing:**
+
+- Read every file in the module first — an empty stub file changes what the README can honestly claim (this is why payment's README reads as mostly-unbuilt and chat's doesn't).
+- Verify each architectural claim against the actual code (imports, schema, guards actually applied) rather than the file's own comments or this file's prose — both can be stale.
+- Reuse the terminology this file and sibling READMEs already use for the same concept, rather than introducing a new synonym for it.
+- Run `pnpm format` (or `npx prettier --write <path>`) on the finished file, and confirm the mermaid fences survived formatting untouched.
+- If writing the README surfaces something that contradicts this file (e.g. a module description here turns out stale because the code moved on), note it under that module's Open items — don't silently rewrite this file as a side effect unless asked to.
+
 ## Frontend listing-form specs (`spec-detail-*.md`)
 
 `apps/backend/docs/spec-detail-one.md` … `spec-detail-twelve.md` (12 files, ~1,120 lines) are **per-category listing-creation form specifications**, written from the frontend's perspective. They are the source of truth for each subcategory's `field_schema` (see the Categories i18n section above). Each file enumerates the form fields for the subcategories of one main category:
@@ -505,6 +533,7 @@ These are design reference, not runtime docs (the frontend forms are currently h
 ## TypeScript constraints
 
 - `tsconfig.json` sets `module: nodenext` with no `"type":"module"` in `package.json` → CJS output. Do **not** add `.js` extensions to relative imports.
+- `strict: true` is enabled (with `strictPropertyInitialization: false` to keep NestJS DI-injected class fields declarable without an initializer). Full strict null-checks apply everywhere else.
 - `noImplicitAny: true` and ESLint `@typescript-eslint/no-explicit-any: error` are enforced. Use typed interfaces or `unknown` instead of `any`. For Supabase client, use `type AnySupabaseClient = SupabaseClient` and add explicit return-type annotations on storage methods to avoid TS2742.
 - Express 5 changed wildcard routing: use `'{*splat}'` in `forRoutes()`, not bare `'*'`.
 - `@nestjs/jwt` uses `ms.StringValue` for `expiresIn`; cast runtime string values as `value as unknown as number` when passing to `jwtService.sign()`.
@@ -563,3 +592,4 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 - **`generateUniqueUsername` race.** Check-then-insert with no 23505 retry — concurrent same-name creates (e.g. two OTP verifies at once) can 500. Add retry-on-unique-violation in the consumers (Telegram login, `updateProfile`, phone-OTP verify).
 - **`phoneVerifiedAt` is never written** though the column exists, and a soft-deleted user keeps its global-unique `user_phones` row so a re-registered active user ends up with `primaryPhone` but no `user_phones` row.
 - **Username login is case-sensitive** (`loginWithPassword` matches `users.username` exactly) while generated usernames are lowercase — typed-cased usernames fail. `UpdateProfileDto` first/last names have no `@MaxLength` (Postgres 22001 → 500 on overflow) while the column is `varchar(100)`.
+- **`src/tenant/` is a design doc, not code.** `tenant/README.md` sketches a proposed `tenants`/`tenant_members` schema meant to eventually back `payment_transactions.tenantId` (currently a bare, FK-less UUID — see the Payments section) and possibly scope `user_subscriptions`. No schema file, migration, or `src/db/schema/index.ts` export exists yet — treat it as a proposal to reference, not something implemented.

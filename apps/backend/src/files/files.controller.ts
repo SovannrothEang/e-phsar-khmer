@@ -1,4 +1,10 @@
-import { Body, Controller, Delete, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Post,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsIn, IsString } from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -34,6 +40,7 @@ class SignUploadDto {
 
 class DeleteFilesDto {
   @IsArray()
+  @IsString({ each: true })
   paths: string[];
 }
 
@@ -61,7 +68,21 @@ export class FilesController {
 
   @Delete()
   @ApiOperation({ summary: 'Delete files by storage paths' })
-  deleteFiles(@Body() dto: DeleteFilesDto) {
+  deleteFiles(@CurrentUser() user: RequestUser, @Body() dto: DeleteFilesDto) {
+    // `chat/` is the only per-user namespace in this bucket, and the storage
+    // path of a chat image is handed to the OTHER participant on every message
+    // read (MessageRow.imagePath). Without this check the recipient of a photo
+    // could delete it out from under the sender — and so could anyone who ever
+    // saw the path. Other scopes share a flat namespace and are cleaned up by
+    // the admin dashboard, so they stay as-is; see the audit note.
+    for (const path of dto.paths) {
+      if (
+        typeof path === 'string' &&
+        path.startsWith('chat/') &&
+        !path.startsWith(`chat/${user.id}/`)
+      )
+        throw new BadRequestException('Cannot delete another user’s files');
+    }
     return this.filesService
       .remove(this.filesService.getDefaultBucket(), dto.paths)
       .then(() => ({ removed: true }));

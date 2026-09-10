@@ -41,8 +41,26 @@ import type {
   MessageWithListing,
 } from './chat.types';
 
+/** A conversation row plus the read-receipt watermark, fetched together. */
+interface ConversationPollContext extends ConversationRow {
+  /** max(readAt) of MY messages in this conversation. */
+  peerLastReadAt: Date | null;
+}
+
 @Injectable()
 export class ChatService {
+  /**
+   * The single object-name segment `FilesService.createSignedUploadUrl`
+   * produces: `${randomUUID()}-${safeName(filename)}`, where `safeName`
+   * collapses everything outside this class to `_`. Deliberately excludes `/`,
+   * `\` and `%`, so no traversal — literal, encoded, or mixed — can survive it.
+   */
+  private static readonly CHAT_OBJECT_NAME_RE = /^[A-Za-z0-9._-]{1,200}$/;
+
+  /** Cursor ids are compared against `uuid` columns; anything else is a 500. */
+  private static readonly UUID_RE =
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly supabaseService: SupabaseService,
@@ -63,12 +81,7 @@ export class ChatService {
       throw new BadRequestException('Cannot message yourself');
     if (!dto.body && !dto.imagePath)
       throw new BadRequestException('Message must contain text or an image');
-    if (
-      dto.imagePath &&
-      (!dto.imagePath.startsWith(`chat/${senderId}/`) ||
-        dto.imagePath.includes('..'))
-    )
-      throw new BadRequestException('Invalid image path');
+    if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
 
     const [recipient] = await this.db
       .select({ id: users.id })
@@ -94,14 +107,19 @@ export class ChatService {
         throw new BadRequestException('Invalid listing context');
     }
 
-    // Race-safe find-or-create + recency bump in one statement
+    // Race-safe find-or-create + recency bump in one statement.
+    // The bump uses the DB clock (`now()` / the column default), never
+    // `new Date()`: lastMessageAt is the inbox ordering key and is compared
+    // against messages.createdAt, so both must come from the same clock. An
+    // app-server clock that runs ahead would park a thread at the top of every
+    // participant's inbox until real time caught up.
     const [a, b] = this.canonicalPair(senderId, dto.recipientId);
     const [conversation] = await this.db
       .insert(conversations)
-      .values({ userAId: a, userBId: b, lastMessageAt: new Date() })
+      .values({ userAId: a, userBId: b })
       .onConflictDoUpdate({
         target: [conversations.userAId, conversations.userBId],
-        set: { lastMessageAt: new Date() },
+        set: { lastMessageAt: sql`now()` },
       })
       .returning();
 
@@ -125,6 +143,23 @@ export class ChatService {
         imagePath: dto.imagePath ?? null,
       })
       .returning();
+
+    // Advance the thread watermark to the message's OWN createdAt. The upsert
+    // above bumps lastMessageAt *before* the message row exists, so two
+    // concurrent sends can commit their messages in the opposite order to
+    // their bumps and leave lastMessageAt behind the newest message — which
+    // would sort the thread wrongly in both participants' inboxes.
+    // The `lt` predicate makes this a monotonic max: an out-of-order writer
+    // can only ever move the watermark forward.
+    await this.db
+      .update(conversations)
+      .set({ lastMessageAt: message.createdAt })
+      .where(
+        and(
+          eq(conversations.id, conversation.id),
+          lt(conversations.lastMessageAt, message.createdAt),
+        ),
+      );
 
     const contexts = await this.batchLoadListingContexts(
       dto.listingId ? [dto.listingId] : [],
@@ -237,12 +272,36 @@ export class ChatService {
     conversationId: string,
     query: QueryMessagesDto,
   ): Promise<{ data: MessageWithListing[]; meta: ChatMessagesMeta }> {
-    await this.getConversationForUserOrThrow(conversationId, userId);
+    // Round trip #1 — participant auth AND the read-receipt watermark.
+    const conversation = await this.getPollContextOrThrow(
+      conversationId,
+      userId,
+    );
     if (query.cursor && query.after)
       throw new BadRequestException('Provide either cursor or after, not both');
 
     const limit = query.limit ?? 30;
     const afterMode = Boolean(query.after);
+    const peerLastReadAt = conversation.peerLastReadAt;
+    const decodedAfter = query.after ? this.decodeCursor(query.after) : null;
+
+    // NOTE: there is deliberately no `lastMessageAt <= cursor` fast path here.
+    // The watermark carries a timestamp but no id, so it cannot disambiguate
+    // two messages sharing a millisecond: with m1=(T,A) and m2=(T,B), B>A, a
+    // client holding cursor (T,A) sees lastMessageAt=T <= T and would be told
+    // "nothing new" on that poll and on every poll after it — m2 is lost until
+    // an unrelated later message moves the watermark past T. No grace window
+    // fixes that (the state is stable, not settling), and tightening `<=` to
+    // `<` disables the optimization outright, since on a quiet thread the
+    // watermark equals the cursor timestamp by definition. Always scan.
+    //
+    // `conversation` is still fetched in one round trip with peerLastReadAt
+    // (see getPollContextOrThrow) — that fusion is independent of the scan.
+
+    // Scoping the scan to this conversation is what makes cursor tampering
+    // inert: the cursor only ever moves a boundary WITHIN the conversation the
+    // caller was just authorised for, so a forged cursor can reorder or skip
+    // the caller's own messages but can never reach another thread's rows.
     const conditions: SQL[] = [eq(messages.conversationId, conversationId)];
 
     if (query.cursor) {
@@ -258,19 +317,16 @@ export class ChatService {
           )!,
         );
       }
-    } else if (query.after) {
-      const decoded = this.decodeCursor(query.after);
-      if (decoded) {
-        conditions.push(
-          or(
-            gt(messages.createdAt, decoded.createdAt),
-            and(
-              eq(messages.createdAt, decoded.createdAt),
-              gt(messages.id, decoded.id),
-            ),
-          )!,
-        );
-      }
+    } else if (decodedAfter) {
+      conditions.push(
+        or(
+          gt(messages.createdAt, decodedAfter.createdAt),
+          and(
+            eq(messages.createdAt, decodedAfter.createdAt),
+            gt(messages.id, decodedAfter.id),
+          ),
+        )!,
+      );
     }
 
     const rows = await this.db
@@ -290,21 +346,14 @@ export class ChatService {
     const last = data[data.length - 1];
     const nextCursor =
       hasMore && last ? this.encodeCursor(last.createdAt, last.id) : null;
-    // Newest returned message: first in history (DESC), last in delta (ASC)
+    // Newest returned message: first in history (DESC), last in delta (ASC).
+    // An empty delta page keeps the client's watermark instead of nulling it.
     const newest = afterMode ? data[data.length - 1] : data[0];
     const latestCursor = newest
       ? this.encodeCursor(newest.createdAt, newest.id)
-      : null;
-
-    const [readRow] = await this.db
-      .select({ last: max(messages.readAt) })
-      .from(messages)
-      .where(
-        and(
-          eq(messages.conversationId, conversationId),
-          eq(messages.senderId, userId),
-        ),
-      );
+      : afterMode && decodedAfter
+        ? query.after!
+        : null;
 
     const listingIds = [
       ...new Set(
@@ -324,7 +373,7 @@ export class ChatService {
         hasMore,
         limit,
         latestCursor,
-        peerLastReadAt: readRow?.last ?? null,
+        peerLastReadAt,
       },
     };
   }
@@ -370,6 +419,32 @@ export class ChatService {
     return a < b ? [a, b] : [b, a];
   }
 
+  /**
+   * An attached image must be an object the SENDER uploaded, and nothing else.
+   *
+   * Structural, not substring-based. A `startsWith('chat/{id}/')` + reject-`..`
+   * pair is a denylist, and denylists on storage keys leak: `%2e%2e`,
+   * backslashes and fullwidth dots all slip past a literal `..` scan, and any
+   * of them may be normalised downstream by the storage layer. So instead:
+   * split on `/`, demand exactly three segments, demand segment 2 EQUALS the
+   * sender's id (an equality check — a prefix check could match a longer id,
+   * even though UUIDs happen to be fixed-length), and constrain the object name
+   * to the character class our own signer emits. `/`, `\` and `%` are outside
+   * that class, so there is no encoding left to smuggle a separator through.
+   */
+  private assertOwnedChatImagePath(imagePath: string, senderId: string): void {
+    const segments = imagePath.split('/');
+    if (
+      segments.length !== 3 ||
+      segments[0] !== 'chat' ||
+      segments[1] !== senderId ||
+      segments[2] === '.' ||
+      segments[2] === '..' ||
+      !ChatService.CHAT_OBJECT_NAME_RE.test(segments[2])
+    )
+      throw new BadRequestException('Invalid image path');
+  }
+
   private async getConversationForUserOrThrow(
     conversationId: string,
     userId: string,
@@ -379,6 +454,55 @@ export class ChatService {
       .from(conversations)
       .where(eq(conversations.id, conversationId))
       .limit(1);
+    return this.ensureParticipant(conversation, userId);
+  }
+
+  /**
+   * Participant auth check + the `peerLastReadAt` read-receipt watermark in a
+   * SINGLE round trip. Both are needed on every message poll — including the
+   * empty deltas that skip the message range scan — so they travel together.
+   */
+  private async getPollContextOrThrow(
+    conversationId: string,
+    userId: string,
+  ): Promise<ConversationPollContext> {
+    const [row] = await this.db
+      .select({
+        id: conversations.id,
+        userAId: conversations.userAId,
+        userBId: conversations.userBId,
+        lastMessageAt: conversations.lastMessageAt,
+        createdAt: conversations.createdAt,
+        // Aggregate over the join rather than a scalar subquery in the select
+        // list: drizzle rewrites top-level columns inside a `sql` select field
+        // to BARE identifiers on single-table selects, which would silently
+        // resolve the correlation against `messages` instead of
+        // `conversations`. The join keeps every reference qualified.
+        peerLastReadAt: max(messages.readAt),
+      })
+      .from(conversations)
+      // Scans exactly what the old standalone peerLastReadAt query scanned:
+      // my messages in this conversation, via messages_conversation_created_idx.
+      .leftJoin(
+        messages,
+        and(
+          eq(messages.conversationId, conversations.id),
+          eq(messages.senderId, userId),
+        ),
+      )
+      .where(eq(conversations.id, conversationId))
+      // Grouping by the PK is enough — the other conversations columns are
+      // functionally dependent on it.
+      .groupBy(conversations.id)
+      .limit(1);
+
+    return this.ensureParticipant(row, userId);
+  }
+
+  private ensureParticipant<T extends { userAId: string; userBId: string }>(
+    conversation: T | undefined,
+    userId: string,
+  ): T {
     // 404 for non-participants too: no conversation-id existence oracle
     if (
       !conversation ||
@@ -534,6 +658,11 @@ export class ChatService {
         typeof parsed?.id !== 'string'
       )
         return null;
+      // The id is compared against a `uuid` column. Postgres rejects a
+      // non-UUID literal with 22P02, which surfaces as a 500 — so a crafted
+      // cursor would be a one-request way to fault any endpoint that paginates.
+      // Treat it like any other malformed cursor: ignore it.
+      if (!ChatService.UUID_RE.test(parsed.id)) return null;
       const createdAt = new Date(parsed.createdAt);
       if (Number.isNaN(createdAt.getTime())) return null;
       return { createdAt, id: parsed.id };

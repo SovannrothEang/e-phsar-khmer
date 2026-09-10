@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
 import { ChatService } from './chat.service';
@@ -22,6 +23,12 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post('messages')
+  // Tighter than the global 100/60s: sending is the one chat verb that pushes
+  // content into someone else's inbox, so it is the harassment/spam surface.
+  // 30/min is well above human chat cadence and well below bot cadence.
+  // Caveat: the global ThrottlerGuard keys on IP, so this is shared by every
+  // user behind one NAT — see the follow-up note about a user-id tracker.
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Send a message (creates the conversation on first message)',
   })
