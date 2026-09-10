@@ -64,7 +64,7 @@ import { subCategory } from "@/types/subcategory";
 import { z } from "zod";
 import { toast } from "@/components/ui/sonner";
 import { FieldGroup } from "@/components/ui/field";
-import Image from "next/image";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 
 type SubCategoryFormData = z.infer<typeof subCategorySchema>;
@@ -481,13 +481,13 @@ export default function SubCategoriesClient() {
                     <TableCell>{subcategory.name}</TableCell>
                     <TableCell>{subcategory.slug}</TableCell>
                     <TableCell className="flex justify-start">
-                      <Image
+                      <DbImage
                         src={subcategory?.subIcon}
                         alt={subcategory.name}
                         width={56}
                         height={56}
                         className="h-12 w-12 object-cover"
-                        unoptimized
+                        fallback={<NoImageCell />}
                       />
                     </TableCell>
                     <TableCell>

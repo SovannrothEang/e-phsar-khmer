@@ -603,3 +603,264 @@ lower, and bar→content spacing was unequal (16px vs the category's equal 8px).
       missing fields never render. Jobs demo listing gained experience
       (2Year+). Browser: jobs detail = Main Category/Category/Job Type/
       Experience exactly; cars keep their 8-row grid.
+- [x] Detail specs order + Body Type (captain #24/#25): ListingSpecs
+      ATTR_KEYS now include bodyType ("Body Type") and follow the reference
+      order — year, taxType, Condition, bodyType, engineType, transmission,
+      color, then remaining keys; condition inserted before bodyType only
+      for condition-carrying categories. Browser (Civic): Main Category →
+      Category → Brand → Model → Year → Tax Type → Condition → Body Type
+      Sedan → Engine Type → Transmission → Color — matches image 25.
+- [x] Motorcycle detail specs (captain #26/#27): no code change needed —
+      the generalized order already matches (Year · Tax Type? · Condition ·
+      Color, no Body Type/Engine). Honda Dream demo gained taxType
+      (Plate Number) so its grid shows the 4-field reference; Yamaha keeps
+      no taxType (matches #27). Browser verified both.
+- [x] Discount price semantics flipped (captain #28: price input is the
+      ORIGINAL): lib/utils deriveOldPrice → applyDiscount (final = price×(1-v/100)
+      percent / price-v amount; no discount → price); Post-Detail + toCardPost
+      now show final as the bold price and the ORIGINAL listing price as the
+      strikethrough (cards/detail %-OFF and $-OFF badges derive from
+      oldPrice − price, unchanged math). Browser: "car test 1" detail =
+      $9 (bold) with $10 (strike) + 10% — matches expectation; lint 0
+      errors, build PASS.
+- [x] Bicycle + motorcycle description references (captain #30/#31):
+      no code change needed — the generalized ListingSpecs already renders
+      the per-category field sets. Bicycle: added a demo listing (Giant ATX
+      27.5, new) and verified detail = Main Category / Category / Condition;
+      motorcycle layout already matches the Vespa reference field-for-field
+      (Brand/Model/Year/Tax Type/Condition/Color) — verified on the Dream
+      125 and Exciter listings.
+- [x] Vehicles-for-rent description (captain #32): added vehicleType →
+      "Vehicle Type" to ListingSpecs ATTR_KEYS (the rent form stores it under
+      vehicleType; label per spec); Condition is NOT shown for rentals (the
+      rent form has no condition field — matches the reference). Seed gained
+      a "Mini Bus 25 Seats For Rent" demo listing (vehicleType Mini Bus,
+      engineType Diesel, transmission Auto) and the condition-less rows were
+      cleaned (villa/land/sofa/polo/job — their forms have no condition).
+      Browser: Main Category / Category / Vehicle Type Mini Bus / Engine
+      Type Diesel / Transmission Auto — exactly image 32. Gates: lint 0
+      errors, build PASS.
+- [x] Last six cars-and-vehicles description references (captain #33-#38):
+      Condition is now SUBcategory-aware — ListingSpecs gained
+      CONDITION_SUBCATEGORIES (25 slugs extracted from the categories seed
+      conditionField usage; maintenance/financing/tuk-tuk/vehicles-others/
+      rentals correctly show none) replacing the main-category rule; plus
+      LABEL_OVERRIDES for parts-and-accessories (vehicleType renders as
+      "Type"). Seeded one demo listing per subcategory (maintenance service,
+      used Hyundai truck, loan/insurance, electric tuk tuk, car spare parts
+      with vehicleType Cars + condition, used truck tires). Six verification
+      subagents (one per subcategory) spawned to check each detail page in
+      the browser.
+      VERIFICATION (6 agents, one per subcategory, headless browser each):
+      all PASS. maintenance-and-repair / financing-and-insurance /
+      tuk-tuk-and-remork / vehicles-others = Main Category + Category only
+      (no Condition — subcategory rule works); lorries = + Condition Used;
+      parts = Main Category + Category + Type (Cars) + Condition (New) —
+      the agent caught the order (Condition rendered before Type vs the
+      reference's Type-then-Condition), fixed via conditionPreKeys
+      (Condition now inserts after the last of Year/Tax Type, plus the Type
+      picker for parts); re-verified PASS + Camry regression PASS (Year,
+      Tax Type, Condition, Body Type, Engine, Transmission, Color intact).
+      Also fixed a real footer bug two agents surfaced: ABA payment icon
+      path lacked its leading slash → rendered /en/icon/ABA.svg 404.
+      Gates: lint 0 errors, build PASS. Uncommitted.
+
+## Image audit — DB is the only source; dead storage must render as absent (2026-09-10)
+
+Captain: "check other category and sub, and even attribute in car and vehicle,
+check image too. image must from db, not from anywhere else. (if the image in
+db, and supabase storage not has, the image must not has, it can't be static
+or bug)."
+
+### Audit (live, 2026-09-10)
+- [x] DB sweep (1013 rows): 306 rows carry an image. 154 are `/sub-img/…`
+      local paths — every file exists. 152 are Supabase Storage URLs in the
+      `product-images` bucket — ALL 152 return `NoSuchKey` (Supabase reports it
+      as HTTP 400 with a 404 payload; verified with a real GET).
+      Missing by surface: category icons 7, subcategory icons 62 (incl. every
+      cars-and-vehicles subcategory), brand icons 56 (all phones/computers
+      brands), attribute images 27 (16 car body types, 7 job types, 5 networks).
+- [x] Renderer sweep: every grid paints `<Image src={db value}>` with no
+      load-failure handling → broken glyphs. Browser-confirmed: home = 7 broken
+      category icons, /category/cars-and-vehicles = 10 broken subcategory
+      icons, cars-for-sale = 9 broken body types + xiaomi brand + 1 dead
+      listing photo.
+- [x] `/placeholder.svg` is referenced by 7 files but does NOT exist in
+      `apps/web/public/` (never committed) → every no-photo listing card paints
+      a broken image (30 across the 3 pages).
+
+### Fix (browse surfaces; no static substitutes)
+- [x] `components/common/DbImage.tsx` — next/image + onError → renders the
+      caller's fallback (the IconImage version was folded into this one).
+- [x] `home/CategoryGrid.tsx` → fallback = the existing LayoutGrid glyph.
+- [x] `category-layouts/SubcategoryGrid.tsx` → fallback = name-in-circle; the
+      label is now a FIXED dark colour (the circle is a fixed light blue in
+      both themes — in dark mode the inherited white text was invisible, a
+      pre-existing bug visible on every icon-less subcategory, e.g. pets).
+- [x] `subcategory-layouts/OptionGrid.tsx` → failed tile renders the bordered
+      text tile; when no option has a loadable image the grid switches to the
+      6-col text layout (cars-for-sale Body Type = 9 clean text tiles).
+- [x] `ads/GridCardPost.tsx` + `ads/ListCardPost.tsx` → dropped
+      `/placeholder.svg`; no photo / failed photo = empty grey area + glyph.
+- [x] `components/post/PostImage.tsx` (detail gallery, 17 `<Image>` sites) →
+      DbImage, same rule for listing photos.
+- [x] Seed: added `car test 1` (test debris with a dead storage photo) to
+      JUNK_TITLES; `db:seed` removed it.
+- [x] Gates: web lint 0 errors (1 pre-existing warning), web build PASS,
+      backend lint/build/tests PASS (16 suites / 159 tests).
+- [x] Browser re-audit (CDP, counts every `<img>` with naturalWidth === 0):
+      home 0 broken, cars-and-vehicles 0, cars-for-sale 0, vehicles-for-rent 0,
+      jobs/accounting-jobs 0, laptops 0, Camry detail 0, photo-less detail 0.
+      Working icons unaffected: 90 car brands render as logos (xiaomi, whose
+      stored object is missing, is a text tile), rent body types show their 5
+      local icons.
+
+### Out of scope (reported, not changed)
+- 152 stale DB image paths — captain decides: re-upload the assets to Storage
+  or clear the columns (admin-owned rows, untouched).
+- `/placeholder.svg` in LoginForm / AdBanner / SmallAdBanner / attribute-manager.
+- Mock surfaces (`lib/categories.ts`, `lib/post-ad.ts`) use local `/cate-img`
+  assets that exist — unchanged.
+
+### Regression caught during verification (2026-09-10)
+- The first pass at the grids dropped the `unoptimized` prop when swapping
+  `<Image>` → the wrapper. `next/image` validates a remote hostname against
+  `next.config` remotePatterns even on the pass-through path, so every page
+  whose subcategory/category icons are Storage URLs threw
+  `Invalid src prop (…supabase.co…) … hostname is not configured` and fell to
+  "Something went wrong! Try again" (phones-and-tablets, computers, electronics,
+  home-and-land, jobs, services, books-sports-and-hobbies — the pages whose
+  subcategories have NULL icons, e.g. pets/foods, masked it).
+  Fix: `DbImage` now defaults `unoptimized` to true (documented in CLAUDE.md).
+  Re-verified: all 12 category pages + subcategory/detail pages render, 0 broken
+  images, and the error boundary is gone.
+
+### Round 2 — "get image from outside db? it's not allow this way" (2026-09-10)
+Captain, on the cars-for-sale Brand grid: storage has no brand images yet the
+logos render; the Body Type grid is boxes though the DB has image values; "in
+admin side and client has — why?".
+
+- [x] Root cause established: the `product-images` bucket holds ONLY an
+      `avatar` folder (verified with the Storage list API using the service
+      key) — no brand/attribute/category/subcategory/listing objects at all.
+      The car-brand logos the captain sees are NOT from storage: those DB rows
+      store `/sub-img/car_vehicles/cars-for-sale/brands/*.png`, files shipped
+      inside `apps/web/public`, so the browser loads them from the Next server.
+      Deleting storage objects could never remove them. Body types differ —
+      their DB values ARE Storage URLs, and those objects are gone, hence boxes.
+- [x] Rule enforced in code: `DbImage` renders ONLY when the src is a Storage
+      object URL (`isStorageObjectUrl`); local static paths and third-party
+      hosts take the fallback path. `OptionGrid` (it keeps its own failure map)
+      applies the same check via the exported helper — that was the miss on the
+      first pass, and why the brand grid still showed logos.
+- [x] Admin parity (captain: "in admin side and client has why?"): the admin
+      brands / categories / subcategories tables and the attribute manager now
+      render through `DbImage` with a muted `NoImageCell` ("—") fallback; the
+      dead `/placeholder.svg` fallback in the attribute manager is gone.
+- [x] Verified: 0 broken `<img>` on home / cars-for-sale / phones / jobs /
+      Camry detail; all 12 category pages render (no error boundary). Every
+      image left on those pages is site chrome (logo, flags, payment icons) or
+      the page's own banner ad.
+- [x] Gates: web lint 0 errors (1 pre-existing warning), web build PASS.
+- DECIDED (captain, 2026-09-10): leave the catalog imageless. No upload, no
+      DB rewrite — icons return only when an admin uploads them through the
+      admin UI. The 154 local-path rows and 152 dead-object rows stay as they
+      are and keep rendering the "no image" state.
+
+### Round 3 — design follows the thing, not the load result (2026-09-10)
+Captain on the cars-for-sale Brand grid: "if the thing that we have to use image,
+then use the image design. if the things has no image use not has image design …
+so what if one image disappear? it's will show the no image design, seems not
+right."
+
+- [x] `OptionGrid`: the circle-vs-box design is now decided by the option SET
+      (majority image-bearing), not by whether icons load; a dead object leaves
+      an empty circle. `DbImage` (storage-object-only + onError) renders the
+      image inside the circle, the grid design never changes.
+- [x] Caught while verifying: a first cut used "any option has an image" and
+      the shared `other` attribute row (linked across families, carrying a
+      musical-instrument icon) flipped the whole FURNITURE Type grid to
+      circles. Switched to a majority test — furniture back to boxes, musical
+      instruments stay circles.
+- [x] `SubcategoryGrid` / `home/CategoryGrid`: same principle — the name-in-
+      circle and the LayoutGrid glyph are now the no-image design for rows with
+      NO icon value only; an icon row whose object is missing shows an empty
+      circle instead of borrowing the other design.
+- [x] Verified (CDP screenshots): Brand = 20 circles, Body Type = 9 circles,
+      musical Type = 11 circles, furniture Type = boxes, home = 7 empty circles
+      + 5 glyphs, subcategories = 10 circles. All pages: 0 broken <img>, no
+      error boundary. Gates: lint 0 errors, build PASS.
+
+### Round 4 — leftover image in the admin Edit dialog (2026-09-10)
+Captain: "after we deleted image, why admin when i click edit, the left over
+image still here? the data is correct show no image, but when edit why the
+image still here? find out the cause of this."
+
+- [x] Cause: the brands TABLE renders through `DbImage` (storage-only) so it
+      shows "—", but the Edit dialog renders the SAME stored string through
+      `ImageUpload`'s bare `next/image` (truthiness check only). MG's value is
+      `/sub-img/car_vehicles/cars-for-sale/brands/mg.png` — a 24 KB file
+      inside `apps/web/public` — so it loads no matter what was deleted in
+      Supabase. `EditBrandForm` seeds `image: brand.image` from the row, so the
+      leftover rode into the dialog (and `icon: parsed.data.image || null` would
+      write it straight back on Save).
+- [x] Fix: `ImageUpload` now applies the same rule — the preview renders only
+      when the value is a Storage object URL, otherwise an empty
+      "No <label> stored" slot (the X button still clears the field).
+- [ ] NOT verified live: driving the admin dialog needs an admin session; the
+      permission layer blocked minting a token from JWT_SECRET, so the captain
+      should click Edit once to confirm. Gates: lint 0 errors, build PASS.
+
+### Round 5 — an applied set steps aside (2026-09-10)
+Captain: "the behavior in car for sale seems not right … when click sedan isn't
+it show move to page which the bodytype has no longer there … and the left show
+be brand."
+
+- [x] Cause: `SubcategoryContent` always rendered every linked set, so the
+      applied Body Type grid stayed on screen (and, because its card is the
+      first block under the sticky bar, the Brand grid above it was scrolled
+      out of sight — which is what the screenshot showed).
+- [x] Fix: a set containing the applied `ad_type` is filtered out; Brand stays
+      as the next choice, and Brand → Model already swapped. The applied filter
+      is still shown by the bar, the breadcrumb (which links back to the
+      unfiltered page) and the feed.
+- [x] Verified: cars-for-sale `?ad_type=sedan` → only Brand remains (breadcrumb
+      "Sedan in Cambodia"); `+ad_field=toyota` → Model grid (2 tiles); jobs
+      `?ad_type=full-time` → Job Type steps aside, breadcrumb "Full-time in
+      Cambodia". Gates: lint 0 errors, build PASS.
+
+### Round 6 — the pick must behave like a navigation (2026-09-10)
+Captain: "why it still there? it not even move … not like go to new page with
+new url. the brand flow same right (brand->bodytype), so choose the same
+behavior like that."
+
+- [x] Reproduced under CDP: load cars-for-sale, scroll to the Body Type grid
+      (scrollY 419), click Sedan → URL becomes ?ad_type=sedan and the set steps
+      aside, but scrollY stays 419 while the page shrinks, so the view lands in
+      the middle of the Brand grid with its heading hidden behind the sticky
+      bar. That is the "it's still there / it doesn't move" the captain saw.
+- [x] Cause: `OptionGrid.handleClick` passed `{ scroll: false }` to
+      `router.replace` (an old "stay on the same page" choice).
+- [x] Fix: `{ scroll: true }` — a pick now resets the view to the top like any
+      navigation. One handler covers brand and attribute picks.
+- [x] Verified: `?ad_type=sedan` → scrollY 0, Brand grid under the bar;
+      `?ad_field=toyota` → scrollY 0, Model + Body Type; combined
+      `?ad_field=toyota&ad_type=sedan` → Model. Gates: lint 0 errors, build PASS.
+
+### Round 7 — Back must walk the drill-down (2026-09-10)
+Captain: "cars-for-sale?ad_type=sedan, when i click back ... it back to
+'cars-and-vehicles' not 'cars-for-sale', why? even '?...&ad_field=mg' also back
+to car and vehicle, not '?ad_type=sedan'."
+
+- [x] Reproduced under CDP: category → subcategory (history len 3) → pick Sedan
+      → Back lands on `/category/cars-and-vehicles`, skipping `cars-for-sale`.
+- [x] Cause: the pick used `router.replace`, which rewrites the current history
+      entry instead of adding one — the subcategory entry was overwritten by the
+      filtered URL, so there was nothing left to go back to.
+- [x] Fix: `router.push` — every pick is a history step. Verified: subcat →
+      +Sedan → +MG → Back = `?ad_type=sedan` → Back = `cars-for-sale`.
+- [ ] NOTE (not changed): the chip filters (Location/Sort/Price/More Filters in
+      `components/filter/*`) still use `router.replace`, so Back skips past them
+      the same way. Captain decided (2026-09-10) to unify them LATER — parked in
+      `tasks/waiting-for-implements-laters.md` §1, no code touched.
+- [x] Gates: lint 0 errors, build PASS.

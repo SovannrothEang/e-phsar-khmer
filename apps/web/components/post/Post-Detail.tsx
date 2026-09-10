@@ -25,7 +25,7 @@ import ListingSpecs from "./ListingSpecs";
 import type { BackendListing } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
-import { deriveOldPrice } from "@/lib/utils";
+import { applyDiscount } from "@/lib/utils";
 
 /**
  * Real-listing data slotted into this template. The page (RSC) builds this from
@@ -55,18 +55,23 @@ function toPostView(l: BackendListing): Post {
     title: l.title,
     images: l.photos.map((p) => p.url),
     imageCount: l.photos.length,
-    price: Number.isFinite(price) ? price : 0,
-    cateId: "",
-    subId: "",
-    brandId: undefined,
-    modelId: undefined,
-    // Mockup shows current + strikethrough old price + discount badge —
-    // derive the old price from price + discountValue/discountType.
-    oldPrice: deriveOldPrice(
+    // The listing price is the ORIGINAL; the discount applies on top — the
+    // bold price is the final, the strikethrough is the original.
+    price: applyDiscount(
       Number.isFinite(price) ? price : 0,
       l.discountValue,
       l.discountType,
     ),
+    cateId: "",
+    subId: "",
+    brandId: undefined,
+    modelId: undefined,
+    oldPrice:
+      l.discountValue && l.discountType
+        ? Number.isFinite(price)
+          ? price
+          : 0
+        : undefined,
     discount,
     description: l.description ?? "",
     createdat: new Date(l.createdAt),
