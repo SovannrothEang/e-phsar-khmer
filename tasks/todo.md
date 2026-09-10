@@ -89,8 +89,7 @@ Captain asked whether the flow works with `DEV_OTP_TOKEN`. Findings:
 ## R2 (2026-08-18): phone+password→OTP login; password/names/username at registration (approved plan rev 2)
 
 - [x] Backend: VerifyOtpDto (required password, optional names) + verifyPhoneOtp
-      password-first rework + mirrorSupabaseUser insertExtras + POST /auth/otp/login
-      + RequestOtpDto rider
+      password-first rework + mirrorSupabaseUser insertExtras + POST /auth/otp/login + RequestOtpDto rider
 - [x] Backend unit tests: insert extras, conflict-set purity, wrong-password 401
       (no Supabase call), DTO 400, requestLoginOtp paths
 - [x] Backend gates: test / build / lint
@@ -198,6 +197,7 @@ until Phase C migrates those pages.
 ## Category + subcategory pages → backend data; car brands/bodyTypes live (2026-08-25)
 
 **Backend** (cars-first data + one public endpoint):
+
 - New `PublicAttributesController` → `GET /api/v1/attributes/:type` (`@Public()`,
   registered in AttributesModule; module was decoupled to grow a public
   surface). AttributesService.list returns full rows incl. subcategoryIds.
@@ -222,6 +222,7 @@ until Phase C migrates those pages.
   admin icon intact; /attributes/bodytypes public → 16 rows (15 with icons).
 
 **Frontend:**
+
 - `lib/api/categories.ts` (server-only): getCategoryWithSubcategories /
   getBrandsForSubcategory / getBodyTypes / getModelsForBrand —
   CategoryGrid-style raw fetch + envelope + null/[] on failure; local types.
@@ -304,8 +305,9 @@ as before — the old local-state filters didn't filter anything either).
 
 Follow-up on the All Ads bar port: (1) the bar was glued below the title
 instead of floating; (2) the grid/list toggle changed no content. Fixed:
+
 - The 4 category layouts now render title + bar only (bar `sticky top-16
-  z-40`, TabsList — no own <Tabs> wrapper); the CATEGORY PAGE owns the Tabs
+z-40`, TabsList — no own <Tabs> wrapper); the CATEGORY PAGE owns the Tabs
   root so the layout's TabsTriggers switch the page's post sections.
 - Page: Tabs("grid"|"list") → TabsContent grid = HighLightAds sections
   (grid cards), list = NormalAd sections (ListCardPost list cards);
@@ -349,4 +351,255 @@ exactly: grid view = `GridCardSell` + `posts.map(GridCardPost)` in
 
 Verified: lint 0, build PASS. Browser: grid panel = Sell card + 39 post
 cards in 4 cols, no Highlights/Latest Ads text; list panel = 39 list cards
-+ Sell card; screenshot matches #28 (RX7/Supra/iPhone first row).
+
+- Sell card; screenshot matches #28 (RX7/Supra/iPhone first row).
+
+## Cars-for-sale filter bar → image-6 component (2026-08-31, captain images #6/#7)
+
+Plan approved via plan-mode checkpoint. Captain: "make the car for sale has
+this component like the image [6] — 'more filters' move to the left for the
+car for sale filter, and put to grid/list layout on the right".
+
+- [x] LSPYCEHeader: title block + sticky bar (CarsCategoryLayout classes);
+      More Filters joins the left chip group (ml-auto removed); dead `view`
+      state / `onShowFilters` / header-row grid-list button removed; TabsList
+      (grid/list) added at the bar right
+- [x] Subcategory page: Tabs root wraps breadcrumb+header+content (header
+      unwrapped from the `mt-2` div — sticky containing block); cars-for-sale
+      gets TabsContent grid (GridCardSell+GridCardPost) / list (ListCardSell+
+      ListCardPost) replacing HighLightAds/NormalAd; mocks keep AD_BLOCKS
+- [x] Gates: web lint 0 errors (known AdminLoginForm warning), build PASS
+- [x] Browser: bar layout vs image 6; toggle switches grid/list; bar sticks;
+      regressions (cars-and-vehicles category page, mock subcategory)
+- [x] Left uncommitted (no commit per project instruction)
+
+### Follow-up pass (captain images #8/#9/#10/#11): full parity with the category bar
+
+Captain flagged: chip sizes differed (local chips ~34px vs shared h-12),
+Location/More-Filters icons missing (bootstrap `bi-*` classes render nothing —
+bootstrap-icons CSS isn't loaded anywhere in web), the category bar sat ~8px
+lower, and bar→content spacing was unequal (16px vs the category's equal 8px).
+
+- [x] LSPYCEHeader chips → shared spec: `Button variant="outline"` +
+      `bg-muted rounded-sm h-12 ...` (same as LocationSelectorFilter/
+      SortFilter/PriceFilter/MoreFilters); lucide `MapPin` on Location,
+      tabler `IconFilterCog` on More Filters; dead `bi-*` chevrons removed;
+      title row byte-matched to the category title block (dead percent/truck
+      mock buttons removed)
+- [x] Page structure mirrors the category page exactly: breadcrumb in its own
+      `px-4 py-2` block, Tabs as a sibling (the 8px offset came from the
+      wrapper's `py-2` being consumed below the Tabs); SubcategoryContent
+      wrapper `py-2` → plain `<div>` (bar→content back to the 8px gap)
+- [x] Gates: web lint 0 errors (known AdminLoginForm warning); web build PASS
+- [x] Measured parity (CDP): both pages title y=379 h=54, bar y=441 w=1280
+      h=74, chips h=48, toggle w=90 h=32, breadcrumb→title 12px,
+      bar→content 8px; list toggle switches to list cards; sticky top-16 ✓;
+      mock phones subcategory unchanged (no toggle, ad blocks render)
+- [x] Bodytype spacing (captain images #12/#13, two correction rounds):
+      final layout = SEPARATE option-grid cards (captain: "the old is
+      correct here" — a one-card merge was tried and reverted per #13),
+      OptionGrid gap mb-4 → mb-2 (brand→bodytype 16px → 8px), and the
+      bodytype→posts distance tightened 24px → 16px (TabsContent margins
+      dropped on the subcategory page; the category page is untouched).
+      Measured: bar→brand 8px, brand→bodytype 8px (separate cards),
+      bodytype→posts 16px; gates lint 0 errors (known warning), build PASS.
+      Note: bodytype icons still show broken glyphs — known Supabase
+      NoSuchKey gap (admin re-upload via admin UI).
+- [x] Grid headings (captain image #14, "use name on above"): OptionGrid
+      gains an optional `title` rendered as a left-aligned h2 above the grid
+      (text-base font-medium mb-4); SubcategoryContent passes "Brand" /
+      "Model" / "Body Type" ("Job Type" for the dead jobs path). Browser:
+      both headings render inside their cards; lint 0 errors, build PASS.
+- [x] Bicycles subcategory → cars-for-sale concept (2026-08-31, captain:
+      "do the bicycles in car and vehicle, understand the concept first").
+      No backend change (subcategory exists; 0 brands/0 listings today). - LSPYCEHeader: optional `year`/`engine` props (default true — cars
+      call site unchanged) wrapping the Year/Engine chip blocks. - Subcategory page: HEADER_MAP explicit `bicycles` key →
+      `<LSPCYEHeader year={false} engine={false} />` (shadows the
+      LSPC_SUBCATEGORIES → LSPCHeader mapping; subcategoryGroups.ts
+      untouched); feed branch generalised to REAL_FEED_SUBCATEGORIES
+      ["cars-for-sale", "bicycles"] — bicycles gets the real grid/list
+      feed (currently 0 listings → Sell card only) instead of AD_BLOCKS.
+      Browser: bicycles bar = Location|Sort|Price|Condition|More Filters +
+      toggle (no Year/Engine); cars-for-sale + phones regressions fine;
+      lint 0 errors, build PASS.
+- [x] Motorcycles-for-sale subcategory → cars-for-sale concept (2026-08-31).
+      Same two edits as bicycles: HEADER_MAP explicit key →
+      `<LSPCYEHeader engine={false} />` (shadows LSPYC_SUBCATEGORIES →
+      LSPYCHeader; chips = Location/Sort/Price/Year/Condition — no Engine),
+      and "motorcycles-for-sale" added to REAL_FEED_SUBCATEGORIES (0 brands/
+      0 listings today → Sell card only). Browser: motorcycles bar correct,
+      bicycles + cars-for-sale regressions fine; lint 0 errors, build PASS.
+- [x] Motorcycle brands + models seeded (captain: "isn't motorcycle have
+      brand?" + "after click brand, next page should show model"):
+      - brands.seed.ts: MOTO_BRANDS (31, design order Honda first; mock-
+        verbatim names incl. "Royal Enfeild"; asset-derived slugs —
+        royal-enfield, other; Honda/Suzuki/BMW take `-moto` slugs so each
+        branch keeps its own row/icon/position; `other` = the shared
+        phones-family Other row, sortOrder 999, admin icon). Seed loop +
+        count updated (189 brands total).
+      - Unlinked the car honda/suzuki/bmw rows from motorcycles-for-sale
+        (one-time SQL in dev DB; slug-uniqueness forced the separate rows).
+      - MOTO_MODEL_SEEDS: curated Khmer-market baseline (24 brands, ~140
+        models — Dream 125/Click/PCX, Jupiter/NMAX/Exciter, Ninja/Duke, V-T),
+        insert-only, admins extend via the Models page (390 models total).
+      - Web: active filter crumb now uses display names (was slug-derived —
+        "honda moto in Cambodia" → "Honda in Cambodia").
+      Browser: moto page = 31 brand tiles (Honda first, moto logos) → click
+      Honda → "Model" heading + 14 model tiles; cars grid untouched.
+      Gates: backend build/lint/test (159/159) + seed ×2 idempotent;
+      web lint 0 errors, build PASS. CLAUDE.md updated (Brands section
+      MOTO_BRANDS paragraph + known-gaps note resolved).
+- [x] Vehicles-for-rent → cars-for-sale concept + Body Type grid (captain
+      image #17):
+      - attributes.seed.ts BODY_TYPES redefined to the rent design grid
+        (21 rows): 5 new rental types (motorcycle, bicycle,
+        tuk-tuk-and-remork, city-bus, express-bus; icons gap-filled from
+        /sub-img/.../vehicles-for-rent/body_type/*.png) + vehicles-for-rent
+        added to the 15 shared rows' subcategories (sedan…trucks, other).
+        Convertible stays cars-only at its design slot — the single global
+        sortOrder keeps cars (Sedan→Convertible→…→Other), lorries
+        (Heavy→…→Other) AND rent (Motorcycle→…→Other) in their own design
+        order. One-time dev-DB SQL: rent link appended to 15 rows (they're
+        insert-only rows; admin edits survive, seed covers fresh DBs) +
+        global sortOrder re-set (0-20).
+      - Web: LSPYCEHeader gains condition?: boolean (default true); rent
+        HEADER_MAP key → year/engine/condition all false (Location/Sort/
+        Price bar); vehicles-for-rent added to REAL_FEED_SUBCATEGORIES.
+      Browser: rent page = Body Type heading + 20 tiles in design order
+      (icons incl. the 5 new), bar L/S/P + More Filters + toggle, Sell card;
+      cars + lorries grids unchanged. Gates: backend build/lint + web
+      lint/build PASS (tests unchanged; no attribute unit tests affected).
+- [x] Maintenance-and-repair → cars-for-sale concept (2026-08-31). Same
+      two web edits as rent (no grids/design assets exist for it):
+      HEADER_MAP key → LSPCYEHeader year/engine/condition all false,
+      added to REAL_FEED_SUBCATEGORIES. Browser: Location|Sort|Price|
+      More Filters + toggle, Sell card feed; lint 0 errors, build PASS.
+- [x] Lorries-vans-and-tractors → cars-for-sale concept (2026-08-31).
+      HEADER_MAP key → LSPCYEHeader year/engine/condition false (L-S-P
+      bar, design profile), added to REAL_FEED_SUBCATEGORIES; its Body
+      Type grid (8 truck types) was already linked from the attributes
+      seed. Browser: L|S|P|More Filters + toggle + Sell card + Body Type
+      grid in design order (mock Highlights ad blocks gone); cars grid
+      regression fine; lint 0 errors, build PASS.
+- [x] Financing-and-insurance → cars-for-sale concept (2026-08-31).
+      HEADER_MAP key → LSPCYEHeader year/engine/condition false; added to
+      REAL_FEED_SUBCATEGORIES. Browser: Location|Sort|Price|More Filters +
+      toggle + Sell card; lint 0 errors (known warning), build PASS.
+- [x] Tuk-tuk-and-remork → cars-for-sale concept (2026-08-31).
+      HEADER_MAP key → LSPCYEHeader year/engine/condition false; added to
+      REAL_FEED_SUBCATEGORIES. Browser: Location|Sort|Price|More Filters +
+      toggle + Sell card; lint 0 errors (known warning), build PASS.
+- [x] Parts-and-accessories → cars-for-sale concept (2026-08-31).
+      HEADER_MAP key → LSPCYEHeader year/engine/condition false; added to
+      REAL_FEED_SUBCATEGORIES (note: the mock group lists it as
+      "parts-accessories" — the real backend slug never matched LSPC).
+      Browser: Location|Sort|Price|More Filters + toggle + Sell card;
+      lint 0 errors (known warning), build PASS.
+- [x] Vehicles-others → cars-for-sale concept (2026-08-31) —
+      LAST mock surface of cars-and-vehicles: HEADER_MAP key →
+      LSPCYEHeader year/engine/condition false; added to
+      REAL_FEED_SUBCATEGORIES. Browser: Location|Sort|Price|More Filters +
+      toggle + Sell card; lint 0 errors (known warning), build PASS.
+      ALL 10 cars-and-vehicles subcategories are now on the real surface.
+- [x] /loop round 1 (2026-08-31): rest of catalog → real data surface.
+      Generalized recipe (no more per-subcategory mock headers):
+      - LSPYCEHeader: new `price`/`priceLabel` chip props (price only, hidden
+        for LS-group surfaces; jobs shows "Salary").
+      - Subcategory page: HEADER_MAP → CATEGORY_HEADER_FLAGS +
+        SUBCATEGORY_HEADER_FLAGS (design chip sets per category; vehicles
+        keep per-subcategory sets); feed is ALWAYS real (AD_BLOCKS + mock
+        header imports removed); every linked attribute set (19 types) is
+        fetched in parallel, filtered by the subcategory UUID, and rendered
+        as an OptionGrid with the design title (ATTRIBUTE_SET_TITLES:
+        bodytypes→"Body Type", types→"Type", accessories, networks,
+        bedrooms/bathrooms/facings, rams/cpus/storage/screensize, ...).
+      - SubcategoryContent: `sets` prop replaces `bodyTypes`; category page
+        feed is always real too (mock `posts` import removed).
+      Browser matrix (per subcategory): property = Type/Bedroom/Bathroom/
+      Facing + L-S bar; jobs = Salary; services/home-land = L-S; phones/
+      computers/electronics = L-S-P-C + Brand links; fashion/furniture/
+      books = L-S-P + Type; pets/foods = L-S-P; all get toggle + real feed.
+      Gates: lint 0 errors, build PASS.
+      Notes: (a) grid clicks outside brand/bodyType don't filter the feed
+      yet (backend /listings accepts brand/bodyType params only); (b) each
+      subcategory page now makes ~21 API calls — nudges the 100/min global
+      throttle under heavy automation (bundle endpoint later); (c) a few
+      design grids still lack links (land types etc. — admin adds).
+- [x] Property browse grids corrected (captain image #18: house and
+      land only needs "Type"): bedrooms/bathrooms/facings rows are lookup
+      picklists, NOT browse grids — their house-for-sale/rent links removed
+      at the seed (subcategories: UNLINKED) + one-time DB cleanup (22 rows).
+      Browser: house-for-sale/rent now show only the "Type" grid + L-S bar.
+      (Land/condo/apartment/room pages still lack their type rows — design
+      data gap, admin/seed follow-up.)
+- [x] Jobs Job Type grids (captain: "job each job subcategory has job
+      type"): jobtypes rows (Full-time/Part-time/Internships/Freelance/
+      Contract/Volunteer/Other-Jobs) now link to ALL 36 jobs subcategories —
+      seed JOBS_SUBS + one-time DB (7 rows). Browser: accounting-jobs and
+      sales both show "Job Type" grid + Location|Sort|Salary bar.
+- [x] Jobs category page chip "Salary" (captain image #19): shared
+      PriceFilter gains `label?: string` (chip + dialog title; default
+      "Price"); JobsCategoryLayout passes label="Salary". Browser: jobs
+      category bar = Location|Sort|Salary|More Filters.
+- [x] Services category bar: Price chip removed (captain: "in service
+      has no price button, only location, sort, more filter") — shared
+      PriceFilter dropped from ServicesCategoryLayout (subcategory pages
+      already price-less via flags).
+- [x] Tables & desks Type grid + tile style (captain image #20): the
+      grid was linked and rendering but throttle-flaky at capture time;
+      verified now (Dining Table / Game Table / Kids Desks / Office Desk /
+      Student Desk / Wooden Table / Other). ALSO aligned the imageless
+      option tiles to the design: bordered TEXT tiles (model-style) instead
+      of the icon-circle fallback — chairs-and-sofas (11) too; image-bearing
+      grids (rent bodytypes, brands) keep the icon circles.
+- [x] Browse-grid audit (captain: "why column color for filter in car for
+      sale? maybe another too?"):
+      - colors + vehicletypes were "plain dropdown, no image" form fields
+        (per seed comments) that the generalized renderer leaked as browse
+        grids — unlinked at the seed + DB (35 rows). Cars now = Brand +
+        Body Type; motorcycles = Brand; rent = Body Type (no duplicate
+        Vehicle Type). The other form-only sets (rams/cpus/storage/
+        screensize/enginetypes/experiences/vgas) were never linked ✓.
+      - Column counts: icon grids (brand/bodytype/jobtype) stay 10 cols;
+        icon-less text grids (models, furniture/property types) now use
+        the design's 6 cols (grid-cols-3 md:6) — image 20 style.
+      - Root cause of flaky "missing" grids: each page made 19 attribute
+        fetches → hit the 100/min global throttle. New public endpoint
+        GET /attributes?subcategoryId=<uuid> (AttributesService
+        .listBySubcategory, JSONB @> containment) + getLinkedAttributeOptions:
+        ONE call per page (~4 total) — verified 5 pages back-to-back with
+        zero flakes. Backend build/lint/tests + web gates PASS.
+- [x] Musical-instruments Type grid → brand icon style (captain #21):
+      the 11 type rows were icon-less (the admin cell was its no-image
+      placeholder, not a broken URL); design icons exist in
+      /sub-img/books-sports-hobbies/brands/*.png — seeded via a null-only
+      gap-fill (incl. the traditional-instruments → traditional-instrument
+      name mapping). Browser: 11 icon tiles in the 10-col brand-style grid.
+      (fashion-beauty type assets also exist — offer as follow-up.)
+- [x] Homepage Latest Ads → real data (captain image #22): the home
+      page fetched the mock lib/posts feed; now getListingsFeed({}, locale)
+      + toCardPost (all active listings) rendered through GridCardSell/
+      GridCardPost. Top Ads + Browse sections untouched. Browser: 5 real
+      dev-DB listings (car, car2, car3, Corolla tests) + Sell card; gates
+      lint 0 errors, build PASS.
+- [x] Demo listings seed ("seed data properly for now"): new
+      src/listings/seeds/listings.seed.ts — 15 curated Khmer-market listings
+      across cars/motos/phones/laptop/TV/property/furniture/fashion/jobs
+      (real brand/type attribute names so feed filters work, USD prices,
+      seeded provinces/districts, active + 30d expiry, admin user as owner,
+      a few with local /sub-img photos); wired into db/seed.ts after admin.
+      Idempotent by title (+ the 6 test-junk rows — "car", Corolla tests —
+      are deleted on seed). Fixes along the way: discountType "amount"
+      (discount_pair CHECK), isNull(deletedAt), schema import paths.
+      Verified: 15 rows DB, home Latest Ads = 15 demo cards, re-run
+      seeds 0 duplicates; backend build/lint/tests 159 PASS.
+- [x] Detail specs grid generalized (captain image #23: jobs shows only
+      related fields): ListingSpecs no longer hardcodes the car rows — it
+      renders Main Category/Category + Brand/Model (when the listing has
+      them) + each attribute key in the design order (year, taxType, color,
+      jobType, experience, engineType, transmission, type, bedrooms,
+      bathrooms, facing, storage, ram, cpu, network) + Condition only for
+      the condition-carrying categories (cars/phones/computers/electronics) —
+      missing fields never render. Jobs demo listing gained experience
+      (2Year+). Browser: jobs detail = Main Category/Category/Job Type/
+      Experience exactly; cars keep their 8-row grid.

@@ -15,9 +15,16 @@ type Props = {
   options: Option[];
   baseHref: string;
   paramKey: "brand" | "body_type" | "model";
+  /** Section heading rendered above the grid (e.g. "Brand", "Body Type"). */
+  title?: string;
 };
 
-export default function OptionGrid({ options, baseHref, paramKey }: Props) {
+export default function OptionGrid({
+  options,
+  baseHref,
+  paramKey,
+  title,
+}: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -25,6 +32,11 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
   const [showAll, setShowAll] = useState(false);
   const visibleOptions = showAll ? options : options.slice(0, LIMIT);
   const router = useRouter();
+
+  // Models and icon-less option grids (design: text tiles, e.g. furniture
+  // Type, property Type, job types) render 6 columns; image-bearing grids
+  // (brands, body types, accessories) render up to 10.
+  const textTiles = paramKey === "model" || !options.some((o) => !!o.image);
 
   const handleClick = (e: React.MouseEvent, slug: string) => {
     // Prevent the Link from performing a full navigation
@@ -50,10 +62,11 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
   };
 
   return (
-    <div className="bg-card rounded p-4 mb-4 pl-6">
+    <div className="bg-card rounded p-4 mb-2 pl-6">
+      {title && <h2 className="text-base font-bold mb-4">{title}</h2>}
       <div
         className={
-          paramKey === "model"
+          textTiles
             ? "grid grid-cols-3 md:grid-cols-6 gap-2"
             : "grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-y-6 gap-x-4"
         }
@@ -77,7 +90,7 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
               href={`${targetPath}?${paramKey === "model" ? "ad_model" : paramKey === "body_type" ? "ad_type" : "ad_field"}=${opt.slug}`}
               onClick={(e) => handleClick(e, opt.slug)}
               className={
-                isModel
+                isModel || !imageSrc
                   ? `border py-2 px-1 text-xs text-center transition-colors flex items-center justify-center min-h-[40px] ${
                       isSelected
                         ? "text-blue-500 bg-blue-50 border-blue-100 font-medium"
@@ -88,24 +101,22 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
             >
               {isModel ? (
                 <span>{opt.name}</span>
-              ) : (
+              ) : imageSrc ? (
                 <>
                   <div className="w-14 h-14 flex items-center justify-center rounded-full bg-blue-50 group-hover:bg-blue-100">
-                    {imageSrc ? (
-                      <Image
-                        src={imageSrc}
-                        alt={opt.name}
-                        width={56}
-                        height={56}
-                        unoptimized
-                        className="object-contain"
-                      />
-                    ) : (
-                      <span className="text-xs">{opt.name}</span>
-                    )}
+                    <Image
+                      src={imageSrc}
+                      alt={opt.name}
+                      width={56}
+                      height={56}
+                      unoptimized
+                      className="object-contain"
+                    />
                   </div>
                   <span className="text-xs mt-2 block">{opt.name}</span>
                 </>
+              ) : (
+                <span>{opt.name}</span>
               )}
             </a>
           );

@@ -24,6 +24,35 @@ const toText = (v: unknown): string | undefined => {
   return s === "" ? undefined : s;
 };
 
+// Only fields the listing's own category/form relates to are rendered. The
+// design order (fixed): brand/model first (cars), then the attribute keys in
+// the observed design sequence, then Condition (only for condition-carrying
+// categories — the same ones that show the Condition chip on the browse bar).
+const ATTR_KEYS: [key: string, label: string][] = [
+  ["year", "Year"],
+  ["taxType", "Tax Type"],
+  ["color", "Color"],
+  ["jobType", "Job Type"],
+  ["experience", "Experience"],
+  ["engineType", "Engine Type"],
+  ["transmission", "Transmission"],
+  ["type", "Type"],
+  ["bedrooms", "Bedroom"],
+  ["bathrooms", "Bathroom"],
+  ["facing", "Facing"],
+  ["storage", "Storage"],
+  ["ram", "RAM"],
+  ["cpu", "CPU"],
+  ["network", "Network"],
+];
+
+const CONDITION_CATEGORIES = [
+  "cars-and-vehicles",
+  "phones-and-tablets",
+  "computers-and-accessories",
+  "electronics-and-appliances",
+];
+
 export default function ListingSpecs({
   cate,
   subcate,
@@ -43,6 +72,8 @@ export default function ListingSpecs({
         }
       : undefined;
 
+  const conditionCarrier = !!cate && CONDITION_CATEGORIES.includes(cate.slug);
+
   const rows: Row[] = [
     {
       label: "Main Category",
@@ -59,9 +90,12 @@ export default function ListingSpecs({
       value: subcate?.name,
       href: subcate && cate ? browseHref : undefined,
     },
-    {
+  ];
+
+  if (brand?.name) {
+    rows.push({
       label: "Brand",
-      value: brand?.name,
+      value: brand.name,
       href:
         brand && cate && subcate
           ? {
@@ -73,10 +107,13 @@ export default function ListingSpecs({
               query: { ad_field: brand.slug },
             }
           : undefined,
-    },
-    {
+    });
+  }
+
+  if (model?.name) {
+    rows.push({
       label: "Model",
-      value: model?.name,
+      value: model.name,
       href:
         model && cate && subcate && brand?.slug
           ? {
@@ -90,17 +127,21 @@ export default function ListingSpecs({
           : model
             ? browseHref
             : undefined,
-    },
-    { label: "Year", value: toText(attributes?.year), href: browseHref },
-    { label: "Tax Type", value: toText(attributes?.taxType), href: browseHref },
-    {
+    });
+  }
+
+  for (const [key, label] of ATTR_KEYS) {
+    const value = toText(attributes?.[key]);
+    if (value) rows.push({ label, value, href: browseHref });
+  }
+
+  if (conditionCarrier && (condition === "used" || condition === "new")) {
+    rows.push({
       label: "Condition",
-      value:
-        condition === "used" ? "Used" : condition === "new" ? "New" : undefined,
+      value: condition === "used" ? "Used" : "New",
       href: browseHref,
-    },
-    { label: "Color", value: toText(attributes?.color), href: browseHref },
-  ];
+    });
+  }
 
   if (rows.every((r) => r.value === undefined)) return null;
 
@@ -118,7 +159,7 @@ export default function ListingSpecs({
             </Link>
           ) : (
             <span className="text-sm text-[#00a0e9] break-words">
-              {row.value ?? "—"}
+              {row.value}
             </span>
           )}
         </div>

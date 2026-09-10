@@ -35,27 +35,108 @@ export interface AttributeSeed {
 
 const PHONES_SUBS = ['phones', 'tablets'];
 const COMPUTER_SUBS = ['laptops', 'desktops', 'all-in-one'];
-const HOUSE_SUBS = ['house-for-sale', 'house-for-rent'];
+// Bedrooms/bathrooms/facings are lookup picklists for the property forms —
+// the design does NOT show them as browse grids, so they carry no
+// subcategory links (rows stay category-scoped for the admin UI / future form).
+const UNLINKED: string[] = [];
+// Every jobs subcategory shows the same Job Type grid (design).
+const JOBS_SUBS = [
+  'accounting-jobs',
+  'administration',
+  'architecture-engineering',
+  'assistant-secretary',
+  'audit-taxation',
+  'banking-insurance',
+  'cashier-receptionist',
+  'catering-restaurant',
+  'cleaner-maid',
+  'consultancy',
+  'customer-service',
+  'design',
+  'education-training',
+  'finance',
+  'freight-shipping-delivery-warehouse',
+  'hotel-hospitality',
+  'human-resources',
+  'information-technology',
+  'jobs-others',
+  'lawyer-legal-services',
+  'management',
+  'manufacturing',
+  'marketing',
+  'media-advertising',
+  'medical-health-nursing',
+  'merchandising-purchasing',
+  'operations',
+  'project-management',
+  'quality-control',
+  'resort-casino',
+  'sales',
+  'security-driver',
+  'technicians',
+  'telecommunications',
+  'translations-interpretation',
+  'travel-agents-ticket-sales',
+];
 
 type BodyTypeTuple = [string, string, string[]];
 
+// Order follows the vehicles-for-rent design grid (image: Motorcycle,
+// Bicycle, Tuk Tuk, cars, buses, trucks, Other) — the single global
+// sortOrder keeps every subcategory's filtered grid in its own design order
+// (cars: sedan→other; lorries: heavy→tractor+other; rent: the full set).
+// Convertible stays cars-for-sale-only at its design slot; the rent grid
+// skips it because it carries no rent link.
 const BODY_TYPES: BodyTypeTuple[] = [
-  ['Sedan', 'sedan', ['cars-for-sale']],
-  ['Hatchback', 'hatchback', ['cars-for-sale']],
-  ['Pickup', 'pickup', ['cars-for-sale']],
-  ['SUV', 'suv', ['cars-for-sale']],
+  ['Motorcycle', 'motorcycle', ['vehicles-for-rent']],
+  ['Bicycle', 'bicycle', ['vehicles-for-rent']],
+  ['Tuk Tuk & Remork', 'tuk-tuk-and-remork', ['vehicles-for-rent']],
+  ['Sedan', 'sedan', ['cars-for-sale', 'vehicles-for-rent']],
+  ['Hatchback', 'hatchback', ['cars-for-sale', 'vehicles-for-rent']],
+  ['Pickup', 'pickup', ['cars-for-sale', 'vehicles-for-rent']],
+  ['SUV', 'suv', ['cars-for-sale', 'vehicles-for-rent']],
   ['Convertible', 'convertible', ['cars-for-sale']],
-  ['MPV (Minivan)', 'mpv-minivan', ['cars-for-sale']],
-  ['Sports', 'sports', ['cars-for-sale']],
-  ['Station Wagon', 'station-wagon', ['cars-for-sale']],
-  ['Heavy Truck', 'heavy-truck', ['lorries-vans-and-tractors']],
-  ['Industrial Vehicle', 'industrial-vehicle', ['lorries-vans-and-tractors']],
-  ['Light Truck', 'light-truck', ['lorries-vans-and-tractors']],
-  ['Medium Truck', 'medium-truck', ['lorries-vans-and-tractors']],
-  ['Mini Bus', 'mini-bus', ['lorries-vans-and-tractors']],
-  ['Mini Truck', 'mini-truck', ['lorries-vans-and-tractors']],
-  ['Tractor Unit', 'tractor-unit', ['lorries-vans-and-tractors']],
-  ['Other', 'other-type', ['cars-for-sale', 'lorries-vans-and-tractors']],
+  ['City Bus', 'city-bus', ['vehicles-for-rent']],
+  ['Express Bus', 'express-bus', ['vehicles-for-rent']],
+  [
+    'Heavy Truck',
+    'heavy-truck',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  [
+    'Industrial Vehicle',
+    'industrial-vehicle',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  [
+    'Light Truck',
+    'light-truck',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  [
+    'Medium Truck',
+    'medium-truck',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  ['Mini Bus', 'mini-bus', ['lorries-vans-and-tractors', 'vehicles-for-rent']],
+  [
+    'Mini Truck',
+    'mini-truck',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  ['MPV (Minivan)', 'mpv-minivan', ['cars-for-sale', 'vehicles-for-rent']],
+  ['Sports', 'sports', ['cars-for-sale', 'vehicles-for-rent']],
+  ['Station Wagon', 'station-wagon', ['cars-for-sale', 'vehicles-for-rent']],
+  [
+    'Tractor Unit',
+    'tractor-unit',
+    ['lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
+  [
+    'Other',
+    'other-type',
+    ['cars-for-sale', 'lorries-vans-and-tractors', 'vehicles-for-rent'],
+  ],
 ];
 
 type PropertyTypeTuple = [string, string, string[]];
@@ -124,7 +205,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: name.toLowerCase(),
     name,
     category: 'cars-and-vehicles',
-    subcategories: ['cars-for-sale', 'motorcycles-for-sale'],
+    subcategories: UNLINKED,
     sortOrder: i,
   })),
 
@@ -311,7 +392,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
       .replace(/ /g, '-'),
     name,
     category: 'cars-and-vehicles',
-    subcategories: ['vehicles-for-rent'],
+    subcategories: UNLINKED,
     sortOrder: i,
   })),
 
@@ -343,7 +424,8 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     sortOrder: i,
   })),
 
-  // ---- jobtypes (has image per spec six:4) ----
+  // ---- jobtypes (has image per spec six:4) — every jobs subcategory shows
+  //      the same Job Type grid (design: "each job subcategory has job type")
   ...[
     ['Full-time', 'full-time'],
     ['Part-time', 'part-time'],
@@ -357,7 +439,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug,
     name,
     category: 'jobs',
-    subcategories: [],
+    subcategories: JOBS_SUBS,
     sortOrder: i,
   })),
 
@@ -377,7 +459,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: n,
     name: n,
     category: 'home-and-land',
-    subcategories: HOUSE_SUBS,
+    subcategories: UNLINKED,
     sortOrder: i,
   })),
   {
@@ -385,7 +467,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: 'more',
     name: 'More+',
     category: 'home-and-land',
-    subcategories: HOUSE_SUBS,
+    subcategories: UNLINKED,
     sortOrder: 6,
   },
   ...['1', '2', '3', '4', '5', '6'].map((n, i) => ({
@@ -393,7 +475,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: n,
     name: n,
     category: 'home-and-land',
-    subcategories: HOUSE_SUBS,
+    subcategories: UNLINKED,
     sortOrder: i,
   })),
   {
@@ -401,7 +483,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: 'more',
     name: 'More+',
     category: 'home-and-land',
-    subcategories: HOUSE_SUBS,
+    subcategories: UNLINKED,
     sortOrder: 6,
   },
   ...[
@@ -418,7 +500,7 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     slug: name.toLowerCase(),
     name,
     category: 'home-and-land',
-    subcategories: HOUSE_SUBS,
+    subcategories: UNLINKED,
     sortOrder: i,
   })),
 
@@ -732,6 +814,63 @@ export async function seedAttributes(db: DbClient): Promise<void> {
       .where(
         and(
           eq(attributeOptions.type, 'bodytypes'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.image),
+        ),
+      );
+  }
+
+  // Vehicles-for-rent body types — same gap-fill pattern, rent assets. Only
+  // the 5 rental-exclusive rows are null at insert; the shared rows already
+  // carry the admin-uploaded icons (never overwritten here).
+  const RENT_BODY_TYPE_FILES: Record<string, string> = {
+    motorcycle: 'motorcycle',
+    bicycle: 'bicycle',
+    'tuk-tuk-and-remork': 'tuk-tuk-and-remork',
+    'city-bus': 'city-bus',
+    'express-bus': 'express-bus',
+  };
+  for (const [slug, file] of Object.entries(RENT_BODY_TYPE_FILES)) {
+    await db
+      .update(attributeOptions)
+      .set({
+        image: `/sub-img/car_vehicles/vehicles-for-rent/body_type/${file}.png`,
+      })
+      .where(
+        and(
+          eq(attributeOptions.type, 'bodytypes'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.image),
+        ),
+      );
+  }
+
+  // Musical-instruments type rows carry the design's icons (they live in the
+  // /sub-img/books-sports-hobbies/brands/ folder) — the browse grid then
+  // renders brand-style icon tiles instead of text tiles. Null-only, like
+  // the other gap-fills (admin uploads survive).
+  const MUSICAL_TYPE_FILES: Record<string, string> = {
+    'guitars-and-basses': 'guitars-and-basses',
+    'pianos-and-keyboards': 'pianos-and-keyboards',
+    drums: 'drums',
+    'amps-and-effects': 'amps-and-effects',
+    dj: 'dj',
+    headphones: 'headphones',
+    microphones: 'microphones',
+    recording: 'recording',
+    'traditional-instruments': 'traditional-instrument',
+    accessories: 'accessories',
+    other: 'other',
+  };
+  for (const [slug, file] of Object.entries(MUSICAL_TYPE_FILES)) {
+    await db
+      .update(attributeOptions)
+      .set({
+        image: `/sub-img/books-sports-hobbies/brands/${file}.png`,
+      })
+      .where(
+        and(
+          eq(attributeOptions.type, 'types'),
           eq(attributeOptions.slug, slug),
           isNull(attributeOptions.image),
         ),

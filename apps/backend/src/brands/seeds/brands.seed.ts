@@ -213,6 +213,155 @@ const MODEL_SEEDS: Record<string, string[]> = {
   toyota: ['Camry', 'Pirus'],
 };
 
+/**
+ * Motorcycle model starter baseline (insert-only; admins add the rest via the
+ * Models page). Like the cars, the spec never enumerates a model list, so this
+ * is a curated set of Khmer-market models keyed by the MOTO_BRANDS slugs.
+ */
+const MOTO_MODEL_SEEDS: Record<string, string[]> = {
+  'honda-moto': [
+    'Dream 125',
+    'Wave 110',
+    'Click 125',
+    'Click 160',
+    'PCX 125',
+    'PCX 160',
+    'Scoopy 125',
+    'Dio 150',
+    'CBR 150R',
+    'Winner X',
+    'CB 150R',
+    'Supra X 125',
+    'Blade 110',
+    'XR 150L',
+  ],
+  yamaha: [
+    'Jupiter 125',
+    'Jupiter Z1 125',
+    'Exciter 150',
+    'NMAX 155',
+    'NVX 155',
+    'Aerox 155',
+    'MT-15',
+    'Yamaha R15 V3',
+    'XSR 155',
+    'Fazzio 125',
+  ],
+  'suzuki-moto': [
+    'Raider 150',
+    'Gixxer 150',
+    'GSX-R 150',
+    'GSX-R 250',
+    'Access 125',
+    'Skydrive 125',
+  ],
+  kawasaki: [
+    'Ninja 250',
+    'Ninja 400',
+    'Z250',
+    'Z400',
+    'KLX 150',
+    'KLX 250',
+    'Versys X 300',
+    'W175',
+    'Eliminator 125',
+  ],
+  ktm: [
+    'Duke 200',
+    'Duke 250',
+    'Duke 390',
+    'RC 200',
+    'RC 390',
+    'Adventure 390',
+    '790 Duke',
+  ],
+  ducati: [
+    'Scrambler 800',
+    'Monster 821',
+    'Monster 937',
+    'Panigale V4',
+    'SuperSport 950',
+    'Diavel 1260',
+  ],
+  bajaj: [
+    'Pulsar 150',
+    'Pulsar NS 200',
+    'Pulsar RS 200',
+    'Dominar 400',
+    'Boxer 100',
+    'Platina 110',
+  ],
+  'kr-motor': ['KR Motard 150', 'KR Motard 250', 'KR 370D'],
+  gpx: ['Demon 150', 'Demon 250', 'Legend 150', 'Legend 200', 'Bolt 150'],
+  keewey: ['Keeway K-Light 150', 'Keeway K-Light 250', 'Keeway Superlight 125'],
+  benelli: [
+    'TNT 150',
+    'TNT 250',
+    '302R',
+    'BN 251',
+    'Leoncino 250',
+    'TRK 251',
+    'TRK 502',
+  ],
+  'bmw-moto': [
+    'S 1000 RR',
+    'R 1250 GS',
+    'F 850 GS',
+    'R nineT',
+    'C 400 GT',
+    'R 18',
+  ],
+  cfmoto: ['250SR', '300SR', '300NK', '450SR', '650MT', '800MT'],
+  'harley-davidson': [
+    'Street 750',
+    'Iron 883',
+    'Forty-Eight',
+    'Sportster S',
+    'Road King',
+    'Pan America 1250',
+  ],
+  husqvarna: [
+    'Svartpilen 200',
+    'Vitpilen 200',
+    'Svartpilen 250',
+    'Svartpilen 401',
+  ],
+  hyosung: ['GT 125', 'GT 250', 'GT 300', 'GV 250'],
+  'italijet-dragster': ['Dragster 125', 'Dragster 200'],
+  lambretta: ['Lambretta V125', 'Lambretta V200', 'Lambretta X300'],
+  peugeot: ['Peugeot Django 125', 'Peugeot Kisbee 50', 'Peugeot Geopolis 300'],
+  piaggio: [
+    'Piaggio Liberty 125',
+    'Piaggio Medley 150',
+    'Piaggio Beverly 300',
+    'Piaggio Zip 50',
+  ],
+  'royal-enfield': [
+    'Classic 350',
+    'Hunter 350',
+    'Meteor 350',
+    'Himalayan 450',
+    'Interceptor 650',
+  ],
+  triumph: [
+    'Bonneville T100',
+    'Bonneville T120',
+    'Street Twin',
+    'Trident 660',
+    'Tiger 900',
+  ],
+  tvs: ['Apache 160', 'Apache 200', 'Raider 125', 'Ntorq 125'],
+  yadea: ['Yadea G5', 'Yadea G5 Pro'],
+  vespa: [
+    'Primavera 125',
+    'Primavera 150',
+    'Sprint 125',
+    'Sprint 150',
+    'GTS 300',
+  ],
+  zontes: ['ZT310R', 'ZT310X', 'ZT310T'],
+};
+
 export const BRANDS: BrandSeed[] = [
   {
     slug: 'apple',
@@ -1289,9 +1438,244 @@ export const CAR_BRANDS: BrandSeed[] = [
   },
 ];
 
+/**
+ * Motorcycle brands (design order from the web mock, Honda first; the app's
+ * local /sub-img/car_vehicles/motorcycles-for-sale/brands/*.png assets are the
+ * interim icon source, like the cars set — admins replace via the UI). Slugs
+ * derive from the asset filenames: the mock's `royal-enfeild` / `others`
+ * entries map to royal-enfield.png / other.png. Names are mock-verbatim,
+ * including the "Royal Enfeild" spelling. `bmw`, `honda`, and `suzuki` share
+ * a display name with cars but have a different logo asset — the slugs here
+ * take a `-moto` suffix so each branch keeps its own row, icon, and design
+ * position (the bare slugs stay cars-only; both render the same name).
+ */
+export const MOTO_BRANDS: BrandSeed[] = [
+  {
+    slug: 'honda-moto',
+    name: 'Honda',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/honda.png',
+    sortOrder: 0,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'yamaha',
+    name: 'Yamaha',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/yamaha.png',
+    sortOrder: 1,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'suzuki-moto',
+    name: 'Suzuki',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/suzuki.png',
+    sortOrder: 2,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'kawasaki',
+    name: 'Kawasaki',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/kawasaki.png',
+    sortOrder: 3,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'ktm',
+    name: 'KTM',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/ktm.png',
+    sortOrder: 4,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'ducati',
+    name: 'Ducati',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/ducati.png',
+    sortOrder: 5,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'bajaj',
+    name: 'Bajaj',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/bajaj.png',
+    sortOrder: 6,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'kr-motor',
+    name: 'Kr Motor',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/kr-motor.png',
+    sortOrder: 7,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'gpx',
+    name: 'GPX',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/gpx.png',
+    sortOrder: 8,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'keewey',
+    name: 'Keewey',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/keewey.png',
+    sortOrder: 9,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'benelli',
+    name: 'Benelli',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/benelli.png',
+    sortOrder: 10,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'stallion',
+    name: 'Stallion',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/stallion.png',
+    sortOrder: 11,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'bmw-moto',
+    name: 'BMW',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/bmw.png',
+    sortOrder: 12,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'umg',
+    name: 'UMG',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/umg.png',
+    sortOrder: 13,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'calypso',
+    name: 'Calypso',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/calypso.png',
+    sortOrder: 14,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'cfmoto',
+    name: 'CFMOTO',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/cfmoto.png',
+    sortOrder: 15,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'harley-davidson',
+    name: 'Harley Davidson',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/harley-davidson.png',
+    sortOrder: 16,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'husqvarna',
+    name: 'Husqvarna',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/husqvarna.png',
+    sortOrder: 17,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'hyosung',
+    name: 'HYOSUNG',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/hyosung.png',
+    sortOrder: 18,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'italijet-dragster',
+    name: 'Italijet Dragster',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/italijet-dragster.png',
+    sortOrder: 19,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'lambretta',
+    name: 'Lambretta',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/lambretta.png',
+    sortOrder: 20,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'miku',
+    name: 'MIKU',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/miku.png',
+    sortOrder: 21,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'peugeot',
+    name: 'PEUGEOT',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/peugeot.png',
+    sortOrder: 22,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'piaggio',
+    name: 'PIAGGIO',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/piaggio.png',
+    sortOrder: 23,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'royal-enfield',
+    name: 'Royal Enfeild',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/royal-enfield.png',
+    sortOrder: 24,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'triumph',
+    name: 'Triumph',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/triumph.png',
+    sortOrder: 25,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'tvs',
+    name: 'TVS',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/tvs.png',
+    sortOrder: 26,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'yadea',
+    name: 'Yadea',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/yadea.png',
+    sortOrder: 27,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'vespa',
+    name: 'Vespa',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/vespa.png',
+    sortOrder: 28,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'zontes',
+    name: 'Zontes',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/zontes.png',
+    sortOrder: 29,
+    subcategories: ['motorcycles-for-sale'],
+  },
+  {
+    slug: 'other',
+    name: 'Others',
+    icon: '/sub-img/car_vehicles/motorcycles-for-sale/brands/other.png',
+    sortOrder: 30,
+    subcategories: ['motorcycles-for-sale'],
+  },
+];
+
 export async function seedBrands(db: DbClient): Promise<void> {
   const slugs = [
-    ...new Set([...BRANDS, ...CAR_BRANDS].flatMap((b) => b.subcategories)),
+    ...new Set(
+      [...BRANDS, ...CAR_BRANDS, ...MOTO_BRANDS].flatMap(
+        (b) => b.subcategories,
+      ),
+    ),
   ];
   const subRows = await db
     .select({ id: subcategories.id, slug: subcategories.slug })
@@ -1301,7 +1685,7 @@ export async function seedBrands(db: DbClient): Promise<void> {
 
   const seenSlugs = new Set<string>();
 
-  for (const brand of [...BRANDS, ...CAR_BRANDS]) {
+  for (const brand of [...BRANDS, ...CAR_BRANDS, ...MOTO_BRANDS]) {
     // brands.slug is globally unique. xiaomi appears in both the phones and
     // the cars sets: the first occurrence creates/upserts the row; later
     // occurrences must NOT re-upsert (their sortOrder would clobber the
@@ -1353,7 +1737,9 @@ export async function seedBrands(db: DbClient): Promise<void> {
     }
   }
 
-  console.log(`  ✓ seeded ${BRANDS.length + CAR_BRANDS.length} brands`);
+  console.log(
+    `  ✓ seeded ${BRANDS.length + CAR_BRANDS.length + MOTO_BRANDS.length} brands`,
+  );
 }
 
 /**
@@ -1368,7 +1754,10 @@ export async function seedModels(db: DbClient): Promise<void> {
   const brandSlugToId = new Map(brandRows.map((r) => [r.slug, r.id]));
 
   let total = 0;
-  for (const [brandSlug, modelNames] of Object.entries(MODEL_SEEDS)) {
+  for (const [brandSlug, modelNames] of Object.entries({
+    ...MODEL_SEEDS,
+    ...MOTO_MODEL_SEEDS,
+  })) {
     const brandId = brandSlugToId.get(brandSlug);
     if (!brandId) continue;
     for (let i = 0; i < modelNames.length; i++) {

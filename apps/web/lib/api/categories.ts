@@ -105,6 +105,7 @@ export interface BackendModel {
 }
 
 export interface BackendAttributeRow {
+  type?: string;
   slug: string;
   name: string;
   image: string | null;
@@ -184,6 +185,32 @@ export async function getBrandsForSubcategory(
 export async function getBodyTypes(): Promise<BackendAttributeRow[]> {
   return (
     (await getJson<BackendAttributeRow[]>("/attributes/bodytypes", "en")) ?? []
+  );
+}
+
+/** Any attribute set (bodytypes, types, bedrooms, …) — rows carry the
+ *  denormalized subcategoryIds (UUIDs) consumed by the subcategory pages. */
+export async function getAttributeOptions(
+  type: string,
+): Promise<BackendAttributeRow[]> {
+  return (
+    (await getJson<BackendAttributeRow[]>(
+      `/attributes/${encodeURIComponent(type)}`,
+      "en",
+    )) ?? []
+  );
+}
+
+/** One call for every attribute row linked to a subcategory — the browse
+ *  pages use this instead of per-type fetches. */
+export async function getLinkedAttributeOptions(
+  subcategoryId: string,
+): Promise<BackendAttributeRow[]> {
+  return (
+    (await getJson<BackendAttributeRow[]>(
+      `/attributes?subcategoryId=${encodeURIComponent(subcategoryId)}`,
+      "en",
+    )) ?? []
   );
 }
 

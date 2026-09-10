@@ -13,26 +13,26 @@ export interface OptionRow {
 type Props = {
   categorySlug: string;
   subcategorySlug: string;
-  /** Brand options (cars) — null when the subcategory has no live brands. */
+  /** Brand options — null when the subcategory has no live brands. */
   brands?: OptionRow[] | null;
-  /** Body-type options (cars) — null when no rows apply. */
-  bodyTypes?: OptionRow[] | null;
   /** Models of the selected brand — null unless a brand is selected. */
   models?: OptionRow[] | null;
+  /** Linked attribute sets (body types, types, bedrooms, …) — each has a
+   *  design title (e.g. "Body Type") and non-empty options. */
+  sets?: { slug: string; title: string; options: OptionRow[] }[];
 };
 
 export default function SubcategoryContent({
   categorySlug,
   subcategorySlug,
   brands,
-  bodyTypes,
   models,
+  sets,
 }: Props) {
   const baseHref = `/category/${categorySlug}/${subcategorySlug}`;
   const searchParams = useSearchParams();
 
   const brandSlug = searchParams.get("ad_field");
-  const bodyType = searchParams.get("ad_type");
 
   // Force lowercase comparison to avoid "Kia" vs "kia" issues
   const selectedBrand = brands?.find(
@@ -43,23 +43,35 @@ export default function SubcategoryContent({
     <>
       {/* BRAND GRID: Show when no brand is selected */}
       {!selectedBrand && !!brands?.length && (
-        <OptionGrid options={brands} baseHref={baseHref} paramKey="brand" />
+        <OptionGrid
+          options={brands}
+          baseHref={baseHref}
+          paramKey="brand"
+          title="Brand"
+        />
       )}
 
       {/* MODEL GRID: Show when a brand is selected */}
       {selectedBrand && !!models?.length && (
-        <OptionGrid options={models} baseHref={baseHref} paramKey="model" />
+        <OptionGrid
+          options={models}
+          baseHref={baseHref}
+          paramKey="model"
+          title="Model"
+        />
       )}
 
-      {/* TYPE GRID: Show when no type is selected */}
-      {!(categorySlug === "jobs" ? brandSlug : bodyType) &&
-        !!bodyTypes?.length && (
-          <OptionGrid
-            options={bodyTypes}
-            baseHref={baseHref}
-            paramKey={categorySlug === "jobs" ? "brand" : "body_type"}
-          />
-        )}
+      {/* ATTRIBUTE GRIDS (Body Type, Type, Bedroom, Accessories, …): each
+          linked set renders its own card with the design title */}
+      {sets?.map((set) => (
+        <OptionGrid
+          key={set.slug}
+          options={set.options}
+          baseHref={baseHref}
+          paramKey="body_type"
+          title={set.title}
+        />
+      ))}
     </>
   );
 }

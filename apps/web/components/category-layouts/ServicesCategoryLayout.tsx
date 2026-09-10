@@ -4,7 +4,6 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IconLayoutGridFilled, IconListFilled } from "@tabler/icons-react";
 import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
 import SortFilter from "@/components/filter/SortFilter";
-import PriceFilter from "@/components/filter/PriceFilter";
 import MoreFilters from "@/components/filter/MoreFilters";
 
 interface ServicesCategoryLayoutProps {
@@ -35,7 +34,6 @@ export default function ServicesCategoryLayout({
         <div className="flex items-center gap-2 flex-wrap">
           <LocationSelectorFilter />
           <SortFilter />
-          <PriceFilter />
           <MoreFilters />
         </div>
         <TabsList className="h-9 shrink-0">

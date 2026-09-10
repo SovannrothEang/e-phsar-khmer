@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import {
+  IconFilterCog,
+  IconLayoutGridFilled,
+  IconListFilled,
+} from "@tabler/icons-react";
+import { MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Filters {
   search: string;
@@ -17,16 +25,27 @@ interface Filters {
   engine: string;
 }
 
-interface LSPYCEHeaderProps {
+export interface LSPCYEHeaderProps {
   title: string;
-  onShowFilters?: () => void;
+  /** Optional chips — cars-for-sale renders all; subcategories hide the ones they don't have. */
+  year?: boolean;
+  engine?: boolean;
+  /** Vehicles-for-rent and other L-S-P surfaces hide the Condition chip. */
+  condition?: boolean;
+  /** LS-group surfaces (services/properties) hide the Price chip. */
+  price?: boolean;
+  /** Jobs replaces "Price" with "Salary". */
+  priceLabel?: string;
 }
 
 export default function LSPYCEHeader({
   title,
-  onShowFilters,
-}: LSPYCEHeaderProps) {
-  const [view, setView] = useState<"grid" | "list">("grid");
+  year = true,
+  engine = true,
+  condition = true,
+  price = true,
+  priceLabel = "Price",
+}: LSPCYEHeaderProps) {
   const [filters, setFilters] = useState<Filters>({
     search: "",
     province: "",
@@ -51,7 +70,7 @@ export default function LSPYCEHeader({
 
   // Helper functions
   const getProvinceLabel = () => {
-    if (!filters.province) return "All Locations";
+    if (!filters.province) return "Location";
     if (filters.province === "phnom-penh") return "Phnom Penh";
     if (filters.province === "siem-reap") return "Siem Reap";
     if (filters.province === "battambang") return "Battambang";
@@ -71,7 +90,7 @@ export default function LSPYCEHeader({
   };
 
   const getPriceLabel = () => {
-    if (!filters.priceRange) return "Price";
+    if (!filters.priceRange) return priceLabel;
     switch (filters.priceRange) {
       case "under-100":
         return "Under $100";
@@ -106,332 +125,299 @@ export default function LSPYCEHeader({
     return "Engine Type";
   };
 
-  const handleMoreFilters = () => {
-    if (onShowFilters) {
-      onShowFilters();
-    }
-  };
-
   return (
-    <div className="bg-white border-b border-gray-200 px-1 py-1 md:px-2 md:py-1 select-none">
+    <>
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-1">
+      <div className="px-6 py-3 bg-card rounded-t-sm border">
         <h1 className="font-semibold text-lg md:text-lg">
           {title} <span className="font-semibold text-lg">in Cambodia</span>
         </h1>
+      </div>
 
-        {/* Right Icons */}
-        <div className="flex gap-2">
-          {/* 💰 Price Icon */}
-          <button className="p-1 rounded hover:bg-gray-100 flex items-center justify-center">
-            <i className="bi bi-percent text-[20px] text-gray-900"></i>
-          </button>
+      {/* FILTER BAR — sticky like the All Ads / category bar; the grid/list
+          tabs switch the page's TabsContent views (the page owns the Tabs
+          root). */}
+      <div className="sticky top-16 z-40 flex items-center justify-between bg-card rounded-b-sm border px-4 p-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Location Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+              className={`flex items-center bg-muted rounded-sm gap-2 h-12 py-1.5 text-sm cursor-pointer whitespace-nowrap px-3 ${
+                filters.province ? "text-sky-500" : "text-foreground"
+              }`}
+            >
+              <MapPin
+                className={`h-4 w-4 shrink-0 ${filters.province ? "text-sky-500" : ""}`}
+              />
+              <span className="font-medium whitespace-nowrap">
+                {getProvinceLabel()}
+              </span>
+            </Button>
 
-          {/* 🚚 Free Delivery Icon */}
-          <button className="p-1 rounded hover:bg-gray-100 flex items-center justify-center">
-            <i className="bi bi-truck text-[20px] text-gray-900"></i>
-          </button>
-
-          {/* 📐 Grid/List Toggle */}
-          <button
-            onClick={() => setView(view === "grid" ? "list" : "grid")}
-            className="p-1 rounded hover:bg-gray-100 flex items-center justify-center"
-          >
-            {view === "grid" ? (
-              <i className="bi bi-grid text-[20px] text-gray-900"></i>
-            ) : (
-              <i className="bi bi-list-ul text-[20px] text-gray-900"></i>
+            {showLocationDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                {[
+                  { val: "", label: "All Locations" },
+                  { val: "phnom-penh", label: "Phnom Penh" },
+                  { val: "siem-reap", label: "Siem Reap" },
+                  { val: "battambang", label: "Battambang" },
+                  { val: "sihanoukville", label: "Sihanoukville" },
+                ].map((loc) => (
+                  <button
+                    key={loc.val}
+                    onClick={() => {
+                      setFilters({ ...filters, province: loc.val });
+                      setShowLocationDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  >
+                    <span>{loc.label}</span>
+                    {filters.province === loc.val && (
+                      <i className="bi bi-check text-blue-600"></i>
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
-          </button>
-        </div>
-      </div>
+          </div>
 
-      {/* FILTER BAR */}
-      <div className="flex flex-wrap gap-2 items-center mb-1">
-        {/* Location Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
-                filters.province
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
-              }`}
-          >
-            <i className="bi bi-geo-alt text-sm"></i>
-            <span className="font-medium whitespace-nowrap">
-              {getProvinceLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showLocationDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
-
-          {showLocationDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "", label: "All Locations" },
-                { val: "phnom-penh", label: "Phnom Penh" },
-                { val: "siem-reap", label: "Siem Reap" },
-                { val: "battambang", label: "Battambang" },
-                { val: "sihanoukville", label: "Sihanoukville" },
-              ].map((loc) => (
-                <button
-                  key={loc.val}
-                  onClick={() => {
-                    setFilters({ ...filters, province: loc.val });
-                    setShowLocationDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{loc.label}</span>
-                  {filters.province === loc.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Sort Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowSortDropdown(!showSortDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
+          {/* Sort Filter */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              className={`bg-muted rounded-sm h-12 p-2 px-3 pr-3 cursor-pointer ${
                 filters.sort !== "latest"
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
+                  ? "text-sky-500 hover:bg-muted/50 hover:text-sky-500"
+                  : ""
               }`}
-          >
-            <span className="font-medium whitespace-nowrap">
-              {getSortLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showSortDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
+            >
+              <span className="font-medium whitespace-nowrap">
+                {getSortLabel()}
+              </span>
+            </Button>
 
-          {showSortDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "latest", label: "Newest First" },
-                { val: "oldest", label: "Oldest First" },
-                { val: "price-low", label: "Price: Low to High" },
-                { val: "price-high", label: "Price: High to Low" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  onClick={() => {
-                    setFilters({ ...filters, sort: opt.val });
-                    setShowSortDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{opt.label}</span>
-                  {filters.sort === opt.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
+            {showSortDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                {[
+                  { val: "latest", label: "Newest First" },
+                  { val: "oldest", label: "Oldest First" },
+                  { val: "price-low", label: "Price: Low to High" },
+                  { val: "price-high", label: "Price: High to Low" },
+                ].map((opt) => (
+                  <button
+                    key={opt.val}
+                    onClick={() => {
+                      setFilters({ ...filters, sort: opt.val });
+                      setShowSortDropdown(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  >
+                    <span>{opt.label}</span>
+                    {filters.sort === opt.val && (
+                      <i className="bi bi-check text-blue-600"></i>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {price && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowPriceDropdown(!showPriceDropdown)}
+                className={`bg-muted rounded-sm h-12 p-2 px-3 pr-3 cursor-pointer ${
+                  filters.priceRange
+                    ? "text-sky-500 hover:bg-muted/50 hover:text-sky-500"
+                    : ""
+                }`}
+              >
+                <span className="font-medium whitespace-nowrap">
+                  {getPriceLabel()}
+                </span>
+              </Button>
+
+              {showPriceDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                  {[
+                    { val: "", label: "All Prices" },
+                    { val: "under-100", label: "Under $100" },
+                    { val: "100-500", label: "$100 - $500" },
+                    { val: "500-plus", label: "$500+" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => {
+                        setFilters({ ...filters, priceRange: opt.val });
+                        setShowPriceDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>{opt.label}</span>
+                      {filters.priceRange === opt.val && (
+                        <i className="bi bi-check text-blue-600"></i>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Price Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowPriceDropdown(!showPriceDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
-                filters.priceRange
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
-              }`}
-          >
-            <span className="font-medium whitespace-nowrap">
-              {getPriceLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showPriceDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
+          {year && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowYearDropdown(!showYearDropdown)}
+                className={`bg-muted rounded-sm h-12 p-2 px-3 pr-3 cursor-pointer ${
+                  filters.year
+                    ? "text-sky-500 hover:bg-muted/50 hover:text-sky-500"
+                    : ""
+                }`}
+              >
+                <span className="font-medium whitespace-nowrap">
+                  {getYearLabel()}
+                </span>
+              </Button>
 
-          {showPriceDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "", label: "All Prices" },
-                { val: "under-100", label: "Under $100" },
-                { val: "100-500", label: "$100 - $500" },
-                { val: "500-plus", label: "$500+" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  onClick={() => {
-                    setFilters({ ...filters, priceRange: opt.val });
-                    setShowPriceDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{opt.label}</span>
-                  {filters.priceRange === opt.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
+              {showYearDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                  {[
+                    { val: "", label: "All Years" },
+                    { val: "2024", label: "2024" },
+                    { val: "2023", label: "2023" },
+                    { val: "2022", label: "2022" },
+                    { val: "2021", label: "2021" },
+                    { val: "2020", label: "2020 & Older" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => {
+                        setFilters({ ...filters, year: opt.val });
+                        setShowYearDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>{opt.label}</span>
+                      {filters.year === opt.val && (
+                        <i className="bi bi-check text-blue-600"></i>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Year Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowYearDropdown(!showYearDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
-                filters.year
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
-              }`}
-          >
-            <span className="font-medium whitespace-nowrap">
-              {getYearLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showYearDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
+          {condition && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowConditionDropdown(!showConditionDropdown)}
+                className={`bg-muted rounded-sm h-12 p-2 px-3 pr-3 cursor-pointer ${
+                  filters.condition
+                    ? "text-sky-500 hover:bg-muted/50 hover:text-sky-500"
+                    : ""
+                }`}
+              >
+                <span className="font-medium whitespace-nowrap">
+                  {getConditionLabel()}
+                </span>
+              </Button>
 
-          {showYearDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "", label: "All Years" },
-                { val: "2024", label: "2024" },
-                { val: "2023", label: "2023" },
-                { val: "2022", label: "2022" },
-                { val: "2021", label: "2021" },
-                { val: "2020", label: "2020 & Older" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  onClick={() => {
-                    setFilters({ ...filters, year: opt.val });
-                    setShowYearDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{opt.label}</span>
-                  {filters.year === opt.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
+              {showConditionDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                  {[
+                    { val: "", label: "All Conditions" },
+                    { val: "new", label: "New" },
+                    { val: "used", label: "Used" },
+                    { val: "refurbished", label: "Refurbished" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => {
+                        setFilters({ ...filters, condition: opt.val });
+                        setShowConditionDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>{opt.label}</span>
+                      {filters.condition === opt.val && (
+                        <i className="bi bi-check text-blue-600"></i>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Condition Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowConditionDropdown(!showConditionDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
-                filters.condition
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
-              }`}
-          >
-            <span className="font-medium whitespace-nowrap">
-              {getConditionLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showConditionDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
+          {engine && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setShowEngineDropdown(!showEngineDropdown)}
+                className={`bg-muted rounded-sm h-12 p-2 px-3 pr-3 cursor-pointer ${
+                  filters.engine
+                    ? "text-sky-500 hover:bg-muted/50 hover:text-sky-500"
+                    : ""
+                }`}
+              >
+                <span className="font-medium whitespace-nowrap">
+                  {getEngineLabel()}
+                </span>
+              </Button>
 
-          {showConditionDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "", label: "All Conditions" },
-                { val: "new", label: "New" },
-                { val: "used", label: "Used" },
-                { val: "refurbished", label: "Refurbished" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  onClick={() => {
-                    setFilters({ ...filters, condition: opt.val });
-                    setShowConditionDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{opt.label}</span>
-                  {filters.condition === opt.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
+              {showEngineDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
+                  {[
+                    { val: "", label: "All Engine Types" },
+                    { val: "gasoline", label: "Gasoline" },
+                    { val: "diesel", label: "Diesel" },
+                    { val: "electric", label: "Electric" },
+                    { val: "hybrid", label: "Hybrid" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => {
+                        setFilters({ ...filters, engine: opt.val });
+                        setShowEngineDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>{opt.label}</span>
+                      {filters.engine === opt.val && (
+                        <i className="bi bi-check text-blue-600"></i>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Engine Filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowEngineDropdown(!showEngineDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
-              ${
-                filters.engine
-                  ? "bg-blue-50 border-blue-300 text-blue-700"
-                  : "text-gray-700"
-              }`}
+          {/* More Filters Button */}
+          <Button
+            variant="outline"
+            className="relative bg-muted rounded-sm h-12 px-3 text-sm cursor-pointer gap-2"
           >
-            <span className="font-medium whitespace-nowrap">
-              {getEngineLabel()}
-            </span>
-            <i
-              className={`bi bi-chevron-down text-xs transition-transform ${showEngineDropdown ? "rotate-180" : ""}`}
-            ></i>
-          </button>
-
-          {showEngineDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-20 py-2">
-              {[
-                { val: "", label: "All Engine Types" },
-                { val: "gasoline", label: "Gasoline" },
-                { val: "diesel", label: "Diesel" },
-                { val: "electric", label: "Electric" },
-                { val: "hybrid", label: "Hybrid" },
-              ].map((opt) => (
-                <button
-                  key={opt.val}
-                  onClick={() => {
-                    setFilters({ ...filters, engine: opt.val });
-                    setShowEngineDropdown(false);
-                  }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
-                  <span>{opt.label}</span>
-                  {filters.engine === opt.val && (
-                    <i className="bi bi-check text-blue-600"></i>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+            <IconFilterCog className="h-4 w-4 shrink-0" />
+            <span className="font-medium whitespace-nowrap">More Filters</span>
+          </Button>
         </div>
-
-        {/* More Filters Button */}
-        <button
-          onClick={handleMoreFilters}
-          className="ml-auto flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200 text-gray-700"
-        >
-          <i className="bi bi-funnel text-sm"></i>
-          <span className="font-medium whitespace-nowrap">More Filters</span>
-        </button>
+        <TabsList className="h-9 shrink-0">
+          <TabsTrigger value="grid" className="cursor-pointer px-3">
+            <IconLayoutGridFilled className="size-4" />
+          </TabsTrigger>
+          <TabsTrigger value="list" className="cursor-pointer px-3">
+            <IconListFilled className="size-4" />
+          </TabsTrigger>
+        </TabsList>
       </div>
-    </div>
+    </>
   );
 }
