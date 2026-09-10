@@ -2,7 +2,6 @@ import { sql } from 'drizzle-orm';
 import {
   check,
   index,
-  pgTable,
   text,
   timestamp,
   uniqueIndex,
@@ -10,8 +9,9 @@ import {
 } from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 import { listings } from './listings.schema';
+import { chatSchema } from './chat.pg-schema';
 
-export const conversations = pgTable(
+export const conversations = chatSchema.table(
   'conversations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -46,7 +46,7 @@ export const conversations = pgTable(
 export type ConversationRow = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
 
-export const messages = pgTable(
+export const messages = chatSchema.table(
   'messages',
   {
     id: uuid('id').defaultRandom().primaryKey(),

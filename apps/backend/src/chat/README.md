@@ -31,7 +31,7 @@ is a latency optimization on a system that already works without it.
 | `chat.types.ts`          | Response-shape interfaces (`InboxItem`, `MessageWithListing`, poll metadata) shared by the service and controller.                 |
 | `dto/`                   | `SendMessageDto`, `QueryChatsDto`, `QueryMessagesDto` — request validation.                                                        |
 
-DB schema lives in [`../db/schema/chat.schema.ts`](../db/schema/chat.schema.ts), not in this folder.
+DB schema lives in [`../db/schema/chat.schema.ts`](../db/schema/chat.schema.ts), not in this folder. Both tables live in a dedicated `chat` Postgres schema (`../db/schema/chat.pg-schema.ts`, mirroring `payment/entity/payment.pg-schema.ts`) rather than `public` — moved there in migration `0016_move_chat_tables_to_chat_schema`. The FKs into `public.users`/`public.listings` are unaffected; Postgres and Drizzle both handle cross-schema foreign keys with no special casing.
 
 ### Entity map
 
