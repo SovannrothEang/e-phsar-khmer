@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../db/db.provider';
-import type { PaymentAttemptRow } from '../entity/payment-attempt';
-import type { PaymentTransactionRow } from '../entity/payment-transaction';
+import { DbClientTag } from '../../../db/db.provider';
+import type { PaymentAttemptRow, PaymentTransactionRow } from '../../entity';
 import {
   PaymentPersistenceError,
   PaymentTransactionConflictError,

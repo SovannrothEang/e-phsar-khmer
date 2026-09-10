@@ -1,24 +1,11 @@
-export * from './errors';
-export * from './create-payment.use-case';
-export * from './check-payment.use-case';
-export * from './list-payments.use-case';
-export * from './upsert-payment.use-case';
-export * from './create-payment-attempt.use-case';
-export * from './list-payment-attempts.use-case';
-export * from './enqueue-payment-attempt.use-case';
-export * from './create-payment-provider-event.use-case';
-export * from './enqueue-payment-provider-event.use-case';
-export * from './find-payment-attempt.use-case';
-export * from './find-payment-attempt-by-provider-attempt-id.use-case';
-export * from './update-payment-attempt.use-case';
-export * from './upsert-payment-transaction-detail.use-case';
-export * from './record-payment-status-history.use-case';
-export * from './fail-payment-attempt.use-case';
-export * from './fail-abandoned-payment-job.use-case';
-export * from './find-payment-provider-event.use-case';
-export * from './find-payment-transaction-detail.use-case';
-export * from './settle-payment-provider-event.use-case';
-export * from './process-payment-attempt.use-case';
-export * from './process-provider-event.use-case';
-export * from './enqueue-payment-attempt-poll.use-case';
-export * from './poll-payment-attempt.use-case';
+/**
+ * The single import surface for this module's use-cases. Internally split
+ * into `payments/` (payment_transaction/payment_attempt/provider-event
+ * lifecycle) and `ledgers/` (double-entry posting) — see the module
+ * README's Architecture section for why. Re-exported together here so
+ * every other file in this module (and outside it) imports from one place
+ * (`from '../use-cases'` / `from './use-cases'`) rather than reaching into
+ * either subfolder directly.
+ */
+export * from './payments';
+export * from './ledgers';

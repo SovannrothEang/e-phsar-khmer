@@ -1,8 +1,8 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../db/db.provider';
-import type { paymentTransactionStatusEnum } from '../entity/payment-transaction';
-import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
-import type { ProcessProviderEventJobData } from '../queue/payment-queue.types';
+import { DbClientTag, runInTransaction } from '../../../db/db.provider';
+import type { paymentTransactionStatusEnum } from '../../entity';
+import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
+import type { ProcessProviderEventJobData } from '../../queue/payment-queue.types';
 import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
 import type { PaymentProcessingError } from './errors';
 import { findPaymentProviderEvent } from './find-payment-provider-event.use-case';
@@ -13,6 +13,7 @@ import { updatePaymentAttempt } from './update-payment-attempt.use-case';
 import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-detail.use-case';
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
+import { postPaymentSettlementLedger } from '../ledgers';
 
 export type ProcessProviderEventOutcome =
   | 'skipped'
@@ -120,6 +121,7 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
 
     const redactedRaw = provider.redact(rawResponse);
     const toStatus = nextTransactionStatus(outcome);
+    const now = new Date();
 
     yield* runInTransaction(
       Effect.gen(function* () {
@@ -138,7 +140,7 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
           id: transaction.id,
           expectedVersion: transaction.version,
           status: toStatus,
-          completedAt: toStatus === 'succeeded' ? new Date() : undefined,
+          completedAt: toStatus === 'succeeded' ? now : undefined,
         });
         yield* recordPaymentStatusHistory({
           paymentTransactionId: transaction.id,
@@ -146,6 +148,9 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
           toStatus,
           reason: 'payment_provider_event',
         });
+        if (toStatus === 'succeeded') {
+          yield* postPaymentSettlementLedger(transaction, now);
+        }
         yield* settlePaymentProviderEvent({
           id: event.id,
           status: 'processed',

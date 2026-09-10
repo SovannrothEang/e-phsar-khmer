@@ -1,9 +1,9 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../db/db.provider';
-import type { OutboxService } from '../../outbox/outbox.service';
-import type { paymentTransactionStatusEnum } from '../entity/payment-transaction';
-import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
-import type { ProcessAttemptJobData } from '../queue/payment-queue.types';
+import { DbClientTag, runInTransaction } from '../../../db/db.provider';
+import type { OutboxService } from '../../../outbox/outbox.service';
+import type { paymentTransactionStatusEnum } from '../../entity';
+import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
+import type { ProcessAttemptJobData } from '../../queue/payment-queue.types';
 import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
 import type { PaymentProcessingError } from './errors';
 import { enqueuePaymentAttemptPoll } from './enqueue-payment-attempt-poll.use-case';
@@ -14,6 +14,7 @@ import { updatePaymentAttempt } from './update-payment-attempt.use-case';
 import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-detail.use-case';
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
+import { postPaymentSettlementLedger } from '../ledgers';
 
 export type ProcessPaymentAttemptOutcome =
   | 'skipped'
@@ -132,17 +133,21 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
         });
 
         if (toStatus !== transaction.status) {
+          const now = new Date();
           yield* upsertPayment({
             id: transaction.id,
             expectedVersion: transaction.version,
             status: toStatus,
-            completedAt: toStatus === 'succeeded' ? new Date() : undefined,
+            completedAt: toStatus === 'succeeded' ? now : undefined,
           });
           yield* recordPaymentStatusHistory({
             paymentTransactionId: transaction.id,
             fromStatus: transaction.status,
             toStatus,
           });
+          if (toStatus === 'succeeded') {
+            yield* postPaymentSettlementLedger(transaction, now);
+          }
         }
 
         if (result.status === 'pending' && result.poll) {

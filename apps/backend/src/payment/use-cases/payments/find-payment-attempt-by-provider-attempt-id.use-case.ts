@@ -1,10 +1,7 @@
 import { Effect } from 'effect';
 import { and, desc, eq } from 'drizzle-orm';
-import { DbClientTag } from '../../db/db.provider';
-import {
-  paymentAttempts,
-  type PaymentAttemptRow,
-} from '../entity/payment-attempt';
+import { DbClientTag } from '../../../db/db.provider';
+import { paymentAttempts, type PaymentAttemptRow } from '../../entity';
 import { PaymentPersistenceError } from './errors';
 
 export interface FindPaymentAttemptByProviderAttemptIdInput {

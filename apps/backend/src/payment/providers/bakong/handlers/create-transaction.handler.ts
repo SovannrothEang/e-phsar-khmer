@@ -43,7 +43,7 @@ function toBakongCurrency(currency: string): number {
  * accept) is a normal, modeled outcome via `CreateTransactionResult.ok`,
  * the same way ABA's non-"00" purchase status becomes a `failed`
  * `ChargeResult` rather than a thrown error (see `PaymentGatewayCallError`'s
- * doc comment in `../../../use-cases/errors.ts`).
+ * doc comment in `../../../use-cases/payments/errors.ts`).
  *
  * Branches on `account.type` — `generateMerchant`/`generateIndividual` are
  * two different SDK entry points, not one function with an optional field

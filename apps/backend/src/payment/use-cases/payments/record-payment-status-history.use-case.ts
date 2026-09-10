@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
 import {
   paymentStatusHistory,
+  paymentTransactionStatusEnum,
   type PaymentStatusHistoryRow,
-} from '../entity/payment-status-history';
-import type { paymentTransactionStatusEnum } from '../entity/payment-transaction';
-import { DbClientTag } from '../../db/db.provider';
+} from '../../entity';
+import { DbClientTag } from '../../../db/db.provider';
 import { PaymentPersistenceError } from './errors';
 
 export interface RecordPaymentStatusHistoryInput {

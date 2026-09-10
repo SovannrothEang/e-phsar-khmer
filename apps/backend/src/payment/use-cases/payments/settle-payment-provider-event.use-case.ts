@@ -1,11 +1,11 @@
 import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
-import { DbClientTag } from '../../db/db.provider';
+import { DbClientTag } from '../../../db/db.provider';
 import {
   paymentProviderEvents,
   paymentProviderEventStatusEnum,
   type PaymentProviderEventRow,
-} from '../entity/payment-provider-event';
+} from '../../entity';
 import { PaymentPersistenceError } from './errors';
 
 export interface SettlePaymentProviderEventInput {

@@ -112,7 +112,7 @@ export class BakongProvider implements PaymentGatewayProvider {
     // A network failure (ApiClientError) rejects here, same contract ABA's
     // reconcile() has — the use-case layer wraps it into
     // PaymentGatewayCallError and asks BullMQ to retry (see
-    // ../../use-cases/errors.ts's doc comment on that error).
+    // ../../use-cases/payments/errors.ts's doc comment on that error).
     const response = await Effect.runPromise(
       checkBakongTransaction(this.apiClient, providerTransactionId),
     );

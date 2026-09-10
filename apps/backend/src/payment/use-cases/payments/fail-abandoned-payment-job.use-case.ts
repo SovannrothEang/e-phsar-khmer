@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../db/db.provider';
+import { DbClientTag, runInTransaction } from '../../../db/db.provider';
 import { PaymentPersistenceError } from './errors';
 import type { PaymentProcessingError } from './errors';
 import { checkPayment } from './check-payment.use-case';

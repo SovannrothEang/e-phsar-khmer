@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../db/db.provider';
+import { DbClientTag } from '../../../db/db.provider';
 import {
   paymentAttempts,
   paymentAttemptMethodEnum,
   type PaymentAttemptRow,
-} from '../entity/payment-attempt';
+} from '../../entity';
 import { PaymentPersistenceError } from './errors';
 
 export interface CreatePaymentAttemptInput {

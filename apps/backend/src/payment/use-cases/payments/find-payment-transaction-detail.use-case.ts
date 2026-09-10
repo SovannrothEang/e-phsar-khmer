@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
-import { DbClientTag } from '../../db/db.provider';
+import { DbClientTag } from '../../../db/db.provider';
 import {
   paymentTransactionDetails,
   type PaymentTransactionDetailRow,
-} from '../entity/payment-transaction-detail';
+} from '../../entity';
 import { PaymentPersistenceError } from './errors';
 
 type FindPaymentTransactionDetailError = PaymentPersistenceError;

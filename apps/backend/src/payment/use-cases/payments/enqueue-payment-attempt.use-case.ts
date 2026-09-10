@@ -1,8 +1,8 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../db/db.provider';
-import type { OutboxService } from '../../outbox/outbox.service';
-import { PAYMENT_ATTEMPT_OUTBOX_EVENT_TYPE } from '../outbox/payment-outbox-events';
-import type { ProcessAttemptJobData } from '../queue/payment-queue.types';
+import { DbClientTag } from '../../../db/db.provider';
+import type { OutboxService } from '../../../outbox/outbox.service';
+import { PAYMENT_ATTEMPT_OUTBOX_EVENT_TYPE } from '../../outbox/payment-outbox-events';
+import type { ProcessAttemptJobData } from '../../queue/payment-queue.types';
 import { PaymentQueueError } from './errors';
 
 type EnqueuePaymentAttemptError = PaymentQueueError;

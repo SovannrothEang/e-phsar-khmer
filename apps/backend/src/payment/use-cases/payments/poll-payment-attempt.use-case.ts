@@ -1,9 +1,9 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../db/db.provider';
-import type { OutboxService } from '../../outbox/outbox.service';
-import type { paymentTransactionStatusEnum } from '../entity/payment-transaction';
-import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
-import type { PollAttemptJobData } from '../queue/payment-queue.types';
+import { DbClientTag, runInTransaction } from '../../../db/db.provider';
+import type { OutboxService } from '../../../outbox/outbox.service';
+import type { paymentTransactionStatusEnum } from '../../entity';
+import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
+import type { PollAttemptJobData } from '../../queue/payment-queue.types';
 import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
 import type { PaymentProcessingError } from './errors';
 import { enqueuePaymentAttemptPoll } from './enqueue-payment-attempt-poll.use-case';
@@ -14,6 +14,7 @@ import { updatePaymentAttempt } from './update-payment-attempt.use-case';
 import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-detail.use-case';
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
+import { postPaymentSettlementLedger } from '../ledgers';
 
 export type PollPaymentAttemptOutcome =
   | 'skipped'
@@ -126,6 +127,7 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
 
   const redactedRaw = provider.redact(result.rawResponse);
   const toStatus = nextTransactionStatus(result.status);
+  const now = new Date();
 
   yield* runInTransaction(
     Effect.gen(function* () {
@@ -145,7 +147,7 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
         id: transaction.id,
         expectedVersion: transaction.version,
         status: toStatus,
-        completedAt: toStatus === 'succeeded' ? new Date() : undefined,
+        completedAt: toStatus === 'succeeded' ? now : undefined,
       });
       yield* recordPaymentStatusHistory({
         paymentTransactionId: transaction.id,
@@ -153,6 +155,9 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
         toStatus,
         reason: 'poll',
       });
+      if (toStatus === 'succeeded') {
+        yield* postPaymentSettlementLedger(transaction, now);
+      }
     }),
     (cause) => new PaymentPersistenceError({ cause }),
   );

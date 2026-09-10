@@ -1,4 +1,5 @@
 import { Schema } from 'effect';
+import { LedgerImbalanceError } from '../ledgers';
 
 /**
  * Typed failures for the payment_transaction use-cases. Each use-case's
@@ -104,4 +105,7 @@ export type PaymentProcessingError =
   // Scheduling the next reconcile() poll (see poll-payment-attempt.use-case.ts)
   // writes an outbox row like any other durable handoff in this module —
   // this is that write failing, thrown up to ask BullMQ to retry the job.
-  | PaymentQueueError;
+  | PaymentQueueError
+  // A settled payment's ledger posting failed to balance — see
+  // post-payment-settlement-ledger.use-case.ts.
+  | LedgerImbalanceError;

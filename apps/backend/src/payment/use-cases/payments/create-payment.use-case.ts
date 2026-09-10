@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../db/db.provider';
+import { DbClientTag } from '../../../db/db.provider';
 import {
   paymentTransactions,
   paymentTransactionTypeEnum,
   type PaymentTransactionRow,
-} from '../entity/payment-transaction';
+} from '../../entity';
 import {
   DuplicateIdempotencyKeyError,
   PaymentPersistenceError,
