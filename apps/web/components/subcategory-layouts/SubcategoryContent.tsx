@@ -33,10 +33,18 @@ export default function SubcategoryContent({
   const searchParams = useSearchParams();
 
   const brandSlug = searchParams.get("ad_field");
+  const attrSlug = searchParams.get("ad_type");
 
   // Force lowercase comparison to avoid "Kia" vs "kia" issues
   const selectedBrand = brands?.find(
     (b) => b.slug.toLowerCase() === brandSlug?.toLowerCase(),
+  );
+
+  // A set the user has already applied steps aside for the next choice — the
+  // Body Type grid disappears once a body type is picked, leaving Brand (the
+  // applied filter is still shown by the bar, the breadcrumb and the feed).
+  const pendingSets = sets?.filter(
+    (set) => !set.options.some((o) => o.slug === attrSlug),
   );
 
   return (
@@ -62,8 +70,9 @@ export default function SubcategoryContent({
       )}
 
       {/* ATTRIBUTE GRIDS (Body Type, Type, Bedroom, Accessories, …): each
-          linked set renders its own card with the design title */}
-      {sets?.map((set) => (
+          linked set renders its own card with the design title; an applied set
+          is filtered out above */}
+      {pendingSets?.map((set) => (
         <OptionGrid
           key={set.slug}
           options={set.options}

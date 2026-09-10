@@ -30,7 +30,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAdminCategories } from "@/actions/admin-categories";
-import Image from "next/image";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import type { Category } from "@/types/category";
 import {
@@ -413,13 +413,13 @@ export default function CategoriesPage() {
                       <TableCell>{category.slug}</TableCell>
 
                       <TableCell className="flex justify-start">
-                        <Image
+                        <DbImage
                           src={category.cateIcon}
                           alt={category.name}
                           width={56}
                           height={56}
                           className="h-12 w-12 object-cover"
-                          unoptimized
+                          fallback={<NoImageCell />}
                         />
                       </TableCell>
 

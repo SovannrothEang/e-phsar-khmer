@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import DbImage from "@/components/common/DbImage";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
@@ -18,6 +18,14 @@ import { ThreeDotPost } from "../Card/ThreeDotPost";
 
 export function GridCardPost({ post }: { post: Post }) {
   const [isLiked, setIsLiked] = useState(false);
+  // No photo at all, or a stored photo missing from storage → empty area. The
+  // DB is the only image source: no static stand-in, no broken <img>.
+  const photo = post.images[0];
+  const emptyPhoto = (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <ImageIcon className="h-8 w-8 text-zinc-400" aria-hidden />
+    </div>
+  );
 
   const province = getProvinceById(post.proId);
   const district = getDistrictById(post.proId, post.disId);
@@ -36,14 +44,19 @@ export function GridCardPost({ post }: { post: Post }) {
         className="absolute inset-0 z-20"
       />
       <div className="relative h-52 w-full bg-zinc-100">
-        <Image
-          src={post.images[0] ?? "/placeholder.svg"}
-          alt={post.title}
-          fill
-          className="object-cover"
-          priority={false}
-          unoptimized
-        />
+        {photo ? (
+          <DbImage
+            src={photo}
+            alt={post.title}
+            fill
+            className="object-cover"
+            priority={false}
+            unoptimized
+            fallback={emptyPhoto}
+          />
+        ) : (
+          emptyPhoto
+        )}
         {post.oldPrice && (
           <div className="absolute top-2 left-2 z-30 flex flex-col items-start gap-1">
             {/* % OFF */}

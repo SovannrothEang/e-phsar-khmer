@@ -1,8 +1,8 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
 import { useState } from "react";
+import DbImage from "@/components/common/DbImage";
 
 /** Minimal option row (brand/bodyType/model) — local type, web is standalone. */
 interface Option {
@@ -33,10 +33,16 @@ export default function OptionGrid({
   const visibleOptions = showAll ? options : options.slice(0, LIMIT);
   const router = useRouter();
 
-  // Models and icon-less option grids (design: text tiles, e.g. furniture
-  // Type, property Type, job types) render 6 columns; image-bearing grids
-  // (brands, body types, accessories) render up to 10.
-  const textTiles = paramKey === "model" || !options.some((o) => !!o.image);
+  // The design follows the SET, never the load result: an image-bearing set
+  // (brands, body types, musical-instrument types, …) uses the icon-circle
+  // design even while an object is missing — one dead image leaves a gap in its
+  // circle, it never re-styles the tile or the grid. A text set (models,
+  // furniture/property Type, job types) uses the bordered text design.
+  // Majority, not "any": a shared option row (the `other` row is linked across
+  // families) can carry an image from another family, and a single stray image
+  // must not flip a whole grid's design.
+  const withImage = options.filter((o) => !!o.image).length;
+  const textTiles = paramKey === "model" || withImage * 2 < options.length;
 
   const handleClick = (e: React.MouseEvent, slug: string) => {
     // Prevent the Link from performing a full navigation
@@ -57,8 +63,12 @@ export default function OptionGrid({
     }
 
     const targetPath = pathname || baseHref;
-    //  stay on the same page, only update query
-    router.replace(`${targetPath}?${params.toString()}`, { scroll: false });
+    // PUSH, not replace: each pick is a navigation step, so Back walks the
+    // drill-down back one choice at a time (replace overwrote the subcategory
+    // entry, which sent Back straight past it to the category page). The view
+    // also resets to the top — a pick changes which grids exist, and keeping
+    // the old offset left the remaining grid's heading under the sticky bar.
+    router.push(`${targetPath}?${params.toString()}`, { scroll: true });
   };
 
   return (
@@ -72,8 +82,6 @@ export default function OptionGrid({
         }
       >
         {visibleOptions.map((opt) => {
-          const imageSrc = "image" in opt ? opt.image : undefined;
-          const isModel = paramKey === "model";
           const targetPath = pathname || baseHref;
 
           const isSelected =
@@ -90,7 +98,7 @@ export default function OptionGrid({
               href={`${targetPath}?${paramKey === "model" ? "ad_model" : paramKey === "body_type" ? "ad_type" : "ad_field"}=${opt.slug}`}
               onClick={(e) => handleClick(e, opt.slug)}
               className={
-                isModel || !imageSrc
+                textTiles
                   ? `border py-2 px-1 text-xs text-center transition-colors flex items-center justify-center min-h-[40px] ${
                       isSelected
                         ? "text-blue-500 bg-blue-50 border-blue-100 font-medium"
@@ -99,24 +107,23 @@ export default function OptionGrid({
                   : `flex flex-col items-center text-center group ${isSelected ? "text-blue-500 font-medium" : ""}`
               }
             >
-              {isModel ? (
+              {textTiles ? (
                 <span>{opt.name}</span>
-              ) : imageSrc ? (
+              ) : (
                 <>
                   <div className="w-14 h-14 flex items-center justify-center rounded-full bg-blue-50 group-hover:bg-blue-100">
-                    <Image
-                      src={imageSrc}
-                      alt={opt.name}
-                      width={56}
-                      height={56}
-                      unoptimized
-                      className="object-contain"
-                    />
+                    {opt.image ? (
+                      <DbImage
+                        src={opt.image}
+                        alt={opt.name}
+                        width={56}
+                        height={56}
+                        className="object-contain"
+                      />
+                    ) : null}
                   </div>
                   <span className="text-xs mt-2 block">{opt.name}</span>
                 </>
-              ) : (
-                <span>{opt.name}</span>
               )}
             </a>
           );

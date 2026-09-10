@@ -3,7 +3,7 @@ import { API_URL } from "@/lib/api/client";
 import type { RealDetailData } from "@/components/post/Post-Detail";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
-import { deriveOldPrice } from "@/lib/utils";
+import { applyDiscount } from "@/lib/utils";
 
 const slugify = (s: string) =>
   s
@@ -290,7 +290,14 @@ export function toCardPost(l: BackendListing): Post {
     userId: l.userId,
     title: l.title,
     images: l.photos.map((p) => p.url),
-    price: Number.isFinite(price) ? price : 0,
+    // The listing price is the ORIGINAL; the discount applies on top — the
+    // bold price is the final, the strikethrough is the original, and the
+    // %-OFF / $-OFF badges derive from oldPrice − price.
+    price: applyDiscount(
+      Number.isFinite(price) ? price : 0,
+      l.discountValue,
+      l.discountType,
+    ),
     cateId: "",
     subId: "",
     description: l.description ?? "",
@@ -301,12 +308,12 @@ export function toCardPost(l: BackendListing): Post {
       l.condition === "used" ? "Used" : l.condition === "new" ? "New" : "",
     freeDelivery: l.deliveryFree,
     location: [l.location, l.address].filter(Boolean).join(", ") || undefined,
-    // Card discount badges (%-OFF / $-OFF) are computed from oldPrice.
-    oldPrice: deriveOldPrice(
-      Number.isFinite(price) ? price : 0,
-      l.discountValue,
-      l.discountType,
-    ),
+    oldPrice:
+      l.discountValue && l.discountType
+        ? Number.isFinite(price)
+          ? price
+          : 0
+        : undefined,
   };
 }
 

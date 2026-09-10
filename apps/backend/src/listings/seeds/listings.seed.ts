@@ -19,7 +19,8 @@ interface DemoListing {
   description: string;
   price: string;
   discountValue?: string;
-  condition: 'new' | 'used';
+  /** Omitted when the category's form has no Condition field (e.g. rentals). */
+  condition?: 'new' | 'used';
   category: string;
   subcategory: string;
   province?: string;
@@ -155,12 +156,132 @@ const DEMO_LISTINGS: DemoListing[] = [
       year: '2023',
       brand: 'Honda',
       model: 'Dream 125',
+      taxType: 'Plate Number',
       color: 'Black',
     },
     photos: [
       {
         url: '/sub-img/car_vehicles/vehicles-for-rent/body_type/motorcycle.png',
         path: 'demo/dream-1.png',
+      },
+    ],
+  },
+  {
+    title: 'Car AC Repair & Maintenance Service',
+    description:
+      'Full car servicing: engine tuning, AC repair, brake check and oil change. Mobile service available.',
+    price: '25',
+    category: 'cars-and-vehicles',
+    subcategory: 'maintenance-and-repair',
+    province: 'phnom-penh',
+    location: 'Sen Sok',
+    contactName: 'Vibol',
+    contactPhones: ['+85516767018'],
+    attributes: {},
+  },
+  {
+    title: 'Hyundai Truck 2.5 Ton 2019',
+    description:
+      '2.5-ton Hyundai truck, well maintained, perfect for cargo business.',
+    price: '18500',
+    condition: 'used',
+    category: 'cars-and-vehicles',
+    subcategory: 'lorries-vans-and-tractors',
+    province: 'phnom-penh',
+    location: 'Dangkao',
+    contactName: 'Sambo',
+    contactPhones: ['+85516767019'],
+    attributes: {},
+  },
+  {
+    title: 'Vehicle Loan & Insurance Service',
+    description:
+      'Car and motorcycle loans with low interest, plus full vehicle insurance packages.',
+    price: '0',
+    category: 'cars-and-vehicles',
+    subcategory: 'financing-and-insurance',
+    province: 'phnom-penh',
+    location: 'Daun Penh',
+    contactName: 'Sokun',
+    contactPhones: ['+85516767020'],
+    attributes: {},
+  },
+  {
+    title: 'Tuk Tuk For Sale - Electric 2024',
+    description:
+      'Electric tuk tuk, new battery, ready for city transport work.',
+    price: '1850',
+    category: 'cars-and-vehicles',
+    subcategory: 'tuk-tuk-and-remork',
+    province: 'siem-reap',
+    location: 'Siem Reap',
+    contactName: 'Rithy',
+    contactPhones: ['+85516767021'],
+    attributes: {},
+  },
+  {
+    title: 'Car Spare Parts - Brake Pads & Filters',
+    description:
+      'Genuine brake pads, oil filters and air filters for most car models. Wholesale price.',
+    price: '15',
+    condition: 'new',
+    category: 'cars-and-vehicles',
+    subcategory: 'parts-and-accessories',
+    province: 'phnom-penh',
+    location: 'Phnom Penh',
+    contactName: 'Dalin',
+    contactPhones: ['+85516767022'],
+    attributes: {
+      vehicleType: 'Cars',
+    },
+  },
+  {
+    title: 'Used Truck Tires - Various Sizes',
+    description:
+      'Quality used tires for trucks and heavy vehicles, various sizes available.',
+    price: '45',
+    category: 'cars-and-vehicles',
+    subcategory: 'vehicles-others',
+    province: 'phnom-penh',
+    location: 'Phnom Penh',
+    contactName: 'Nak',
+    contactPhones: ['+85516767023'],
+    attributes: {},
+  },
+  {
+    title: 'Mini Bus 25 Seats For Rent',
+    description:
+      '25-seat mini bus with driver, available for daily or monthly rental. Airport and province trips.',
+    price: '120',
+    category: 'cars-and-vehicles',
+    subcategory: 'vehicles-for-rent',
+    province: 'phnom-penh',
+    location: 'Phnom Penh',
+    contactName: 'Borey',
+    contactPhones: ['+85516767017'],
+    attributes: {
+      vehicleType: 'Mini Bus',
+      engineType: 'Diesel',
+      transmission: 'Auto',
+    },
+  },
+  {
+    title: 'Giant ATX 27.5 Mountain Bike',
+    description:
+      'Brand new Giant ATX 27.5, 21-speed, aluminium frame. Assembly included.',
+    price: '320',
+    condition: 'new',
+    category: 'cars-and-vehicles',
+    subcategory: 'bicycles',
+    province: 'phnom-penh',
+    deliveryFree: true,
+    contactName: 'Sokha',
+    contactPhones: ['+85516767016'],
+    attributes: {},
+    photos: [
+      {
+        url: '/sub-img/car_vehicles/vehicles-for-rent/body_type/bicycle.png',
+        path: 'demo/bicycle-1.png',
       },
     ],
   },
@@ -262,7 +383,6 @@ const DEMO_LISTINGS: DemoListing[] = [
     description:
       'New duplex villa in a quiet residential area, 4 bedrooms, 5 bathrooms, facing south.',
     price: '245000',
-    condition: 'new',
     category: 'home-and-land',
     subcategory: 'house-for-sale',
     province: 'siem-reap',
@@ -283,7 +403,6 @@ const DEMO_LISTINGS: DemoListing[] = [
     description:
       'Prime residential land near the beach road, title deed available.',
     price: '38000',
-    condition: 'used',
     category: 'home-and-land',
     subcategory: 'land-for-sale',
     province: 'sihanoukville',
@@ -299,7 +418,6 @@ const DEMO_LISTINGS: DemoListing[] = [
       'Modern fabric sofa set, 3 seater plus armchair, free delivery.',
     price: '380',
     deliveryFree: true,
-    condition: 'new',
     category: 'furniture-and-decor',
     subcategory: 'chairs-and-sofas',
     province: 'phnom-penh',
@@ -314,7 +432,6 @@ const DEMO_LISTINGS: DemoListing[] = [
     title: "Men's Polo Shirt - New Arrival",
     description: 'New arrival polo shirts, all sizes, wholesale welcome.',
     price: '12',
-    condition: 'new',
     category: 'fashion-and-beauty',
     subcategory: 'mens-fashion',
     province: 'battambang',
@@ -329,7 +446,6 @@ const DEMO_LISTINGS: DemoListing[] = [
     description:
       'Medium-size company seeking an experienced accountant, full-time.',
     price: '500',
-    condition: 'used',
     category: 'jobs',
     subcategory: 'accounting-jobs',
     province: 'phnom-penh',
@@ -348,6 +464,7 @@ const JUNK_TITLES = [
   'car 1',
   'car 2',
   'car 3',
+  'car test 1',
   'E2E Corolla 2024 - browser test',
   'Smoke Test Corolla 2023',
 ];

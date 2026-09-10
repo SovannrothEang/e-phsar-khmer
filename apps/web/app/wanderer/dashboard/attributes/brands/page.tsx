@@ -56,7 +56,7 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
-import Image from "next/image";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -603,13 +603,13 @@ export default function BrandsPage() {
                         {brand.slug}
                       </TableCell>
                       <TableCell>
-                        <Image
+                        <DbImage
                           src={brand.image}
                           alt={brand.name}
                           width={40}
                           height={40}
                           className="w-10 h-10 object-contain rounded border bg-muted/30 p-0.5"
-                          unoptimized
+                          fallback={<NoImageCell />}
                         />
                       </TableCell>
                       <TableCell>

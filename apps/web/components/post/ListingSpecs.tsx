@@ -25,17 +25,20 @@ const toText = (v: unknown): string | undefined => {
 };
 
 // Only fields the listing's own category/form relates to are rendered. The
-// design order (fixed): brand/model first (cars), then the attribute keys in
-// the observed design sequence, then Condition (only for condition-carrying
-// categories — the same ones that show the Condition chip on the browse bar).
+// design order (fixed, per the reference image): brand/model first (cars),
+// then year, taxType, Condition (only for condition-carrying categories —
+// the same ones that show the Condition chip on the browse bar), bodyType,
+// engineType, transmission, color, then the remaining keys.
 const ATTR_KEYS: [key: string, label: string][] = [
   ["year", "Year"],
   ["taxType", "Tax Type"],
+  ["bodyType", "Body Type"],
+  ["vehicleType", "Vehicle Type"],
+  ["engineType", "Engine Type"],
+  ["transmission", "Transmission"],
   ["color", "Color"],
   ["jobType", "Job Type"],
   ["experience", "Experience"],
-  ["engineType", "Engine Type"],
-  ["transmission", "Transmission"],
   ["type", "Type"],
   ["bedrooms", "Bedroom"],
   ["bathrooms", "Bathroom"],
@@ -46,12 +49,42 @@ const ATTR_KEYS: [key: string, label: string][] = [
   ["network", "Network"],
 ];
 
-const CONDITION_CATEGORIES = [
-  "cars-and-vehicles",
-  "phones-and-tablets",
-  "computers-and-accessories",
-  "electronics-and-appliances",
-];
+// Subcategories whose listing forms carry a Condition field (mirrors the
+// `conditionField` usage in categories.seed.ts — a subcategory-level rule,
+// so e.g. maintenance/rentals/financing/tuk-tuk/vehicles-others show none).
+const CONDITION_SUBCATEGORIES = new Set([
+  "cars-for-sale",
+  "bicycles",
+  "motorcycles-for-sale",
+  "lorries-vans-and-tractors",
+  "parts-and-accessories",
+  "phones",
+  "tablets",
+  "smart-watches",
+  "phone-accessories",
+  "laptops",
+  "desktops",
+  "all-in-one",
+  "monitors",
+  "printers-and-scanners",
+  "computers-parts-and-accessories",
+  "washing-machines-and-dryers",
+  "fridges-and-freezers",
+  "air-conditioning-and-heating",
+  "tools",
+  "consumer-electronics",
+  "cameras-and-camcorders",
+  "tvs-videos-and-audio",
+  "home-appliances",
+  "video-games-consoles-toys",
+  "musical-instruments",
+]);
+
+// The parts-and-accessories form keys its "Type" picker (Cars/Bicycles/…) as
+// `vehicleType` — same key as the rentals' "Vehicle Type"; label per design.
+const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
+  "parts-and-accessories": { vehicleType: "Type" },
+};
 
 export default function ListingSpecs({
   cate,
@@ -72,7 +105,9 @@ export default function ListingSpecs({
         }
       : undefined;
 
-  const conditionCarrier = !!cate && CONDITION_CATEGORIES.includes(cate.slug);
+  const conditionCarrier =
+    !!subcate && CONDITION_SUBCATEGORIES.has(subcate.slug);
+  const labelOverrides = subcate ? LABEL_OVERRIDES[subcate.slug] : undefined;
 
   const rows: Row[] = [
     {
@@ -130,18 +165,39 @@ export default function ListingSpecs({
     });
   }
 
-  for (const [key, label] of ATTR_KEYS) {
-    const value = toText(attributes?.[key]);
-    if (value) rows.push({ label, value, href: browseHref });
-  }
-
-  if (conditionCarrier && (condition === "used" || condition === "new")) {
+  // Condition sits directly after the fields the design places before it:
+  // Year/Tax Type (cars/motorcycles) — plus the Type picker for parts
+  // (reference shows "Type" then "Condition"). When none of those are
+  // present it falls back to just after Brand/Model (or Category).
+  const conditionPreKeys = new Set(
+    subcate?.slug === "parts-and-accessories"
+      ? ["year", "taxType", "vehicleType"]
+      : ["year", "taxType"],
+  );
+  const showCondition =
+    conditionCarrier && (condition === "used" || condition === "new");
+  let conditionInserted = false;
+  const pushCondition = () => {
+    if (!showCondition || conditionInserted) return;
     rows.push({
       label: "Condition",
       value: condition === "used" ? "Used" : "New",
       href: browseHref,
     });
+    conditionInserted = true;
+  };
+
+  for (const [key, label] of ATTR_KEYS) {
+    const value = toText(attributes?.[key]);
+    if (!value) continue;
+    if (!conditionPreKeys.has(key)) pushCondition();
+    rows.push({
+      label: labelOverrides?.[key] ?? label,
+      value,
+      href: browseHref,
+    });
   }
+  pushCondition();
 
   if (rows.every((r) => r.value === undefined)) return null;
 
