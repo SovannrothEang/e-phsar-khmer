@@ -85,6 +85,7 @@ export class PaymentsController {
           paymentTransactionId: transaction.id,
           paymentAttemptId: attempt.id,
           browserReturnUrl: dto.browserReturnUrl,
+          browserCancelUrl: dto.browserCancelUrl,
         });
         return { transaction, attempt };
       }),

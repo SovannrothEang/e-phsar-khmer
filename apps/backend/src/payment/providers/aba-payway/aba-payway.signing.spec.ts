@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import {
   signAbaPayway,
   signAbaPaywayCallback,
+  signAbaPaywayPurchase,
   verifyAbaPaywayCallbackSignature,
 } from './aba-payway.signing';
 
@@ -38,6 +39,127 @@ describe('signAbaPayway', () => {
     const withNulls = signAbaPayway(['1', null, 'm', undefined, 't'], 'key');
     const withoutNulls = signAbaPayway(['1', 'm', 't'], 'key');
     expect(withNulls).toBe(withoutNulls);
+  });
+});
+
+describe('signAbaPaywayPurchase', () => {
+  it('matches a manually computed digest over the full 23-field order', () => {
+    // req_time, merchant_id, tran_id, amount, items, shipping, firstname,
+    // lastname, email, phone, type, payment_option, return_url, cancel_url,
+    // continue_success_url, return_deeplink, currency, custom_fields,
+    // return_params, payout, lifetime, additional_params, google_pay_token,
+    // skip_success_page — per ABA's own developer docs
+    // (developer.payway.com.kh/purchase-14530820e0).
+    const expectedData =
+      '20260916090503' + // req_time
+      'merchant-1' + // merchant_id
+      'tran-99' + // tran_id
+      '10' + // amount
+      '' + // items
+      '' + // shipping
+      '' + // firstname
+      '' + // lastname
+      '' + // email
+      '' + // phone
+      '' + // type
+      '' + // payment_option
+      'cmV0dXJu' + // return_url
+      'Y2FuY2Vs' + // cancel_url
+      'Y29udGludWU='; // continue_success_url — deliberately no fields after
+    // this one in the test input, all trailing positions stay ''.
+    const expected = createHmac('sha512', 'my-api-key')
+      .update(expectedData, 'utf-8')
+      .digest('base64');
+
+    expect(
+      signAbaPaywayPurchase(
+        {
+          reqTime: '20260916090503',
+          merchantId: 'merchant-1',
+          tranId: 'tran-99',
+          amount: 10,
+          returnUrl: 'cmV0dXJu',
+          cancelUrl: 'Y2FuY2Vs',
+          continueSuccessUrl: 'Y29udGludWU=',
+        },
+        'my-api-key',
+      ),
+    ).toBe(expected);
+  });
+
+  it('leaves an unset optional field as an empty string at its position, not skipped', () => {
+    // Omitting `currency` (position 17 of 23) must not shift `customFields`
+    // (position 18) — or any later field — one slot earlier.
+    const withCurrency = signAbaPaywayPurchase(
+      {
+        reqTime: '1',
+        merchantId: 'm',
+        tranId: 't',
+        amount: 10,
+        currency: 'USD',
+        customFields: 'cf',
+      },
+      'key',
+    );
+    const withoutCurrency = signAbaPaywayPurchase(
+      {
+        reqTime: '1',
+        merchantId: 'm',
+        tranId: 't',
+        amount: 10,
+        customFields: 'cf',
+      },
+      'key',
+    );
+    expect(withCurrency).not.toBe(withoutCurrency);
+
+    const manualWithout =
+      '1' + // req_time
+      'm' + // merchant_id
+      't' + // tran_id
+      '10' + // amount
+      '' + // items
+      '' + // shipping
+      '' + // firstname
+      '' + // lastname
+      '' + // email
+      '' + // phone
+      '' + // type
+      '' + // payment_option
+      '' + // return_url
+      '' + // cancel_url
+      '' + // continue_success_url
+      '' + // return_deeplink
+      '' + // currency (omitted)
+      'cf'; // custom_fields
+    const expected = createHmac('sha512', 'key')
+      .update(manualWithout, 'utf-8')
+      .digest('base64');
+    expect(withoutCurrency).toBe(expected);
+  });
+
+  it('is deterministic for the same inputs', () => {
+    const fields = {
+      reqTime: '1',
+      merchantId: 'm',
+      tranId: 't',
+      amount: 10,
+    };
+    expect(signAbaPaywayPurchase(fields, 'key')).toBe(
+      signAbaPaywayPurchase(fields, 'key'),
+    );
+  });
+
+  it('changes when the key changes', () => {
+    const fields = {
+      reqTime: '1',
+      merchantId: 'm',
+      tranId: 't',
+      amount: 10,
+    };
+    expect(signAbaPaywayPurchase(fields, 'key-a')).not.toBe(
+      signAbaPaywayPurchase(fields, 'key-b'),
+    );
   });
 });
 

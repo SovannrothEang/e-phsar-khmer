@@ -81,4 +81,15 @@ export class CreatePaymentDto {
       'so a caller can never redirect that notification elsewhere.',
   })
   browserReturnUrl?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  @ApiPropertyOptional({
+    description:
+      "Where the payer's browser is redirected if they cancel checkout at " +
+      'the provider (e.g. ABA PayWay `cancel_url`). Same trust boundary as ' +
+      '`browserReturnUrl` — a browser redirect target, never the ' +
+      'server-to-server webhook URL.',
+  })
+  browserCancelUrl?: string;
 }

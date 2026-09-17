@@ -61,6 +61,51 @@ export interface CheckTransactionResponse {
 }
 
 /**
+ * `transaction-detail`'s request body is identical in shape to
+ * check-transaction's (`hash`, `merchant_id`, `req_time`, `tran_id`) — reused
+ * rather than redeclared, per spec.md's own footnote that naming/reuse
+ * across endpoints doesn't need to be strict when the required fields match.
+ */
+export type GetTransactionDetailRequest = CheckTransactionRequest;
+
+export interface AbaPaywayTransactionOperation {
+  amount?: number | null;
+  bank_ref?: string | null;
+  status?: string | null;
+  transaction_date?: string | null;
+}
+
+export interface GetTransactionDetailData {
+  apv?: string | null;
+  bank_name?: string | null;
+  bank_ref?: string | null;
+  card_source?: string | null;
+  discount_amount?: number | null;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  original_amount?: number | null;
+  original_currency?: string | null;
+  payer_account?: string | null;
+  payment_amount?: number | null;
+  payment_currency?: string | null;
+  payment_status?: string | null;
+  payment_status_code?: number | null;
+  payment_type?: string | null;
+  phone?: string | null;
+  refund_amount?: number | null;
+  status?: AbaPaywayStatus | null;
+  total_amount?: number | null;
+  transaction_date?: string | null;
+  transaction_id?: string | null;
+  transaction_operations?: AbaPaywayTransactionOperation[] | null;
+}
+
+export interface GetTransactionDetailResponse {
+  data?: GetTransactionDetailData | null;
+}
+
+/**
  * ABA's async payment notification ("Pushback Data") POSTed to `return_url`.
  * Not documented in spec.md (which only covers the 5 REST endpoints) — this
  * is the real, doc-confirmed shape (the "Handle Callback URL" guide's

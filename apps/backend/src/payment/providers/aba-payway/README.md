@@ -11,19 +11,27 @@ fields become the checkout artifact handed back to the client.
 
 ### One file per concern
 
-| File                       | Purpose                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `aba-payway.provider.ts`   | Implements `PaymentGatewayProvider` — `charge()`, `reconcile()`, `verifyWebhookSignature()`, `parseWebhookEvent()`, `redact()`. |
-| `aba-payway.controller.ts` | `AbaPaywayController` — ABA's dedicated webhook route (see [Webhook intake](#webhook-intake) below).                            |
-| `aba-payway.signing.ts`    | The two outbound/inbound HMAC-SHA512 signing algorithms (see [Two signing algorithms](#two-signing-algorithms-not-one)).        |
-| `aba-payway.encoding.ts`   | `base64EncodeAbaPaywayUrl` — the base64 encoding ABA's docs require on URL fields.                                              |
-| `aba-payway.status.ts`     | `toPaymentAttemptOutcome` — maps ABA's status codes/text onto `payment_attempts.status`.                                        |
-| `aba-payway.types.ts`      | Wire-format interfaces, field names taken verbatim from `spec.md`.                                                              |
-| `spec.md`                  | The documented REST endpoints (purchase, check-transaction, transaction-detail, close-transaction, transaction-list).           |
-| `*.spec.ts`                | Unit tests for the pure functions (signing, encoding, status mapping).                                                          |
+| File                                     | Purpose                                                                                                                                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aba-payway.provider.ts`                 | Implements `PaymentGatewayProvider` — `charge()`, `reconcile()`, `verifyWebhookSignature()`, `parseWebhookEvent()`, `redact()`. |
+| `aba-payway.controller.ts`               | `AbaPaywayController` — ABA's dedicated webhook route (see [Webhook intake](#webhook-intake) below).                                                                                     |
+| `handlers/create-transaction.handler.ts` | `createAbaPaywayTransaction` — the `purchase` network call behind `charge()`.                                                                                                            |
+| `handlers/check-transaction.handler.ts`  | `checkAbaPaywayTransaction` — the `check-transaction-2` network call behind `reconcile()`.                                                                                               |
+| `aba-payway.signing.ts`                  | The three outbound/inbound HMAC-SHA512 signing algorithms (see [Three signing algorithms](#three-signing-algorithms-not-one)).                                                           |
+| `aba-payway.encoding.ts`                 | `base64EncodeAbaPaywayUrl` (the base64 encoding `return_url` needs) and `formatAbaPaywayReqTime` (the `YYYYMMDDHHmmss` UTC timestamp every outbound call needs).                         |
+| `aba-payway.status.ts`                   | `toPaymentAttemptOutcome` — maps ABA's status codes/text onto `payment_attempts.status`.                                                                                                 |
+| `aba-payway.types.ts`                    | Wire-format interfaces, field names taken verbatim from `spec.md`.                                                                                                                       |
+| `spec.md`                                | The documented REST endpoints (purchase, check-transaction, transaction-detail, close-transaction, transaction-list).                                                                    |
+| `*.spec.ts`                              | Unit tests for the pure functions (signing, encoding, status mapping).                                                                                                                   |
 
-Only two of `spec.md`'s five documented endpoints are actually wired up:
-`purchase` (via `charge()`) and `check-transaction-2` (via `reconcile()`).
+Each network call is a thin `Effect.fn` handler under `handlers/` — the same
+split Bakong's provider uses (see `../bakong/handlers/`) — that POSTs via the
+shared `ApiClient` (`../../../utils/api-client.ts`) and hands the raw typed
+response back; interpreting `status.code` into a `ChargeResult` stays the
+provider's job, not the handler's.
+
+Two of `spec.md`'s five documented endpoints are wired up: `purchase` (via
+`charge()`) and `check-transaction-2` (via `reconcile()`).
 `transaction-detail`, `close-transaction`, and `transaction-list` are
 documented but unused — nothing in this module currently needs them.
 
@@ -31,20 +39,28 @@ documented but unused — nothing in this module currently needs them.
 
 `charge()` calls ABA's `purchase` endpoint. A `"00"` `status.code` means a
 checkout session was created, not that money has moved — the attempt stays
-`pending`, and `checkout_qr_url` comes back as `ChargeResult.redirectUrl` for
-the client to display. `reconcile()` calls `check-transaction-2` and maps
-the response through `toPaymentAttemptOutcome`; a non-`"00"` status here
-means ABA has no record of the `tran_id` yet, which is treated as
-inconclusive (`pending`), not a rejection.
+`pending`. `abapay_deeplink` comes back as `ChargeResult.redirectUrl` for
+the client to display; the KHQR itself (`qrString`/`qrImage`) travels
+through `ChargeResult.rawResponse` (see [Three signing
+algorithms](#three-signing-algorithms-not-one) below for why — there's no
+`checkout_qr_url` field in ABA's real response, despite what `spec.md`
+documents). `reconcile()` calls `check-transaction-2` and maps the
+response through `toPaymentAttemptOutcome`; a non-`"00"` status here means
+ABA has no record of the `tran_id` yet, which is treated as inconclusive
+(`pending`), not a rejection.
 
-`tran_id` sent to ABA is always the `payment_transactions.id` UUID
-(`ChargeRequest.transactionId`), never the free-text `reference` — `id` is
-the column with a uniqueness constraint, and ABA echoes `tran_id` back
-verbatim on every subsequent call (check-transaction, the callback body),
-which is what lets a webhook or a reconcile lookup correlate back to the
-right attempt without a second, ABA-specific reference column.
+`tran_id` sent to ABA is a short opaque id `AbaPaywayProvider.charge()`
+generates per attempt (`generateTranId()`) — **not**
+`payment_transactions.id`/`payment_attempts.id` (both 36-character UUIDs;
+ABA's live validation rejects `tran_id` past ~20-25 characters, confirmed
+2026-09-16). ABA echoes `tran_id` back verbatim on every subsequent call
+(check-transaction, the callback body), and that echoed value is what
+`payment_attempts.provider_attempt_id` stores — which is what lets a
+webhook or a reconcile lookup correlate back to the right attempt, without
+needing our own UUID to fit in ABA's field. See
+`CreatePurchaseRequest.tran_id`'s own doc comment in `aba-payway.types.ts`.
 
-### `return_url` vs `continue_success_url` — do not conflate these
+### `return_url` vs `continue_success_url`/`cancel_url` — do not conflate these
 
 Despite the name, ABA's `return_url` is a **server-to-server** field: the
 URL ABA POSTs the payment result to once the payer completes or abandons
@@ -53,25 +69,52 @@ redirect. It is always `webhookUrl()` (fixed server config,
 `ABA_PAYWAY_WEBHOOK_URL`, pointed at `AbaPaywayController`'s own route) and
 is never sourced from caller input — a client controlling where ABA's
 payment-result notification goes would be a real vulnerability.
-`continue_success_url` is the actual browser redirect, and that one is
-legitimately caller-supplied via `ChargeRequest.returnUrl`. Both are
-base64-encoded before being sent (`aba-payway.encoding.ts`) — confirmed
-against ABA's own documented field description for `return_url` only (see
-[Open items](#open-items)).
+`continue_success_url`/`cancel_url` are the actual browser redirects, and
+those are legitimately caller-supplied, via `ChargeRequest.returnUrl`/
+`.cancelUrl` → `CreatePaymentDto.browserReturnUrl`/`.browserCancelUrl`.
+**Only `return_url` is base64-encoded** (`aba-payway.encoding.ts`) —
+confirmed against both ABA's own documented field description for
+`return_url` ("encrypted with Base64") and its developer docs
+([developer.payway.com.kh/purchase-14530820e0](https://developer.payway.com.kh/purchase-14530820e0)),
+which call out base64 for `return_url` specifically and say nothing of the
+sort for the other two — `continue_success_url`/`cancel_url` are sent as
+plain URLs. (An earlier version of this provider applied the same encoding
+to all three on an unconfirmed "same URL-field convention" assumption —
+see git history — before the developer docs settled it.)
 
-### Two signing algorithms, not one
+### Three signing algorithms, not one
 
-ABA documents outbound requests and inbound callbacks as two separate
-schemes — don't assume they're interchangeable:
+ABA documents `purchase`, `check-transaction-2`/`transaction-detail`, and
+inbound callbacks as three separate schemes — don't assume any two are
+interchangeable:
 
-- **Outbound** (`signAbaPayway`, used by `charge()`/`reconcile()`):
-  HMAC-SHA512 over the plain concatenation of the request's required
-  values, in the API's documented positional order (5 fields for purchase —
-  `req_time, merchant_id, tran_id, amount, currency`; 3 for
-  check-transaction), keyed by the merchant API key, base64-encoded.
-  `null`/`undefined` values are skipped rather than stringified, so a sparse
-  request signs the same way ABA computes it on its side. Ported from the
-  verified `payway-gateway` reference implementation.
+- **`purchase`** (`signAbaPaywayPurchase`, used only by `charge()`):
+  HMAC-SHA512 over the plain concatenation of exactly 23 fields, in this
+  fixed order — `req_time, merchant_id, tran_id, amount, items, shipping,
+firstname, lastname, email, phone, type, payment_option, return_url,
+cancel_url, continue_success_url, return_deeplink, currency,
+custom_fields, return_params, payout, lifetime, additional_params,
+google_pay_token, skip_success_page` — keyed by the merchant API key,
+  base64-encoded. A field this codebase never populates (items, shipping,
+  firstname, email, ...) still occupies its position as an **empty
+  string**, never a skip — this is positional concatenation, so dropping a
+  gap would desync every field after it. Confirmed against ABA's own
+  developer docs
+  ([developer.payway.com.kh/purchase-14530820e0](https://developer.payway.com.kh/purchase-14530820e0)).
+  This superseded an earlier 5-field implementation (`req_time,
+merchant_id, tran_id, amount, currency`, that order) that was wrong on
+  both field count and order — see [Open items](#open-items) for how that
+  was found.
+- **`check-transaction-2`** (`signAbaPayway`, used by
+  `reconcile()`): HMAC-SHA512 over the plain
+  concatenation of the only 3 fields either endpoint takes —
+  `req_time + merchant_id + tran_id` — base64-encoded. `null`/`undefined`
+  values are skipped rather than stringified, harmless here since these
+  two endpoints have no optional fields to leave gaps. Confirmed against
+  ABA's own developer docs
+  ([developer.payway.com.kh/check-transaction-14530826e0](https://developer.payway.com.kh/check-transaction-14530826e0)),
+  including its PHP sample (`$req_time . $merchant_id . $tran_id`) — this
+  one was already correct.
 - **Inbound / callback** (`signAbaPaywayCallback` +
   `verifyAbaPaywayCallbackSignature`): sort the payload's top-level keys
   ascending, concatenate the values in that key order (JSON-encoding any
@@ -79,8 +122,16 @@ schemes — don't assume they're interchangeable:
   key, base64-encoded, then compared **in constant time**
   (`timingSafeEqual`, length-checked first since it throws rather than
   returning `false` on a mismatched length) against the
-  `X-PayWay-Hmac-Sha512` request header. Confirmed against ABA's own
-  "Verify Callback Signature" documentation.
+  `X-PayWay-Hmac-Sha512` request header. Confirmed against both ABA's own
+  "Verify Callback Signature" documentation and its developer docs
+  ([developer.payway.com.kh/ecommerce-checkout-3158159f0](https://developer.payway.com.kh/ecommerce-checkout-3158159f0)).
+
+`req_time` itself is a 14-digit UTC timestamp (`YYYYMMDDHHmmss`,
+`formatAbaPaywayReqTime` in `aba-payway.encoding.ts`), used identically by
+all three outbound calls — confirmed against ABA's developer docs for both
+`purchase` and `check-transaction-2`. This superseded an earlier
+`String(Date.now())` (epoch milliseconds) implementation that would never
+have matched what ABA expects — see [Open items](#open-items).
 
 ### Status mapping
 
@@ -126,77 +177,114 @@ against `check-transaction-2` before its reported status is trusted.
 
 ## Configuration
 
-| Var                      | Required for                                                         |
-| ------------------------ | -------------------------------------------------------------------- |
-| `ABA_PAYWAY_API_KEY`     | Signing every outbound request and verifying every inbound callback. |
-| `ABA_PAYWAY_MERCHANT_ID` | Every outbound request.                                              |
-| `ABA_PAYWAY_BASE_URL`    | Defaults to `https://checkout-sandbox.abapayway.com`.                |
-| `ABA_PAYWAY_WEBHOOK_URL` | `return_url` on `charge()` — see below.                              |
+| Var                      | Required for                                                                                                                                                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ABA_PAYWAY_API_KEY`     | Signing every outbound request and verifying every inbound callback.                                                                                                                                                                               |
+| `ABA_PAYWAY_MERCHANT_ID` | Every outbound request.                                                                                                                                                                                                                            |
+| `ABA_PAYWAY_BASE_URL`    | Defaults to `https://checkout-sandbox.payway.com.kh` — confirmed against ABA's own developer docs ([developer.payway.com.kh](https://developer.payway.com.kh)). An earlier default (`checkout-sandbox.abapayway.com`) was never a real ABA domain. |
+| `ABA_PAYWAY_WEBHOOK_URL` | `return_url` on `charge()` — see below.                                                                                                                                                                                                            |
 
 All four are optional at the `ConfigModule` level (empty-string defaults) so
 the app can boot without ABA credentials, but `charge()` throws immediately
-if `ABA_PAYWAY_WEBHOOK_URL` is unset, and `post()` throws immediately if
-either `ABA_PAYWAY_API_KEY` or `ABA_PAYWAY_MERCHANT_ID` is unset — fail
-fast with a clear message rather than sending ABA a malformed, unsigned, or
-unroutable request.
+if `ABA_PAYWAY_WEBHOOK_URL` is unset, and `ensureConfigured()` throws
+immediately (called at the top of `charge()`/`reconcile()`) if either
+`ABA_PAYWAY_API_KEY` or
+`ABA_PAYWAY_MERCHANT_ID` is unset — fail fast with a clear message rather
+than sending ABA a malformed, unsigned, or unroutable request.
 
 ## Current state
 
-| Piece                             | Status                                                                                                                                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `charge()` (purchase)             | Done, against the sandbox base URL.                                                                                                                                                              |
-| `reconcile()` (check-transaction) | Done.                                                                                                                                                                                            |
-| `verifyWebhookSignature()`        | Done — real HMAC check, not a stub.                                                                                                                                                              |
-| `parseWebhookEvent()`             | Done.                                                                                                                                                                                            |
-| `redact()`                        | Identity function — correct, not unimplemented (see the doc comment on `AbaPaywayProvider.redact`; no PAN/account/token field appears anywhere in `spec.md`'s documented shapes).                |
-| Unit tests                        | Signing (both algorithms), encoding, and status-mapping pure functions are covered (`*.spec.ts`). No test exercises `charge()`/`reconcile()`/the controller against a live or mocked HTTP layer. |
-| Live verification                 | None — no sandbox credentials or public callback endpoint have been available in this environment. Everything below is doc-derived, not observed.                                                |
+| Piece                             | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `charge()` (purchase)             | Done — confirmed live against the sandbox (2026-09-16), not just unit-tested.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `reconcile()` (check-transaction) | Done — confirmed live against the sandbox (2026-09-16).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `verifyWebhookSignature()`        | Done — real HMAC check, not a stub.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `parseWebhookEvent()`             | Done.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `redact()`                        | Identity function — correct, not unimplemented (see the doc comment on `AbaPaywayProvider.redact`; no PAN/account/token field appears anywhere in `spec.md`'s documented shapes).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Unit tests                        | Signing (all three algorithms), encoding (base64 + `req_time` formatting), and status-mapping pure functions are covered (`*.spec.ts`). No test exercises `charge()`/`reconcile()`/the controller against a live or mocked HTTP layer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Live verification                 | **`charge()` and `reconcile()` both confirmed live against the sandbox (2026-09-16)** — real credentials, real `AbaPaywayProvider` instance, no mocking. `charge()` returned `status.code: "00"`, a working `redirectUrl` (`abapay_deeplink`), and a real KHQR (`qrString`/`qrImage`); `reconcile()` on the same `tran_id` round-tripped cleanly. This also caught and fixed three bugs no amount of doc-reading surfaced: ABA rejects `tran_id` over ~20-25 characters (a `payment_transactions.id` UUID is 36 — see `CreatePurchaseRequest.tran_id`'s doc comment), the purchase endpoint returns a rendered HTML page instead of JSON unless the request sends `Accept: application/json`, and the real JSON response shape (`qrString`/`qrImage`, no `checkout_qr_url`) doesn't match `spec.md`'s documented schema at all. **Not yet verified: a real webhook callback** — that needs either a publicly reachable `ABA_PAYWAY_WEBHOOK_URL` or an actually-completed sandbox payment (see [Open items](#open-items)), neither of which this environment has. |
 
 ## Open items
 
-- **`ABA_PAYWAY_WEBHOOK_URL` must be set, and publicly reachable, before any
-  purchase can be charged.** `return_url` is the server-to-server field ABA
-  posts the payment result to; `charge()` refuses to call ABA at all if it's
-  unset. In local dev without a public tunnel (ngrok/cloudflared), ABA has
-  nowhere to deliver a real notification — `reconcile()` is the fallback
-  poll path for that case, not a substitute for having the webhook reachable
-  in any real deployment.
-- **`return_url`/`continue_success_url` base64 encoding is only half
-  doc-confirmed.** ABA's purchase-endpoint docs state `return_url` must be
-  base64-encoded ("encrypted with Base64") — confirmed. `encoding.ts`
-  applies the same encoding to `continue_success_url` on the assumption
-  that it follows the same "URL field" convention, but that specific field
-  isn't independently confirmed against ABA's docs. The `payway-gateway`
-  reference implementation has a matching `EncodeBase64Builder` utility but
-  never actually calls it on `return_url` — this exact step was apparently
-  left unfinished there too. `cancel_url` isn't wired at all yet (no
-  `ChargeRequest` field carries a distinct cancel destination).
-- **The outbound hash field order isn't independently verified against
-  ABA's own merchant docs.** The signing in `aba-payway.signing.ts` (5
-  fields for purchase, 3 for check-transaction, that specific order) is
-  ported from the working `payway-gateway` reference implementation, not
-  derived from `spec.md` — whose only note on the topic is "typically a
-  SHA256 hash of the concatenated string of required parameters," which
-  doesn't even match the HMAC-SHA512 algorithm actually used here or by the
-  reference. If a live sandbox call is rejected with a signature error,
-  this field order/algorithm is the first thing to cross-check against
-  ABA's current merchant integration guide. Same caveat for `req_time`'s
-  wire format: sent as `String(Date.now())` (epoch ms as a string, matching
-  `spec.md`'s declared `string` type) rather than a `YYYYMMDDHHmmss`-style
-  timestamp — neither `spec.md` nor the reference implementation states
-  which ABA actually expects.
-- **The callback signature scheme is implemented from ABA's own docs, not
-  independently tested against a live callback.** `verifyWebhookSignature()`
+- **Resolved and confirmed live (2026-09-16)** against the real sandbox
+  with real credentials, using the actual `AbaPaywayProvider` class (not a
+  reimplementation) — not just cross-checked against docs:
+  - The sandbox base URL was never a real ABA domain
+    (`checkout-sandbox.abapayway.com` → `checkout-sandbox.payway.com.kh`).
+  - `req_time`'s wire format is `YYYYMMDDHHmmss` UTC, not epoch
+    milliseconds.
+  - The `purchase` hash algorithm is 23 fixed-position fields, not the 5
+    the previous implementation signed in a materially different order
+    (`currency` was 5th instead of 17th, among other differences).
+  - **`tran_id` must be ≤ ~20-25 characters** — ABA's live validation
+    rejected the 36-character UUID this provider used to send
+    (`payment_transactions.id`) with `"The tran_id cannot empty and
+exceed 25 characters"`. `AbaPaywayProvider` now generates a short
+    opaque id per attempt instead (`generateTranId()`, 20 characters);
+    correlation still works because `payment_attempts.provider_attempt_id`
+    was already populated from whatever ABA echoes back, not from our own
+    UUID directly. This wasn't something any documentation would have
+    caught — the reference implementation and `spec.md` both send the raw
+    transaction id too.
+  - **ABA's purchase endpoint returns a rendered HTML checkout page (200
+    OK) instead of the documented JSON body unless the request sends
+    `Accept: application/json`.** Without it, `response.status` is
+    `undefined` on an HTML string — every purchase would have silently
+    been read as failed. Now set on the shared `apiClient` construction.
+  - **The real JSON response shape doesn't match `spec.md`'s
+    `CreatePurchaseResponseSchema` at all.** Confirmed shape: `qrString`
+    (camelCase, not `qr_string`), `qrImage` (a ready-to-display
+    `data:image/png` base64 URI, not documented at all), `abapay_deeplink`,
+    `app_store`, `play_store`, `description`, and `status` (the one field
+    that does match). There is no `checkout_qr_url` field — `redirectUrl`
+    now maps to `abapay_deeplink`; the KHQR data travels through
+    `rawResponse`, same pattern `../bakong/bakong.provider.ts` uses.
+
+  Any one of the first three would have made a live call fail outright;
+  the last three would have made it silently misread success as failure
+  even once signing was correct — together, the most likely reasons a
+  first live attempt would have failed or appeared to fail, ahead of
+  anything about `continue_success_url`/`cancel_url` encoding.
+
+- **`continue_success_url`/`cancel_url` base64 encoding — resolved, no
+  longer applied.** ABA's developer docs single out `return_url` for
+  base64 encoding and say nothing about it for the other two URL fields —
+  they're now sent plain. This reverses an earlier assumption (matching
+  `return_url`'s convention) that this same investigation showed was
+  probably wrong. Not independently confirmed against a live payer
+  actually landing on the right page (that needs a completed payment —
+  see the webhook item below), but the purchase call itself accepts the
+  plain URLs without complaint.
+- **A real webhook callback still hasn't been observed** — the one piece
+  of the [Current state](#current-state) table's Live verification row
+  genuinely still open. `verifyWebhookSignature()`/`signAbaPaywayCallback`
+  are independently confirmed against both ABA's documented sample
+  payload and its developer docs (algorithm-level), but ABA only ever
+  sends this callback once a payment actually completes — which needs
+  either a publicly reachable `ABA_PAYWAY_WEBHOOK_URL` (currently unset in
+  `apps/backend/.env` — `charge()` refuses to call ABA at all without it)
+  or a test card
+  ([developer.payway.com.kh/resources-3305682f0](https://developer.payway.com.kh/resources-3305682f0)
+  lists sandbox test cards for completing a transaction without a real
+  bank account) run through the checkout page at the confirmed-working
+  `abapay_deeplink`/`qrImage`. Neither has been available in this
+  environment. Whoever has a tunnel (ngrok/cloudflared) and 2 minutes
+  with a test card can close this the rest of the way.
   - `signAbaPaywayCallback`/`verifyAbaPaywayCallbackSignature` are
-    unit-tested against ABA's own documented sample payload, but what isn't
-    verified is whether that sample's key/value shape is exactly what a real
-    callback delivers — undocumented fields or different key casing would
-    silently change the signed string. This provider has no `reconcile()`
-    fallback for a signature check that's wrong in production —
-    `processProviderEvent` trusts the payload once it clears
-    `verifyWebhookSignature()`, full stop (the `reconcile()` corroboration
-    described under [Webhook intake](#webhook-intake) only runs after
-    signature verification already passed).
+    unit-tested against ABA's own documented sample payload, and the
+    algorithm itself (sort keys, concatenate, HMAC-SHA512, base64) is now
+    independently confirmed against ABA's developer docs
+    ([developer.payway.com.kh/ecommerce-checkout-3158159f0](https://developer.payway.com.kh/ecommerce-checkout-3158159f0)),
+    not just the sample payload. What still isn't verified is whether a
+    real callback's field set matches the documented one
+    (`tran_id`/`apv`/`status`/`return_params`/`merchant_ref`) exactly —
+    undocumented fields or different key casing would silently change the
+    signed string. This provider has no `reconcile()` fallback for a
+    signature check that's wrong in production — `processProviderEvent`
+    trusts the payload once it clears `verifyWebhookSignature()`, full
+    stop (the `reconcile()` corroboration described under [Webhook
+    intake](#webhook-intake) only runs after signature verification
+    already passed).
 - **`ParsedProviderEvent.providerEventId` is `${tran_id}:${status}`.** This
   dedupes a true retry (same outcome resent) but treats a later, genuinely
   different status for the same transaction as a new event — reasonable for

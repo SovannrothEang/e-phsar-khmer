@@ -23,6 +23,11 @@ export interface ProcessAttemptJobData {
    * call this job makes.
    */
   browserReturnUrl?: string;
+  /**
+   * The payer's browser redirect on cancel (e.g. ABA PayWay `cancel_url`).
+   * Same carry-through rationale as `browserReturnUrl` above.
+   */
+  browserCancelUrl?: string;
 }
 
 export interface ProcessProviderEventJobData {

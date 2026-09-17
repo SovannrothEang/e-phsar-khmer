@@ -39,6 +39,7 @@ export interface ChargeRequest {
   customerId?: string;
   description?: string;
   returnUrl?: string;
+  cancelUrl?: string;
 }
 
 /**

@@ -13,3 +13,24 @@
 export function base64EncodeAbaPaywayUrl(url: string): string {
   return Buffer.from(url, 'utf-8').toString('base64');
 }
+
+/**
+ * ABA PayWay's `req_time` wire format, confirmed against ABA's own
+ * developer docs (developer.payway.com.kh/purchase-14530820e0 and
+ * .../check-transaction-14530826e0, both state "Request date and time in
+ * UTC format as YYYYMMDDHHmmss"): a 14-digit UTC timestamp, not epoch
+ * milliseconds. This superseded a previous `String(Date.now())`
+ * implementation that would never have matched what ABA expects on a live
+ * call — see the module README's Open items for how this was found.
+ */
+export function formatAbaPaywayReqTime(date: Date): string {
+  const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
+  return (
+    date.getUTCFullYear().toString() +
+    pad(date.getUTCMonth() + 1) +
+    pad(date.getUTCDate()) +
+    pad(date.getUTCHours()) +
+    pad(date.getUTCMinutes()) +
+    pad(date.getUTCSeconds())
+  );
+}
