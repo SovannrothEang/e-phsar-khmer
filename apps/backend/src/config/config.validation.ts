@@ -69,7 +69,10 @@ const envSchema = z.object({
   ABA_PAYWAY_MERCHANT_ID: z.string().optional().default(''),
   ABA_PAYWAY_BASE_URL: z
     .string()
-    .default('https://checkout-sandbox.abapayway.com'),
+    // Confirmed against ABA's own developer docs (developer.payway.com.kh)
+    // — the old default (checkout-sandbox.abapayway.com) was never a real
+    // ABA domain.
+    .default('https://checkout-sandbox.payway.com.kh'),
   // The `return_url` ABA PayWay is told to POST payment results to on
   // every purchase call — this backend's own public
   // /api/v1/payments/aba-payway/webhook route. Must be a publicly

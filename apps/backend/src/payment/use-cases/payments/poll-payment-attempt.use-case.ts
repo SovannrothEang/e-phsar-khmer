@@ -15,6 +15,7 @@ import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-det
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
 import { postPaymentSettlementLedger } from '../ledgers';
+import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 
 export type PollPaymentAttemptOutcome =
   | 'skipped'
@@ -156,7 +157,17 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
         reason: 'poll',
       });
       if (toStatus === 'succeeded') {
-        yield* postPaymentSettlementLedger(transaction, now);
+        const ledgerTransaction = yield* postPaymentSettlementLedger(
+          transaction,
+          now,
+        );
+        if (ledgerTransaction) {
+          yield* enqueuePaymentSettledEvent(
+            outbox,
+            transaction,
+            ledgerTransaction,
+          );
+        }
       }
     }),
     (cause) => new PaymentPersistenceError({ cause }),

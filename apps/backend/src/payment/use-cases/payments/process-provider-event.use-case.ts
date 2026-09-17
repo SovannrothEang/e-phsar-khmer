@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { DbClientTag, runInTransaction } from '../../../db/db.provider';
+import type { OutboxService } from '../../../outbox/outbox.service';
 import type { paymentTransactionStatusEnum } from '../../entity';
 import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
 import type { ProcessProviderEventJobData } from '../../queue/payment-queue.types';
@@ -14,6 +15,7 @@ import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-det
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
 import { postPaymentSettlementLedger } from '../ledgers';
+import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 
 export type ProcessProviderEventOutcome =
   | 'skipped'
@@ -44,9 +46,15 @@ function nextTransactionStatus(
  * provider (like ABA PayWay) whose documented webhook carries no
  * signature. A gateway with no `reconcile()` falls back to trusting the
  * re-parsed payload directly.
+ *
+ * `outbox` is a plain parameter, same convention as `processPaymentAttempt`
+ * — it's only needed on the `succeeded` branch, to durably announce the
+ * settlement (`enqueuePaymentSettledEvent`) inside the same transaction as
+ * the ledger posting.
  */
 export const processProviderEvent = Effect.fn('processProviderEvent')(
   function* (
+    outbox: OutboxService,
     input: ProcessProviderEventJobData,
   ): Effect.fn.Return<
     ProcessProviderEventOutcome,
@@ -149,7 +157,17 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
           reason: 'payment_provider_event',
         });
         if (toStatus === 'succeeded') {
-          yield* postPaymentSettlementLedger(transaction, now);
+          const ledgerTransaction = yield* postPaymentSettlementLedger(
+            transaction,
+            now,
+          );
+          if (ledgerTransaction) {
+            yield* enqueuePaymentSettledEvent(
+              outbox,
+              transaction,
+              ledgerTransaction,
+            );
+          }
         }
         yield* settlePaymentProviderEvent({
           id: event.id,

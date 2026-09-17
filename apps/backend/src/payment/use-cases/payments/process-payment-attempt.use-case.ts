@@ -15,6 +15,7 @@ import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-det
 import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
 import { upsertPayment } from './upsert-payment.use-case';
 import { postPaymentSettlementLedger } from '../ledgers';
+import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 
 export type ProcessPaymentAttemptOutcome =
   | 'skipped'
@@ -106,6 +107,7 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
           customerId: transaction.customerId ?? undefined,
           description: transaction.description ?? undefined,
           returnUrl: input.browserReturnUrl,
+          cancelUrl: input.browserCancelUrl,
         }),
       catch: (cause) => new PaymentGatewayCallError({ cause }),
     });
@@ -146,7 +148,17 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
             toStatus,
           });
           if (toStatus === 'succeeded') {
-            yield* postPaymentSettlementLedger(transaction, now);
+            const ledgerTransaction = yield* postPaymentSettlementLedger(
+              transaction,
+              now,
+            );
+            if (ledgerTransaction) {
+              yield* enqueuePaymentSettledEvent(
+                outbox,
+                transaction,
+                ledgerTransaction,
+              );
+            }
           }
         }
 

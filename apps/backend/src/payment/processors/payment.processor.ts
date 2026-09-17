@@ -77,18 +77,24 @@ export class PaymentProcessor extends WorkerHost {
             job.data as ProcessAttemptJobData,
           ),
         );
-        // Only this job kind (and PAYMENT_POLL_JOB below) can have written a
-        // new outbox row — see processPaymentAttempt's own doc comment on
-        // when a poll gets scheduled. Waking unconditionally is harmless
-        // (an idle worker just finds nothing due) but only these two ever
-        // have anything to wake for.
+        // Any of the three job kinds can now have written a new outbox row
+        // — either the existing poll-scheduling (this one, PAYMENT_POLL_JOB)
+        // or a `payment.succeeded` settlement announcement (all three, on a
+        // success transition — see enqueuePaymentSettledEvent). Waking
+        // unconditionally is harmless: an idle worker just finds nothing due.
         this.outboxService.wakeupAfterCommit();
         return result;
       }
-      case PAYMENT_EVENT_JOB:
-        return this.run(
-          processProviderEvent(job.data as ProcessProviderEventJobData),
+      case PAYMENT_EVENT_JOB: {
+        const result = await this.run(
+          processProviderEvent(
+            this.outboxService,
+            job.data as ProcessProviderEventJobData,
+          ),
         );
+        this.outboxService.wakeupAfterCommit();
+        return result;
+      }
       case PAYMENT_POLL_JOB: {
         const result = await this.run(
           pollPaymentAttempt(

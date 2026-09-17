@@ -22,3 +22,4 @@ export * from './process-payment-attempt.use-case';
 export * from './process-provider-event.use-case';
 export * from './enqueue-payment-attempt-poll.use-case';
 export * from './poll-payment-attempt.use-case';
+export * from './enqueue-payment-settled-event.use-case';

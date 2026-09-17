@@ -218,15 +218,15 @@ sequenceDiagram
 
     Note over Provider,Processor: Implemented — a provider-specific webhook controller,<br/>processProviderEvent, the registered provider's reconcile()
 
-    Note over Processor,Notifier: Outbox announcement and notification are not built — see Current state.<br/>Ledger posting (the alt block below) is built and runs inside the same<br/>runInTransaction as the status flip that made it true.
+    Note over Processor,Notifier: Notification emission is not built — see Current state.<br/>Ledger posting and the outbox announcement (the alt block below) are both<br/>built and run inside the same runInTransaction as the status flip that made it true.
 
     alt Happy path (attempt/event/poll succeeded)
         Processor->>Ledger: postPaymentSettlementLedger(transaction, occurredAt)<br/>— same DB transaction as the status update above
         Ledger->>Postgres: find-or-create system ledger_accounts<br/>(provider_clearing:CCY, platform_revenue:CCY)
         Ledger->>Postgres: insert ledger_transaction (posted,<br/>idempotencyKey = payment_transaction.id)
         Ledger->>Postgres: insert ledger_entry x2 (debit provider_clearing, credit platform_revenue)
-        Note over Ledger,Notifier: NOT BUILT past this point
-        Ledger->>Postgres: insert outbox_event (payment.succeeded)
+        Processor->>Postgres: enqueuePaymentSettledEvent: insert outbox_event<br/>(payment.succeeded, dedupeKey = payment-succeeded:transaction.id)<br/>— same transaction, only when the ledger posting produced a row
+        Note over Processor,Notifier: NOT BUILT past this point — no handler<br/>is registered for payment.succeeded yet, so the row above<br/>retries on the outbox's normal backoff and eventually lands<br/>as failed until a consumer exists (see Open items)
         Ledger->>Notifier: emit notification (payment.succeeded)
     else Terminal failure — NOT BUILT past this point
         Processor->>Notifier: emit notification (payment.failed)
@@ -300,7 +300,7 @@ Key properties this gives us:
 | Attempt polling (`pollPaymentAttempt`)                                | Done — the only path to a resolved status for a provider with no webhook at all. Calls `reconcile()`, applies the same transition on a definite outcome (including the ledger posting on `succeeded`), or re-schedules itself (`enqueuePaymentAttemptPoll`) on `pending`. Gives up (attempt `failed`, code `POLL_EXPIRED`) once `ChargeResult.poll.expiresAt` passes. See [`providers/bakong/README.md`](./providers/bakong/README.md) for the full loop.                                                                                                                                                                                                                                          |
 | Provider-specific webhook routes (e.g. ABA PayWay's)                  | Pattern established — a provider whose callback payload doesn't fit the generic `PaymentsController.webhook()` envelope gets its own dedicated route. See the individual provider's README for that route's own status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Ledger posting (`use-cases/ledgers/`)                                 | Done for `payment_transaction.type === 'payment'` — `postPaymentSettlementLedger` resolves/creates the `provider_clearing`/`platform_revenue` system accounts for the transaction's currency (`findOrCreateSystemLedgerAccount`) and posts one balanced `ledger_transaction` + 2 `ledger_entries` (`postLedgerTransaction`) inside the same `runInTransaction` as the status flip, from all three success-transition use-cases above. `refund`/`capture`/`void` are not mapped — see Open items. No business-level outbox event or notification is written yet (next row).                                                                                                                         |
-| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | Not started — distinct from the internal `payment.attempt.requested`/`payment.provider_event.received` handoff events, which _are_ built (see above), and from the ledger posting above, which _is_ built.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases. `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items). **No consumer registered for either type yet** — see Open items.                                                                                                                                                                                                                                                                                                                                                                                       |
 | Notification emission (success / failure)                             | Not started — no `Notifier`/consumer exists; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered). No unit/e2e tests yet for the use-cases, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (272 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
 
@@ -341,6 +341,23 @@ Key properties this gives us:
   up being a consumer of `outbox_events`, a direct call from the queue
   processor, or its own module. The failure path in particular has no
   outbox row to key off, so it can't simply be "subscribe to the outbox."
+- **`payment.succeeded` has no registered consumer yet.** The event is
+  written (see Current state), but no `OutboxHandler` is registered for
+  `PAYMENT_SETTLED_OUTBOX_EVENT_TYPE` — `OutboxDispatcher.run()` treats an
+  unregistered type as retryable (a deliberate design choice for rolling
+  deploys, not a bug), so today every `payment.succeeded` row retries on
+  the outbox's normal backoff schedule and eventually lands as `failed`
+  once it exhausts `maxAttempts`. The row itself is never lost (it stays in
+  `outbox_events` for a future handler or manual replay), but this is
+  expected noise until a real consumer (Notifier, or whatever else
+  subscribes) is registered — see the notification item above.
+- **`payment.refunded` has no producer yet.** `enqueuePaymentSettledEvent`
+  only fires from the three success-transition use-cases on a `payment`
+  transaction reaching `succeeded` (`postPaymentSettlementLedger` returns
+  `null`, and the event is correctly skipped, for any other
+  `payment_transaction.type`) — there is no equivalent settlement path for
+  a `refund` yet because the `refund` transaction type itself doesn't
+  exist (see the ledger-mapping item below).
 - **Still no test coverage for the use-cases, controllers, processor, or
   outbox handlers.** Every use-case is a pure `Effect.fn` taking its
   dependencies through `DbClientTag`/`PaymentGatewayRegistryTag`
