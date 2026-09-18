@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const categorySchema = z.object({
   name: z
@@ -14,12 +14,12 @@ export const categorySchema = z.object({
     .max(100, "Slug must be less than 100 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Slug must be lowercase with hyphens only (e.g. my-category)"
+      "Slug must be lowercase with hyphens only (e.g. my-category)",
     ),
 
   cateIcon: z.string(),
-})
+});
 
 export const deleteCategorySchema = z.object({
   cateId: z.string().min(1, "Category ID is required"),
-})
+});

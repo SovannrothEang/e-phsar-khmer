@@ -1,40 +1,34 @@
-"use client"
+"use client";
 
-import React from "react"
-import { useTheme } from "next-themes"
+import React from "react";
+import { useTheme } from "next-themes";
 import {
   IconSunHigh,
   IconMoonFilled,
   IconDeviceDesktop,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
 export function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
 
-  const [mounted, setMounted] = React.useState(false)
+  const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
     // Gate SSR/hydration: theme is only known after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   if (!mounted) {
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-10 w-10"
-      />
-    )
+    return <Button variant="ghost" size="icon" className="h-10 w-10" />;
   }
   return (
     <DropdownMenu modal={false}>
@@ -53,10 +47,7 @@ export function ThemeSwitcher() {
           )}
 
           {theme === "system" && (
-            <IconDeviceDesktop
-              stroke={2}
-              className="h-[1.1rem] w-[1.1rem]"
-            />
+            <IconDeviceDesktop stroke={2} className="h-[1.1rem] w-[1.1rem]" />
           )}
           <span className="sr-only">Toggle theme</span>
         </Button>
@@ -102,5 +93,5 @@ export function ThemeSwitcher() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

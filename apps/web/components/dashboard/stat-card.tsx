@@ -1,15 +1,14 @@
-import { TrendingUp, TrendingDown } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface StatCardProps {
-  
-  title: string
-  value: string
-  change: string
-  trend: "up" | "down"
-  description: string
-  subtext: string
+  title: string;
+  value: string;
+  change: string;
+  trend: "up" | "down";
+  description: string;
+  subtext: string;
 }
 
 export function StatCard({
@@ -20,7 +19,7 @@ export function StatCard({
   description,
   subtext,
 }: StatCardProps) {
-  const isPositive = trend === "up"
+  const isPositive = trend === "up";
 
   return (
     <Card className="gap-4 py-4">
@@ -30,7 +29,7 @@ export function StatCard({
           <div
             className={cn(
               "flex items-center gap-1 text-xs font-medium",
-              isPositive ? "text-emerald-500" : "text-red-400"
+              isPositive ? "text-emerald-500" : "text-red-400",
             )}
           >
             {isPositive ? (
@@ -53,5 +52,5 @@ export function StatCard({
         <p className="text-xs text-muted-foreground">{subtext}</p>
       </CardContent>
     </Card>
-  )
+  );
 }

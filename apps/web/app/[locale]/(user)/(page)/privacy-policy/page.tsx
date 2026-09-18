@@ -6,7 +6,5 @@ export const metadata: Metadata = {
   description: "Privacy Policy - Psakhmer",
 };
 export default function PrivacyPolicyPage() {
-    return (
-      <PrivacyPolicy />
-    )
+  return <PrivacyPolicy />;
 }

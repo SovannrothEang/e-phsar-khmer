@@ -1,4 +1,4 @@
-import ApplyJobs from "@/components/profile/Apply-Jobs"
+import ApplyJobs from "@/components/profile/Apply-Jobs";
 
 import type { Metadata } from "next";
 
@@ -8,7 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AppliedJobsPage() {
-    return (
-        <ApplyJobs />
-    )
+  return <ApplyJobs />;
 }

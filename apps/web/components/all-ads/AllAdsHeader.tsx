@@ -1,22 +1,14 @@
-"use client"
+"use client";
 
-import { useMemo } from "react"
-import { useSearchParams } from "next/navigation"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
-  IconLayoutGridFilled,
-  IconListFilled,
-} from "@tabler/icons-react"
-import AllAdsCategories from "./AllAdsCategories"
-import { GridCardPost }  from "@/components/ads/GridCardPost"
-import { GridCardSell }  from "@/components/ads/GridCardSell"
-import { ListCardPost }  from "@/components/ads/ListCardPost"
-import { ListCardSell }  from "@/components/ads/ListCardSell"
+import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IconLayoutGridFilled, IconListFilled } from "@tabler/icons-react";
+import AllAdsCategories from "./AllAdsCategories";
+import { GridCardPost } from "@/components/ads/GridCardPost";
+import { GridCardSell } from "@/components/ads/GridCardSell";
+import { ListCardPost } from "@/components/ads/ListCardPost";
+import { ListCardSell } from "@/components/ads/ListCardSell";
 
 // ─── Filter components ────────────────────────────────────────────────────────
 import {
@@ -24,52 +16,51 @@ import {
   filterPostsByLocation,
   LOCATION_PRO_PARAM,
   LOCATION_DIS_PARAM,
-} from "@/components/filter/LocationSelectorFilter"
+} from "@/components/filter/LocationSelectorFilter";
 import SortFilter, {
   SORT_PARAM,
   parseSortParam,
   sortPosts,
-} from "@/components/filter/SortFilter"
+} from "@/components/filter/SortFilter";
 import PriceFilter, {
   filterPostsByPrice,
   MAX_AD_PRICE_PARAM,
   MIN_AD_PRICE_PARAM,
   parsePriceParam,
-} from "@/components/filter/PriceFilter"
+} from "@/components/filter/PriceFilter";
 import MoreFilters, {
   KEYWORD_PARAM,
   DATE_PARAM,
   filterPostsByKeyword,
   filterPostsByDate,
   type DateValue,
-} from "@/components/filter/MoreFilters"
+} from "@/components/filter/MoreFilters";
 
-import { posts } from "@/lib/posts"
+import { posts } from "@/lib/posts";
 
 export default function AllAdsHeader() {
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams();
 
   // ── Read all active params ─────────────────────────────────────────────────
-  const minPrice = parsePriceParam(searchParams.get(MIN_AD_PRICE_PARAM))
-  const maxPrice = parsePriceParam(searchParams.get(MAX_AD_PRICE_PARAM))
-  const sort     = parseSortParam(searchParams.get(SORT_PARAM))
-  const proId    = searchParams.get(LOCATION_PRO_PARAM) ?? undefined
-  const disId    = searchParams.get(LOCATION_DIS_PARAM) ?? undefined
-  const keyword  = searchParams.get(KEYWORD_PARAM)  ?? ""
-  const date     = (searchParams.get(DATE_PARAM)    ?? "") as DateValue
+  const minPrice = parsePriceParam(searchParams.get(MIN_AD_PRICE_PARAM));
+  const maxPrice = parsePriceParam(searchParams.get(MAX_AD_PRICE_PARAM));
+  const sort = parseSortParam(searchParams.get(SORT_PARAM));
+  const proId = searchParams.get(LOCATION_PRO_PARAM) ?? undefined;
+  const disId = searchParams.get(LOCATION_DIS_PARAM) ?? undefined;
+  const keyword = searchParams.get(KEYWORD_PARAM) ?? "";
+  const date = (searchParams.get(DATE_PARAM) ?? "") as DateValue;
 
   // ── Filter + sort pipeline ─────────────────────────────────────────────────
   const filteredPosts = useMemo(() => {
-    const byKeyword  = filterPostsByKeyword(posts, keyword)
-    const byDate     = filterPostsByDate(byKeyword, date)
-    const byLocation = filterPostsByLocation(byDate, proId, disId)
-    const byPrice    = filterPostsByPrice(byLocation, minPrice, maxPrice)
-    return sortPosts(byPrice, sort)
-  }, [keyword, date, proId, disId, minPrice, maxPrice, sort])
+    const byKeyword = filterPostsByKeyword(posts, keyword);
+    const byDate = filterPostsByDate(byKeyword, date);
+    const byLocation = filterPostsByLocation(byDate, proId, disId);
+    const byPrice = filterPostsByPrice(byLocation, minPrice, maxPrice);
+    return sortPosts(byPrice, sort);
+  }, [keyword, date, proId, disId, minPrice, maxPrice, sort]);
 
   return (
     <Tabs defaultValue="grid" className="max-w-7xl select-none bg-muted">
-
       {/* Header title */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
         <h1 className="text-lg font-semibold text-card-foreground">
@@ -131,7 +122,6 @@ export default function AllAdsHeader() {
           </>
         )}
       </TabsContent>
-
     </Tabs>
-  )
+  );
 }

@@ -1,5 +1,4 @@
-
-import Feedback from "@/components/page/Feedback"; 
+import Feedback from "@/components/page/Feedback";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

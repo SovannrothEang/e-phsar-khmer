@@ -1,21 +1,30 @@
-
 import { Link } from "@/i18n/routing";
-import { IconHome, IconChevronRight } from '@tabler/icons-react';
+import { IconHome, IconChevronRight } from "@tabler/icons-react";
 export default function PostingRule() {
   return (
-
     <div>
       <div className="px-4 py-4  bg-muted">
         <div className="max-w-7xl mx-auto w-full pb-2">
           <nav className="flex items-center gap-2 text-base">
             <Link
               href="/"
-              className="group flex items-center transition-colors duration-150 text-foreground dark:text-gray-400 hover:text-blue-300">
-              <IconHome size={16} className="text-foreground dark:text-gray-400 group-hover:text-blue-300" />
-              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">Home</span>
+              className="group flex items-center transition-colors duration-150 text-foreground dark:text-gray-400 hover:text-blue-300"
+            >
+              <IconHome
+                size={16}
+                className="text-foreground dark:text-gray-400 group-hover:text-blue-300"
+              />
+              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
+                Home
+              </span>
             </Link>
-            <IconChevronRight size={16} className="block text-muted-foreground" />
-            <h1 className="text-muted-foreground dark:text-gray-400">Ads Posting Rule</h1>
+            <IconChevronRight
+              size={16}
+              className="block text-muted-foreground"
+            />
+            <h1 className="text-muted-foreground dark:text-gray-400">
+              Ads Posting Rule
+            </h1>
           </nav>
         </div>
       </div>
@@ -27,28 +36,41 @@ export default function PostingRule() {
             </h1>
 
             <p className="mb-4">
-              <strong className="text-lg font-medium">PSA-KHMER&apos;S AD LISTING POLICIES ARE INTENDED TO:</strong>
+              <strong className="text-lg font-medium">
+                PSA-KHMER&apos;S AD LISTING POLICIES ARE INTENDED TO:
+              </strong>
             </p>
 
             <ul className="list-decimal pl-6 space-y-1 mb-4">
-              <li className="text-sm">Support government laws and regulations</li>
-              <li className="text-sm">Minimize risks to both buyers and sellers</li>
-              <li className="text-sm">Provide equal opportunity to all buyers and sellers</li>
+              <li className="text-sm">
+                Support government laws and regulations
+              </li>
+              <li className="text-sm">
+                Minimize risks to both buyers and sellers
+              </li>
+              <li className="text-sm">
+                Provide equal opportunity to all buyers and sellers
+              </li>
               <li className="text-sm">Protect intellectual property rights</li>
-              <li className="text-sm">Provide an enjoyable buying & selling experience</li>
-              <li className="text-sm">Support the values of the PSA-NPIC Community</li>
+              <li className="text-sm">
+                Provide an enjoyable buying & selling experience
+              </li>
+              <li className="text-sm">
+                Support the values of the PSA-NPIC Community
+              </li>
             </ul>
 
-
-            <p className="font-semibold text-lg font-medium mb-2">Every seller must know and follow:</p>
+            <p className="font-semibold text-lg font-medium mb-2">
+              Every seller must know and follow:
+            </p>
             <ul className="list-decimal pl-6 space-y-2 mb-4">
               <li className="text-sm">
                 <a
                   href="#restricted-items"
                   className="text-[#00a0e9] hover:underline"
                 >
-                  Rules about Prohibited and Restricted Items - What items can and
-                  cannot be listed
+                  Rules about Prohibited and Restricted Items - What items can
+                  and cannot be listed
                 </a>
               </li>
               <li className="text-sm">
@@ -60,7 +82,10 @@ export default function PostingRule() {
                 </a>
               </li>
               <li className="text-sm">
-                <a href="#birds-animals" className="text-[#00a0e9] hover:underline">
+                <a
+                  href="#birds-animals"
+                  className="text-[#00a0e9] hover:underline"
+                >
                   Rules about Birds & Animals
                 </a>
               </li>
@@ -70,8 +95,8 @@ export default function PostingRule() {
                   className="text-[#00a0e9] hover:underline"
                 >
                   Rules about Intellectual Property - Products that have the
-                  potential of violating certain copyrights, trademarks, or other
-                  rights.
+                  potential of violating certain copyrights, trademarks, or
+                  other rights.
                 </a>
               </li>
               <li className="text-sm">
@@ -84,22 +109,27 @@ export default function PostingRule() {
                 </a>
               </li>
               <li className="text-sm">
-                <a href="#miscellaneous" className="text-[#00a0e9] hover:underline">
+                <a
+                  href="#miscellaneous"
+                  className="text-[#00a0e9] hover:underline"
+                >
                   Miscellaneous info - Your listing, information, Advertisement
                 </a>
               </li>
               <li className="text-sm">
-                <a href="#consequences" className="text-[#00a0e9] hover:underline">
+                <a
+                  href="#consequences"
+                  className="text-[#00a0e9] hover:underline"
+                >
                   Consequences of Breach of Listing Policy.
                 </a>
                 <p className="text-foreground leading-7 mb-4">
-                  Learning about PSA-NPIC&apos;s policies will help you avoid breaking
-                  rules (including the law) and aid you in trading with reliable,
-                  trustworthy buyers and sellers.
+                  Learning about PSA-NPIC&apos;s policies will help you avoid
+                  breaking rules (including the law) and aid you in trading with
+                  reliable, trustworthy buyers and sellers.
                 </p>
               </li>
             </ul>
-
 
             <section id="restricted-items" className="scroll-mt-24 mb-4">
               <h2 className="text-lg font-medium mb-2">
@@ -129,16 +159,28 @@ export default function PostingRule() {
                 <li>Hospital equipment and general aesthetic</li>
                 <li>Human Parts and Remains</li>
                 <li>Illegal Drugs</li>
-                <li>Items that hurt the Laws for the Protection of Historical, Artistic and Cultural significance</li>
+                <li>
+                  Items that hurt the Laws for the Protection of Historical,
+                  Artistic and Cultural significance
+                </li>
                 <li>Ivory products</li>
                 <li>Lottery Tickets, Sweepstakes Entries</li>
-                <li>Offensive Material - examples include ethnically or racially offensive material</li>
+                <li>
+                  Offensive Material - examples include ethnically or racially
+                  offensive material
+                </li>
                 <li>Pharmaceutical products (prescribed or not)</li>
-                <li>Photos of artists/singers/entertainers are not allowed unless with permit</li>
+                <li>
+                  Photos of artists/singers/entertainers are not allowed unless
+                  with permit
+                </li>
                 <li>Playing cards</li>
                 <li>Police, Army, Navy and Air force Related Items</li>
                 <li>Political</li>
-                <li>Products without the approval and registration of government agencies such as CNG, Pepper Spray, LPG, Cylinders</li>
+                <li>
+                  Products without the approval and registration of government
+                  agencies such as CNG, Pepper Spray, LPG, Cylinders
+                </li>
                 <li>Sheeshah or Hookah with flavor content</li>
                 <li>Software to unlock phones and video games</li>
                 <li>Steroids</li>
@@ -151,7 +193,10 @@ export default function PostingRule() {
                 <li>Used Undergarments</li>
                 <li>Weapons & Knives</li>
                 <li>Wildlife Products - mounted specimens, and ivory</li>
-                <li>Wholesale/Bulk selling of Branded Products (Electronic Items/Mobiles)</li>
+                <li>
+                  Wholesale/Bulk selling of Branded Products (Electronic
+                  Items/Mobiles)
+                </li>
               </ul>
             </section>
 
@@ -161,11 +206,16 @@ export default function PostingRule() {
               </h2>
               <ul className="list-decimal pl-6 space-y-1 text-sm">
                 <li>Adult Massage services</li>
-                <li>Any kind of government service - Only consultancy/guidance is allowed</li>
+                <li>
+                  Any kind of government service - Only consultancy/guidance is
+                  allowed
+                </li>
                 <li>Bulk SMS / Email services</li>
                 <li>Escorts</li>
                 <li>Multi-Level Marketing Services</li>
-                <li>People looking for relationship, dating and / or friendship</li>
+                <li>
+                  People looking for relationship, dating and / or friendship
+                </li>
                 <li>Quick get-rich schemes</li>
                 <li>Surrogacy</li>
               </ul>
@@ -176,11 +226,26 @@ export default function PostingRule() {
                 3. Rules about Birds & Animals
               </h2>
               <ul className="list-decimal pl-6 space-y-1 text-sm">
-                <li>In birds, we only allow Chickens, Roosters, Chicks, Geese, Emus, Pigeons, Turkeys & Ducks</li>
-                <li>In Animals, we only allow Dogs, Cats, Fishes, Bovine, Pigs, Equines, Rabbits, Hamsters, Guinea Pigs & Goats</li>
-                <li>Birds and animals used for fighting or racing is strictly prohibited</li>
-                <li>PSA-NPIC only allows ads selling Meat & Eggs of the animals/birds listed above with an exception of Cow meat.</li>
-                <li>We do not allow animals & birds which fall under the restricted category.</li>
+                <li>
+                  In birds, we only allow Chickens, Roosters, Chicks, Geese,
+                  Emus, Pigeons, Turkeys & Ducks
+                </li>
+                <li>
+                  In Animals, we only allow Dogs, Cats, Fishes, Bovine, Pigs,
+                  Equines, Rabbits, Hamsters, Guinea Pigs & Goats
+                </li>
+                <li>
+                  Birds and animals used for fighting or racing is strictly
+                  prohibited
+                </li>
+                <li>
+                  PSA-NPIC only allows ads selling Meat & Eggs of the
+                  animals/birds listed above with an exception of Cow meat.
+                </li>
+                <li>
+                  We do not allow animals & birds which fall under the
+                  restricted category.
+                </li>
               </ul>
             </section>
 
@@ -199,27 +264,29 @@ export default function PostingRule() {
             </section>
 
             <section id="prohibited-practices" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">5. Prohibited Practices</h2>
+              <h2 className="text-lg font-medium mb-2">
+                5. Prohibited Practices
+              </h2>
               <p className="text-foreground leading-7 mb-4">
                 To promote a safe, fair and enjoyable experience, PSA-NPIC has
-                established a set of rules and policies for item listings. You are
-                requested, not to ---
+                established a set of rules and policies for item listings. You
+                are requested, not to ---
               </p>
               <ul className="list-decimal pl-6 space-y-1 text-sm">
                 <li>
-                  Post Duplicate Ad listings - Any ad posted more than once with the
-                  same content or Title in the same city and category would be
-                  considered as a Duplicate Ad. We advise you to post multiple ads
-                  only if you have different items or services for sale. All
-                  duplicate ads would be deleted and posters penalized if the
-                  problem persists.
+                  Post Duplicate Ad listings - Any ad posted more than once with
+                  the same content or Title in the same city and category would
+                  be considered as a Duplicate Ad. We advise you to post
+                  multiple ads only if you have different items or services for
+                  sale. All duplicate ads would be deleted and posters penalized
+                  if the problem persists.
                 </li>
                 <li>
                   Post Mature Audience/Sexually oriented material: Classifieds
-                  relating to items that includes items intended for use in sexual
-                  activity would not be permitted. Please also be aware that titles
-                  with graphic adult language are inappropriate, regardless of the
-                  item contained in the listing itself.
+                  relating to items that includes items intended for use in
+                  sexual activity would not be permitted. Please also be aware
+                  that titles with graphic adult language are inappropriate,
+                  regardless of the item contained in the listing itself.
                 </li>
                 <li>Write Misleading Titles</li>
                 <li>Upload Inappropriate/wrong picture with the Ad</li>
@@ -230,26 +297,28 @@ export default function PostingRule() {
             </section>
 
             <section id="miscellaneous" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">6. Miscellaneous Info</h2>
+              <h2 className="text-lg font-medium mb-2">
+                6. Miscellaneous Info
+              </h2>
               <ul className="list-decimal pl-6 space-y-1 text-sm">
                 <li>
-                  Shall not be defamatory, trade libelous, unlawfully threatening or
-                  unlawfully harassing. Further shall not be fraudulent,
-                  misrepresenting, misleading or pertain to the sale of any illegal,
-                  stolen goods and or services which do not belong to you or you do
-                  not have the authority for.
+                  Shall not be defamatory, trade libelous, unlawfully
+                  threatening or unlawfully harassing. Further shall not be
+                  fraudulent, misrepresenting, misleading or pertain to the sale
+                  of any illegal, stolen goods and or services which do not
+                  belong to you or you do not have the authority for.
                 </li>
                 <li>
-                  Shall not be allowed to libel anyone or include hate, derogatory,
-                  slanderous speech directed at individuals or groups. You should
-                  not advocate violence against other users or individuals or
-                  groups.
+                  Shall not be allowed to libel anyone or include hate,
+                  derogatory, slanderous speech directed at individuals or
+                  groups. You should not advocate violence against other users
+                  or individuals or groups.
                 </li>
                 <li>
-                  Shall not be allowed to libel anyone or include hate, derogatory,
-                  slanderous speech directed at individuals or groups. You should
-                  not advocate violence against other users or individuals or
-                  groups.
+                  Shall not be allowed to libel anyone or include hate,
+                  derogatory, slanderous speech directed at individuals or
+                  groups. You should not advocate violence against other users
+                  or individuals or groups.
                 </li>
               </ul>
             </section>
@@ -258,8 +327,8 @@ export default function PostingRule() {
                 7. Consequences of Breach of Listing Policy
               </h2>
               <p className="text-foreground leading-7 px-6 text-sm">
-                Users who violate the prohibited items policy and or the restricted
-                items policy may be subject to the following actions
+                Users who violate the prohibited items policy and or the
+                restricted items policy may be subject to the following actions
               </p>
               <ul className="list-decimal pl-6 space-y-1 text-sm">
                 <li>Permanent blacklisting from PSA-NPIC community</li>

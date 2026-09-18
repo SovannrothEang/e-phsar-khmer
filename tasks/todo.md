@@ -89,8 +89,7 @@ Captain asked whether the flow works with `DEV_OTP_TOKEN`. Findings:
 ## R2 (2026-08-18): phone+password→OTP login; password/names/username at registration (approved plan rev 2)
 
 - [x] Backend: VerifyOtpDto (required password, optional names) + verifyPhoneOtp
-      password-first rework + mirrorSupabaseUser insertExtras + POST /auth/otp/login
-      + RequestOtpDto rider
+      password-first rework + mirrorSupabaseUser insertExtras + POST /auth/otp/login + RequestOtpDto rider
 - [x] Backend unit tests: insert extras, conflict-set purity, wrong-password 401
       (no Supabase call), DTO 400, requestLoginOtp paths
 - [x] Backend gates: test / build / lint
@@ -198,6 +197,7 @@ until Phase C migrates those pages.
 ## Category + subcategory pages → backend data; car brands/bodyTypes live (2026-08-25)
 
 **Backend** (cars-first data + one public endpoint):
+
 - New `PublicAttributesController` → `GET /api/v1/attributes/:type` (`@Public()`,
   registered in AttributesModule; module was decoupled to grow a public
   surface). AttributesService.list returns full rows incl. subcategoryIds.
@@ -222,6 +222,7 @@ until Phase C migrates those pages.
   admin icon intact; /attributes/bodytypes public → 16 rows (15 with icons).
 
 **Frontend:**
+
 - `lib/api/categories.ts` (server-only): getCategoryWithSubcategories /
   getBrandsForSubcategory / getBodyTypes / getModelsForBrand —
   CategoryGrid-style raw fetch + envelope + null/[] on failure; local types.
@@ -304,8 +305,9 @@ as before — the old local-state filters didn't filter anything either).
 
 Follow-up on the All Ads bar port: (1) the bar was glued below the title
 instead of floating; (2) the grid/list toggle changed no content. Fixed:
+
 - The 4 category layouts now render title + bar only (bar `sticky top-16
-  z-40`, TabsList — no own <Tabs> wrapper); the CATEGORY PAGE owns the Tabs
+z-40`, TabsList — no own <Tabs> wrapper); the CATEGORY PAGE owns the Tabs
   root so the layout's TabsTriggers switch the page's post sections.
 - Page: Tabs("grid"|"list") → TabsContent grid = HighLightAds sections
   (grid cards), list = NormalAd sections (ListCardPost list cards);
@@ -349,4 +351,5 @@ exactly: grid view = `GridCardSell` + `posts.map(GridCardPost)` in
 
 Verified: lint 0, build PASS. Browser: grid panel = Sell card + 39 post
 cards in 4 cols, no Highlights/Latest Ads text; list panel = 39 list cards
-+ Sell card; screenshot matches #28 (RX7/Supra/iPhone first row).
+
+- Sell card; screenshot matches #28 (RX7/Supra/iPhone first row).

@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const loginSchema = z.object({
   login: z
@@ -8,6 +8,5 @@ export const loginSchema = z.object({
 
   password: z
     .string()
-    .min(8, "Your password must be at least 8 characters long.")
-    ,
-})
+    .min(8, "Your password must be at least 8 characters long."),
+});

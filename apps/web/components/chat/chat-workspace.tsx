@@ -2,13 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Loader2, LogIn, MessagesSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { fetchConversationWith, fetchInbox, getChatViewer } from "@/actions/chat";
+import {
+  fetchConversationWith,
+  fetchInbox,
+  getChatViewer,
+} from "@/actions/chat";
 import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
 import { ConversationList } from "@/components/chat/conversation-list";
@@ -40,7 +48,8 @@ export function ChatWorkspace({
   const searchParams = useSearchParams();
 
   const peerFromUrl = initialPeerId ?? searchParams.get("to") ?? null;
-  const listingFromUrl = initialListingId ?? searchParams.get("listing") ?? null;
+  const listingFromUrl =
+    initialListingId ?? searchParams.get("listing") ?? null;
 
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(
     peerFromUrl,
@@ -82,13 +91,10 @@ export function ChatWorkspace({
     staleTime: 30 * 1000,
   });
 
-  const handleSelect = useCallback(
-    (item: InboxItem) => {
-      if (!item.otherUser) return;
-      setSelectedPeerId(item.otherUser.id);
-    },
-    [],
-  );
+  const handleSelect = useCallback((item: InboxItem) => {
+    if (!item.otherUser) return;
+    setSelectedPeerId(item.otherUser.id);
+  }, []);
 
   const handleBack = useCallback(() => setSelectedPeerId(null), []);
 

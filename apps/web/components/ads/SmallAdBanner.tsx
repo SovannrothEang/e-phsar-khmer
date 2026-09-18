@@ -1,6 +1,5 @@
 // // src/app/components/ads/SmallAdBanner.tsx
 
-
 // import Image from "next/image";
 // import type { FC } from "react";
 
@@ -82,9 +81,9 @@ const SmallAdBanner: FC<SmallAdBannerProps> = ({
           height={height}
           className="w-full h-auto object-contain"
           // FIX: Remove priority, let it lazy load
-          loading="lazy" 
+          loading="lazy"
           // FIX: GIFs should usually be unoptimized to preserve animation and save CPU
-          unoptimized={imagePath.endsWith('.gif')} 
+          unoptimized={imagePath.endsWith(".gif")}
         />
       </div>
     </div>
@@ -92,10 +91,7 @@ const SmallAdBanner: FC<SmallAdBannerProps> = ({
 
   if (link) {
     return (
-      <a
-        href={link}
-        className="block transition-opacity hover:opacity-90"
-      >
+      <a href={link} className="block transition-opacity hover:opacity-90">
         {adContent}
       </a>
     );

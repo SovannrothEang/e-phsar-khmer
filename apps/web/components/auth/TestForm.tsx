@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import { createProject } from "@/actions/project"
-import { Button } from "@/components/ui/button"
+import { createProject } from "@/actions/project";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldContent,
@@ -11,23 +11,23 @@ import {
   FieldLegend,
   FieldSeparator,
   FieldSet,
-} from "@/components/ui/field"
+} from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-} from "@/components/ui/input-group"
-import { SelectItem } from "@/components/ui/select"
-import { PROJECT_STATUSES, projectSchema } from "@/schemas/project"
-import { XIcon } from "lucide-react"
-import { toast } from "sonner"
-import { z } from "zod"
-import { useAppForm } from "@/components/form/hooks"
+} from "@/components/ui/input-group";
+import { SelectItem } from "@/components/ui/select";
+import { PROJECT_STATUSES, projectSchema } from "@/schemas/project";
+import { XIcon } from "lucide-react";
+import { toast } from "sonner";
+import { z } from "zod";
+import { useAppForm } from "@/components/form/hooks";
 
-type FormData = z.infer<typeof projectSchema>
+type FormData = z.infer<typeof projectSchema>;
 
-export  function TestForm() {
+export function TestForm() {
   const form = useAppForm({
     defaultValues: {
       name: "",
@@ -44,37 +44,37 @@ export  function TestForm() {
       onSubmit: projectSchema,
     },
     onSubmit: async ({ value }) => {
-      const res = await createProject(value)
+      const res = await createProject(value);
 
       if (res.success) {
-        form.reset()
+        form.reset();
         toast.success("Project created successfully!", {
           description: JSON.stringify(value, null, 2),
           className: "whitespace-pre-wrap font-mono",
-        })
+        });
       } else {
-        toast.error("Failed to create project.")
+        toast.error("Failed to create project.");
       }
     },
-  })
+  });
 
   return (
     <div className="container px-4 mx-auto my-6">
       <form
-        onSubmit={e => {
-          e.preventDefault()
-          form.handleSubmit()
+        onSubmit={(e) => {
+          e.preventDefault();
+          form.handleSubmit();
         }}
       >
         <FieldGroup>
           <form.AppField name="name">
-            {field => <field.Input label="Name" />}
+            {(field) => <field.Input label="Name" />}
           </form.AppField>
 
           <form.AppField name="status">
-            {field => (
+            {(field) => (
               <field.Select label="Status">
-                {PROJECT_STATUSES.map(status => (
+                {PROJECT_STATUSES.map((status) => (
                   <SelectItem key={status} value={status}>
                     {status}
                   </SelectItem>
@@ -84,7 +84,7 @@ export  function TestForm() {
           </form.AppField>
 
           <form.AppField name="description">
-            {field => (
+            {(field) => (
               <field.Textarea
                 label="Description"
                 description="Be as detailed as possible"
@@ -101,13 +101,13 @@ export  function TestForm() {
             </FieldContent>
             <FieldGroup data-slot="checkbox-group">
               <form.AppField name="notifications.email">
-                {field => <field.Checkbox label="Email" />}
+                {(field) => <field.Checkbox label="Email" />}
               </form.AppField>
               <form.AppField name="notifications.sms">
-                {field => <field.Checkbox label="Text" />}
+                {(field) => <field.Checkbox label="Text" />}
               </form.AppField>
               <form.AppField name="notifications.push">
-                {field => <field.Checkbox label="In App" />}
+                {(field) => <field.Checkbox label="In App" />}
               </form.AppField>
             </FieldGroup>
           </FieldSet>
@@ -115,7 +115,7 @@ export  function TestForm() {
           <FieldSeparator />
 
           <form.Field name="users" mode="array">
-            {field => {
+            {(field) => {
               return (
                 <FieldSet>
                   <div className="flex justify-between gap-2 items-center">
@@ -142,10 +142,10 @@ export  function TestForm() {
                   <FieldGroup>
                     {field.state.value.map((_, index) => (
                       <form.Field key={index} name={`users[${index}].email`}>
-                        {innerField => {
+                        {(innerField) => {
                           const isInvalid =
                             innerField.state.meta.isTouched &&
-                            !innerField.state.meta.isValid
+                            !innerField.state.meta.isValid;
                           return (
                             <Field
                               orientation="horizontal"
@@ -159,7 +159,7 @@ export  function TestForm() {
                                     aria-label={`User ${index + 1} email`}
                                     type="email"
                                     onBlur={innerField.handleBlur}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                       innerField.handleChange(e.target.value)
                                     }
                                     value={innerField.state.value}
@@ -185,13 +185,13 @@ export  function TestForm() {
                                 )}
                               </FieldContent>
                             </Field>
-                          )
+                          );
                         }}
                       </form.Field>
                     ))}
                   </FieldGroup>
                 </FieldSet>
-              )
+              );
             }}
           </form.Field>
 
@@ -199,5 +199,5 @@ export  function TestForm() {
         </FieldGroup>
       </form>
     </div>
-  )
+  );
 }

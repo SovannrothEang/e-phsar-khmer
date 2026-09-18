@@ -157,44 +157,35 @@
 //   )
 // }
 
-"use client"
+"use client";
 
-import { useState } from "react"
-import {
-  CategorySelecter,
-  PostForm
-} from "@/components/post/PostForm"
-import type {
-  Category,
-  Subcategory
-} from "@/types/category"
-import { IconChevronRight, IconHome } from "@tabler/icons-react"
-import { Link } from "@/i18n/routing"
-import { Separator } from "@/components/ui/separator"
+import { useState } from "react";
+import { CategorySelecter, PostForm } from "@/components/post/PostForm";
+import type { Category, Subcategory } from "@/types/category";
+import { IconChevronRight, IconHome } from "@tabler/icons-react";
+import { Link } from "@/i18n/routing";
+import { Separator } from "@/components/ui/separator";
 
 export default function SellPage() {
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2>(1);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<Category | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+    null,
+  );
 
-  const [selectedSub, setSelectedSub] =
-    useState<Subcategory | null>(null)
+  const [selectedSub, setSelectedSub] = useState<Subcategory | null>(null);
 
-  const handleSelect = (
-    cat: Category,
-    sub: Subcategory
-  ) => {
-    setSelectedCategory(cat)
-    setSelectedSub(sub)
-    setStep(2)
-  }
+  const handleSelect = (cat: Category, sub: Subcategory) => {
+    setSelectedCategory(cat);
+    setSelectedSub(sub);
+    setStep(2);
+  };
 
   const handleBack = () => {
-    setStep(1)
-    setSelectedCategory(null)
-    setSelectedSub(null)
-  }
+    setStep(1);
+    setSelectedCategory(null);
+    setSelectedSub(null);
+  };
 
   return (
     <>
@@ -240,9 +231,7 @@ export default function SellPage() {
               <Separator className="mt-2" />
             </div>
             {step === 1 ? (
-              <CategorySelecter
-                onSelectAction={handleSelect}
-              />
+              <CategorySelecter onSelectAction={handleSelect} />
             ) : (
               selectedCategory &&
               selectedSub && (
@@ -257,5 +246,5 @@ export default function SellPage() {
         </div>
       </div>
     </>
-  )
+  );
 }

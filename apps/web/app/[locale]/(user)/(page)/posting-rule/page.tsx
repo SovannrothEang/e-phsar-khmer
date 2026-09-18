@@ -1,4 +1,3 @@
-
 import PostingRule from "@/components/page/Posting-Rule";
 import type { Metadata } from "next";
 

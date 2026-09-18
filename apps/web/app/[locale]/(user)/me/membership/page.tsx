@@ -1,7 +1,5 @@
-import Membership from "@/components/page/Membership"
+import Membership from "@/components/page/Membership";
 
 export default function MembershipPage() {
-    return (
-        <Membership />
-    )
+  return <Membership />;
 }

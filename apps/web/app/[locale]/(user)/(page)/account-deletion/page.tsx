@@ -7,7 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AccountDeletionPage() {
-    return (
-        <AccountDeletion />
-    )
+  return <AccountDeletion />;
 }

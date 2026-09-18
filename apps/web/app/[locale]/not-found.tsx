@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import {Link} from '@/i18n/routing'
+import { Link } from "@/i18n/routing";
 
 export default function NotFound() {
   return (
@@ -9,12 +9,12 @@ export default function NotFound() {
       <p className="text-muted-foreground">
         Sorry, we couldn&apos;t find the page you are looking for.
       </p>
-      <Link 
+      <Link
         href="/"
         className="rounded-sm bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors"
       >
         Return Home
       </Link>
     </div>
-  )
+  );
 }

@@ -17,7 +17,6 @@ const inter = Inter({
   display: "swap",
 });
 
-
 export const metadata: Metadata = {
   title: {
     default: "Psakhmer, Buy and Sell Everything In Cambodia",
@@ -33,7 +32,7 @@ export default async function RootLayout({
   children: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  const { locale } = await params
+  const { locale } = await params;
 
   if (!routing.locales.includes(locale as Locale)) {
     notFound();
@@ -42,7 +41,11 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
+    <html
+      lang={locale}
+      className={`${inter.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <NextTopLoader
           color="#00a0e9"
@@ -64,10 +67,8 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <NextIntlClientProvider messages={messages}>
-            <Providers>
-              {children}
-            </Providers>
-           <Toaster/>
+            <Providers>{children}</Providers>
+            <Toaster />
           </NextIntlClientProvider>
         </ClientThemeProvider>
       </body>

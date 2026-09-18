@@ -6,8 +6,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "../ui/button";
 
-export  function ForgotPasswordForm() {
-
+export function ForgotPasswordForm() {
   const [emailOrPhone, setEmailOrPhone] = useState("");
 
   // Split into two separate states so they don't trigger together
@@ -111,13 +110,13 @@ export  function ForgotPasswordForm() {
             </FieldDescription>
           )}
         </Field>
-         <Button
-            type="submit"
-            disabled={isLoading}
-            className="mt-6 bg-orange-500 rounded-sm text-white h-10 w-full hover:bg-orange-600 cursor-pointer font-medium"
-          >
-            {isLoading ? "Loading..." : "Submit"}
-          </Button>
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="mt-6 bg-orange-500 rounded-sm text-white h-10 w-full hover:bg-orange-600 cursor-pointer font-medium"
+        >
+          {isLoading ? "Loading..." : "Submit"}
+        </Button>
       </form>
     </div>
   );

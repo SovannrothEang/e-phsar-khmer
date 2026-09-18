@@ -1,4 +1,4 @@
-import SavedAds from "@/components/profile/Saved-Ads"
+import SavedAds from "@/components/profile/Saved-Ads";
 
 import type { Metadata } from "next";
 
@@ -8,9 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function SavedProfile() {
-    return (
-        <div>
-            <SavedAds />
-        </div>
-    )
+  return (
+    <div>
+      <SavedAds />
+    </div>
+  );
 }

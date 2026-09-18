@@ -1,25 +1,25 @@
-import { ReactNode } from "react"
-import { useFieldContext } from "./hooks"
+import { ReactNode } from "react";
+import { useFieldContext } from "./hooks";
 import {
   Field,
   FieldContent,
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "../ui/field"
+} from "../ui/field";
 
 export type FormControlProps = {
-  label: string
-  type?: string
-  description?: string
-  required?: boolean
-}
+  label: string;
+  type?: string;
+  description?: string;
+  required?: boolean;
+};
 
 type FormBaseProps = FormControlProps & {
-  children: ReactNode
-  horizontal?: boolean
-  controlFirst?: boolean
-}
+  children: ReactNode;
+  horizontal?: boolean;
+  controlFirst?: boolean;
+};
 
 export function FormBase({
   children,
@@ -27,19 +27,22 @@ export function FormBase({
   description,
   controlFirst,
   horizontal,
-  required
+  required,
 }: FormBaseProps) {
-  const field = useFieldContext()
-  const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
+  const field = useFieldContext();
+  const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
   const labelElement = (
     <>
-      <FieldLabel htmlFor={field.name}>{label}
+      <FieldLabel htmlFor={field.name}>
+        {label}
         {required && <span className="text-red-500">*</span>}
       </FieldLabel>
       {description && <FieldDescription>{description}</FieldDescription>}
     </>
-  )
-  const errorElem = isInvalid && <FieldError errors={field.state.meta.errors} />
+  );
+  const errorElem = isInvalid && (
+    <FieldError errors={field.state.meta.errors} />
+  );
 
   return (
     <Field
@@ -62,5 +65,5 @@ export function FormBase({
         </>
       )}
     </Field>
-  )
+  );
 }

@@ -1,11 +1,11 @@
-import { createFormHook, createFormHookContexts } from "@tanstack/react-form"
-import { FormInput } from "./FormInput"
-import { FormTextarea } from "./FormTextarea"
-import { FormSelect } from "./FormSelect"
-import { FormCheckbox } from "./FormCheckbox"
-import { FormInputGroup } from "./FormInputgroup"
+import { createFormHook, createFormHookContexts } from "@tanstack/react-form";
+import { FormInput } from "./FormInput";
+import { FormTextarea } from "./FormTextarea";
+import { FormSelect } from "./FormSelect";
+import { FormCheckbox } from "./FormCheckbox";
+import { FormInputGroup } from "./FormInputgroup";
 const { fieldContext, formContext, useFieldContext, useFormContext } =
-  createFormHookContexts()
+  createFormHookContexts();
 
 const { useAppForm } = createFormHook({
   fieldComponents: {
@@ -18,6 +18,6 @@ const { useAppForm } = createFormHook({
   formComponents: {},
   fieldContext,
   formContext,
-})
+});
 
-export { useAppForm, useFieldContext, useFormContext }
+export { useAppForm, useFieldContext, useFormContext };

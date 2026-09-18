@@ -140,8 +140,8 @@ refreshToken})` (mirrors `actions/login.ts:47`), then the client toasts
    - `requestOtp(phone: string): Promise<{ success: boolean; error?: string }>`
      → `POST ${API_URL}/auth/otp/request` body `{ phone }`.
    - `verifyOtp(phone: string, token: string): Promise<
-    { success: true; user: { id: string; username: string | null; role: string } } |
-    { success: false; error: string }>` → `POST ${API_URL}/auth/otp/verify`;
+{ success: true; user: { id: string; username: string | null; role: string } } |
+{ success: false; error: string }>` → `POST ${API_URL}/auth/otp/verify`;
      on success call `setUserSession({ accessToken, refreshToken })`. Import
      `API_URL` from `@/lib/api/client`, `setUserSession` from
      `@/lib/auth/session`. Parse the envelope defensively
@@ -256,6 +256,7 @@ OTP page mount-guard + mode-aware back navigation. Full approved plan:
 
 Captain: "after login … we can use as user account … right now it like visitor
 mode." Phase A approved: web reads the USER session and renders identity.
+
 - `userServerFetch` (user-side twin of the admin client, transparent
   refresh on 401, ApiError on failure).
 - `getCurrentUser()` fail-soft server helper (anonymous fast-path: no

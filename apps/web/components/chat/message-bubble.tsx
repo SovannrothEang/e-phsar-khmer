@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { Check, CheckCheck, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  Loader2,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";

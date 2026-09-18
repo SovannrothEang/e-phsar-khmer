@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   fetchMessages,
   markConversationRead,
@@ -156,10 +160,7 @@ export function useChatThread({
   const delta = useQuery({
     queryKey: [...chatKeys.thread(conversationId ?? "none"), "delta"],
     enabled:
-      enabled &&
-      conversationId !== null &&
-      history.isSuccess &&
-      !wsConnected,
+      enabled && conversationId !== null && history.isSuccess && !wsConnected,
     refetchInterval: wsConnected ? false : refetchInterval,
     refetchIntervalInBackground: false,
     staleTime: 0,
@@ -182,7 +183,10 @@ export function useChatThread({
         page.meta.peerLastReadAt,
       );
       if (page.items.length > 0) {
-        deltaStoreRef.current = mergeMessages(deltaStoreRef.current, page.items);
+        deltaStoreRef.current = mergeMessages(
+          deltaStoreRef.current,
+          page.items,
+        );
       }
       return {
         messages: deltaStoreRef.current,
@@ -264,9 +268,7 @@ export function useChatThread({
         // Optimistic echo is already in `local`; the WS echo handler will
         // confirm or the timeout will mark it failed.
         setLocal((prev) =>
-          prev.map((m) =>
-            m.tempId === tempId ? { ...m, pending: false } : m,
-          ),
+          prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
         );
         if (conversationId === null) {
           onConversationCreated?.(conversationId);

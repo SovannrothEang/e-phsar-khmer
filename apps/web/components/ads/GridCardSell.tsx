@@ -1,12 +1,12 @@
-'use client'
-import { Button } from "@/components/ui/button"
+"use client";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 export function GridCardSell() {
@@ -26,7 +26,7 @@ export function GridCardSell() {
       </CardContent>
       <CardFooter className="mt-auto p-3 border-none leading-relaxed ">
         <Button
-          onClick={() => router.push({ pathname: '/post' })}
+          onClick={() => router.push({ pathname: "/post" })}
           size="sm"
           className="w-full bg-card rounded text-foreground px-18 py-4 text-base hover:bg-muted cursor-pointer"
         >
@@ -34,5 +34,5 @@ export function GridCardSell() {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }

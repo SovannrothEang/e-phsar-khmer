@@ -23,7 +23,12 @@ interface WsMessage {
 
 export interface ChatWsState {
   isConnected: boolean;
-  send: (envelope: { recipientId: string; body?: string; listingId?: string; imagePath?: string }) => void;
+  send: (envelope: {
+    recipientId: string;
+    body?: string;
+    listingId?: string;
+    imagePath?: string;
+  }) => void;
 }
 
 /**
@@ -123,10 +128,17 @@ export function useChatWs({
   }, [enabled, connect]);
 
   const send = useCallback(
-    (envelope: { recipientId: string; body?: string; listingId?: string; imagePath?: string }) => {
+    (envelope: {
+      recipientId: string;
+      body?: string;
+      listingId?: string;
+      imagePath?: string;
+    }) => {
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({ event: "send_message", data: { payload: envelope } }));
+      ws.send(
+        JSON.stringify({ event: "send_message", data: { payload: envelope } }),
+      );
     },
     [],
   );

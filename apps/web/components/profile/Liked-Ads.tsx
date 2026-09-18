@@ -1,4 +1,4 @@
-import { Heart } from 'lucide-react';
+import { Heart } from "lucide-react";
 
 export default function LikedAds() {
   return (
@@ -11,15 +11,16 @@ export default function LikedAds() {
               <Heart className="w-16 h-16 text-gray-500" strokeWidth={2.5} />
             </div>
             <div className="text-center">
-              <h2 className="text-lg font-medium text-foreground mb-2">No Result!</h2>
+              <h2 className="text-lg font-medium text-foreground mb-2">
+                No Result!
+              </h2>
               <p className="text-muted-foreground text-sm">
                 Oops! Looks like you haven&apos;t liked any posts yet.
               </p>
             </div>
-            
           </div>
         </main>
       </div>
     </div>
-  )
+  );
 }

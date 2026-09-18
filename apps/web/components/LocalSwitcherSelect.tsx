@@ -24,7 +24,6 @@ export default function LocaleSwitcherSelect({
   defaultValue: string;
   label: string;
 }) {
-  
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -33,7 +32,7 @@ export default function LocaleSwitcherSelect({
     router.replace(
       // @ts-expect-error -- validation handled by i18n routing
       { pathname, params },
-      { locale: nextLocale as Locale }
+      { locale: nextLocale as Locale },
     );
   }
 
@@ -81,7 +80,9 @@ export default function LocaleSwitcherSelect({
                       className="rounded-full object-cover border border-muted/10"
                     />
                   </div>
-                  <span className={`text-sm font-medium ${isActive ? "text-[#00a0e9]" : "text-foreground"}`}>
+                  <span
+                    className={`text-sm font-medium ${isActive ? "text-[#00a0e9]" : "text-foreground"}`}
+                  >
                     {flagMap[locale]?.name}
                   </span>
                 </div>

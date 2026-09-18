@@ -17,14 +17,14 @@ Date: 2026-09-02. Read-only investigation; **no application code was changed**.
 
 ## 1. Verification methodology (what I ran and what I read)
 
-| Step | Command | Result |
-|---|---|---|
-| Confirm checkout | `git status`, `git log --oneline -5` | detached HEAD at `origin/main` = `adda2e1`, clean tree |
-| Locate outbox/queue/notifications | `find apps/backend/src -type d`; `git grep -il outbox` (whole repo) | **absent at HEAD**; empty grep |
-| Branch inventory | `git branch -a`; `git ls-tree -r --name-only <ref> -- apps/backend/src` | 4 relevant refs (see §2) |
-| Chat unit tests | `pnpm --filter backend test -- --testPathPatterns=chat` | **PASS — 1 suite, 26 tests** |
-| Full backend suite | `pnpm --filter backend test` | **PASS — 16 suites, 159 tests** (2.45 s) |
-| Timer inventory | `grep -rn -E 'setInterval\|setTimeout\|@Cron\|ScheduleModule' apps/backend/src` at HEAD and via `git grep` on the other refs | see §6 |
+| Step                              | Command                                                                                                                      | Result                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Confirm checkout                  | `git status`, `git log --oneline -5`                                                                                         | detached HEAD at `origin/main` = `adda2e1`, clean tree |
+| Locate outbox/queue/notifications | `find apps/backend/src -type d`; `git grep -il outbox` (whole repo)                                                          | **absent at HEAD**; empty grep                         |
+| Branch inventory                  | `git branch -a`; `git ls-tree -r --name-only <ref> -- apps/backend/src`                                                      | 4 relevant refs (see §2)                               |
+| Chat unit tests                   | `pnpm --filter backend test -- --testPathPatterns=chat`                                                                      | **PASS — 1 suite, 26 tests**                           |
+| Full backend suite                | `pnpm --filter backend test`                                                                                                 | **PASS — 16 suites, 159 tests** (2.45 s)               |
+| Timer inventory                   | `grep -rn -E 'setInterval\|setTimeout\|@Cron\|ScheduleModule' apps/backend/src` at HEAD and via `git grep` on the other refs | see §6                                                 |
 
 No browser work, no DB migration run, no server start (nothing in this checkout would exercise the outbox anyway). All outbox/WS file content below was read via `git show <ref>:<path>`, i.e. from the actual branch trees — line numbers are from `grep -n ''` on those exact blobs.
 
@@ -55,6 +55,7 @@ Files: `src/chat/chat.controller.ts`, `src/chat/chat.service.ts` (16 207 bytes �
 ### 3.1 Data model — `src/db/schema/chat.schema.ts`
 
 **`conversations`** (`chat.schema.ts:14-44`):
+
 - `id uuid PK defaultRandom` (:17)
 - `userAId`/`userBId` uuid NOT NULL, FK → `users.id ON DELETE CASCADE` (:19-24). Canonical **unordered pair**: comment at :18 "user_a_id < user_b_id (service sorts before insert)"; enforced by `check('conversations_pair_ordered', sql\`user_a_id < user_b_id\`)` (:42).
 - `lastMessageAt timestamp(3) withTimezone defaultNow() notNull` (:28-33) — "Denormalized inbox ordering key; bumped on every send. precision 3 (ms): cursors roundtrip through JS Dates, which have no microseconds — full precision would make gt/lt boundary checks drift." (comment :25-27)
@@ -62,6 +63,7 @@ Files: `src/chat/chat.controller.ts`, `src/chat/chat.service.ts` (16 207 bytes �
 - Indexes (:38-43): `uniqueIndex('conversations_pair_uq').on(userAId, userBId)` (:39); `conversations_user_a_recency_idx` / `conversations_user_b_recency_idx` on `(user, lastMessageAt)` (:40-41); pair-ordered CHECK (:42).
 
 **`messages`** (`chat.schema.ts:49-92`):
+
 - `id uuid PK defaultRandom` (:52); `conversationId` FK → conversations `ON DELETE CASCADE` (:53-55); `senderId` FK → users cascade (:56-58)
 - `body text` nullable (:59); `listingId uuid` FK → listings **`ON DELETE SET NULL`** (:60-63, "the card survives listing removal via SET NULL"); `imageUrl`/`imagePath` text (:64-65); `readAt timestamp` (:66)
 - `createdAt timestamp(3) withTimezone defaultNow() notNull` (:69-71) — "must compare exactly against JS-Date-derived cursors" (:67-68)
@@ -71,14 +73,14 @@ Migration history: tables created in `drizzle/migrations/0005_nosy_monster_badoo
 
 ### 3.2 REST surface — `src/chat/chat.controller.ts` (global prefix `api`, version 1, JWT-guarded by the global `JwtAuthGuard`; user identity via `@CurrentUser() user: RequestUser`)
 
-| Route | Line | Handler → service |
-|---|---|---|
-| `POST /api/v1/chats/messages` | `:24-29` | `sendMessage(user.id, dto)` — creates conversation on first message |
-| `GET /api/v1/chats` | `:32-35` | `getInbox(user.id, query)` |
-| `GET /api/v1/chats/unread-count` | `:38-41` | `getUnreadCount(user.id)` → `{ total }` |
-| `GET /api/v1/chats/with/:userId` | `:44-52` | `getConversationWith(user.id, userId)` (read-only, never creates) |
-| `GET /api/v1/chats/:conversationId/messages` | `:55-62` | `getMessages(user.id, conversationId, query)` |
-| `POST /api/v1/chats/:conversationId/read` | `:65-71` | `markRead(user.id, conversationId)` → `{ marked }` |
+| Route                                        | Line     | Handler → service                                                   |
+| -------------------------------------------- | -------- | ------------------------------------------------------------------- |
+| `POST /api/v1/chats/messages`                | `:24-29` | `sendMessage(user.id, dto)` — creates conversation on first message |
+| `GET /api/v1/chats`                          | `:32-35` | `getInbox(user.id, query)`                                          |
+| `GET /api/v1/chats/unread-count`             | `:38-41` | `getUnreadCount(user.id)` → `{ total }`                             |
+| `GET /api/v1/chats/with/:userId`             | `:44-52` | `getConversationWith(user.id, userId)` (read-only, never creates)   |
+| `GET /api/v1/chats/:conversationId/messages` | `:55-62` | `getMessages(user.id, conversationId, query)`                       |
+| `POST /api/v1/chats/:conversationId/read`    | `:65-71` | `markRead(user.id, conversationId)` → `{ marked }`                  |
 
 **At HEAD there is NO `@Throttle` on send** — the per-route `@Throttle({ default: { limit: 30, ttl: 60_000 } })` (`chat.controller.ts:31` on rothh, with the explanatory comment at :26-30: "sending is the one chat verb that pushes content into someone else's inbox, so it is the harassment/spam surface… Caveat: the global ThrottlerGuard keys on IP, so this is shared by every user behind one NAT") is a `48e5009` addition only. Global throttle at HEAD: `app.module.ts` `ThrottlerModule.forRootAsync` ttl 60 s, limit 100 (`app.module.ts:36-44`), applied via global `APP_GUARD` `ThrottlerGuard` (`app.module.ts:83`).
 
@@ -87,6 +89,7 @@ DTOs: `SendMessageDto` — `recipientId @IsUUID()` (:12), `body? @IsString() @Is
 ### 3.3 Service flow — `src/chat/chat.service.ts` (HEAD)
 
 **`sendMessage(senderId, dto)`** (`:61-141`) validation order:
+
 1. self-message → 400 `'Cannot message yourself'` (:63)
 2. neither body nor imagePath → 400 (:65)
 3. **HEAD's** imagePath check is a denylist: `!startsWith('chat/{senderId}/') || includes('..')` → 400 (:71). (Replaced on rothh by the structural allow-list `assertOwnedChatImagePath`, §4.2.)
@@ -95,14 +98,19 @@ DTOs: `SendMessageDto` — `recipientId @IsUUID()` (:12), `body? @IsString() @Is
 6. listing context must be owned by one of the two participants → 400 `'Invalid listing context'` (:94)
 
 Then the **race-safe find-or-create + recency bump in one statement** (:96-105):
+
 ```ts
-const [a, b] = this.canonicalPair(senderId, dto.recipientId);          // :98
-const [conversation] = await this.db.insert(conversations)
-  .values({ userAId: a, userBId: b, lastMessageAt: new Date() })       // :101  ← app clock at HEAD
-  .onConflictDoUpdate({ target: [conversations.userAId, conversations.userBId],
-    set: { lastMessageAt: new Date() } })                              // :102-103
+const [a, b] = this.canonicalPair(senderId, dto.recipientId); // :98
+const [conversation] = await this.db
+  .insert(conversations)
+  .values({ userAId: a, userBId: b, lastMessageAt: new Date() }) // :101  ← app clock at HEAD
+  .onConflictDoUpdate({
+    target: [conversations.userAId, conversations.userBId],
+    set: { lastMessageAt: new Date() },
+  }) // :102-103
   .returning();
 ```
+
 `canonicalPair` (`:369-371`) is a pure string sort: `return a < b ? [a, b] : [b, a];`. Image URL derivation from `imagePath` via `supabaseService.getPublicUrl(bucket, path)` (:107-114). Message insert (:115-125). Listing contexts batch-loaded after insert (:127-138); response `{ conversationId, message: {...message, listing} }`.
 
 **Inbox `getInbox`** (`:144-180`): keyset on `(lastMessageAt DESC, id DESC)`, cursor decoded by `decodeCursor` (:523-535, base64 JSON `{createdAt, id}`, tolerant of garbage — returns null), `limit+1` fetch to compute `hasMore`/`nextCursor` (:167-176). `buildInboxItems` (:401-434) batch-loads last message (`selectDistinctOn(conversationId) … orderBy conversationId, createdAt DESC, id DESC`, :424-440), unread counts (grouped count, :443-457), and user summaries (no `deletedAt` filter — history with soft-deleted users stays renderable, :460-473). `batchLoadListingContexts` (:478-505) also grabs the first `listingPhotos` row per listing as thumbnail.
@@ -120,6 +128,7 @@ const [conversation] = await this.db.insert(conversations)
 Wiring added by that commit: `main.ts:3,39` (`import { WsAdapter } from '@nestjs/platform-ws'; app.useWebSocketAdapter(new WsAdapter(app))`); `chat.module.ts` gains `imports: [AuthModule]` and providers `[ChatService, ConnectionRegistry, HeartbeatService, ChatGateway]`; `jwt-auth.guard.ts` short-circuits `if (context.getType() === 'ws') return true;` so the global HTTP guard never blocks WS upgrades; `app.module.ts:9,51` adds `EventEmitterModule.forRoot()`; backend `package.json` adds `@nestjs/platform-ws`, `@nestjs/websockets`, `@nestjs/event-emitter`, `@socket.io/redis-adapter`, `socket.io`, `ws`, `redis`, `@types/ws`.
 
 **`chat.gateway.ts`** (`@WebSocketGateway({ path: '/ws/chat' })`, :19):
+
 - `handleConnection` (:29-52): three token sources, in order — `?token=` query param, `Authorization: Bearer`, and the `user_access_token` httpOnly cookie via regex on the Cookie header (:31-38; comment :31-34 explains browser WS cannot set headers, cookies travel on same-origin upgrade). No token → `socket.close(4001, 'Missing token')` (:40-43). `this.auth.verify<{ sub: string }>(token)` → `conn = { socket, userId: claims.sub, lastPongAt: Date.now() }`, stashed on `(socket as any)._conn`, then `registry.add(claims.sub, conn)` (:45-48). Any throw → `socket.close(4001, 'Invalid token')` (:49-51). **4001 is the only close code used.**
 - `handleDisconnect` (:65-68) removes the conn from the registry.
 - `@SubscribeMessage('send_message')` (:70-82): `const result = await this.core.sendMessage(conn.userId, envelope.payload)` — **the exact same `ChatService.sendMessage` as REST**, so all validations (§3.3) apply. Then push: `if (this.registry.isOnline(recipientId)) for (const rc of this.registry.connectionsFor(recipientId)) rc.socket.send(JSON.stringify({ type: 'message', payload: message }))` (:76-81). Sender does not receive a push (their own response is the echo); multi-device fan-out comes free from the `Set` per user.
@@ -131,27 +140,30 @@ Wiring added by that commit: `main.ts:3,39` (`import { WsAdapter } from '@nestjs
 
 ### 3.5 Delivery / read model (backend side; the client that consumes it is also only on `48e5009`)
 
-- **WS delivers**: new incoming messages pushed live to the online recipient's sockets (`chat.gateway.ts:77-81`). The `send_message` event is an alternative *transport for the send verb* (same service call, same row insert).
+- **WS delivers**: new incoming messages pushed live to the online recipient's sockets (`chat.gateway.ts:77-81`). The `send_message` event is an alternative _transport for the send verb_ (same service call, same row insert).
 - **REST delivers everything else**: inbox, history (`cursor=`), deltas (`after=`), unread count, mark-read. Read receipts travel in `meta.peerLastReadAt` on the messages endpoint (polled, never pushed).
 - Client composition (from `48e5009`, `apps/web/hooks/use-chat-thread.ts:121,163`): WS is primary; when `ws.isConnected`, delta polling is disabled (`refetchInterval: wsConnected ? false : refetchInterval`); when the WS drops, adaptive polling resumes (tiers 3 s active / 10 s warm / 30 s idle, paused when the tab is hidden — `use-chat-polling.ts`).
 
 **Sequences (as the brief asks):**
 
-*Send while recipient is online (all on one instance):*
+_Send while recipient is online (all on one instance):_
+
 1. Sender's client sends `{event:'send_message', data:{payload}}` over its `/ws/chat` socket — or `POST /api/v1/chats/messages`.
 2. `ChatGateway.onSendMessage` → `ChatService.sendMessage` (full validation chain, §3.3) → canonical-pair upsert of `conversations` (bumping `last_message_at`) → insert `messages` row → build `{conversationId, message}`.
 3. Gateway checks `registry.isOnline(recipientId)` → for each of the recipient's sockets: `socket.send({type:'message', payload: message})`.
 4. Recipient's client receives the push, appends it (and its own `after=` watermark advances on the next poll); the sender's client shows the row from the send response. Read receipts only move when the recipient's client calls `POST /:conversationId/read`, surfaced to the sender via `peerLastReadAt` on a poll.
 
-*Send while recipient is offline (or on another instance):*
+_Send while recipient is offline (or on another instance):_
+
 1. Step 2 above is identical — the message is durably persisted.
 2. `isOnline(recipientId)` is false (or the registry on this instance doesn't know them) → no push.
 3. When the recipient connects (or reconnects), their client resumes delta polling from `after = meta.latestCursor` (or from a WS catch-up path), and the message arrives via REST. No server-side offline queue; no push retention.
 
 **Edge cases verifiable in code:**
+
 - **Multiple sockets per user**: registry holds a `Set` per userId → every socket gets the push (multi-tab/multi-device). (:13, :29-31, :78-79).
 - **`lastPongAt` init**: set to `Date.now()` at connect (gateway :46) — and **never updated again** (§4.5).
-- **Cross-instance**: registry is per-process, so recipient-on-instance-B gets no push from sender-on-instance-A; and because each client disables polling while *its own* WS is up, a two-instance deployment can stall delivery until a reconnect/activity. `@socket.io/redis-adapter` was added to package.json but **nothing uses it** — the gateway is platform-ws, and no redis adapter is constructed anywhere on the branch.
+- **Cross-instance**: registry is per-process, so recipient-on-instance-B gets no push from sender-on-instance-A; and because each client disables polling while _its own_ WS is up, a two-instance deployment can stall delivery until a reconnect/activity. `@socket.io/redis-adapter` was added to package.json but **nothing uses it** — the gateway is platform-ws, and no redis adapter is constructed anywhere on the branch.
 - **No WS for the sender's other devices**: push targets only `recipientId`; the sender's own other tabs rely on their own polling or their own WS receive path (there is none for own messages — they get no push). Not a correctness issue (REST echo + polling cover it) but worth noting.
 
 ---
@@ -164,23 +176,23 @@ Files (all `48e5009`): `src/db/schema/outbox.schema.ts`, `src/outbox/{outbox.mod
 
 `pgEnum('outbox_status', ['pending','processing','published','dead'])` (:16-25). Table `outbox_messages` (:27-64):
 
-| Column | Line | Notes |
-|---|---|---|
-| `id uuid PK defaultRandom` | :30 | |
-| `topic varchar(80) notNull` | :31 | no enum — a new topic is a code change, not a migration |
-| `aggregate_id uuid` | :33 | "Partition / ordering key — typically the userId the message belongs to" |
-| `payload jsonb notNull` | :34 | |
-| `status outbox_status default 'pending'` | :35 | |
-| `priority smallint default 0` | :37 | "Higher runs sooner (see the claim ORDER BY)" |
-| `attempts integer default 0` | :38 | |
-| `max_attempts integer default 5` | :39 | |
-| `next_attempt_at timestamptz default now()` | :40-43 | backoff/availability gate |
-| `dedupe_key varchar(160)` | :44 | unique → repeated enqueue is a no-op |
-| `locked_by varchar(64)` | :45 | `instanceId:workerId` (dispatcher :32, :67) |
-| `locked_at timestamptz` | :46 | lease stamp |
-| `last_error text` | :47 | diagnostics |
-| `created_at timestamptz default now()` | :48-50 | |
-| `published_at timestamptz` | :51 | |
+| Column                                      | Line   | Notes                                                                    |
+| ------------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| `id uuid PK defaultRandom`                  | :30    |                                                                          |
+| `topic varchar(80) notNull`                 | :31    | no enum — a new topic is a code change, not a migration                  |
+| `aggregate_id uuid`                         | :33    | "Partition / ordering key — typically the userId the message belongs to" |
+| `payload jsonb notNull`                     | :34    |                                                                          |
+| `status outbox_status default 'pending'`    | :35    |                                                                          |
+| `priority smallint default 0`               | :37    | "Higher runs sooner (see the claim ORDER BY)"                            |
+| `attempts integer default 0`                | :38    |                                                                          |
+| `max_attempts integer default 5`            | :39    |                                                                          |
+| `next_attempt_at timestamptz default now()` | :40-43 | backoff/availability gate                                                |
+| `dedupe_key varchar(160)`                   | :44    | unique → repeated enqueue is a no-op                                     |
+| `locked_by varchar(64)`                     | :45    | `instanceId:workerId` (dispatcher :32, :67)                              |
+| `locked_at timestamptz`                     | :46    | lease stamp                                                              |
+| `last_error text`                           | :47    | diagnostics                                                              |
+| `created_at timestamptz default now()`      | :48-50 |                                                                          |
+| `published_at timestamptz`                  | :51    |                                                                          |
 
 Indexes (:54-63): `outbox_messages_claim_idx (priority DESC, next_attempt_at) WHERE status='pending'` — "Serves the claim query's predicate and its leading ORDER BY key"; `uniqueIndex outbox_messages_dedupe_key_uq (dedupe_key)`; `outbox_messages_published_idx (published_at) WHERE status='published'` — retention sweep of delivered rows.
 
@@ -197,7 +209,7 @@ Migration DDL (`0013_productive_mentor.sql`): `CREATE TYPE outbox_status` + `CRE
 
 ### 4.3 Dispatcher — `src/outbox/outbox.dispatcher.ts`
 
-- Constants: `WakeupToken = 'wake'` (:21-22 — non-undefined string because `Channel.tryRead()` uses `undefined` as its empty sentinel, so a `Channel<void>` couldn't distinguish empty from a real value, :16-19); `SHUTDOWN_GRACE_MS = 10_000` (:24); `instanceId = \`${process.pid}-${randomUUID().slice(0,8)}\`` (:32 — "Identifies this process in `outbox_messages.locked_by`").
+- Constants: `WakeupToken = 'wake'` (:21-22 — non-undefined string because `Channel.tryRead()` uses `undefined` as its empty sentinel, so a `Channel<void>` couldn't distinguish empty from a real value, :16-19); `SHUTDOWN_GRACE_MS = 10_000` (:24); `instanceId = \`${process.pid}-${randomUUID().slice(0,8)}\``(:32 — "Identifies this process in`outbox_messages.locked_by`").
 - Config read in constructor (:49-56): `outbox.concurrency ?? 5`, `outbox.batchSize ?? 100`, `outbox.pollIntervalMs ?? 1500`, `outbox.reclaimIntervalMs ?? 60_000`, `outbox.staleLockSeconds ?? 300`. (Config keys defined in `config/configuration.ts:36-42` + Zod-validated env in `config/config.validation.ts:24-28`: `OUTBOX_CONCURRENCY=5`, `OUTBOX_BATCH_SIZE=100`, `OUTBOX_POLL_INTERVAL_MS=1500`, `OUTBOX_RECLAIM_INTERVAL_MS=60000`, `OUTBOX_STALE_LOCK_SECONDS=300`.)
 - The wakeup channel: `Channel.createBounded<WakeupToken>(1)` (:29) — capacity-1 coalescing flag ("a full buffer simply means a wakeup is already pending", :11-14).
 - `onModuleInit` (:59-97): `running = true`; **startup reclaim** of any `processing` rows left by a dead process (:62-63); worker pool of `concurrency` workers with `workerId = ${instanceId}:${i}` (:65-76); **startup drain** `this.wakeup('startup')` (:78-79); poll timer `setInterval(() => this.wakeup('retry'), pollIntervalMs)` with `.unref()` (:87-91); reclaim timer `setInterval(() => void this.reclaim(), reclaimIntervalMs)` with `.unref()` (:93-96).
@@ -227,6 +239,7 @@ Migration DDL (`0013_productive_mentor.sql`): `CREATE TYPE outbox_status` + `CRE
 ### 4.6 Lifecycle sequences
 
 **Happy path (one message):**
+
 1. Producer, inside its own business transaction, calls `outbox.enqueue(tx, { topic, payload, aggregateId?, dedupeKey?, … })` → row inserted with `status='pending'`, `attempts=0`, `next_attempt_at=now()` (DB clock).
 2. Producer's transaction commits (row becomes visible atomically with the business write).
 3. Producer calls `outbox.wakeupAfterCommit()` → EventEmitter emits `outbox.wakeup` → `OutboxWakeupListener` → `dispatcher.wakeup()` → `channel.tryWrite('wake')`.
@@ -236,10 +249,7 @@ Migration DDL (`0013_productive_mentor.sql`): `CREATE TYPE outbox_status` + `CRE
 7. If no further wakeup arrives, the 1500 ms poll re-checks; with no due rows the drain returns immediately.
 
 **Failure path (handler throws):**
-1-4. Same, up to the claim (attempt 1 consumed).
-5. `handler.handle` throws → `dispatch` catch → `release(id, message)` → `markFailed`: `attempts(1) < max_attempts(5)` → `status='pending'`, `next_attempt_at = now() + 2 s (× jitter 0.75–1.25)`, `last_error` stored (≤2000 chars), lock cleared.
-6. Retry arrives either via the 1500 ms poll (`wakeup('retry')` re-arms the drain) or a future `next_attempt_at`; each claim increments attempts: ~2 s, ~4 s, ~8 s, ~16 s (capped 300 s, ±25 %).
-7. When `attempts >= max_attempts` → `status='dead'` (terminal; also immediate if `terminal=true`, e.g. unroutable topic). A worker crash mid-handle leaves the row `processing`; the 60 s `reclaimStale` sweep (and the startup reclaim) flips it back to `pending` (or `dead` if the budget is gone).
+1-4. Same, up to the claim (attempt 1 consumed). 5. `handler.handle` throws → `dispatch` catch → `release(id, message)` → `markFailed`: `attempts(1) < max_attempts(5)` → `status='pending'`, `next_attempt_at = now() + 2 s (× jitter 0.75–1.25)`, `last_error` stored (≤2000 chars), lock cleared. 6. Retry arrives either via the 1500 ms poll (`wakeup('retry')` re-arms the drain) or a future `next_attempt_at`; each claim increments attempts: ~2 s, ~4 s, ~8 s, ~16 s (capped 300 s, ±25 %). 7. When `attempts >= max_attempts` → `status='dead'` (terminal; also immediate if `terminal=true`, e.g. unroutable topic). A worker crash mid-handle leaves the row `processing`; the 60 s `reclaimStale` sweep (and the startup reclaim) flips it back to `pending` (or `dead` if the budget is gone).
 
 ### 4.7 The divergent `feat/notifications` outbox (older line, wired but different API)
 
@@ -253,18 +263,18 @@ On `feat/notifications` the outbox is named after **events**, not topics: table 
 
 Across the unmerged branches:
 
-| Timer / worker | Where | Cadence & default | Driver | Per-… |
-|---|---|---|---|---|
-| Outbox worker pool | `outbox.dispatcher.ts:65-76` (rothh) / `outbox-worker.service.ts` (feat/notifications) | `concurrency` = 5 (rothh); single loop (feat) | capacity-1 wakeup `Channel` (rothh) / recursive `setTimeout` (feat) | per-process |
-| Outbox poll fallback | `outbox.dispatcher.ts:87-91` (rothh) | `pollIntervalMs` = **1500 ms** (`OUTBOX_POLL_INTERVAL_MS`) | `setInterval(…).unref()` → `wakeup('retry')` | per-process |
-| Outbox stale reclaim sweep | `outbox.dispatcher.ts:93-96` (rothh); startup reclaim at :62-63 | `reclaimIntervalMs` = **60 000 ms** (`OUTBOX_RECLAIM_INTERVAL_MS`), stale threshold `staleLockSeconds` = **300 s** (`OUTBOX_STALE_LOCK_SECONDS`) | `setInterval(…).unref()`; `reclaimStale` SQL | per-process |
-| Outbox shutdown grace | `outbox.dispatcher.ts:110-115` (rothh) | 10 s one-shot | `setTimeout(…).unref()` in `Promise.race` | per-process |
-| Chat WS heartbeat | `chat/heartbeat.service.ts:11-13` (rothh only) | 30 s ping interval; 10 s pong timeout (40 s close threshold) | `setInterval` in `OnModuleInit` (no `unref`) | per-process |
-| Telegram gateway HTTP timeout | `notifications/channels/telegram-gateway.channel.ts:127` (feat/notifications only) | `REQUEST_TIMEOUT_MS` | `setTimeout(() => controller.abort(), …)` | per-request |
+| Timer / worker                | Where                                                                                  | Cadence & default                                                                                                                                | Driver                                                              | Per-…       |
+| ----------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ----------- |
+| Outbox worker pool            | `outbox.dispatcher.ts:65-76` (rothh) / `outbox-worker.service.ts` (feat/notifications) | `concurrency` = 5 (rothh); single loop (feat)                                                                                                    | capacity-1 wakeup `Channel` (rothh) / recursive `setTimeout` (feat) | per-process |
+| Outbox poll fallback          | `outbox.dispatcher.ts:87-91` (rothh)                                                   | `pollIntervalMs` = **1500 ms** (`OUTBOX_POLL_INTERVAL_MS`)                                                                                       | `setInterval(…).unref()` → `wakeup('retry')`                        | per-process |
+| Outbox stale reclaim sweep    | `outbox.dispatcher.ts:93-96` (rothh); startup reclaim at :62-63                        | `reclaimIntervalMs` = **60 000 ms** (`OUTBOX_RECLAIM_INTERVAL_MS`), stale threshold `staleLockSeconds` = **300 s** (`OUTBOX_STALE_LOCK_SECONDS`) | `setInterval(…).unref()`; `reclaimStale` SQL                        | per-process |
+| Outbox shutdown grace         | `outbox.dispatcher.ts:110-115` (rothh)                                                 | 10 s one-shot                                                                                                                                    | `setTimeout(…).unref()` in `Promise.race`                           | per-process |
+| Chat WS heartbeat             | `chat/heartbeat.service.ts:11-13` (rothh only)                                         | 30 s ping interval; 10 s pong timeout (40 s close threshold)                                                                                     | `setInterval` in `OnModuleInit` (no `unref`)                        | per-process |
+| Telegram gateway HTTP timeout | `notifications/channels/telegram-gateway.channel.ts:127` (feat/notifications only)     | `REQUEST_TIMEOUT_MS`                                                                                                                             | `setTimeout(() => controller.abort(), …)`                           | per-request |
 
 `@nestjs/schedule` / `@Cron` / `ScheduleModule`: **absent from every ref**. Everything is hand-rolled `setInterval`/`setTimeout`. Config keys live under `outbox.*` and are read in `outbox.dispatcher.ts:49-56` (rothh) — see §4.3.
 
-**Outbox ↔ background delivery relationship:** as shipped in this checkout there is no relationship — nothing enqueues and nothing registers handlers, and on `rothh/feat/notifications` the dispatcher (the only thing that would run the workers/timers) is never instantiated because `OutboxModule` is not imported. On `feat/notifications` the outbox *is* live background machinery driving OTP delivery (`notification.service.ts` enqueue + inline `dispatchById`, `otp-delivery.handler.ts` handler, `outbox-worker.service.ts` poll loop).
+**Outbox ↔ background delivery relationship:** as shipped in this checkout there is no relationship — nothing enqueues and nothing registers handlers, and on `rothh/feat/notifications` the dispatcher (the only thing that would run the workers/timers) is never instantiated because `OutboxModule` is not imported. On `feat/notifications` the outbox _is_ live background machinery driving OTP delivery (`notification.service.ts` enqueue + inline `dispatchById`, `otp-delivery.handler.ts` handler, `outbox-worker.service.ts` poll loop).
 
 `src/queue/queue.module.ts`: on `rothh/feat/notifications` it exists as an **empty `@Module({})` placeholder** (4 lines) and is the only queue-related file; it is imported by `app.module.ts:66`. `src/notifications/`: **absent from `origin/main`**; on `feat/notifications` it is a full channel-based notification stack (SMS/email/Telegram-gateway/composition/retrying channels, `ChannelRegistry`, `NotificationService`, `OtpDeliveryHandler`); on `fm/psa-npic-outbox-otp-workers` a different adapter-shaped version exists. Implication: the "queue" is scaffolding reserved for the not-yet-landed worker vertical slice; the notification/Redis work exists only on the unmerged feature line.
 
@@ -291,11 +301,11 @@ Net: **both ships are "pending" from the perspective of `origin/main`.** The red
 ## 8. Risks & observations (things that look unfinished, dead, or fragile)
 
 1. **Heartbeat bug (on `rothh/feat/notifications` only): `lastPongAt` is never updated.** Written at connect (`chat.gateway.ts:46`) and read by the sweep (`heartbeat.service.ts:18`), but no `socket.on('pong', …)` listener exists anywhere on the branch (`git grep 'pong'` → only those two refs plus geography false-positives). `conn.socket.ping()` is sent but pongs are never recorded, so `now - lastPongAt` grows monotonically and **every WS connection is force-closed at the second sweep (~60 s after connect)** regardless of liveness. A healthy chat session would silently drop every ~60 s and rely on client reconnect + polling. Fix is one `socket.on('pong', () => { conn.lastPongAt = Date.now(); })` in the gateway.
-2. **In-memory `ConnectionRegistry` is per-process.** Multi-instance deployments: a recipient connected to instance B gets no push for sends handled on instance A, and because the web client disables polling while *its own* WS is up (`use-chat-thread.ts:163`), cross-instance delivery can stall until a reconnect. `@socket.io/redis-adapter` + `socket.io` are in `package.json` but unused (gateway is platform-ws) — either the intended fix or dead deps.
+2. **In-memory `ConnectionRegistry` is per-process.** Multi-instance deployments: a recipient connected to instance B gets no push for sends handled on instance A, and because the web client disables polling while _its own_ WS is up (`use-chat-thread.ts:163`), cross-instance delivery can stall until a reconnect. `@socket.io/redis-adapter` + `socket.io` are in `package.json` but unused (gateway is platform-ws) — either the intended fix or dead deps.
 3. **Outbox not mounted on the branch the brief describes**: `OutboxModule` unimported on `rothh/feat/notifications`; absent on `origin/main`. Its dispatcher/timers/workers never start anywhere in any current checkout.
 4. **Two divergent outbox implementations** (`rothh` topic/dedupeKey/terminal-missing-handler vs `feat/notifications` eventType/redact/retryable-missing-handler + inline `dispatchById` fast-path). They disagree on: missing-handler semantics (terminal vs retryable), terminal state (`dead` vs `failed`), payload scrubbing (`{}` vs handler `redact()`), polling (fixed-interval `setInterval` + channel vs recursive `setTimeout`), worker model (pool of 5 vs single sequential loop), and migration table names (`outbox_messages` vs `outbox_events`). **Both cannot survive.**
 5. **No outbox tests on the `rothh` line** (zero `*.spec.ts` under `src/outbox/`, `src/utils/`); the `feat/notifications` line has specs for its shape.
-6. **HEAD chat hardening gaps that `48e5009` fixes** (relevant if the branch is never merged): (a) imagePath validation at HEAD is a denylist (`startsWith('chat/{id}/')` + reject `..`, `chat.service.ts:71`) — rothh replaces it with a structural 3-segment allow-list `assertOwnedChatImagePath` (`chat.service.ts:435-445`) because "denylists on storage keys leak: %2e%2e, backslashes and fullwidth dots all slip past a literal `..` scan"; (b) HEAD's `lastMessageAt` bump uses `new Date()` (app clock, `chat.service.ts:101,103`) while `messages.createdAt` uses the DB default — rothh switches the bump to `sql\`now()\`` (:122) and adds a post-insert **monotonic-max watermark update** (:148-161, `UPDATE conversations SET lastMessageAt = message.createdAt WHERE id=… AND lastMessageAt < message.createdAt`) to fix the concurrent-send ordering race (bump-before-row-exists); (c) HEAD's `decodeCursor` accepts any id string, so a crafted non-UUID cursor id hits Postgres `22P02` → 500; rothh validates ids against `UUID_RE` (:61-63, decode :527-535) and notes a `lastMessageAt <= cursor` fast-path is deliberately absent (same-millisecond message loss, comment ~:290-305); (d) HEAD chat has no `@Throttle` on send; rothh adds `@Throttle({default:{limit:30,ttl:60_000}})` (`chat.controller.ts:31`).
+6. **HEAD chat hardening gaps that `48e5009` fixes** (relevant if the branch is never merged): (a) imagePath validation at HEAD is a denylist (`startsWith('chat/{id}/')` + reject `..`, `chat.service.ts:71`) — rothh replaces it with a structural 3-segment allow-list `assertOwnedChatImagePath` (`chat.service.ts:435-445`) because "denylists on storage keys leak: %2e%2e, backslashes and fullwidth dots all slip past a literal `..` scan"; (b) HEAD's `lastMessageAt` bump uses `new Date()` (app clock, `chat.service.ts:101,103`) while `messages.createdAt` uses the DB default — rothh switches the bump to `sql\`now()\``(:122) and adds a post-insert **monotonic-max watermark update** (:148-161,`UPDATE conversations SET lastMessageAt = message.createdAt WHERE id=… AND lastMessageAt < message.createdAt`) to fix the concurrent-send ordering race (bump-before-row-exists); (c) HEAD's `decodeCursor`accepts any id string, so a crafted non-UUID cursor id hits Postgres`22P02`→ 500; rothh validates ids against`UUID_RE`(:61-63, decode :527-535) and notes a`lastMessageAt <= cursor`fast-path is deliberately absent (same-millisecond message loss, comment ~:290-305); (d) HEAD chat has no`@Throttle`on send; rothh adds`@Throttle({default:{limit:30,ttl:60_000}})` (`chat.controller.ts:31`).
 7. **Web chat at HEAD is mock**: `apps/web/components/home/Chats.tsx` is a static `useState`-driven demo; the real chat UI (server actions `actions/chat.ts`, components, WS + polling hooks) exists only in `48e5009`.
 8. **Minor**: `(socket as any)._conn` casts (gateway :47, :66, :72), `ClientEnvelope { payload: any }` (`common/dto/client-envelope.dto.ts`) — lint hygiene; `queue/queue.module.ts` is an empty shell imported for no effect.
 

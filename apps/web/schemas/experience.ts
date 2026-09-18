@@ -1,7 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const experienceSchema = z.object({
-
   name: z
     .string()
     .trim()
@@ -14,11 +13,11 @@ export const experienceSchema = z.object({
     .max(50, "Experience slug must be less than 50 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Experience slug must be lowercase with hyphens only (e.g. my-category)"
+      "Experience slug must be lowercase with hyphens only (e.g. my-category)",
     ),
   categoryId: z.string().min(1, "Category is required"),
-})
+});
 
 export const deleteExperienceSchema = z.object({
   experienceId: z.string().min(1, "experience ID is required"),
-})
+});

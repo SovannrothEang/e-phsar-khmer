@@ -55,10 +55,10 @@ _module term can be the same as feature for this topic_
 
 1. Title + a one-to-two sentence purpose statement.
 2. `## Architecture`
-    - An opening subsection whose heading names the module's actual core design idea (`The ledger boundary`, `REST is authoritative, the socket is a shortcut`) — never a generic `### Overview`.
-    - A table: one row per file for a thin/service-style module, or one row per DB table for a schema-heavy one. One-line purpose per row.
-    - `### Entity map` — a `mermaid erDiagram` of the tables the module owns (fields + FK relationships). Skip this subsection entirely if the module owns no tables.
-    - A short subsection on how the module relates to this backend's two standing cross-cutting mechanisms — the transactional outbox (`src/outbox/`) and BullMQ queues. State plainly which ones it uses and which it deliberately skips, and why (chat skips both; payment is designed around both).
+   - An opening subsection whose heading names the module's actual core design idea (`The ledger boundary`, `REST is authoritative, the socket is a shortcut`) — never a generic `### Overview`.
+   - A table: one row per file for a thin/service-style module, or one row per DB table for a schema-heavy one. One-line purpose per row.
+   - `### Entity map` — a `mermaid erDiagram` of the tables the module owns (fields + FK relationships). Skip this subsection entirely if the module owns no tables.
+   - A short subsection on how the module relates to this backend's two standing cross-cutting mechanisms — the transactional outbox (`src/outbox/`) and BullMQ queues. State plainly which ones it uses and which it deliberately skips, and why (chat skips both; payment is designed around both).
 3. `## Lifecycle, end to end` — one or more `mermaid sequenceDiagram` blocks tracing the module's real request/data flow (not a generic CRUD sketch), followed by a short `Key properties this gives us` bullet list pulling out the non-obvious invariants the diagram makes visible.
 4. `## Current state` — a table of piece vs. status (`Done` / `Not started` / partial with a caveat). Be honest: a mostly-unbuilt module should read as mostly-unbuilt, not padded out to look further along.
 5. `## Open items` — real findings from reading the actual code (a structural gap, a guard that isn't applied consistently, a doc that's gone stale), each with why it matters. No filler items. Carry forward anything from this file's `Known gaps` section that applies to the module, plus whatever new gaps surfaced while writing the README.
@@ -70,4 +70,3 @@ _module term can be the same as feature for this topic_
 - Reuse the terminology this file and sibling READMEs already use for the same concept, rather than introducing a new synonym for it.
 - Run `pnpm format` (or `npx prettier --write <path>`) on the finished file, and confirm the mermaid fences survived formatting untouched.
 - If writing the README surfaces something that contradicts this file (e.g. a module description here turns out stale because the code moved on), note it under that module's Open items — don't silently rewrite this file as a side effect unless asked to.
-

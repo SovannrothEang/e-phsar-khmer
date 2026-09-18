@@ -5,13 +5,15 @@ export const categories: Category[] = [
     cateId: "1",
     name: "Cars and Vehicles",
     slug: "cars-and-vehicles",
-    cateIcon: "https://images.khmer24.co/categories/23-01-17/s-cars-and-vehicles-1673926803.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/23-01-17/s-cars-and-vehicles-1673926803.png",
     subcategories: [
       {
         subId: "1",
         name: "Cars for Sale",
         slug: "cars-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-cars-for-sale-1638864308.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-cars-for-sale-1638864308.png",
         images: [""],
         title: "",
         brands: [
@@ -906,7 +908,8 @@ export const categories: Category[] = [
         subId: "2",
         name: "Bicycles",
         slug: "bicycles",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-bicycles-1638864338.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-bicycles-1638864338.png",
         images: [""],
         title: "",
         condition: [
@@ -943,7 +946,8 @@ export const categories: Category[] = [
         subId: "3",
         name: "Motorcycles For Sale",
         slug: "motorcycles-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-motorcycles-for-sale-1638864345.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-motorcycles-for-sale-1638864345.png",
         images: [""],
         title: "",
         brands: [
@@ -1312,7 +1316,8 @@ export const categories: Category[] = [
         subId: "4",
         name: "Vehicles For Rent",
         slug: "vehicles-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-vehicles-for-rent-1638864353.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-vehicles-for-rent-1638864353.png",
         images: [""],
         title: "",
         vehicletypes: [
@@ -1520,7 +1525,8 @@ export const categories: Category[] = [
         subId: "5",
         name: "Maintenance & Repair",
         slug: "maintenance-repair",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-car-maintenance-repair-1638864358.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-car-maintenance-repair-1638864358.png",
         images: [""],
         title: "",
         price: 0,
@@ -1537,7 +1543,8 @@ export const categories: Category[] = [
         subId: "6",
         name: "Lorries, Vans & Tractors",
         slug: "lorries-vans-and-tractors",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-lorries-vans-and-tractors-1638864364.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-lorries-vans-and-tractors-1638864364.png",
         images: [""],
         title: "",
         condition: [
@@ -1633,7 +1640,8 @@ export const categories: Category[] = [
         subId: "7",
         name: "Financing & Insurance",
         slug: "financing-insurance",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-financing-insurance-1638864370.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-financing-insurance-1638864370.png",
         images: [""],
         title: "",
         price: 0,
@@ -1649,7 +1657,8 @@ export const categories: Category[] = [
         subId: "8",
         name: "Tuk Tuk & Remork",
         slug: "tuk-tuk-and-remork",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-tuk-tuk-and-remork-1638864378.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-tuk-tuk-and-remork-1638864378.png",
         images: [""],
         title: "",
         discount: [
@@ -1676,7 +1685,8 @@ export const categories: Category[] = [
         subId: "9",
         name: "Parts & Accessories",
         slug: "parts-accessories",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-car-parts-accessories-1635125149.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-car-parts-accessories-1635125149.png",
         images: [""],
         title: "",
         cartypes: [
@@ -1740,7 +1750,8 @@ export const categories: Category[] = [
         subId: "10",
         name: "Others",
         slug: "others-vihicles",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-others-vihicles-1635300275.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-others-vihicles-1635300275.png",
         images: [""],
         title: "",
         price: 0,
@@ -1758,13 +1769,15 @@ export const categories: Category[] = [
     cateId: "2",
     name: "Phones & Tablets",
     slug: "phones-tablets",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-mobile-phones-tablets-1638848154.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-mobile-phones-tablets-1638848154.png",
     subcategories: [
       {
         subId: "11",
         name: "Phones",
         slug: "phones",
-        subcate: "https://images.khmer24.co/categories/21-11-04/s-phones-1635998098.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-04/s-phones-1635998098.png",
         images: [""],
         title: "",
         brands: [
@@ -2012,7 +2025,8 @@ export const categories: Category[] = [
         subId: "12",
         name: "Tablets",
         slug: "tablets",
-        subcate: "https://images.khmer24.co/categories/21-11-04/s-tablets-1635998033.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-04/s-tablets-1635998033.png",
         images: [""],
         title: "",
         brands: [
@@ -2510,7 +2524,8 @@ export const categories: Category[] = [
         subId: "13",
         name: "Smart Watches",
         slug: "smart-watches",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-smart-watches-1635818860.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-smart-watches-1635818860.png",
         images: [""],
         title: "",
         brands: [
@@ -3330,7 +3345,8 @@ export const categories: Category[] = [
         subId: "14",
         name: "Phone Accessories",
         slug: "phone-accessories",
-        subcate: "https://images.khmer24.co/categories/21-10-22/s-phone-accessories-1634875697.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-22/s-phone-accessories-1634875697.png",
         images: [""],
         title: "",
         accessories: [
@@ -3439,7 +3455,8 @@ export const categories: Category[] = [
         subId: "15",
         name: "Phone Numbers",
         slug: "phone-numbers",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-phone-numbers-1635818003.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-phone-numbers-1635818003.png",
         images: [""],
         title: "",
         networks: [
@@ -3501,13 +3518,15 @@ export const categories: Category[] = [
     cateId: "3",
     name: "Computers & Accessories",
     slug: "computers-accessories",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-computer-and-accessories-1638848160.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-computer-and-accessories-1638848160.png",
     subcategories: [
       {
         subId: "16",
         name: "Laptops",
         slug: "laptops",
-        subcate: "https://images.khmer24.co/categories/21-12-07/s-laptops-1638864565.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-07/s-laptops-1638864565.png",
         images: [""],
         title: "",
         brands: [
@@ -3817,7 +3836,8 @@ export const categories: Category[] = [
         subId: "17",
         name: "Desktops",
         slug: "desktops",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-desktops-1638927496.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-desktops-1638927496.png",
         images: [""],
         title: "",
         brands: [
@@ -4068,7 +4088,8 @@ export const categories: Category[] = [
         subId: "18",
         name: "All-in-One",
         slug: "all-in-one",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-all-in-one-pc-1638927503.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-all-in-one-pc-1638927503.png",
         images: [""],
         title: "",
         brands: [
@@ -4383,7 +4404,8 @@ export const categories: Category[] = [
         subId: "19",
         name: "Monitors",
         slug: "monitors",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-monitors-1638927508.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-monitors-1638927508.png",
         images: [""],
         title: "",
         brands: [
@@ -4524,7 +4546,8 @@ export const categories: Category[] = [
         subId: "20",
         name: "Printers & Scanners",
         slug: "printers-scanners",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-printers-and-scanners-1638927513.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-printers-and-scanners-1638927513.png",
         images: [""],
         title: "",
         brands: [
@@ -4683,7 +4706,8 @@ export const categories: Category[] = [
         subId: "21",
         name: "Parts & Accessories",
         slug: "parts-accessories-c",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-computer-parts-and-accessories-1638927519.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-computer-parts-and-accessories-1638927519.png",
         images: [""],
         title: "",
         types: [
@@ -4806,7 +4830,7 @@ export const categories: Category[] = [
             slug: "other",
             image:
               "/sub-img/computers-accessories/parts-accessories/brands/other.png",
-          },  
+          },
         ],
         condition: [
           {
@@ -4842,7 +4866,8 @@ export const categories: Category[] = [
         subId: "22",
         name: "Softwares",
         slug: "softwares",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-softwares-1638927558.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-softwares-1638927558.png",
         images: [""],
         title: "",
         discount: [
@@ -4871,13 +4896,15 @@ export const categories: Category[] = [
     cateId: "4",
     name: "Electronics & Appliances",
     slug: "electronics-appliances",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-electronics-appliances-1638848165.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-electronics-appliances-1638848165.png",
     subcategories: [
       {
         subId: "23",
         name: "Washing Machines & Dryers",
         slug: "washing-machines-and-dryers",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-washing-machines-and-dryers-1638935004.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-washing-machines-and-dryers-1638935004.png",
         images: [""],
         title: "",
         condition: [
@@ -4914,7 +4941,8 @@ export const categories: Category[] = [
         subId: "24",
         name: "Fridges & Freezers",
         slug: "fridges-and-freezers",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-fridges-and-freezers-1638935018.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-fridges-and-freezers-1638935018.png",
         images: [""],
         title: "",
         condition: [
@@ -4951,7 +4979,8 @@ export const categories: Category[] = [
         subId: "25",
         name: "Air Conditioning & Heating ",
         slug: "air-conditioning-and-heating",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-air-conditioning-and-heating-1638935707.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-air-conditioning-and-heating-1638935707.png",
         images: [""],
         title: "",
         condition: [
@@ -4988,7 +5017,8 @@ export const categories: Category[] = [
         subId: "26",
         name: "Tools",
         slug: "tools",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-tools-1638935031.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-tools-1638935031.png",
         images: [""],
         title: "",
         discount: [
@@ -5015,7 +5045,8 @@ export const categories: Category[] = [
         subId: "27",
         name: "Machinery",
         slug: "machinery",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-machinery-1638935038.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-machinery-1638935038.png",
         images: [""],
         title: "",
         discount: [
@@ -5042,7 +5073,8 @@ export const categories: Category[] = [
         subId: "28",
         name: "Consumer/Electronics",
         slug: "consumer-electronics",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-consumer-electronics-1638935046.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-consumer-electronics-1638935046.png",
         images: [""],
         title: "",
         condition: [
@@ -5079,7 +5111,8 @@ export const categories: Category[] = [
         subId: "29",
         name: "Security Camera",
         slug: "security-camera",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-security-camera-1638935051.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-security-camera-1638935051.png",
         images: [""],
         title: "",
         discount: [
@@ -5106,7 +5139,8 @@ export const categories: Category[] = [
         subId: "30",
         name: "Lighting",
         slug: "lighting",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-lighting-1638935056.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-lighting-1638935056.png",
         images: [""],
         title: "",
         discount: [
@@ -5133,7 +5167,8 @@ export const categories: Category[] = [
         subId: "31",
         name: "Cameras & camcorders",
         slug: "cameras-camcorders",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-cameras-camcorders-1638935062.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-cameras-camcorders-1638935062.png",
         images: [""],
         title: "",
         types: [
@@ -5221,7 +5256,8 @@ export const categories: Category[] = [
         subId: "32",
         name: "TVs, Videos & Audios",
         slug: "tvs-videos-and-audios",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-tvs-videos-and-audios-1638935068.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-tvs-videos-and-audios-1638935068.png",
         images: [""],
         title: "",
         types: [
@@ -5297,7 +5333,8 @@ export const categories: Category[] = [
         subId: "33",
         name: "Home appliances",
         slug: "home-appliances",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-home-appliances-1638935075.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-home-appliances-1638935075.png",
         images: [""],
         title: "",
         condition: [
@@ -5334,7 +5371,8 @@ export const categories: Category[] = [
         subId: "34",
         name: "Video games, consoles, toys",
         slug: "video-games-consoles-toys",
-        subcate: "https://images.khmer24.co/categories/21-12-08/s-video-games-consoles-toys-1638935080.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-08/s-video-games-consoles-toys-1638935080.png",
         images: [""],
         title: "",
         condition: [
@@ -5373,13 +5411,15 @@ export const categories: Category[] = [
     cateId: "5",
     name: "House & Land",
     slug: "house-land",
-    cateIcon: "https://images.khmer24.co/categories/23-09-21/s-property-housing-rentals-1695265714.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/23-09-21/s-property-housing-rentals-1695265714.png",
     subcategories: [
       {
         subId: "35",
         name: "House For Sale",
         slug: "house-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-12-29/s-house-for-sale-1640752236.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-29/s-house-for-sale-1640752236.png",
         images: [""],
         title: "",
         bedrooms: [
@@ -5517,7 +5557,8 @@ export const categories: Category[] = [
         subId: "36",
         name: "House For Rent",
         slug: "house-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-house-for-rent-1640838860.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-house-for-rent-1640838860.png",
         images: [""],
         title: "",
         bedrooms: [
@@ -5655,7 +5696,8 @@ export const categories: Category[] = [
         subId: "37",
         name: "Condo For Sale",
         slug: "condo-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-condo-for-sale-1640838868.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-condo-for-sale-1640838868.png",
         images: [""],
         title: "",
         size: 0,
@@ -5672,7 +5714,8 @@ export const categories: Category[] = [
         subId: "38",
         name: "Apartment For Rent ",
         slug: "apartment-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-apartment-for-rent-1640838875.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-apartment-for-rent-1640838875.png",
         images: [""],
         title: "",
         size: 0,
@@ -5689,7 +5732,8 @@ export const categories: Category[] = [
         subId: "39",
         name: "Land For Sale ",
         slug: "land-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-land-for-sale-1635319589.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-land-for-sale-1635319589.png",
         images: [""],
         title: "",
         size: 0,
@@ -5706,7 +5750,8 @@ export const categories: Category[] = [
         subId: "40",
         name: "Land For Rent",
         slug: "land-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-11-04/s-land-for-rent-1636020760.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-04/s-land-for-rent-1636020760.png",
         images: [""],
         title: "",
         size: 0,
@@ -5723,7 +5768,8 @@ export const categories: Category[] = [
         subId: "41",
         name: "Commercial Properties For Sale",
         slug: "commercial-properties-for-sale",
-        subcate: "https://images.khmer24.co/categories/21-11-04/s-commercial-properties-for-sale-1636019636.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-04/s-commercial-properties-for-sale-1636019636.png",
         images: [""],
         title: "",
         size: 0,
@@ -5792,7 +5838,8 @@ export const categories: Category[] = [
         subId: "42",
         name: "Commercial Properties For Rent",
         slug: "commercial-properties-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-commercial-properties-for-rent-1640838885.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-commercial-properties-for-rent-1640838885.png",
         images: [""],
         title: "",
         size: 0,
@@ -5861,7 +5908,8 @@ export const categories: Category[] = [
         subId: "43",
         name: "Room For Rent ",
         slug: "room-for-rent",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-room-for-rent-1635322825.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-room-for-rent-1635322825.png",
         images: [""],
         title: "",
         size: 0,
@@ -5878,7 +5926,8 @@ export const categories: Category[] = [
         subId: "44",
         name: "Properties Wanted",
         slug: "properties-wanted",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-properties-wanted-1635324689.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-properties-wanted-1635324689.png",
         images: [""],
         title: "",
         description: "",
@@ -5893,7 +5942,8 @@ export const categories: Category[] = [
         subId: "45",
         name: "Agent Services",
         slug: "agent-services",
-        subcate: "https://images.khmer24.co/categories/21-10-20/s-agent-services-1634722141.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-20/s-agent-services-1634722141.png",
         images: [""],
         title: "",
         description: "",
@@ -5908,7 +5958,8 @@ export const categories: Category[] = [
         subId: "46",
         name: "Others",
         slug: "others-properties",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-others-properties-1635316937.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-others-properties-1635316937.png",
         images: [""],
         title: "",
         description: "",
@@ -5925,13 +5976,15 @@ export const categories: Category[] = [
     cateId: "6",
     name: "Jobs",
     slug: "jobs",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-jobs-1638848186.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-jobs-1638848186.png",
     subcategories: [
       {
         subId: "47",
         name: "Accounting",
         slug: "accounting",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-accounting-1640231422.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-accounting-1640231422.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -5940,43 +5993,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6039,7 +6099,8 @@ export const categories: Category[] = [
         subId: "48",
         name: "Administration ",
         slug: "administration",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-administration-1640231429.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-administration-1640231429.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6048,43 +6109,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6147,7 +6215,8 @@ export const categories: Category[] = [
         subId: "49",
         name: "Architecture/Engineering",
         slug: "architecture-engineering",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-architecture-engineering-1640231436.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-architecture-engineering-1640231436.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6156,43 +6225,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6255,7 +6331,8 @@ export const categories: Category[] = [
         subId: "50",
         name: "Assistant/Secretary",
         slug: "assistant-secretary",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-assistant-secretary-1640231444.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-assistant-secretary-1640231444.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6264,43 +6341,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6363,7 +6447,8 @@ export const categories: Category[] = [
         subId: "51",
         name: "Audit/Taxation",
         slug: "audit-taxation",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-audit-taxation-1640231453.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-audit-taxation-1640231453.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6372,43 +6457,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6471,7 +6563,8 @@ export const categories: Category[] = [
         subId: "52",
         name: "Banking/Insurance",
         slug: "banking-insurance",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-banking-insurance-1640231463.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-banking-insurance-1640231463.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6480,43 +6573,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6579,7 +6679,8 @@ export const categories: Category[] = [
         subId: "53",
         name: "Cashier/Receptionist",
         slug: "cashier-receptionist",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-cashier-receptionist-1640231470.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-cashier-receptionist-1640231470.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6588,43 +6689,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6687,7 +6795,8 @@ export const categories: Category[] = [
         subId: "54",
         name: "Catering/Restaurant",
         slug: "catering-restaurant",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-catering-restaurant-1640231478.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-catering-restaurant-1640231478.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6696,43 +6805,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6795,7 +6911,8 @@ export const categories: Category[] = [
         subId: "55",
         name: "Cleaner/Maid",
         slug: "cleaner-maid",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-cleaner-maid-1640231487.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-cleaner-maid-1640231487.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6804,43 +6921,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -6903,7 +7027,8 @@ export const categories: Category[] = [
         subId: "56",
         name: "Consultancy",
         slug: "consultancy",
-        subcate: "https://images.khmer24.co/categories/21-12-28/s-jobs-consultancy-1640658491.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-28/s-jobs-consultancy-1640658491.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -6912,43 +7037,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7011,7 +7143,8 @@ export const categories: Category[] = [
         subId: "57",
         name: "Customer Service",
         slug: "customer-service",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-customer-service-1640231503.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-customer-service-1640231503.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7020,43 +7153,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7119,7 +7259,8 @@ export const categories: Category[] = [
         subId: "58",
         name: "Design",
         slug: "design",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-design-1640231512.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-design-1640231512.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7128,43 +7269,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7227,7 +7375,8 @@ export const categories: Category[] = [
         subId: "59",
         name: "Education/Training",
         slug: "education-training",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-education-training-1640231535.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-education-training-1640231535.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7236,43 +7385,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7335,7 +7491,8 @@ export const categories: Category[] = [
         subId: "60",
         name: "Finance",
         slug: "finance",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-finance-1640231653.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-finance-1640231653.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7344,43 +7501,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7443,7 +7607,8 @@ export const categories: Category[] = [
         subId: "61",
         name: "Freight/Shipping/Delivery/Warehouse",
         slug: "freight-shipping-delivery-warehouse",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-freight-shipping-delivery-warehouse-1640231666.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-freight-shipping-delivery-warehouse-1640231666.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7452,43 +7617,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7551,7 +7723,8 @@ export const categories: Category[] = [
         subId: "62",
         name: "Hotel/Hospitality",
         slug: "hotel-hospitality",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-hotel-hospitality-1640231672.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-hotel-hospitality-1640231672.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7560,43 +7733,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7659,7 +7839,8 @@ export const categories: Category[] = [
         subId: "63",
         name: "Human Resource",
         slug: "human-resource",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-human-resource-1640231680.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-human-resource-1640231680.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7668,43 +7849,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7767,7 +7955,8 @@ export const categories: Category[] = [
         subId: "64",
         name: "Information Technology",
         slug: "information-technology",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-information-technology-1640231692.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-information-technology-1640231692.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7776,43 +7965,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7875,7 +8071,8 @@ export const categories: Category[] = [
         subId: "65",
         name: "Lawyer/Legal",
         slug: "lawyer-legal-service",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-lawyer-legal-service-1640231701.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-lawyer-legal-service-1640231701.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7884,43 +8081,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -7983,7 +8187,8 @@ export const categories: Category[] = [
         subId: "66",
         name: "Management",
         slug: "management",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-management-1640231721.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-management-1640231721.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -7992,43 +8197,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -8091,7 +8303,8 @@ export const categories: Category[] = [
         subId: "67",
         name: "Manufacturing",
         slug: "manufacturing",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-marketing-1640231735.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-marketing-1640231735.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8100,43 +8313,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -8199,7 +8419,8 @@ export const categories: Category[] = [
         subId: "68",
         name: "Marketing",
         slug: "marketing",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-media-advertising-1640231742.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-media-advertising-1640231742.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8208,43 +8429,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -8307,7 +8535,8 @@ export const categories: Category[] = [
         subId: "69",
         name: "Media/Advertising",
         slug: "media-advertising",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-medical-health-nursing-1640231748.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-medical-health-nursing-1640231748.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8316,43 +8545,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -8415,7 +8651,8 @@ export const categories: Category[] = [
         subId: "70",
         name: "Medical/Health/Nursing",
         slug: "medical-health-nursing",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-medical-health-nursing-1640231748.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-medical-health-nursing-1640231748.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8424,44 +8661,51 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
-          }
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+          },
         ],
         experience: [
           {
@@ -8523,7 +8767,8 @@ export const categories: Category[] = [
         subId: "71",
         name: "Merchandising/Purchasing",
         slug: "merchandising-purchasing",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-merchandising-purchasing-1640231756.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-merchandising-purchasing-1640231756.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8532,44 +8777,51 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
-          }
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+          },
         ],
         experience: [
           {
@@ -8631,7 +8883,8 @@ export const categories: Category[] = [
         subId: "72",
         name: "Operations",
         slug: "operations",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-operations-1640231765.png" ,
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-operations-1640231765.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8640,44 +8893,51 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
-          }
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+          },
         ],
         experience: [
           {
@@ -8739,7 +8999,8 @@ export const categories: Category[] = [
         subId: "73",
         name: "Project Management",
         slug: "project-management",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-project-management-1640231774.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-project-management-1640231774.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8748,44 +9009,51 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
-          }
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+          },
         ],
         experience: [
           {
@@ -8847,7 +9115,8 @@ export const categories: Category[] = [
         subId: "74",
         name: "Quality Control",
         slug: "quality-control",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-quality-control-1640233015.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-quality-control-1640233015.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8856,43 +9125,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -8955,7 +9231,8 @@ export const categories: Category[] = [
         subId: "75",
         name: "Resort/Casino",
         slug: "resort-casino",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-resort-casino-1640231811.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-resort-casino-1640231811.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -8964,43 +9241,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9063,7 +9347,8 @@ export const categories: Category[] = [
         subId: "76",
         name: "Sales",
         slug: "sales",
-        subcate: "https://images.khmer24.co/categories/23-09-11/s-jobs-sales-1694412987.png",
+        subcate:
+          "https://images.khmer24.co/categories/23-09-11/s-jobs-sales-1694412987.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9072,43 +9357,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9171,7 +9463,8 @@ export const categories: Category[] = [
         subId: "77",
         name: "Security/Driver",
         slug: "security-driver",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-security-driver-1640231826.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-security-driver-1640231826.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9180,43 +9473,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9279,7 +9579,8 @@ export const categories: Category[] = [
         subId: "78",
         name: "Technician",
         slug: "technician",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-technician-1640231842.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-technician-1640231842.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9288,43 +9589,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9387,7 +9695,8 @@ export const categories: Category[] = [
         subId: "79",
         name: "Telecommunication",
         slug: "telecommunication",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-telecommunication-1640231850.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-telecommunication-1640231850.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9396,43 +9705,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9495,7 +9811,8 @@ export const categories: Category[] = [
         subId: "80",
         name: "Translation/Interpretation",
         slug: "translation-interpretation",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-translation-interpretation-1640231859.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-translation-interpretation-1640231859.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9504,43 +9821,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9603,7 +9927,8 @@ export const categories: Category[] = [
         subId: "81",
         name: "Travel Agent/Ticket Sales",
         slug: "travel-agent-ticket-sales",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-travel-agent-ticket-sales-1640231865.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-travel-agent-ticket-sales-1640231865.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9612,43 +9937,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9711,7 +10043,8 @@ export const categories: Category[] = [
         subId: "82",
         name: "Others",
         slug: "others",
-        subcate: "https://images.khmer24.co/categories/21-12-23/s-jobs-others-1640231886.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-23/s-jobs-others-1640231886.png",
         images: [""],
         title: "",
         jobTypes: [
@@ -9720,43 +10053,50 @@ export const categories: Category[] = [
             jobTypeId: "1",
             name: "Full-time",
             slug: "full-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-full-time-1638518688.png",
           },
           {
             jobTypeId: "2",
             name: "Part-time",
             slug: "part-time",
-            image: "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-part-time-1638518694.png",
           },
           {
             jobTypeId: "3",
             name: "Internships",
             slug: "internships",
-            image: "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-internships-1638506546.png",
           },
           {
             jobTypeId: "4",
             name: "Freelance",
             slug: "freelance",
-            image: "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-freelance-1638523268.png",
           },
           {
             jobTypeId: "5",
             name: "Contract",
             slug: "contract",
-            image: "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-contract-1638504559.png",
           },
           {
             jobTypeId: "6",
             name: "Volunteer",
             slug: "volunteer",
-            image: "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-volunteer-1638523150.png",
           },
           {
             jobTypeId: "7",
             name: "Other-Jobs",
             slug: "other-jobs",
-            image: "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
+            image:
+              "https://images.khmer24.co/fields/21-12-03/s-other-1638524996.png",
           },
         ],
         experience: [
@@ -9821,13 +10161,15 @@ export const categories: Category[] = [
     cateId: "7",
     name: "Services",
     slug: "services",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-services-1638848194.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-services-1638848194.png",
     subcategories: [
       {
         subId: "83",
         name: "Accounting",
         slug: "accounting",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-accounting-1640847829.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-accounting-1640847829.png",
         images: [""],
         title: "",
         description: "",
@@ -9843,7 +10185,8 @@ export const categories: Category[] = [
         subId: "84",
         name: "Administration ",
         slug: "administration",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-financial-services-1640847864.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-financial-services-1640847864.png",
         images: [""],
         title: "",
         description: "",
@@ -9859,7 +10202,8 @@ export const categories: Category[] = [
         subId: "85",
         name: "Travel & Tourism",
         slug: "travel&tourism",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-travel-and-tourism-services-1640848418.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-travel-and-tourism-services-1640848418.png",
         images: [""],
         title: "",
         description: "",
@@ -9875,7 +10219,8 @@ export const categories: Category[] = [
         subId: "86",
         name: "Automotive",
         slug: "automotive",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-automotive-1640851413.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-automotive-1640851413.png",
         images: [""],
         title: "",
         description: "",
@@ -9891,7 +10236,8 @@ export const categories: Category[] = [
         subId: "87",
         name: "Advertising & Media",
         slug: "advertising&media",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-advertising-media-1640847907.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-advertising-media-1640847907.png",
         images: [""],
         title: "",
         description: "",
@@ -9907,7 +10253,8 @@ export const categories: Category[] = [
         subId: "88",
         name: "Bridal Services",
         slug: "bridal-services",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-bridal-services-1640851132.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-bridal-services-1640851132.png",
         images: [""],
         title: "",
         description: "",
@@ -9923,7 +10270,8 @@ export const categories: Category[] = [
         subId: "89",
         name: "Cleaning & Maid Services",
         slug: "cleaning&maid-services",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-cleaning-maid-services-1640847915.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-cleaning-maid-services-1640847915.png",
         images: [""],
         title: "",
         description: "",
@@ -9939,7 +10287,8 @@ export const categories: Category[] = [
         subId: "90",
         name: "Construction,Arch. & Interiors",
         slug: "construction,arch.&interiors",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-construction-arch-interiors-1641177009.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-construction-arch-interiors-1641177009.png",
         images: [""],
         title: "",
         description: "",
@@ -9955,7 +10304,8 @@ export const categories: Category[] = [
         subId: "91",
         name: "Education & Training",
         slug: "education&training",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-education-training-1640851166.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-education-training-1640851166.png",
         images: [""],
         title: "",
         description: "",
@@ -9971,7 +10321,8 @@ export const categories: Category[] = [
         subId: "92",
         name: "Engineering",
         slug: "engineering",
-        subcate: "https://images.khmer24.co/categories/21-10-20/s-engineering-1634717508.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-20/s-engineering-1634717508.png",
         images: [""],
         title: "",
         description: "",
@@ -9987,7 +10338,8 @@ export const categories: Category[] = [
         subId: "93",
         name: "Insurance",
         slug: "insurance",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-insurance-1640852023.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-insurance-1640852023.png",
         images: [""],
         title: "",
         description: "",
@@ -10003,7 +10355,8 @@ export const categories: Category[] = [
         subId: "94",
         name: "Massage & Spa",
         slug: "massage-spa",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-massage-spa-1641175109.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-massage-spa-1641175109.png",
         images: [""],
         title: "",
         description: "",
@@ -10019,7 +10372,8 @@ export const categories: Category[] = [
         subId: "95",
         name: "Hospitality,Travel & Tourism",
         slug: "hospitality-travel-tourism",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-hospitality-travel-tourism-1641179094.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-hospitality-travel-tourism-1641179094.png",
         images: [""],
         title: "",
         description: "",
@@ -10035,7 +10389,8 @@ export const categories: Category[] = [
         subId: "96",
         name: "Health, Medical & Pharma",
         slug: "health-medical-pharma",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-health-medical-pharma-1640854252.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-health-medical-pharma-1640854252.png",
         images: [""],
         title: "",
         description: "",
@@ -10051,7 +10406,8 @@ export const categories: Category[] = [
         subId: "97",
         name: "IT & Telecom",
         slug: "it-telecom",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-it-telecom-1640847955.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-it-telecom-1640847955.png",
         images: [""],
         title: "",
         description: "",
@@ -10067,7 +10423,8 @@ export const categories: Category[] = [
         subId: "98",
         name: "Interior Design & Renovation",
         slug: "interior-design-renovation",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-interior-design-renovation-1641178324.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-interior-design-renovation-1641178324.png",
         images: [""],
         title: "",
         description: "",
@@ -10083,7 +10440,8 @@ export const categories: Category[] = [
         subId: "99",
         name: "Legal",
         slug: "legal",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-legal-1640847968.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-legal-1640847968.png",
         images: [""],
         title: "",
         description: "",
@@ -10099,7 +10457,8 @@ export const categories: Category[] = [
         subId: "100",
         name: "Movers & Logistics",
         slug: "movers-logistics",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-movers-logistics-1640856087.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-movers-logistics-1640856087.png",
         images: [""],
         title: "",
         description: "",
@@ -10115,7 +10474,8 @@ export const categories: Category[] = [
         subId: "101",
         name: "Plumbing & Electrical",
         slug: "plumbing-electrical",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-plumbing-electrical-1641177922.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-plumbing-electrical-1641177922.png",
         images: [""],
         title: "",
         description: "",
@@ -10131,7 +10491,8 @@ export const categories: Category[] = [
         subId: "102",
         name: "Property & Real Estate",
         slug: "property-real-estate",
-        subcate: "https://images.khmer24.co/categories/22-01-03/s-property-real-estate-1641177355.png",
+        subcate:
+          "https://images.khmer24.co/categories/22-01-03/s-property-real-estate-1641177355.png",
         images: [""],
         title: "",
         description: "",
@@ -10147,7 +10508,8 @@ export const categories: Category[] = [
         subId: "103",
         name: "Science",
         slug: "science",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-science-1640856383.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-science-1640856383.png",
         images: [""],
         title: "",
         description: "",
@@ -10163,7 +10525,8 @@ export const categories: Category[] = [
         subId: "104",
         name: "Supply Chain & Logistics",
         slug: "supply-chain-logistics",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-supply-chain-logistics-1640856137.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-supply-chain-logistics-1640856137.png",
         images: [""],
         title: "",
         description: "",
@@ -10179,7 +10542,8 @@ export const categories: Category[] = [
         subId: "105",
         name: "Printing & Publishing",
         slug: "printing-publishing",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-printing-publishing-1640854716.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-printing-publishing-1640854716.png",
         images: [""],
         title: "",
         description: "",
@@ -10195,7 +10559,8 @@ export const categories: Category[] = [
         subId: "106",
         name: "Other Services",
         slug: "other-services",
-        subcate: "https://images.khmer24.co/categories/21-12-30/s-other-services-1640854729.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-30/s-other-services-1640854729.png",
       },
     ],
   },
@@ -10203,13 +10568,15 @@ export const categories: Category[] = [
     cateId: "8",
     name: "Fashion & Beauty",
     slug: "fashion-beauty",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-fashion-beauty-1638848200.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-fashion-beauty-1638848200.png",
     subcategories: [
       {
         subId: "107",
         name: "Women's Fashion",
         slug: "womens-fashion",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-womens-fashion-1635903108.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-womens-fashion-1635903108.png",
         images: [""],
         title: "",
         types: [
@@ -10276,7 +10643,8 @@ export const categories: Category[] = [
         subId: "108",
         name: "Men's Fashion",
         slug: "mens-fashion",
-        subcate: "https://images.khmer24.co/categories/21-12-04/s-mens-fashion-1638592641.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-12-04/s-mens-fashion-1638592641.png",
         images: [""],
         title: "",
         types: [
@@ -10343,7 +10711,8 @@ export const categories: Category[] = [
         subId: "109",
         name: "Baby & Kids ",
         slug: "baby-and-kids-fashion",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-baby-and-kids-fashion-1635903293.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-baby-and-kids-fashion-1635903293.png",
         images: [""],
         title: "",
         types: [
@@ -10404,7 +10773,8 @@ export const categories: Category[] = [
         subId: "110",
         name: "Travel & Luggage",
         slug: "travel-and-luggage",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-travel-and-luggage-1635905981.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-travel-and-luggage-1635905981.png",
         images: [""],
         title: "",
         types: [
@@ -10459,7 +10829,8 @@ export const categories: Category[] = [
         subId: "111",
         name: "Fashion Accessories",
         slug: "fashion-accessories",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-fashion-accessories-1635138284.png",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-fashion-accessories-1635138284.png",
         images: [""],
         title: "",
         accessories: [
@@ -10532,9 +10903,10 @@ export const categories: Category[] = [
         subId: "112",
         name: "Beauty & Healthcare Products",
         slug: "beauty-healthcare-products",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-beauty-healthcare-products-1635906849.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-beauty-healthcare-products-1635906849.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10551,7 +10923,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10562,15 +10934,17 @@ export const categories: Category[] = [
     cateId: "9",
     name: "Furniture & Decor",
     slug: "furniture-decor",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-furniture-decor-1638848206.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-furniture-decor-1638848206.png",
     subcategories: [
       {
         subId: "113",
         name: "Tables & Desks",
         slug: "tables-and-desks",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-tables-and-desks-1635127325.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-tables-and-desks-1635127325.png",
+        images: [""],
+        title: "",
         types: [
           //7
           {
@@ -10625,7 +10999,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10634,9 +11008,10 @@ export const categories: Category[] = [
         subId: "114",
         name: "Chairs & Sofas",
         slug: "chairs-and-sofas",
-        subcate: "https://images.khmer24.co/categories/21-11-01/s-chairs-and-sofas-1635761445.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-01/s-chairs-and-sofas-1635761445.png",
+        images: [""],
+        title: "",
         types: [
           //11
           {
@@ -10722,7 +11097,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10731,9 +11106,10 @@ export const categories: Category[] = [
         subId: "115",
         name: "Wardrobes & Cabinets ",
         slug: "wardrobes-and-cabinets",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-wardrobes-and-cabinets-1635930378.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-wardrobes-and-cabinets-1635930378.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10750,7 +11126,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10759,9 +11135,10 @@ export const categories: Category[] = [
         subId: "116",
         name: "wardrobes-and-cabinets",
         slug: "shelves-and-drawers",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-shelves-and-drawers-1635127666.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-shelves-and-drawers-1635127666.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10778,7 +11155,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10787,9 +11164,10 @@ export const categories: Category[] = [
         subId: "117",
         name: "Beds & Mattresses",
         slug: "beds-and-mattresses",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-beds-and-mattresses-1635155536.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-beds-and-mattresses-1635155536.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10806,7 +11184,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10815,9 +11193,10 @@ export const categories: Category[] = [
         subId: "118",
         name: "Curtain & Carpet ",
         slug: "curtain-and-carpet",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-curtain-and-carpet-1635929744.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-curtain-and-carpet-1635929744.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10834,7 +11213,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10843,9 +11222,10 @@ export const categories: Category[] = [
         subId: "119",
         name: "Other Furniture",
         slug: "other-furniture",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-other-furniture-1635928589.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-other-furniture-1635928589.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10862,7 +11242,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10871,9 +11251,10 @@ export const categories: Category[] = [
         subId: "120",
         name: "Kitchenware",
         slug: "kitchenware",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-kitchenware-1635129800.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-kitchenware-1635129800.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10890,7 +11271,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10899,9 +11280,10 @@ export const categories: Category[] = [
         subId: "121",
         name: "Household Items ",
         slug: "household-items",
-        subcate: "https://images.khmer24.co/categories/21-10-25/s-household-items-1635128668.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-25/s-household-items-1635128668.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10918,7 +11300,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10927,9 +11309,10 @@ export const categories: Category[] = [
         subId: "122",
         name: "Handicrafts-Paintings",
         slug: "handicrafts-paintings",
-        subcate: "https://images.khmer24.co/categories/21-10-20/s-handicrafts-paintings-1634718072.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-20/s-handicrafts-paintings-1634718072.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -10946,7 +11329,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -10957,15 +11340,17 @@ export const categories: Category[] = [
     cateId: "10",
     name: "Books, Sports & Hobbies",
     slug: "books-sports-hobbies",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-books-sports-hobbies-1638848212.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-books-sports-hobbies-1638848212.png",
     subcategories: [
       {
         subId: "123",
         name: "Musical Instruments",
         slug: "musical-instruments",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-musical-instruments-1635309264.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-musical-instruments-1635309264.png",
+        images: [""],
+        title: "",
         types: [
           //11
           {
@@ -11064,7 +11449,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11073,9 +11458,10 @@ export const categories: Category[] = [
         subId: "124",
         name: "Fishing ",
         slug: "fishing",
-        subcate: "https://images.khmer24.co/categories/21-10-20/s-fishing-1634719734.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-20/s-fishing-1634719734.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11092,7 +11478,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11101,9 +11487,10 @@ export const categories: Category[] = [
         subId: "125",
         name: "Hike & Camp",
         slug: "hike-and-camp",
-        subcate: "https://images.khmer24.co/categories/21-10-20/s-hike-and-camp-1634719749.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-20/s-hike-and-camp-1634719749.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11120,7 +11507,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11129,9 +11516,10 @@ export const categories: Category[] = [
         subId: "126",
         name: "CDS, DVDS, VHS",
         slug: "cds-dvds-vhs",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-cds-dvds-vhs-1635305494.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-cds-dvds-vhs-1635305494.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11148,7 +11536,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11157,9 +11545,10 @@ export const categories: Category[] = [
         subId: "127",
         name: "Books",
         slug: "books",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-books-1635306378.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-books-1635306378.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11176,7 +11565,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11185,9 +11574,10 @@ export const categories: Category[] = [
         subId: "128",
         name: "Sports Equipment",
         slug: "sports-equipment",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-sports-equipment-1635308104.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-sports-equipment-1635308104.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11204,7 +11594,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11213,9 +11603,10 @@ export const categories: Category[] = [
         subId: "129",
         name: "Others",
         slug: "others",
-        subcate: "https://images.khmer24.co/categories/21-10-27/s-others-buy-sell-1635309277.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-10-27/s-others-buy-sell-1635309277.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11232,7 +11623,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11243,15 +11634,17 @@ export const categories: Category[] = [
     cateId: "11",
     name: "Pets",
     slug: "pets",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-pets-1638848219.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-pets-1638848219.png",
     subcategories: [
       {
         subId: "130",
         name: "Dogs ",
         slug: "dogs",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-dogs-1635843963.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-dogs-1635843963.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11268,7 +11661,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11277,9 +11670,10 @@ export const categories: Category[] = [
         subId: "131",
         name: "Cats",
         slug: "cats",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-cats-1635844240.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-cats-1635844240.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11296,7 +11690,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11305,9 +11699,10 @@ export const categories: Category[] = [
         subId: "132",
         name: "Birds",
         slug: "birds",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-birds-1635844797.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-birds-1635844797.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11324,7 +11719,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11333,9 +11728,10 @@ export const categories: Category[] = [
         subId: "133",
         name: "Fish",
         slug: "fish",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-fish-1635844895.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-fish-1635844895.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11352,7 +11748,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11361,9 +11757,10 @@ export const categories: Category[] = [
         subId: "134",
         name: "Pet Food",
         slug: "pet-food",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-pet-food-1635845716.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-pet-food-1635845716.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11380,7 +11777,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11389,9 +11786,10 @@ export const categories: Category[] = [
         subId: "135",
         name: "Pet Accessories",
         slug: "pet-accessories",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-pet-accessories-1635846503.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-pet-accessories-1635846503.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11408,7 +11806,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11417,9 +11815,10 @@ export const categories: Category[] = [
         subId: "136",
         name: "Other pets ",
         slug: "other-pets",
-        subcate: "https://images.khmer24.co/categories/21-11-02/s-other-pets-1635846530.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-02/s-other-pets-1635846530.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11436,7 +11835,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11447,15 +11846,17 @@ export const categories: Category[] = [
     cateId: "12",
     name: "Foods",
     slug: "foods",
-    cateIcon: "https://images.khmer24.co/categories/21-12-07/s-foods-1638848268.png",
+    cateIcon:
+      "https://images.khmer24.co/categories/21-12-07/s-foods-1638848268.png",
     subcategories: [
       {
         subId: "137",
         name: "Meat",
         slug: "meat",
-        subcate: "https://images.khmer24.co/categories/21-11-03/s-meat-1635907737.png",
-        images:[""],
-        title:"",
+        subcate:
+          "https://images.khmer24.co/categories/21-11-03/s-meat-1635907737.png",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11472,7 +11873,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11482,8 +11883,8 @@ export const categories: Category[] = [
         name: "Seafood",
         slug: "seafood",
         subcate: "/sub-img/subcate/seafood.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11500,7 +11901,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11510,8 +11911,8 @@ export const categories: Category[] = [
         name: "Fruits ",
         slug: "fruits",
         subcate: "/sub-img/subcate/fruits.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11528,7 +11929,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11538,8 +11939,8 @@ export const categories: Category[] = [
         name: "Vegetables",
         slug: "vegetables",
         subcate: "/sub-img/subcate/vegetables.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11556,7 +11957,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11566,8 +11967,8 @@ export const categories: Category[] = [
         name: "Beverages",
         slug: "beverages",
         subcate: "/sub-img/subcate/beverages.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11584,7 +11985,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11594,8 +11995,8 @@ export const categories: Category[] = [
         name: "Grocery",
         slug: "grocery",
         subcate: "/sub-img/subcate/grocery.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11612,7 +12013,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11622,8 +12023,8 @@ export const categories: Category[] = [
         name: "Bread & Bakery",
         slug: "bread-and-bakery",
         subcate: "/sub-img/subcate/bread-and-bakery.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11640,7 +12041,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11650,8 +12051,8 @@ export const categories: Category[] = [
         name: "Beer & Wine",
         slug: "beer-and-wine",
         subcate: "/sub-img/subcate/beer-and-wine.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11668,7 +12069,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11678,8 +12079,8 @@ export const categories: Category[] = [
         name: "Rice & Cereal ",
         slug: "rice-and-cereal",
         subcate: "/sub-img/subcate/rice-and-cereal.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11696,7 +12097,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",
@@ -11706,8 +12107,8 @@ export const categories: Category[] = [
         name: "Other Foods",
         slug: "other-foods",
         subcate: "/sub-img/subcate/others-vihicles.png",
-        images:[""],
-        title:"",
+        images: [""],
+        title: "",
         discount: [
           {
             discountId: "1",
@@ -11724,7 +12125,7 @@ export const categories: Category[] = [
         proId: "",
         disId: "",
         address: "",
-        company_name:"",
+        company_name: "",
         name_contact: "",
         phone: "",
         email: "",

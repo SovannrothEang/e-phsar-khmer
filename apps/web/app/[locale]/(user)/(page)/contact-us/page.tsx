@@ -6,7 +6,5 @@ export const metadata: Metadata = {
   description: "Contact Us",
 };
 export default function Page() {
-    return (
-        <ContactUsPage />
-    );
+  return <ContactUsPage />;
 }

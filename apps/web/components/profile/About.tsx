@@ -1,6 +1,6 @@
-import { Globe, MapPin, CircleCheckBig } from 'lucide-react';
-import { IconPhone, IconMailFilled } from '@tabler/icons-react';
-import { Separator } from "@/components/ui/separator"
+import { Globe, MapPin, CircleCheckBig } from "lucide-react";
+import { IconPhone, IconMailFilled } from "@tabler/icons-react";
+import { Separator } from "@/components/ui/separator";
 import { User } from "@/lib/user";
 
 export default function AboutProfile({ user }: { user: User }) {
@@ -11,7 +11,7 @@ export default function AboutProfile({ user }: { user: User }) {
         <main className="max-w-7xl mx-auto mt-6">
           <div className="bg-card rounded-sm p-3 pb-10 space-y-3 shadow-sm">
             <p className="font-medium text-lg px-3 pt-3">Overview</p>
-            
+
             <div className="flex items-center gap-2 px-3 pt-4">
               <CircleCheckBig className="text-muted-foreground scale-90" />
               {user.verified ? "Verified" : "Not Verified"}
@@ -31,7 +31,9 @@ export default function AboutProfile({ user }: { user: User }) {
 
             <div className="flex items-center gap-2 px-3">
               <IconMailFilled className="text-muted-foreground scale-90" />
-              <a href={`mailto:${user.email}`} className="text-[#00a0e9]">{user.email}</a>
+              <a href={`mailto:${user.email}`} className="text-[#00a0e9]">
+                {user.email}
+              </a>
             </div>
             <div className="px-3">
               <Separator />
@@ -44,7 +46,9 @@ export default function AboutProfile({ user }: { user: User }) {
                 target="_self"
                 rel="noreferrer"
                 className="text-[#00a0e9] hover:underline truncate"
-              >{user.userlink}</a>
+              >
+                {user.userlink}
+              </a>
             </div>
             <div className="px-3">
               <Separator />
@@ -58,5 +62,5 @@ export default function AboutProfile({ user }: { user: User }) {
         </main>
       </div>
     </div>
-  )
+  );
 }

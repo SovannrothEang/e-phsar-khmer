@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef } from "react";
 
 /**
  * useClickOutside
@@ -10,23 +10,23 @@ import { useEffect, useRef } from "react"
  */
 export function useClickOutside<T extends HTMLElement = HTMLElement>(
   handler: () => void,
-  enabled: boolean = true   // pass `false` to pause listening (e.g. when closed)
+  enabled: boolean = true, // pass `false` to pause listening (e.g. when closed)
 ) {
-  const ref = useRef<T>(null)
+  const ref = useRef<T>(null);
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) return;
 
     function onPointerDown(e: PointerEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        handler()
+        handler();
       }
     }
 
     // pointerdown fires before click, works for mouse + touch + stylus
-    document.addEventListener("pointerdown", onPointerDown)
-    return () => document.removeEventListener("pointerdown", onPointerDown)
-  }, [handler, enabled])
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [handler, enabled]);
 
-  return ref
+  return ref;
 }

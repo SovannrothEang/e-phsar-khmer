@@ -1,10 +1,8 @@
-
-import { BadgeCheck, Globe, PhoneCall, MapPin, Mail } from 'lucide-react';
-import { notFound } from "next/navigation"
-import { currentUser } from '@/lib/user';
+import { BadgeCheck, Globe, PhoneCall, MapPin, Mail } from "lucide-react";
+import { notFound } from "next/navigation";
+import { currentUser } from "@/lib/user";
 
 export default function AboutProfile() {
-
   if (!currentUser) {
     notFound();
   }
@@ -27,27 +25,41 @@ export default function AboutProfile() {
             <div className="flex px-3">
               <PhoneCall className="text-muted-foreground scale-90" />
               {currentUser.phone?.map((phone, index) => (
-                <p key={index} className="text-[#00a0e9] hover:underline ml-3 cursor-pointer">{phone}</p>
+                <p
+                  key={index}
+                  className="text-[#00a0e9] hover:underline ml-3 cursor-pointer"
+                >
+                  {phone}
+                </p>
               ))}
             </div>
             <div className="border-t border-muted-foreground/30 mt-3 mb-4 px-3" />
             <div className="flex px-3">
               <Mail className="text-muted-foreground scale-90" />
-              <p className="text-[#00a0e9] ml-3 cursor-pointer">{currentUser.email}</p>
+              <p className="text-[#00a0e9] ml-3 cursor-pointer">
+                {currentUser.email}
+              </p>
             </div>
             <div className="border-t border-muted-foreground/30 mt-3 mb-4 px-3" />
             <div className="flex px-3">
               <Globe className="text-muted-foreground scale-90" />
-              <a href={currentUser.userlink} className="text-[#00a0e9] hover:underline ml-3 cursor-pointer">{currentUser.userlink}</a>
+              <a
+                href={currentUser.userlink}
+                className="text-[#00a0e9] hover:underline ml-3 cursor-pointer"
+              >
+                {currentUser.userlink}
+              </a>
             </div>
             <div className="border-t border-muted-foreground/30 mt-3 mb-4 px-3" />
             <div className="flex px-3">
               <MapPin className="text-muted-foreground scale-90" />
-              <p className="text-[#00a0e9] ml-3 cursor-pointer">{currentUser.locations}</p>
+              <p className="text-[#00a0e9] ml-3 cursor-pointer">
+                {currentUser.locations}
+              </p>
             </div>
           </div>
         </main>
       </div>
     </div>
-  )
+  );
 }

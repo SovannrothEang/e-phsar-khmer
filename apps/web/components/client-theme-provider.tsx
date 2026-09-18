@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import dynamic from "next/dynamic"
+import * as React from "react";
+import dynamic from "next/dynamic";
 
 // Dynamically load the actual ThemeProvider only on the client
 const DynamicProvider = dynamic(
   () => import("@/components/theme-provider").then((mod) => mod.ThemeProvider),
-  { ssr: false }
-)
+  { ssr: false },
+);
 
 export function ClientThemeProvider({
   children,
   ...props
 }: React.ComponentProps<typeof DynamicProvider>) {
-  return <DynamicProvider {...props}>{children}</DynamicProvider>
+  return <DynamicProvider {...props}>{children}</DynamicProvider>;
 }

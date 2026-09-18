@@ -99,16 +99,19 @@ export default function Feedback() {
                     <div
                       onClick={triggerUpload}
                       className={`flex flex-col items-center justify-center w-full h-full rounded-md cursor-pointer transition-all border
-                    ${isNextSlot
-                          ? "bg-muted hover:bg-card/70" 
-                          : "bg-muted hover:bg-card/70" 
-                        }
+                    ${
+                      isNextSlot
+                        ? "bg-muted hover:bg-card/70"
+                        : "bg-muted hover:bg-card/70"
+                    }
                     `}
                     >
                       {isNextSlot ? (
                         <>
                           <Images className="w-8 h-8 text-muted-foreground " />
-                          <span className="text-xs text-muted-foreground mt-1">Upload</span>
+                          <span className="text-xs text-muted-foreground mt-1">
+                            Upload
+                          </span>
                         </>
                       ) : (
                         <ImagePlus className="w-6 h-6 text-muted-foreground" />
@@ -124,27 +127,52 @@ export default function Feedback() {
           <FieldSet>
             <FieldGroup className="space-y-1">
               <Field>
-                <FieldLabel>Name<span className="text-red-500">*</span></FieldLabel>
-                <Input id="name" placeholder="Your Name" className="rounded-sm" />
+                <FieldLabel>
+                  Name<span className="text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  id="name"
+                  placeholder="Your Name"
+                  className="rounded-sm"
+                />
               </Field>
               <Field>
-                <FieldLabel>Phone<span className="text-red-500">*</span></FieldLabel>
-                <Input id="phone" placeholder="Your Phone Number" className="rounded-sm" />
+                <FieldLabel>
+                  Phone<span className="text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  id="phone"
+                  placeholder="Your Phone Number"
+                  className="rounded-sm"
+                />
               </Field>
               <Field>
                 <FieldLabel>Email</FieldLabel>
-                <Input id="email" placeholder="Your Email Address" className="rounded-sm" />
+                <Input
+                  id="email"
+                  placeholder="Your Email Address"
+                  className="rounded-sm"
+                />
               </Field>
               <Field>
-                <FieldLabel>Tell us how we can improve here<span className="text-red-500">*</span></FieldLabel>
-                <Textarea id="feedback" className="h-40 rounded-sm" placeholder="Your feedback helps us improve..." />
+                <FieldLabel>
+                  Tell us how we can improve here
+                  <span className="text-red-500">*</span>
+                </FieldLabel>
+                <Textarea
+                  id="feedback"
+                  className="h-40 rounded-sm"
+                  placeholder="Your feedback helps us improve..."
+                />
               </Field>
             </FieldGroup>
           </FieldSet>
         </div>
         <div className="bg-card rounded-sm border p-4 mt-4 text-center md:text-left">
           <p className="text-sm text-foreground">
-            Thanks for taking the time to give us feedback. Though we can&apos;t review every submission, we use your input to improve the experience for everyone.
+            Thanks for taking the time to give us feedback. Though we can&apos;t
+            review every submission, we use your input to improve the experience
+            for everyone.
           </p>
           <Button
             type="submit"

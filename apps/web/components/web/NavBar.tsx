@@ -6,22 +6,21 @@ import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { FaCamera } from "react-icons/fa";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
-import LocalSelector from "../LocalSelector"
+import LocalSelector from "../LocalSelector";
 import { useLocale } from "next-intl";
 
 export type User = {
-  username: string
-  role: string
-  email: string
-  profileImage: string
-  firstName: string | null
-  lastName: string | null
-  profilePhotoUrl: string | null
-}
+  username: string;
+  role: string;
+  email: string;
+  profileImage: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+};
 
 export function NavBar({ user }: { user: User | null }) {
-
-  const locale = useLocale()
+  const locale = useLocale();
   const isLoggedIn = !!user;
 
   return (
@@ -57,7 +56,6 @@ export function NavBar({ user }: { user: User | null }) {
                   asChild
                   variant="ghost"
                   className="h-[42px] px-4 rounded text-base font-medium rounded text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
-
                 >
                   <Link href="/login">Login</Link>
                 </Button>

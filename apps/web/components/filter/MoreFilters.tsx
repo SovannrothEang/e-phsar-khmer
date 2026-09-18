@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -12,72 +12,72 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils"
-import { locations } from "@/lib/location"
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { locations } from "@/lib/location";
 import {
   SORT_PARAM,
   SORT_OPTIONS,
   DEFAULT_SORT,
   type SortValue,
-} from "@/components/filter/SortFilter"
+} from "@/components/filter/SortFilter";
 import {
   MIN_AD_PRICE_PARAM,
   MAX_AD_PRICE_PARAM,
-} from "@/components/filter/PriceFilter"
+} from "@/components/filter/PriceFilter";
 import {
   LOCATION_PRO_PARAM,
   LOCATION_DIS_PARAM,
   LOCATION_COM_PARAM,
-} from "@/components/filter/LocationSelectorFilter"
-import type { Post } from "@/lib/posts"
-import { IconFilterCog } from '@tabler/icons-react';
+} from "@/components/filter/LocationSelectorFilter";
+import type { Post } from "@/lib/posts";
+import { IconFilterCog } from "@tabler/icons-react";
 
 // ─── Shared param keys (imported by AllAdsHeader) ─────────────────────────────
-export const KEYWORD_PARAM = "keyword"
-export const DATE_PARAM    = "date"
+export const KEYWORD_PARAM = "keyword";
+export const DATE_PARAM = "date";
 
 // ─── Date options ─────────────────────────────────────────────────────────────
 export const DATE_OPTIONS = [
-  { value: "",       label: "All Time" },
-  { value: "today",  label: "Today" },
-  { value: "week",   label: "This Week" },
-  { value: "month",  label: "This Month" },
-] as const
-export type DateValue = (typeof DATE_OPTIONS)[number]["value"]
+  { value: "", label: "All Time" },
+  { value: "today", label: "Today" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+] as const;
+export type DateValue = (typeof DATE_OPTIONS)[number]["value"];
 
 // ─── Post filter helpers ──────────────────────────────────────────────────────
 export function filterPostsByKeyword(posts: Post[], keyword: string): Post[] {
-  if (!keyword.trim()) return posts
-  const q = keyword.toLowerCase()
-  return posts.filter((p) => p.title.toLowerCase().includes(q))
+  if (!keyword.trim()) return posts;
+  const q = keyword.toLowerCase();
+  return posts.filter((p) => p.title.toLowerCase().includes(q));
 }
 
 export function filterPostsByDate(posts: Post[], date: DateValue): Post[] {
-  if (!date) return posts
-  const start = new Date()
+  if (!date) return posts;
+  const start = new Date();
   if (date === "today") {
-    start.setHours(0, 0, 0, 0)
+    start.setHours(0, 0, 0, 0);
   } else if (date === "week") {
-    start.setDate(start.getDate() - 7)
-    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 7);
+    start.setHours(0, 0, 0, 0);
   } else if (date === "month") {
-    start.setDate(start.getDate() - 30)
-    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 30);
+    start.setHours(0, 0, 0, 0);
   }
-  return posts.filter((p) => p.createdat >= start)
+  return posts.filter((p) => p.createdat >= start);
 }
 
 // ─── Active filter badge count ────────────────────────────────────────────────
 function countActiveFilters(params: URLSearchParams): number {
-  let n = 0
-  if (params.get(KEYWORD_PARAM))      n++
-  if (params.get(DATE_PARAM))         n++
-  if (params.get(LOCATION_PRO_PARAM)) n++
-  if (params.get(SORT_PARAM) && params.get(SORT_PARAM) !== DEFAULT_SORT) n++
-  if (params.get(MIN_AD_PRICE_PARAM)) n++
-  if (params.get(MAX_AD_PRICE_PARAM)) n++
-  return n
+  let n = 0;
+  if (params.get(KEYWORD_PARAM)) n++;
+  if (params.get(DATE_PARAM)) n++;
+  if (params.get(LOCATION_PRO_PARAM)) n++;
+  if (params.get(SORT_PARAM) && params.get(SORT_PARAM) !== DEFAULT_SORT) n++;
+  if (params.get(MIN_AD_PRICE_PARAM)) n++;
+  if (params.get(MAX_AD_PRICE_PARAM)) n++;
+  return n;
 }
 
 // ─── Reusable cascading select ────────────────────────────────────────────────
@@ -89,12 +89,12 @@ function SelectField({
   disabled = false,
   placeholder = "Select...",
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-  disabled?: boolean
-  placeholder?: string
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -109,7 +109,7 @@ function SelectField({
             "focus:outline-none focus:ring-2 focus:ring-ring transition-colors",
             disabled
               ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground"
-              : "cursor-pointer hover:border-ring"
+              : "cursor-pointer hover:border-ring",
           )}
         >
           <option value="">{placeholder}</option>
@@ -121,98 +121,126 @@ function SelectField({
         </select>
         <svg
           className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19 9l-7 7-7-7"
+          />
         </svg>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MoreFilters() {
-  const router       = useRouter()
-  const pathname     = usePathname()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   // ── Draft state ──────────────────────────────────────────────────────────
-  const [keyword,  setKeyword]  = useState("")
-  const [sort,     setSort]     = useState<SortValue>(DEFAULT_SORT)
-  const [date,     setDate]     = useState<DateValue>("")
-  const [proId,    setProId]    = useState("")
-  const [disId,    setDisId]    = useState("")
-  const [comId,    setComId]    = useState("")
-  const [minPrice, setMinPrice] = useState("")
-  const [maxPrice, setMaxPrice] = useState("")
+  const [keyword, setKeyword] = useState("");
+  const [sort, setSort] = useState<SortValue>(DEFAULT_SORT);
+  const [date, setDate] = useState<DateValue>("");
+  const [proId, setProId] = useState("");
+  const [disId, setDisId] = useState("");
+  const [comId, setComId] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   // Sync draft from URL whenever dialog opens
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     // Sync draft from URL each time the dialog opens.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setKeyword(searchParams.get(KEYWORD_PARAM)      ?? "")
-    setSort((searchParams.get(SORT_PARAM)  as SortValue) ?? DEFAULT_SORT)
-    setDate((searchParams.get(DATE_PARAM)  as DateValue) ?? "")
-    setProId(searchParams.get(LOCATION_PRO_PARAM)   ?? "")
-    setDisId(searchParams.get(LOCATION_DIS_PARAM)   ?? "")
-    setComId(searchParams.get(LOCATION_COM_PARAM)   ?? "")
-    setMinPrice(searchParams.get(MIN_AD_PRICE_PARAM) ?? "")
-    setMaxPrice(searchParams.get(MAX_AD_PRICE_PARAM) ?? "")
-  }, [open, searchParams])
+    setKeyword(searchParams.get(KEYWORD_PARAM) ?? "");
+    setSort((searchParams.get(SORT_PARAM) as SortValue) ?? DEFAULT_SORT);
+    setDate((searchParams.get(DATE_PARAM) as DateValue) ?? "");
+    setProId(searchParams.get(LOCATION_PRO_PARAM) ?? "");
+    setDisId(searchParams.get(LOCATION_DIS_PARAM) ?? "");
+    setComId(searchParams.get(LOCATION_COM_PARAM) ?? "");
+    setMinPrice(searchParams.get(MIN_AD_PRICE_PARAM) ?? "");
+    setMaxPrice(searchParams.get(MAX_AD_PRICE_PARAM) ?? "");
+  }, [open, searchParams]);
 
   // ── Location cascade options ─────────────────────────────────────────────
-  const provinceOptions = locations.map((p) => ({ value: p.proId, label: p.name }))
+  const provinceOptions = locations.map((p) => ({
+    value: p.proId,
+    label: p.name,
+  }));
 
-  const selectedProvince = locations.find((p) => p.proId === proId)
-  const districtOptions  = (selectedProvince?.districts ?? []).map((d) => ({
-    value: d.disId, label: d.name,
-  }))
+  const selectedProvince = locations.find((p) => p.proId === proId);
+  const districtOptions = (selectedProvince?.districts ?? []).map((d) => ({
+    value: d.disId,
+    label: d.name,
+  }));
 
-  const selectedDistrict = selectedProvince?.districts.find((d) => d.disId === disId)
-  const communeOptions   = (selectedDistrict?.communes ?? []).map((c) => ({
-    value: c.comId, label: c.name,
-  }))
+  const selectedDistrict = selectedProvince?.districts.find(
+    (d) => d.disId === disId,
+  );
+  const communeOptions = (selectedDistrict?.communes ?? []).map((c) => ({
+    value: c.comId,
+    label: c.name,
+  }));
 
-  const handleProvinceChange = (v: string) => { setProId(v); setDisId(""); setComId("") }
-  const handleDistrictChange = (v: string) => { setDisId(v); setComId("") }
+  const handleProvinceChange = (v: string) => {
+    setProId(v);
+    setDisId("");
+    setComId("");
+  };
+  const handleDistrictChange = (v: string) => {
+    setDisId(v);
+    setComId("");
+  };
 
   // ── Write all params to URL at once ─────────────────────────────────────
   const applyFilters = () => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams(searchParams.toString());
     const set = (key: string, val: string) =>
-      val.trim() ? params.set(key, val.trim()) : params.delete(key)
+      val.trim() ? params.set(key, val.trim()) : params.delete(key);
 
-    set(KEYWORD_PARAM, keyword)
-    set(DATE_PARAM, date)
+    set(KEYWORD_PARAM, keyword);
+    set(DATE_PARAM, date);
     if (sort === DEFAULT_SORT) {
-      params.delete(SORT_PARAM)
+      params.delete(SORT_PARAM);
     } else {
-      params.set(SORT_PARAM, sort)
+      params.set(SORT_PARAM, sort);
     }
-    set(LOCATION_PRO_PARAM, proId)
-    set(LOCATION_DIS_PARAM, disId)
-    set(LOCATION_COM_PARAM, comId)
-    set(MIN_AD_PRICE_PARAM, minPrice)
-    set(MAX_AD_PRICE_PARAM, maxPrice)
+    set(LOCATION_PRO_PARAM, proId);
+    set(LOCATION_DIS_PARAM, disId);
+    set(LOCATION_COM_PARAM, comId);
+    set(MIN_AD_PRICE_PARAM, minPrice);
+    set(MAX_AD_PRICE_PARAM, maxPrice);
 
-    const query = params.toString()
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
-    setOpen(false)
-  }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+    setOpen(false);
+  };
 
   // ── Clear everything ─────────────────────────────────────────────────────
   const clearAll = () => {
-    setKeyword(""); setSort(DEFAULT_SORT); setDate("")
-    setProId(""); setDisId(""); setComId("")
-    setMinPrice(""); setMaxPrice("")
-    router.replace(pathname, { scroll: false })
-    setOpen(false)
-  }
-  const activeCount = countActiveFilters(searchParams)
-  
+    setKeyword("");
+    setSort(DEFAULT_SORT);
+    setDate("");
+    setProId("");
+    setDisId("");
+    setComId("");
+    setMinPrice("");
+    setMaxPrice("");
+    router.replace(pathname, { scroll: false });
+    setOpen(false);
+  };
+  const activeCount = countActiveFilters(searchParams);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {/* ── Trigger ─────────────────────────────────────────────────────── */}
@@ -237,7 +265,9 @@ export default function MoreFilters() {
       >
         {/* Header */}
         <DialogHeader className="flex-row items-center justify-between px-5 py-4 border-b shrink-0 gap-0">
-          <DialogTitle className="text-base font-semibold">More Filters</DialogTitle>
+          <DialogTitle className="text-base font-semibold">
+            More Filters
+          </DialogTitle>
           <div className="flex items-center gap-4">
             <button
               onClick={clearAll}
@@ -251,10 +281,11 @@ export default function MoreFilters() {
 
         {/* Scrollable body */}
         <div className="overflow-y-auto px-5 py-5 space-y-5 flex-1">
-
           {/* Search */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">Search</label>
+            <label className="text-sm font-medium text-foreground">
+              Search
+            </label>
             <Input
               placeholder="Search keywords..."
               value={keyword}
@@ -268,7 +299,10 @@ export default function MoreFilters() {
             label="Sort"
             value={sort}
             onChange={(v) => setSort(v as SortValue)}
-            options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            options={SORT_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
             placeholder="Default"
           />
           {/* Date */}
@@ -277,7 +311,8 @@ export default function MoreFilters() {
             value={date}
             onChange={(v) => setDate(v as DateValue)}
             options={DATE_OPTIONS.filter((o) => o.value !== "").map((o) => ({
-              value: o.value, label: o.label,
+              value: o.value,
+              label: o.label,
             }))}
             placeholder="All Time"
           />
@@ -296,7 +331,9 @@ export default function MoreFilters() {
               onChange={handleDistrictChange}
               options={districtOptions}
               disabled={!proId}
-              placeholder={proId ? "Select district..." : "Select province first"}
+              placeholder={
+                proId ? "Select district..." : "Select province first"
+              }
             />
             <SelectField
               label="Sangkat / Commune"
@@ -304,12 +341,16 @@ export default function MoreFilters() {
               onChange={setComId}
               options={communeOptions}
               disabled={!disId}
-              placeholder={disId ? "Select commune..." : "Select district first"}
+              placeholder={
+                disId ? "Select commune..." : "Select district first"
+              }
             />
           </div>
           {/* Price */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground ">Price</label>
+            <label className="text-sm font-medium text-foreground ">
+              Price
+            </label>
             <div className="flex gap-3 mt-2">
               <Input
                 type="number"
@@ -341,5 +382,5 @@ export default function MoreFilters() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

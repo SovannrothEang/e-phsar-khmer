@@ -144,11 +144,11 @@ Do not introduce these unless requirements justify them:
 
 ## 4.1 Three storage responsibilities
 
-| System | Responsibility | Durability |
-|---|---|---|
-| PostgreSQL | Users, channels, membership, permissions, configuration | Durable |
-| ScyllaDB | Messages and high-volume message state | Durable |
-| Redis | Presence, typing, rate limits, connection routing, cache, transient fan-out | Ephemeral |
+| System     | Responsibility                                                              | Durability |
+| ---------- | --------------------------------------------------------------------------- | ---------- |
+| PostgreSQL | Users, channels, membership, permissions, configuration                     | Durable    |
+| ScyllaDB   | Messages and high-volume message state                                      | Durable    |
+| Redis      | Presence, typing, rate limits, connection routing, cache, transient fan-out | Ephemeral  |
 
 The same conceptual rule applies throughout the module:
 
@@ -222,13 +222,13 @@ Those belong to application/infrastructure boundaries.
 Prefer:
 
 ```ts
-domainDecision(message, channelPolicy, actor)
+domainDecision(message, channelPolicy, actor);
 ```
 
 over hidden work such as:
 
 ```ts
-domainDecision(messageId)
+domainDecision(messageId);
 ```
 
 where the function secretly performs database/network operations.
@@ -452,7 +452,7 @@ MessageBody
 Example:
 
 ```ts
-MessageBody.create(raw)
+MessageBody.create(raw);
 ```
 
 can reject invalid content before persistence.
@@ -1885,20 +1885,20 @@ should be an expected recovery path.
 
 The system must explicitly handle:
 
-| Failure | Required behavior |
-|---|---|
-| PostgreSQL unavailable | authorization/metadata operations fail safely |
-| Scylla unavailable | durable message operation fails/retries; do not claim success |
-| Redis unavailable | ephemeral features degrade according to policy |
-| Redis Pub/Sub message missed | client reconnects and recovers from Scylla |
-| WebSocket node crashes | client reconnects to another node |
-| Worker crashes | durable work remains recoverable |
-| Duplicate event | idempotent consumer ignores/reconciles duplicate |
-| Process crashes after durable write | recovery mechanism finds publication/delivery work |
-| Network timeout after message accepted | client retry does not duplicate message |
-| Hot conversation | partition/bucketing strategy prevents uncontrolled hotspot |
-| Broker unavailable | durable pending work accumulates safely |
-| Slow consumers | bounded queues/backpressure prevent memory exhaustion |
+| Failure                                | Required behavior                                             |
+| -------------------------------------- | ------------------------------------------------------------- |
+| PostgreSQL unavailable                 | authorization/metadata operations fail safely                 |
+| Scylla unavailable                     | durable message operation fails/retries; do not claim success |
+| Redis unavailable                      | ephemeral features degrade according to policy                |
+| Redis Pub/Sub message missed           | client reconnects and recovers from Scylla                    |
+| WebSocket node crashes                 | client reconnects to another node                             |
+| Worker crashes                         | durable work remains recoverable                              |
+| Duplicate event                        | idempotent consumer ignores/reconciles duplicate              |
+| Process crashes after durable write    | recovery mechanism finds publication/delivery work            |
+| Network timeout after message accepted | client retry does not duplicate message                       |
+| Hot conversation                       | partition/bucketing strategy prevents uncontrolled hotspot    |
+| Broker unavailable                     | durable pending work accumulates safely                       |
+| Slow consumers                         | bounded queues/backpressure prevent memory exhaustion         |
 
 ---
 
@@ -1932,17 +1932,17 @@ Document consistency per operation.
 
 Example:
 
-| Operation | Consistency |
-|---|---|
-| Membership authorization | strong/current enough to enforce security |
-| Message write | durable |
-| Message history | durable, ordered according to defined sequence |
-| Presence | eventually consistent |
-| Typing | eventually consistent |
-| Rate limit | coordinated/bounded |
-| WebSocket fan-out | at least once/transient |
-| Search index | eventually consistent |
-| Analytics | eventually consistent |
+| Operation                | Consistency                                    |
+| ------------------------ | ---------------------------------------------- |
+| Membership authorization | strong/current enough to enforce security      |
+| Message write            | durable                                        |
+| Message history          | durable, ordered according to defined sequence |
+| Presence                 | eventually consistent                          |
+| Typing                   | eventually consistent                          |
+| Rate limit               | coordinated/bounded                            |
+| WebSocket fan-out        | at least once/transient                        |
+| Search index             | eventually consistent                          |
+| Analytics                | eventually consistent                          |
 
 Do not accidentally promise stronger consistency than the architecture provides.
 

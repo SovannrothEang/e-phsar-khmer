@@ -1,7 +1,5 @@
-import { TestForm } from "@/components/auth/TestForm"
+import { TestForm } from "@/components/auth/TestForm";
 
 export default function TestPage() {
-  return (
-    <TestForm />
-  )
+  return <TestForm />;
 }

@@ -24,20 +24,20 @@ apps/backend/docs/spec-detail-*.md — 12 per-category listing-form specs (1,117
 
 ## 2. Backend core responsibilities
 
-| Module                        | Responsibility                                                                                                                                                                |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth/`                       | Password + phone-OTP + Telegram login, social callbacks, dual JWT (`{sub, role}`, 15m/30d), `mirrorSupabaseUser` upserts, soft-delete enforcement at 3 entry points           |
-| `users/`                      | Profile CRUD, phone management (≤1 primary), avatar/cover upload, blocks, username generation (`base2`, `base3`… suffix loop, NFC-lowercase)                                  |
-| `listings/`                   | Marketplace feed (cursor on `(createdAt, id)` base64) + owner feed (offset), slug short-circuit `[]`, publish (30d expiry), photos in 2nd batch, soft-delete                  |
-| `categories/`                 | 4-table i18n (`en/km/zh`), dual LEFT JOIN + JS COALESCE, `field_schema` JSONB (`FieldDef[]`) seeded but never read at runtime                                                 |
-| `chat/`                       | REST + polling, per-contact threads (canonical `userA < userB` pair, upsert), 6-step send rejections, cursor + `after=` deltas, bulk read receipts                            |
-| `files/`                      | Signed uploads to Supabase (9 scopes), no confirmation endpoint, no content validation                                                                                        |
-| `locations/` + `brands/`      | Public read-only lookups (provinces/districts/communes; brands/models/links)                                                                                                  |
-| `admin/`                      | The 9-controller admin surface: stats/timeseries, users, categories, subcategories, brands, models, subscriptions (4-tier), user-subscriptions, reports, reasons                |
+| Module                        | Responsibility                                                                                                                                                                            |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth/`                       | Password + phone-OTP + Telegram login, social callbacks, dual JWT (`{sub, role}`, 15m/30d), `mirrorSupabaseUser` upserts, soft-delete enforcement at 3 entry points                       |
+| `users/`                      | Profile CRUD, phone management (≤1 primary), avatar/cover upload, blocks, username generation (`base2`, `base3`… suffix loop, NFC-lowercase)                                              |
+| `listings/`                   | Marketplace feed (cursor on `(createdAt, id)` base64) + owner feed (offset), slug short-circuit `[]`, publish (30d expiry), photos in 2nd batch, soft-delete                              |
+| `categories/`                 | 4-table i18n (`en/km/zh`), dual LEFT JOIN + JS COALESCE, `field_schema` JSONB (`FieldDef[]`) seeded but never read at runtime                                                             |
+| `chat/`                       | REST + polling, per-contact threads (canonical `userA < userB` pair, upsert), 6-step send rejections, cursor + `after=` deltas, bulk read receipts                                        |
+| `files/`                      | Signed uploads to Supabase (9 scopes), no confirmation endpoint, no content validation                                                                                                    |
+| `locations/` + `brands/`      | Public read-only lookups (provinces/districts/communes; brands/models/links)                                                                                                              |
+| `admin/`                      | The 9-controller admin surface: stats/timeseries, users, categories, subcategories, brands, models, subscriptions (4-tier), user-subscriptions, reports, reasons                          |
 | `attributes/`                 | Admin-scoped CRUD for `attribute_options` (route `/admin/attributes/:type`), decoupled from `AdminModule` — own module registered in `AppModule`, imports `FilesModule` for image cleanup |
-| `activity/`                   | `LastSeenInterceptor` → in-memory 5-min throttle touch                                                                                                                        |
-| `common/`                     | Response envelope, exception filter, idempotency middleware, decorators, Supabase client                                                                                      |
-| `db/` + `config/` + `health/` | Global Drizzle/PG clients, Zod env validation, `GET /health`                                                                                                                  |
+| `activity/`                   | `LastSeenInterceptor` → in-memory 5-min throttle touch                                                                                                                                    |
+| `common/`                     | Response envelope, exception filter, idempotency middleware, decorators, Supabase client                                                                                                  |
+| `db/` + `config/` + `health/` | Global Drizzle/PG clients, Zod env validation, `GET /health`                                                                                                                              |
 
 ## 3. Key API contracts
 

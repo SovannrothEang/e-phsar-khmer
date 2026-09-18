@@ -1,7 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const bedroomSchema = z.object({
-  
   name: z
     .string()
     .trim()
@@ -14,12 +13,12 @@ export const bedroomSchema = z.object({
     .max(50, "bedroom slug must be less than 50 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "bedroom slug must be lowercase with hyphens only (e.g. my-category)"
+      "bedroom slug must be lowercase with hyphens only (e.g. my-category)",
     ),
   categoryId: z.string().min(1, "Category is required"),
   subcategories: z.array(z.string()).min(1, "Select at least one subcategory"),
-})
+});
 
 export const deleteBedroomSchema = z.object({
   bedroomId: z.string().min(1, "bedroom ID is required"),
-})
+});

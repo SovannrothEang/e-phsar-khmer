@@ -42,7 +42,8 @@ export function Composer({
   const [staged, setStaged] = useState<StagedImage | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const canSend = !disabled && !sending && (text.trim() !== "" || staged !== null);
+  const canSend =
+    !disabled && !sending && (text.trim() !== "" || staged !== null);
 
   function submit() {
     if (!canSend) return;

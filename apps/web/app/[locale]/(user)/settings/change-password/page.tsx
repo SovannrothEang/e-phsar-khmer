@@ -1,4 +1,4 @@
-import ChangePassword from "@/components/setting/Change-Password"
+import ChangePassword from "@/components/setting/Change-Password";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -6,7 +6,5 @@ export const metadata: Metadata = {
   description: "Change Password",
 };
 export default function ChangePasswordPage() {
-    return (
-        <ChangePassword />
-    )
+  return <ChangePassword />;
 }

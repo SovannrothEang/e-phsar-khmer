@@ -1,10 +1,10 @@
 export type Vehicletype = {
-    vehicleTypeId: string;
-    name: string;
-    slug: string;
-    image: string;
-    categoryId: string;
-    subcategories: string[];
-    createdAt: string;
-    updatedAt: string;
-}
+  vehicleTypeId: string;
+  name: string;
+  slug: string;
+  image: string;
+  categoryId: string;
+  subcategories: string[];
+  createdAt: string;
+  updatedAt: string;
+};

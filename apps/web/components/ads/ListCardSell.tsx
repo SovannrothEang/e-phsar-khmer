@@ -1,17 +1,16 @@
-'use client'
+"use client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import { useRouter } from "@/i18n/routing";
 
 export function ListCardSell() {
-
   const router = useRouter();
 
   return (
@@ -23,12 +22,13 @@ export function ListCardSell() {
       </CardHeader>
       <CardContent>
         <p className="text-base opacity-90 px-2">
-          Make some extra cash by selling this in khmer24. Go on, it&apos;s quick and easy.
+          Make some extra cash by selling this in khmer24. Go on, it&apos;s
+          quick and easy.
         </p>
       </CardContent>
       <CardFooter className="p-3 border-none leading-relaxed ">
         <Button
-          onClick={() => router.push({ pathname: '/post' })}
+          onClick={() => router.push({ pathname: "/post" })}
           size="sm"
           className="w-full bg-card rounded text-foreground px-18 py-4 text-base hover:bg-muted cursor-pointer"
         >
@@ -36,5 +36,5 @@ export function ListCardSell() {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }

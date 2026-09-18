@@ -1,12 +1,12 @@
-import { useLocale } from "next-intl"
-import LocaleSwitcherSelect from "./LocalSwitcherSelect"
+import { useLocale } from "next-intl";
+import LocaleSwitcherSelect from "./LocalSwitcherSelect";
 
 export default function LocaleSwitcher() {
-  const locale = useLocale()
+  const locale = useLocale();
 
   return (
     <div className="flex items-center">
       <LocaleSwitcherSelect defaultValue={locale} label="Select a locale" />
     </div>
-  )
+  );
 }

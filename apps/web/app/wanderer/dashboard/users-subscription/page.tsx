@@ -77,7 +77,6 @@ type Subscription = {
   expiredAt: string;
 };
 
-
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
   const { data: subscription = [] } = useQuery({

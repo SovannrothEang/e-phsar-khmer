@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ArrowLeft, Loader2, MessageSquareOff, ShieldAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  MessageSquareOff,
+  ShieldAlert,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -372,7 +377,9 @@ function ThreadSkeleton() {
             i % 2 === 0 ? "flex-row" : "flex-row-reverse",
           )}
         >
-          {i % 2 === 0 && <Skeleton className="h-8 w-8 shrink-0 rounded-full" />}
+          {i % 2 === 0 && (
+            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+          )}
           <Skeleton
             className={cn("h-11 rounded-2xl", i % 2 === 0 ? "w-52" : "w-40")}
           />

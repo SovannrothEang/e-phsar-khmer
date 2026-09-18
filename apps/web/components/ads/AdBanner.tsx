@@ -1,8 +1,7 @@
 // src/app/components/ads/AdBanner.tsx
 
-
-import Image from 'next/image';
-import type { FC } from 'react';
+import Image from "next/image";
+import type { FC } from "react";
 
 interface AdBannerProps {
   imagePath: string;
@@ -12,10 +11,15 @@ interface AdBannerProps {
   height?: number;
 }
 
-const AdBanner: FC<AdBannerProps> = ({ imagePath, altText, link, width = 970, height = 250 }) => {
+const AdBanner: FC<AdBannerProps> = ({
+  imagePath,
+  altText,
+  link,
+  width = 970,
+  height = 250,
+}) => {
   const adContent = (
     <div className="flex justify-center w-full">
-      
       <div
         style={{ width: `${width}px`, height: `${height}px` }}
         className="relative overflow-hidden "
@@ -25,7 +29,7 @@ const AdBanner: FC<AdBannerProps> = ({ imagePath, altText, link, width = 970, he
           alt={altText}
           fill
           className="object-cover"
-         loading="lazy"
+          loading="lazy"
         />
       </div>
     </div>

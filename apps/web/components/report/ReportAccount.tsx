@@ -1,6 +1,6 @@
-"use client"
+"use client";
 import { reportUserOption } from "@/lib/report";
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -12,7 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogClose,
@@ -20,10 +20,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import { FieldGroup } from "@/components/ui/field";
 import Image from "next/image";
-import { Images,X,ImagePlus } from "lucide-react";
+import { Images, X, ImagePlus } from "lucide-react";
 import { User } from "@/lib/user";
 
 interface ReportAccountProps {
@@ -31,8 +31,11 @@ interface ReportAccountProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) {
-
+export function ReportAccount({
+  user,
+  open,
+  onOpenChange,
+}: ReportAccountProps) {
   const [files, setFiles] = useState<File[]>([]);
 
   // Single ref for the hidden file input
@@ -65,7 +68,9 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
       <form>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Report {user?.name?.toUpperCase() || "ACCOUNT"}</DialogTitle>
+            <DialogTitle>
+              Report {user?.name?.toUpperCase() || "ACCOUNT"}
+            </DialogTitle>
           </DialogHeader>
           <Separator className="my-1" />
           <h2 className="text-sm">Photo ({files.length}/24)</h2>
@@ -106,16 +111,19 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
                     <div
                       onClick={triggerUpload}
                       className={`flex flex-col items-center justify-center w-full h-full rounded-md cursor-pointer transition-all border
-                    ${isNextSlot
-                          ? "bg-muted hover:bg-card/70" 
-                          : "bg-muted hover:bg-card/70" 
-                        }
+                    ${
+                      isNextSlot
+                        ? "bg-muted hover:bg-card/70"
+                        : "bg-muted hover:bg-card/70"
+                    }
                     `}
                     >
                       {isNextSlot ? (
                         <>
                           <Images className="w-8 h-8 text-muted-foreground " />
-                          <span className="text-xs text-muted-foreground mt-1">Upload</span>
+                          <span className="text-xs text-muted-foreground mt-1">
+                            Upload
+                          </span>
                         </>
                       ) : (
                         <ImagePlus className="w-6 h-6 text-muted-foreground" />
@@ -128,7 +136,9 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
           </div>
           <FieldGroup>
             <Field>
-              <FieldLabel className="text-sm">Reason<span className="text-red-500">*</span></FieldLabel>
+              <FieldLabel className="text-sm">
+                Reason<span className="text-red-500">*</span>
+              </FieldLabel>
               <Select>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a reason" />
@@ -136,7 +146,10 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
                 <SelectContent>
                   <SelectGroup>
                     {reportUserOption.map((report) => (
-                      <SelectItem key={report.reportReasonId} value={report.reportReasonId}>
+                      <SelectItem
+                        key={report.reportReasonId}
+                        value={report.reportReasonId}
+                      >
                         {report.reportUserReason}
                       </SelectItem>
                     ))}
@@ -155,12 +168,23 @@ export function ReportAccount({ user, open, onOpenChange }: ReportAccountProps) 
           </FieldGroup>
           <DialogFooter className="flex flex-row justify-between">
             <DialogClose asChild>
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-sm cursor-pointer h-10  text-foreground bg-muted-foreground/10 hover:bg-muted-foreground/20 w-1/2">Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="rounded-sm cursor-pointer h-10  text-foreground bg-muted-foreground/10 hover:bg-muted-foreground/20 w-1/2"
+              >
+                Cancel
+              </Button>
             </DialogClose>
-            <Button type="submit" className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3">Submit</Button>
+            <Button
+              type="submit"
+              className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3"
+            >
+              Submit
+            </Button>
           </DialogFooter>
         </DialogContent>
       </form>
     </Dialog>
-  )
+  );
 }

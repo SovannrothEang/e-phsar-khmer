@@ -65,10 +65,10 @@ export function ContactSellerButton({
       return;
     }
 
-    const query = listingId ? { to: sellerId, listing: listingId } : { to: sellerId };
-    startTransition(() =>
-      router.push({ pathname: "/chats", query }),
-    );
+    const query = listingId
+      ? { to: sellerId, listing: listingId }
+      : { to: sellerId };
+    startTransition(() => router.push({ pathname: "/chats", query }));
   }
 
   const busy = resolving || pending;

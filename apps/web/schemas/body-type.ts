@@ -1,7 +1,6 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const bodytypeSchema = z.object({
-  
   name: z
     .string()
     .trim()
@@ -14,13 +13,13 @@ export const bodytypeSchema = z.object({
     .max(50, "bodytype slug must be less than 50 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "bodytype slug must be lowercase with hyphens only (e.g. my-category)"
+      "bodytype slug must be lowercase with hyphens only (e.g. my-category)",
     ),
   image: z.string(),
   categoryId: z.string().min(1, "Category is required"),
   subcategories: z.array(z.string()).min(1, "Select at least one subcategory"),
-})
+});
 
 export const deleteBodytypeSchema = z.object({
   bodytypeId: z.string().min(1, "Brand ID is required"),
-})
+});

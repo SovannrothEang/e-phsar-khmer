@@ -1,4 +1,3 @@
-
 import JobApplications from "@/components/profile/Job-Applications";
 import type { Metadata } from "next";
 

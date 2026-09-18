@@ -88,6 +88,7 @@ Supabase SMS setup is required.
 ## R2 (2026-08-18): phone+password→OTP login; registration sets password + names + username
 
 Backend (apps/backend):
+
 - `src/auth/dto/verify-otp.dto.ts` — REQUIRED `password` (@MinLength(8)),
   optional `firstName`/`lastName` (@MaxLength(100)).
 - `src/auth/dto/login-otp.dto.ts` — NEW: phone (E.164) + password.
@@ -105,6 +106,7 @@ Backend (apps/backend):
   or wrong password → 401, no OTP sent).
 
 Web (apps/web):
+
 - `lib/phone.ts` — NEW `isLocalPhone()` (strict `^0\d{7,9}$`).
 - `lib/otp-registration.ts` — NEW sessionStorage handoff (mode
   register|login, phone, password, names; parse-guarded, stale-discard,
@@ -193,7 +195,7 @@ exist". The captain's failed attempt (`+85599888999`) created no row (the
   2. LOGGED-IN home: **Login/Register buttons absent**, "Sell" present —
      SocialBar (user chrome) driven by the real session cookie.
   3. LOGGED-IN /en/me: real card `Sok Dara / @sokdara / Member since 18
-     Aug 2026 / Phone number 0990000001 / Phone Verified`; logged-in
+Aug 2026 / Phone number 0990000001 / Phone Verified`; logged-in
      navbar. (Mock header "Thouch Sayi" still above — Phase C.)
 - The /en 404 scare was a false positive (flight payload boundary
   markers, not a rendered error); the home page renders fine.
@@ -202,11 +204,12 @@ exist". The captain's failed attempt (`+85599888999`) created no row (the
 
 "after login or register … success as user, then first thing we redirect
 user to /me" — post-session redirects point to `/me` instead of `/`:
+
 - `components/auth/LoginForm.tsx` password-login success push → `/me`
 - `components/auth/OtpVerifyForm.tsx` verify success push → `/me`
   (covers register→OTP and login→OTP)
-Browser-verified E2E via CDP against the running dev app:
+  Browser-verified E2E via CDP against the running dev app:
 - password mode (sokdara/password123): click Login → URL `/en/me`
 - phone mode (0990000001/password123): → `/en/otp?phone=%2B855990000001`
   → type 000000 (autofocused input) → `/en/me`
-Gates: web build ✓, web lint 0 errors (same 1 pre-existing warning).
+  Gates: web build ✓, web lint 0 errors (same 1 pre-existing warning).

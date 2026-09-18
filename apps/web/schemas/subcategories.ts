@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from "zod";
 
 export const subCategorySchema = z.object({
   name: z
@@ -14,9 +14,9 @@ export const subCategorySchema = z.object({
     .max(50, "SubSlug must be less than 50 characters")
     .regex(
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "SubSlug must be lowercase with hyphens only (e.g. my-category)"
+      "SubSlug must be lowercase with hyphens only (e.g. my-category)",
     ),
 
   subIcon: z.string(),
   categoryId: z.string(),
-})
+});

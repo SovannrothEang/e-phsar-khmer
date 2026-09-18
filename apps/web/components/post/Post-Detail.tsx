@@ -296,7 +296,11 @@ export default function PostDetail({
           {/* Sidebar */}
           <aside className="w-full md:w-[400px] shrink-0">
             <div className="sticky top-20 space-y-2">
-              <ProfileSidebar userId={post.userId} user={user} listingId={String(post.postId)} />
+              <ProfileSidebar
+                userId={post.userId}
+                user={user}
+                listingId={String(post.postId)}
+              />
             </div>
           </aside>
         </div>

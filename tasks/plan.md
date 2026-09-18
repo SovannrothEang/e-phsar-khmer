@@ -9,8 +9,8 @@
 
 ## 0. Captain's decisions (settled — baked into this plan, not re-litigated)
 
-1. **Durable publication = spec §25 Option C.** PostgreSQL is the primary/authoritative store for the command, idempotency and outbox publication intent, all committed in **one transaction** (transactional outbox). Message history *may* later move to ScyllaDB behind an idempotent worker, but PostgreSQL remains the command/idempotency/outbox authority even then.
-2. **Outbox = `eventType`-based shape** (`outbox_events`, the design on the divergent `feat/notifications` line at `33e1220`), and dispatch is **triggered by events** (enqueue wakeup) rather than an interval poll timer. A **bounded worker pool is still required**; only the *trigger* is event-driven.
+1. **Durable publication = spec §25 Option C.** PostgreSQL is the primary/authoritative store for the command, idempotency and outbox publication intent, all committed in **one transaction** (transactional outbox). Message history _may_ later move to ScyllaDB behind an idempotent worker, but PostgreSQL remains the command/idempotency/outbox authority even then.
+2. **Outbox = `eventType`-based shape** (`outbox_events`, the design on the divergent `feat/notifications` line at `33e1220`), and dispatch is **triggered by events** (enqueue wakeup) rather than an interval poll timer. A **bounded worker pool is still required**; only the _trigger_ is event-driven.
 3. **Message ordering = `(createdAt, id)` where `id` is a monotonic bigint/serial** (not a random UUID), so ordering is deterministic, sortable, and supports gap detection / sequence-based resume.
 
 ---
@@ -19,16 +19,16 @@
 
 ### 1.1 `origin/main` (this branch's base — what the implementation starts from)
 
-| Area | State |
-|---|---|
-| Chat | REST + polling only. `apps/backend/src/chat/{chat.controller,chat.service,chat.module,chat.types}.ts` + `dto/{send-message,query-chats,query-messages}.dto.ts`. 6 endpoints under `/api/v1/chats`. |
-| Schema | `apps/backend/src/db/schema/chat.schema.ts`: `conversations` (uuid PK, pair-unique + `user_a < user_b` CHECK, `lastMessageAt` timestamp(3)); `messages` (**uuid `defaultRandom()` PK**, `createdAt` timestamp(3), `readAt`, 3 CHECKs, 3 indexes). |
-| Outbox / queue / notifications | **Absent.** No `src/outbox/`, `src/queue/`, `src/notifications/` directories. |
-| WS layer | **Absent.** No `@nestjs/platform-ws`, `ws`, or `@nestjs/websockets` in `apps/backend/package.json`. |
-| `main.ts` | No `enableShutdownHooks()`, no WS adapter (report §3, row §47 → "Violated" invariant I13). |
-| Idempotency | Transport-level `IdempotencyMiddleware` only (body-hash, `apps/backend/src/common/middleware/idempotency.middleware.ts`) — **not** the spec's model; WS has nothing (report §3, rows §14/§13.2; invariant I2 violated). |
-| Ordering | Keyset `(createdAt, id)` with **uuid tie-break** (report §3, row §15; invariant I8 "satisfied with caveat"). |
-| Migrations | Latest is `0012_blushing_sentinel.sql` → the next migration on this base is **`0013`**. |
+| Area                           | State                                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat                           | REST + polling only. `apps/backend/src/chat/{chat.controller,chat.service,chat.module,chat.types}.ts` + `dto/{send-message,query-chats,query-messages}.dto.ts`. 6 endpoints under `/api/v1/chats`.                                                |
+| Schema                         | `apps/backend/src/db/schema/chat.schema.ts`: `conversations` (uuid PK, pair-unique + `user_a < user_b` CHECK, `lastMessageAt` timestamp(3)); `messages` (**uuid `defaultRandom()` PK**, `createdAt` timestamp(3), `readAt`, 3 CHECKs, 3 indexes). |
+| Outbox / queue / notifications | **Absent.** No `src/outbox/`, `src/queue/`, `src/notifications/` directories.                                                                                                                                                                     |
+| WS layer                       | **Absent.** No `@nestjs/platform-ws`, `ws`, or `@nestjs/websockets` in `apps/backend/package.json`.                                                                                                                                               |
+| `main.ts`                      | No `enableShutdownHooks()`, no WS adapter (report §3, row §47 → "Violated" invariant I13).                                                                                                                                                        |
+| Idempotency                    | Transport-level `IdempotencyMiddleware` only (body-hash, `apps/backend/src/common/middleware/idempotency.middleware.ts`) — **not** the spec's model; WS has nothing (report §3, rows §14/§13.2; invariant I2 violated).                           |
+| Ordering                       | Keyset `(createdAt, id)` with **uuid tie-break** (report §3, row §15; invariant I8 "satisfied with caveat").                                                                                                                                      |
+| Migrations                     | Latest is `0012_blushing_sentinel.sql` → the next migration on this base is **`0013`**.                                                                                                                                                           |
 
 ### 1.2 Reference implementations (read from the primary checkout, not merged)
 
@@ -91,13 +91,13 @@ The same path serves REST and WS: the gateway's `send_message` calls the identic
 
 Spec §25 offers three designs. The chosen one:
 
-| Option | Design | Rejected because |
-|---|---|---|
-| A — Scylla-native publication state | Persist message + publication record in Scylla together | Scylla has **no cross-partition transactions**: "message saved ⟺ publication-intent saved" cannot be made atomic. Loses the core invariant spec §4.6/§25 demand. |
-| B — durable broker/write protocol | Broker write participates in the message write path | Reintroduces the **dual-write problem** (two systems, no shared transaction) and makes the broker a hard dependency of the hot send path. |
+| Option                                             | Design                                                                                                                        | Rejected because                                                                                                                                                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — Scylla-native publication state                | Persist message + publication record in Scylla together                                                                       | Scylla has **no cross-partition transactions**: "message saved ⟺ publication-intent saved" cannot be made atomic. Loses the core invariant spec §4.6/§25 demand.                                              |
+| B — durable broker/write protocol                  | Broker write participates in the message write path                                                                           | Reintroduces the **dual-write problem** (two systems, no shared transaction) and makes the broker a hard dependency of the hot send path.                                                                     |
 | **C — PG as command/idempotency/outbox authority** | Command + idempotency + publication intent commit in one PG transaction; durable message written through an idempotent worker | **Chosen.** Maximizes correctness, not raw write throughput: `message saved ⟺ publication intent saved` holds atomically. Spec §25 explicitly names this design and requires documenting it — this plan does. |
 
-Option C scales adequately here because PostgreSQL carries only **small, short-lived** command/idempotency/outbox rows (the outbox row is scrubbed/purged once published, §4.5), while the high-volume message history can move to ScyllaDB later **behind an idempotent worker** without disturbing the command authority. The trade-off — an extra hop before the durable message store sees the write — is the price of the atomic invariant, and it is explicitly accepted (spec §90: add a component only for a concrete capability; the capability here is *recoverable publication*, which the current code lacks entirely: report §3 rows §25/§70 — "built but dead outbox, send not transactional").
+Option C scales adequately here because PostgreSQL carries only **small, short-lived** command/idempotency/outbox rows (the outbox row is scrubbed/purged once published, §4.5), while the high-volume message history can move to ScyllaDB later **behind an idempotent worker** without disturbing the command authority. The trade-off — an extra hop before the durable message store sees the write — is the price of the atomic invariant, and it is explicitly accepted (spec §90: add a component only for a concrete capability; the capability here is _recoverable publication_, which the current code lacks entirely: report §3 rows §25/§70 — "built but dead outbox, send not transactional").
 
 The state machine Option C "introduces" (spec §25) is the outbox `pending → processing → published | failed` lifecycle with retry/backoff and reclaim — specified in §4 (outbox), with reconciliation in §4.5.
 
@@ -130,17 +130,17 @@ Per spec §53 (failure matrix A–F) and invariants I1/I2/I6/I7:
 
 **Affected files**
 
-| File | Change |
-|---|---|
-| `apps/backend/src/chat/dto/send-message.dto.ts` | Add required `clientMessageId`. |
-| `apps/backend/src/db/schema/chat.schema.ts` | Add `clientMessageId` column + partial unique index. |
-| `apps/backend/drizzle/migrations/0013_*.sql` | Add column + index (the ordering column swap in §2.3 shares this migration — see Increment A in §5). |
-| `apps/backend/src/chat/chat.service.ts` | Wrap send in one transaction; conflict → return existing message. |
-| `apps/backend/src/chat/chat.types.ts` | `sendMessage` return gains `duplicate: boolean`. |
-| `apps/backend/src/chat/chat.controller.ts` | No route change (same `POST /chats/messages`). |
-| `apps/backend/src/chat/chat.gateway.ts` | WS `send_message` sends the same DTO (field rides for free) + explicit ack. |
-| `apps/web/actions/chat.ts`, `apps/web/components/chat/*` (rothh state) | Generate a UUID per pending message, keep it stable across retries/reconnect resends. |
-| `apps/backend/src/chat/chat.service.spec.ts` (+ integration) | New idempotency tests (§8). |
+| File                                                                   | Change                                                                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `apps/backend/src/chat/dto/send-message.dto.ts`                        | Add required `clientMessageId`.                                                                      |
+| `apps/backend/src/db/schema/chat.schema.ts`                            | Add `clientMessageId` column + partial unique index.                                                 |
+| `apps/backend/drizzle/migrations/0013_*.sql`                           | Add column + index (the ordering column swap in §2.3 shares this migration — see Increment A in §5). |
+| `apps/backend/src/chat/chat.service.ts`                                | Wrap send in one transaction; conflict → return existing message.                                    |
+| `apps/backend/src/chat/chat.types.ts`                                  | `sendMessage` return gains `duplicate: boolean`.                                                     |
+| `apps/backend/src/chat/chat.controller.ts`                             | No route change (same `POST /chats/messages`).                                                       |
+| `apps/backend/src/chat/chat.gateway.ts`                                | WS `send_message` sends the same DTO (field rides for free) + explicit ack.                          |
+| `apps/web/actions/chat.ts`, `apps/web/components/chat/*` (rothh state) | Generate a UUID per pending message, keep it stable across retries/reconnect resends.                |
+| `apps/backend/src/chat/chat.service.spec.ts` (+ integration)           | New idempotency tests (§8).                                                                          |
 
 **Schema**
 
@@ -185,7 +185,7 @@ Why this is safe: `ON CONFLICT DO NOTHING ... RETURNING` makes the winner/loser 
 
 **REST:** unchanged route; the transport-level `Idempotency-Key` middleware remains as an orthogonal layer (body-hash based; its known completed-hash gap is a separate ticket and does not block this).
 
-**WebSocket:** `send_message` envelope stays `{ payload: SendMessageDto }` — the new required field propagates. The gateway must **ack the sender** (rothh only pushes to the recipient): reply `{ type: 'message.ack', clientMessageId, message }`. On reconnect/timeout the client resends the *same* `clientMessageId` and receives the same message; the `duplicate` flag lets the UI reconcile (dedupe by message `id` client-side regardless).
+**WebSocket:** `send_message` envelope stays `{ payload: SendMessageDto }` — the new required field propagates. The gateway must **ack the sender** (rothh only pushes to the recipient): reply `{ type: 'message.ack', clientMessageId, message }`. On reconnect/timeout the client resends the _same_ `clientMessageId` and receives the same message; the `duplicate` flag lets the UI reconcile (dedupe by message `id` client-side regardless).
 
 **Note on interplay with §4 (outbox):** idempotency and the outbox enqueue are entangled by design — the outbox event is enqueued **only on the created path**, inside the same transaction. Fix 1 ships before the outbox (§4) with the enqueue line absent; §4 adds exactly that line. The transaction boundary is introduced here.
 
@@ -200,7 +200,9 @@ const conn = { socket, userId: claims.sub, lastPongAt: Date.now() };
 this.registry.add(claims.sub, conn);
 // The ws library emits 'pong' for every protocol pong frame the client
 // sends (browsers auto-reply to server pings) — this line is the fix:
-socket.on('pong', () => { conn.lastPongAt = Date.now(); });
+socket.on("pong", () => {
+  conn.lastPongAt = Date.now();
+});
 ```
 
 - `HeartbeatService` keeps its 30 s ping / 40 s deadline sweep; with the update, only genuinely dead peers get closed.
@@ -211,13 +213,13 @@ socket.on('pong', () => { conn.lastPongAt = Date.now(); });
 
 Reference state: `main.ts` (worktree) has no `enableShutdownHooks()`; `HeartbeatService`'s `setInterval` is never cleared; no gateway destroy hook; the outbox dispatcher's `OnModuleDestroy` exists but is unmounted — report invariant **I13 violated**.
 
-| File | Change |
-|---|---|
-| `apps/backend/src/main.ts` | `app.enableShutdownHooks()` after `await app.listen(...)` (Nest lifecycle events docs; triggers `onModuleDestroy`/`beforeApplicationShutdown` on SIGTERM/SIGINT, then closes HTTP + WS servers). |
-| `apps/backend/src/chat/heartbeat.service.ts` | Store the interval id; add `OnModuleDestroy` → `clearInterval`. |
-| `apps/backend/src/chat/chat.gateway.ts` | Add `OnModuleDestroy`: close every registered socket with code `1001` ("going away"), then clear the registry. |
+| File                                               | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/backend/src/main.ts`                         | `app.enableShutdownHooks()` after `await app.listen(...)` (Nest lifecycle events docs; triggers `onModuleDestroy`/`beforeApplicationShutdown` on SIGTERM/SIGINT, then closes HTTP + WS servers).                                                                                                                                                                                                                                                                       |
+| `apps/backend/src/chat/heartbeat.service.ts`       | Store the interval id; add `OnModuleDestroy` → `clearInterval`.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `apps/backend/src/chat/chat.gateway.ts`            | Add `OnModuleDestroy`: close every registered socket with code `1001` ("going away"), then clear the registry.                                                                                                                                                                                                                                                                                                                                                         |
 | `apps/backend/src/outbox/outbox-worker.service.ts` | Drain: set `stopped`, clear timers, `channel.complete()`, await in-flight dispatches under a 10 s grace (`Promise.race` + log on timeout — rothh's `SHUTDOWN_GRACE_MS` pattern, `outbox.dispatcher.ts:59-116`). Rows still `processing` at exit are reclaimed by another instance via the stale-lease claim predicate — **graceful drain is best-effort by design; durability comes from the outbox, not from finishing the drain** (spec §47 + §52 "Worker crashes"). |
-| `apps/backend/src/app.module.ts` | Import `EventEmitterModule.forRoot()` + `OutboxModule` (replaces the empty `QueueModule` placeholder — delete `apps/backend/src/queue/queue.module.ts`). |
+| `apps/backend/src/app.module.ts`                   | Import `EventEmitterModule.forRoot()` + `OutboxModule` (replaces the empty `QueueModule` placeholder — delete `apps/backend/src/queue/queue.module.ts`).                                                                                                                                                                                                                                                                                                               |
 
 Shutdown order (spec §47): gateway stops WS intake and closes sockets → heartbeat interval cleared → outbox worker drains → Nest closes stores. Nest runs `onModuleDestroy` hooks in reverse module-init order; the gateway/worker hooks are all idempotent so exact ordering between them is not load-bearing.
 
@@ -236,17 +238,17 @@ New file `apps/backend/src/db/schema/outbox.schema.ts`, re-exported from `apps/b
 
 Ports from `33e1220` (the wired, tested line) — these files exist there and are unit-tested; they are re-landed onto `origin/main` with the worker architecture swapped per §4.3:
 
-| File | Content |
-|---|---|
-| `outbox.module.ts` | Providers/exports `OutboxService`, `OutboxRegistry`, `OutboxDispatcher`, `OutboxWorker`. **Not `@Global()`** — importing it is an architectural choice, visible in `ChatModule` (comment in `33e1220` preserved). |
-| `outbox.types.ts` | `TxClient`/`DbExecutor`, `IntegrationEvent`, `HandlerOutcome {published|retry|failed}`, `OutboxHandler {handle, onAbandoned?, redact?}`, `DispatchOutcome`. |
-| `outbox.service.ts` | `enqueue(executor, event)` (`onConflictDoNothing` on `dedupeKey`, return existing on miss); `claimDue(limit)` = `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED ...)` with the due predicate `(pending AND availableAt <= now()) OR (processing AND lockedAt < now() - lease)` — **claim-side stale-lease reclamation** (crashed-dispatcher recovery needs no separate reclaim timer); `claimById` (inline fast-path); `markPublished(eventId, redactedPayload)`, `markRetry(eventId, error, delayMs)` (sets `availableAt` forward), `markFailed`; `instanceId` = `hostname:pid:uuid8` lease attribution. All timestamps via `sql\`now()\`` (DB clock). |
-| `outbox-registry.service.ts` | `Map<eventType, OutboxHandler>`; `register` throws on duplicate; `get`. |
-| `outbox-dispatcher.service.ts` | `dispatchDue(limit)` (sequential batch — a batch usually targets one provider, firing it concurrently is how you get rate-limited); `dispatchById(eventId)` (inline claim-or-null); `run`: unregistered type ⇒ `retry` (rolling-deploy safe — producer may ship before consumer); thrown handler ⇒ `retry`; `settle`: `published` ⇒ `markPublished(+ redact)`, `failed` ⇒ `markFailed`, `retry` with `attempts >= maxAttempts` ⇒ `markFailed` + `handler.onAbandoned`; else `markRetry` with `computeBackoffMs`. |
-| `backoff.util.ts` | `computeBackoffMs(attempts, {baseMs, factor, maxMs})` — pure, **unjittered** (SKIP LOCKED claim order removes the herd; `33e1220` comment preserved). |
-| `outbox-events.ts` | `OUTBOX_WAKEUP_EVENT = 'outbox.wakeup'`. |
-| `outbox-wakeup.listener.ts` | `@OnEvent(OUTBOX_WAKEUP_EVENT)` → `channel.tryWrite(WAKE)` (capacity-1: a full buffer means a wakeup is already pending — coalescing, spec §64). |
-| `outbox-worker.service.ts` | Bounded worker pool + event-driven trigger (§4.3). |
+| File                           | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | ----------------------------------------------------------------------------- |
+| `outbox.module.ts`             | Providers/exports `OutboxService`, `OutboxRegistry`, `OutboxDispatcher`, `OutboxWorker`. **Not `@Global()`** — importing it is an architectural choice, visible in `ChatModule` (comment in `33e1220` preserved).                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `outbox.types.ts`              | `TxClient`/`DbExecutor`, `IntegrationEvent`, `HandlerOutcome {published                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | retry | failed}`, `OutboxHandler {handle, onAbandoned?, redact?}`, `DispatchOutcome`. |
+| `outbox.service.ts`            | `enqueue(executor, event)` (`onConflictDoNothing` on `dedupeKey`, return existing on miss); `claimDue(limit)` = `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED ...)` with the due predicate `(pending AND availableAt <= now()) OR (processing AND lockedAt < now() - lease)` — **claim-side stale-lease reclamation** (crashed-dispatcher recovery needs no separate reclaim timer); `claimById` (inline fast-path); `markPublished(eventId, redactedPayload)`, `markRetry(eventId, error, delayMs)` (sets `availableAt` forward), `markFailed`; `instanceId` = `hostname:pid:uuid8` lease attribution. All timestamps via `sql\`now()\`` (DB clock). |
+| `outbox-registry.service.ts`   | `Map<eventType, OutboxHandler>`; `register` throws on duplicate; `get`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `outbox-dispatcher.service.ts` | `dispatchDue(limit)` (sequential batch — a batch usually targets one provider, firing it concurrently is how you get rate-limited); `dispatchById(eventId)` (inline claim-or-null); `run`: unregistered type ⇒ `retry` (rolling-deploy safe — producer may ship before consumer); thrown handler ⇒ `retry`; `settle`: `published` ⇒ `markPublished(+ redact)`, `failed` ⇒ `markFailed`, `retry` with `attempts >= maxAttempts` ⇒ `markFailed` + `handler.onAbandoned`; else `markRetry` with `computeBackoffMs`.                                                                                                                                                   |
+| `backoff.util.ts`              | `computeBackoffMs(attempts, {baseMs, factor, maxMs})` — pure, **unjittered** (SKIP LOCKED claim order removes the herd; `33e1220` comment preserved).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `outbox-events.ts`             | `OUTBOX_WAKEUP_EVENT = 'outbox.wakeup'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `outbox-wakeup.listener.ts`    | `@OnEvent(OUTBOX_WAKEUP_EVENT)` → `channel.tryWrite(WAKE)` (capacity-1: a full buffer means a wakeup is already pending — coalescing, spec §64).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `outbox-worker.service.ts`     | Bounded worker pool + event-driven trigger (§4.3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 `apps/backend/src/utils/channel.ts` is ported unchanged from `rothh/feat/notifications` (bounded `Channel<T>`, spec §29: in-memory = execution mechanism only; all work is recoverable from `outbox_events`).
 
@@ -256,7 +258,7 @@ The captain's rule: **trigger by events, keep the bounded pool.** Synthesis of t
 
 - **Pool:** `N = OUTBOX_WORKER_CONCURRENCY` (default 5) concurrent worker loops; each loop: wait for wakeup **or** poll-fallback timeout → `dispatcher.dispatchDue(OUTBOX_BATCH_SIZE)` → repeat. A full batch loops immediately (backlog drain); otherwise back to waiting.
 - **Trigger:** producer calls `OutboxService.wakeupAfterCommit()` (EventEmitter, local non-durable — spec §30's exact permitted use) **after the transaction commits**; the listener writes the capacity-1 wakeup token.
-- **Poll fallback (kept deliberately):** `OUTBOX_POLL_INTERVAL_MS` (default 2000) is the safety net for a lost wakeup (EventEmitter is non-durable by rule §30) and the steady-state heartbeat that picks up rows whose `availableAt` backoff expired while nothing new enqueued. The captain's decision removes the *interval as the trigger*; it does not forbid the fallback.
+- **Poll fallback (kept deliberately):** `OUTBOX_POLL_INTERVAL_MS` (default 2000) is the safety net for a lost wakeup (EventEmitter is non-durable by rule §30) and the steady-state heartbeat that picks up rows whose `availableAt` backoff expired while nothing new enqueued. The captain's decision removes the _interval as the trigger_; it does not forbid the fallback.
 - **Boundedness (invariant I11):** capacity-1 channel, fixed pool, batch cap — memory is `O(N + batch)`; durable backlog lives in `outbox_events`, never in RAM.
 - **Shutdown:** §3.3 drain.
 
@@ -283,17 +285,17 @@ OUTBOX_RETENTION_DAYS        = 7          (NEW — retention sweep, §4.5)
 
 ```ts
 outbox.enqueue(tx, {
-  eventType: 'chat.message.sent',
-  aggregateType: 'conversation',
+  eventType: "chat.message.sent",
+  aggregateType: "conversation",
   aggregateId: conversationId,
-  dedupeKey: `chat.message.sent:${message.id}`,  // one event per message, ever (stringified bigint)
+  dedupeKey: `chat.message.sent:${message.id}`, // one event per message, ever (stringified bigint)
   payload: {
     messageId: message.id,
     conversationId,
     senderId,
     recipientId: dto.recipientId,
     createdAt: message.createdAt,
-    schemaVersion: 1,              // spec §56/§57
+    schemaVersion: 1, // spec §56/§57
   },
 });
 ```
@@ -316,24 +318,24 @@ Emit at least: `chat_messages_accepted_total{duplicate}`, `chat_message_write_la
 
 Each increment is independently deployable and observable. **Lands first: the Postgres-only transactional outbox + idempotency + ordering** (captain's explicit sequencing). **Deferred until measured load justifies:** Scylla, Redis, broker, scale-out.
 
-| Increment | Spec mapping | Content | Deploy gate |
-|---|---|---|---|
-| **A — ordering + idempotency (REST-only)** | Slices 1 + 3 (of §79) | The §2.3 ordering change + Fix 1: `messages.id` → bigint identity, `clientMessageId` + partial unique index, single-transaction send (no outbox line yet), cursor guards. Migration **`0013`** on this base (column + index + id swap). Adopt the rothh hardening that ships regardless (report §5 "work that should ship": UUID_RE→numeric cursor guard, structural `assertOwnedChatImagePath`, DB-clock `lastMessageAt` + monotonic-max watermark, `@Throttle` on send). Web client sends `clientMessageId` in the same release. | Unit + integration tests; API contract note: message `id` becomes a JSON number, `clientMessageId` required. |
-| **B — outbox + event-driven delivery (still Postgres-only)** | Slice 6 (durable delivery/recovery), §25 Option C | §4: `outbox_events` migration (`0014`), `OutboxModule` (+ `EventEmitterModule`, delete empty `QueueModule`), wakeup + bounded pool, `chat.message.sent` producer + in-process handler + `ConnectionRegistry` (no gateway yet — registry is empty, handler publishes immediately). Retention sweep + core metrics. | Dispatcher/handler unit tests (ported `33e1220` suites); e2e: enqueue inside tx, worker drains, duplicate key collapses. |
-| **C — WebSocket layer + heartbeat + shutdown** | Slice 7 (single-node), §16-19, §47 | Port gateway/registry/heartbeat with Fix 2 (pong update) + Fix 3 (shutdown hooks) + `WsAdapter` in `main.ts` + WS ack contract (§3.1). Delivery stays exclusively via the outbox handler — the gateway never pushes directly (single delivery path). | Gateway/heartbeat unit tests; manual e2e with a real ws client (reconnect, heartbeat survival > 60 s, SIGTERM drain). |
-| **D — observability + ops hardening** | §43-46, §77, §81 | Metrics/logging/health split/alerts; reconciliation + retention verification; WS auth hardening decision (OQ-4); per-connection rate limit if product chose it. | Dashboard + alert runbook. |
+| Increment                                                    | Spec mapping                                      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Deploy gate                                                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **A — ordering + idempotency (REST-only)**                   | Slices 1 + 3 (of §79)                             | The §2.3 ordering change + Fix 1: `messages.id` → bigint identity, `clientMessageId` + partial unique index, single-transaction send (no outbox line yet), cursor guards. Migration **`0013`** on this base (column + index + id swap). Adopt the rothh hardening that ships regardless (report §5 "work that should ship": UUID_RE→numeric cursor guard, structural `assertOwnedChatImagePath`, DB-clock `lastMessageAt` + monotonic-max watermark, `@Throttle` on send). Web client sends `clientMessageId` in the same release. | Unit + integration tests; API contract note: message `id` becomes a JSON number, `clientMessageId` required.             |
+| **B — outbox + event-driven delivery (still Postgres-only)** | Slice 6 (durable delivery/recovery), §25 Option C | §4: `outbox_events` migration (`0014`), `OutboxModule` (+ `EventEmitterModule`, delete empty `QueueModule`), wakeup + bounded pool, `chat.message.sent` producer + in-process handler + `ConnectionRegistry` (no gateway yet — registry is empty, handler publishes immediately). Retention sweep + core metrics.                                                                                                                                                                                                                  | Dispatcher/handler unit tests (ported `33e1220` suites); e2e: enqueue inside tx, worker drains, duplicate key collapses. |
+| **C — WebSocket layer + heartbeat + shutdown**               | Slice 7 (single-node), §16-19, §47                | Port gateway/registry/heartbeat with Fix 2 (pong update) + Fix 3 (shutdown hooks) + `WsAdapter` in `main.ts` + WS ack contract (§3.1). Delivery stays exclusively via the outbox handler — the gateway never pushes directly (single delivery path).                                                                                                                                                                                                                                                                               | Gateway/heartbeat unit tests; manual e2e with a real ws client (reconnect, heartbeat survival > 60 s, SIGTERM drain).    |
+| **D — observability + ops hardening**                        | §43-46, §77, §81                                  | Metrics/logging/health split/alerts; reconciliation + retention verification; WS auth hardening decision (OQ-4); per-connection rate limit if product chose it.                                                                                                                                                                                                                                                                                                                                                                    | Dashboard + alert runbook.                                                                                               |
 
 Spec-phase mapping: Increments A–C ≈ **Phase 2** (strong boundaries, idempotent commands, observability) executed on Postgres-only, with the outbox brought forward from Phase 4 because it is a prerequisite of idempotent delivery; **Phase 1's Redis is intentionally deferred** (captain: introduce components only for measured need — spec §90, §87 minimal architecture, §3.2).
 
 ### 5.3 Explicitly deferred (with revisit triggers)
 
-| Deferred item | Spec ref | Revisit when |
-|---|---|---|
-| Redis: presence, typing, rate limits, connection registry, Pub/Sub fan-out | §11, §17-18, §23, Slices 4 + 7 | Second WS node is deployed, or measured per-IP throttle abuse / reconnect storms. Note: `ConnectionRegistry` is in-process — **single-instance is a documented hard constraint** until then (report gap #10). |
-| ScyllaDB message history | §10, §37, Slice 5 | PG message table growth/hot-partition evidence; then Option C phase 2: PG keeps command/idempotency/outbox authority, an idempotent worker writes Scylla, with dual-write reconciliation per §80-81 (never a silent secondary write). |
-| Durable broker (Kafka/NATS/…), search, analytics, audit | §49, §74-76 | A second *durable* consumer appears that needs replay/backlog. Redis Pub/Sub alone suffices for transient fan-out (§49 left column). |
-| Per-conversation `sequence` column | §15/§19/§20 conflict | Exact per-conversation gap detection is a product requirement (OQ-8); the bigint id already enables `after=` resume. |
-| Redis-backed throttler | §23 | Multi-instance or per-user keying decision (OQ-5). |
+| Deferred item                                                              | Spec ref                       | Revisit when                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Redis: presence, typing, rate limits, connection registry, Pub/Sub fan-out | §11, §17-18, §23, Slices 4 + 7 | Second WS node is deployed, or measured per-IP throttle abuse / reconnect storms. Note: `ConnectionRegistry` is in-process — **single-instance is a documented hard constraint** until then (report gap #10).                         |
+| ScyllaDB message history                                                   | §10, §37, Slice 5              | PG message table growth/hot-partition evidence; then Option C phase 2: PG keeps command/idempotency/outbox authority, an idempotent worker writes Scylla, with dual-write reconciliation per §80-81 (never a silent secondary write). |
+| Durable broker (Kafka/NATS/…), search, analytics, audit                    | §49, §74-76                    | A second _durable_ consumer appears that needs replay/backlog. Redis Pub/Sub alone suffices for transient fan-out (§49 left column).                                                                                                  |
+| Per-conversation `sequence` column                                         | §15/§19/§20 conflict           | Exact per-conversation gap detection is a product requirement (OQ-8); the bigint id already enables `after=` resume.                                                                                                                  |
+| Redis-backed throttler                                                     | §23                            | Multi-instance or per-user keying decision (OQ-5).                                                                                                                                                                                    |
 
 ---
 
@@ -341,17 +343,17 @@ Spec-phase mapping: Increments A–C ≈ **Phase 2** (strong boundaries, idempot
 
 **Placement decision:** ADR-004/005/006 are drafted inline here (they are load-bearing for this plan). The full set ADR-001..009 should exist per spec §84; 001–003, 007–009 are recorded below as stubs/decisions with their "Revisit When" clause, and are extracted to `docs/adr/` when the implementing change lands (this task adds no files beyond `tasks/plan.md`).
 
-| ADR | Title | Status in this plan |
-|---|---|---|
-| 001 | PostgreSQL ownership (users/conversations/membership/permissions) | Implicit in code; draft with Increment A. |
-| 002 | ScyllaDB message storage | **Decision: deferred** — Option C phase 2 (§5.3); record the trigger. |
-| 003 | Redis ephemeral state | **Decision: deferred** — record the trigger. |
-| 004 | Message ordering | **Drafted below.** |
-| 005 | Message idempotency | **Drafted below.** |
-| 006 | Event/delivery mechanism | **Drafted below.** |
-| 007 | WebSocket fan-out | Decision: in-process registry + outbox-driven push now; Redis Pub/Sub when >1 node (revisit trigger in §5.3). |
-| 008 | Reconnect/gap recovery | Decision: `after=` cursor against Postgres now; sequence-based resume when ADR re sequence lands. |
-| 009 | Partition strategy | N/A until ADR-002 is adopted; triggers §5.3. |
+| ADR | Title                                                             | Status in this plan                                                                                           |
+| --- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 001 | PostgreSQL ownership (users/conversations/membership/permissions) | Implicit in code; draft with Increment A.                                                                     |
+| 002 | ScyllaDB message storage                                          | **Decision: deferred** — Option C phase 2 (§5.3); record the trigger.                                         |
+| 003 | Redis ephemeral state                                             | **Decision: deferred** — record the trigger.                                                                  |
+| 004 | Message ordering                                                  | **Drafted below.**                                                                                            |
+| 005 | Message idempotency                                               | **Drafted below.**                                                                                            |
+| 006 | Event/delivery mechanism                                          | **Drafted below.**                                                                                            |
+| 007 | WebSocket fan-out                                                 | Decision: in-process registry + outbox-driven push now; Redis Pub/Sub when >1 node (revisit trigger in §5.3). |
+| 008 | Reconnect/gap recovery                                            | Decision: `after=` cursor against Postgres now; sequence-based resume when ADR re sequence lands.             |
+| 009 | Partition strategy                                                | N/A until ADR-002 is adopted; triggers §5.3.                                                                  |
 
 ---
 
@@ -417,18 +419,18 @@ Spec-phase mapping: Increments A–C ≈ **Phase 2** (strong boundaries, idempot
 
 ## 7. Open questions / remaining product decisions
 
-| # | Question | Options | Notes |
-|---|---|---|---|
-| OQ-1 | Read-state model | (a) Keep per-message `readAt` + `max(readAt)` watermark (current); (b) move to `read_cursors(last_read_sequence)` per spec §20 | Spec prefers cursors but the current model satisfies the same query; decide before group channels (report §6 #4). No code change either way in increments A–C. |
-| OQ-2 | `clientMessageId` for legacy/3rd-party clients | (a) Required (400 when missing) — this plan's default; (b) optional (no idempotency protection when absent) | Column is nullable + partial index either way, so relaxing later is a DTO-only change. |
-| OQ-3 | `messages.id` wire format | (a) JSON number (this plan's default; safe to 2^53); (b) string-serialized bigint | Pick (a) now; (b) is a breaking change later, so decide before first public API freeze. |
-| OQ-4 | WS auth hardening | (a) Ship rothh's manual `JwtService.verify` + the `jwt-auth.guard.ts` ws bypass as-is; (b) verify the token through `JwtStrategy.validate` semantics (reject soft-deleted users) or a dedicated `WsAuthGuard` | REST rejects soft-deleted users at `JwtStrategy.validate`; WS currently would not (report gap #8). Recommend (b); needs auth-module refactor scope. |
-| OQ-5 | Rate-limit keying | (a) per-user (needs user-id resolution + likely Redis for multi-instance); (b) per-IP (current, NAT-shared budget documented) | Report §6 #6; the redis-backed throttler from the `fm/psa-npic-rate-limit-redis-outbox` line exists as reference. Not blocking increments A–C. |
-| OQ-6 | WS connection-attempt limits (spec §23) | Threshold + window + failure behavior (e.g. 10 attempts/min/IP ⇒ 429/close 4008) | None exists today; pick numbers with product. |
-| OQ-7 | Retention windows | `outbox_events` (proposed 7 d), `idempotency_keys` (existing table — currently unbounded, report gap #7), chat images in storage | Ops/product decision; defaults proposed in §4.5. |
-| OQ-8 | Per-conversation `sequence` now vs later | Deferred per ADR-004; revisit trigger = exact gap-detection requirement | Spec §15/§19/§20 internal tension documented (report §6 #3). |
-| OQ-9 | Scylla cutover thresholds | Message-table size / hot-conversation p95 evidence that triggers ADR-002 adoption | Captain: "deferred until measured load justifies it" — the measurement is OQ-9's deliverable. |
-| OQ-10 | Offline/notification semantics | Should `chat.message.sent` also feed push notifications (APNs/…)? | The outbox makes this a new handler, not a chat change; coordinate with the notifications module later. |
+| #     | Question                                       | Options                                                                                                                                                                                                       | Notes                                                                                                                                                          |
+| ----- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ-1  | Read-state model                               | (a) Keep per-message `readAt` + `max(readAt)` watermark (current); (b) move to `read_cursors(last_read_sequence)` per spec §20                                                                                | Spec prefers cursors but the current model satisfies the same query; decide before group channels (report §6 #4). No code change either way in increments A–C. |
+| OQ-2  | `clientMessageId` for legacy/3rd-party clients | (a) Required (400 when missing) — this plan's default; (b) optional (no idempotency protection when absent)                                                                                                   | Column is nullable + partial index either way, so relaxing later is a DTO-only change.                                                                         |
+| OQ-3  | `messages.id` wire format                      | (a) JSON number (this plan's default; safe to 2^53); (b) string-serialized bigint                                                                                                                             | Pick (a) now; (b) is a breaking change later, so decide before first public API freeze.                                                                        |
+| OQ-4  | WS auth hardening                              | (a) Ship rothh's manual `JwtService.verify` + the `jwt-auth.guard.ts` ws bypass as-is; (b) verify the token through `JwtStrategy.validate` semantics (reject soft-deleted users) or a dedicated `WsAuthGuard` | REST rejects soft-deleted users at `JwtStrategy.validate`; WS currently would not (report gap #8). Recommend (b); needs auth-module refactor scope.            |
+| OQ-5  | Rate-limit keying                              | (a) per-user (needs user-id resolution + likely Redis for multi-instance); (b) per-IP (current, NAT-shared budget documented)                                                                                 | Report §6 #6; the redis-backed throttler from the `fm/psa-npic-rate-limit-redis-outbox` line exists as reference. Not blocking increments A–C.                 |
+| OQ-6  | WS connection-attempt limits (spec §23)        | Threshold + window + failure behavior (e.g. 10 attempts/min/IP ⇒ 429/close 4008)                                                                                                                              | None exists today; pick numbers with product.                                                                                                                  |
+| OQ-7  | Retention windows                              | `outbox_events` (proposed 7 d), `idempotency_keys` (existing table — currently unbounded, report gap #7), chat images in storage                                                                              | Ops/product decision; defaults proposed in §4.5.                                                                                                               |
+| OQ-8  | Per-conversation `sequence` now vs later       | Deferred per ADR-004; revisit trigger = exact gap-detection requirement                                                                                                                                       | Spec §15/§19/§20 internal tension documented (report §6 #3).                                                                                                   |
+| OQ-9  | Scylla cutover thresholds                      | Message-table size / hot-conversation p95 evidence that triggers ADR-002 adoption                                                                                                                             | Captain: "deferred until measured load justifies it" — the measurement is OQ-9's deliverable.                                                                  |
+| OQ-10 | Offline/notification semantics                 | Should `chat.message.sent` also feed push notifications (APNs/…)?                                                                                                                                             | The outbox makes this a new handler, not a chat change; coordinate with the notifications module later.                                                        |
 
 ---
 
@@ -449,4 +451,4 @@ Spec-phase mapping: Increments A–C ≈ **Phase 2** (strong boundaries, idempot
 
 **Deleted:** `apps/backend/src/queue/queue.module.ts` (empty placeholder; superseded by `OutboxModule`).
 
-*End of plan.*
+_End of plan._

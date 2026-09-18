@@ -1,32 +1,34 @@
-"use server"
+"use server";
 
-import { bedroomSchema, deleteBedroomSchema } from "@/schemas/bedroom"
-import z from "zod"
+import { bedroomSchema, deleteBedroomSchema } from "@/schemas/bedroom";
+import z from "zod";
 
 export async function createBedroom(unsafeData: z.infer<typeof bedroomSchema>) {
-  const data = bedroomSchema.safeParse(unsafeData)
+  const data = bedroomSchema.safeParse(unsafeData);
 
-  if (!data.success) return { success: false }
+  if (!data.success) return { success: false };
 
   // Save to DB
 
-  return { success: true }
+  return { success: true };
 }
 export async function updateBedroom(unsafeData: z.infer<typeof bedroomSchema>) {
-  const data = bedroomSchema.safeParse(unsafeData)
+  const data = bedroomSchema.safeParse(unsafeData);
 
-  if (!data.success) return { success: false }
+  if (!data.success) return { success: false };
 
   // Save to DB
 
-  return { success: true }
+  return { success: true };
 }
-export async function deleteBedroom(unsafeData: z.infer<typeof deleteBedroomSchema>) {
-  const data = deleteBedroomSchema.safeParse(unsafeData)
+export async function deleteBedroom(
+  unsafeData: z.infer<typeof deleteBedroomSchema>,
+) {
+  const data = deleteBedroomSchema.safeParse(unsafeData);
 
-  if (!data.success) return { success: false, error: "Invalid bedroom ID" }
+  if (!data.success) return { success: false, error: "Invalid bedroom ID" };
 
   // Save to DB
 
-  return { success: true }
+  return { success: true };
 }

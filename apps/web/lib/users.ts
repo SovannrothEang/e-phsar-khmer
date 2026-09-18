@@ -1,4 +1,4 @@
-import { User } from "@/types/user"
+import { User } from "@/types/user";
 
 export const Users: User[] = [
   {
@@ -120,7 +120,7 @@ export const Users: User[] = [
     password: "88888888",
     profileImage: "/user-img/reahu-hin.png",
     coverImage: "",
-    networks: ["0912919192921", "0912919192921",],
+    networks: ["0912919192921", "0912919192921"],
     email: "reahuhin@gmail.com",
     role: "admin",
     accountType: "Normal",
@@ -149,4 +149,4 @@ export const Users: User[] = [
     createdAt: "2022-01-01",
     updatedAt: "2022-01-01",
   },
-]
+];

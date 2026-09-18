@@ -4,7 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EllipsisVertical, BookmarkIcon, } from "lucide-react";
+import { EllipsisVertical, BookmarkIcon } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
 import { toast } from "sonner";
 import { Post } from "@/lib/posts";
@@ -13,23 +13,25 @@ import { useState } from "react";
 import { toSlug } from "@/lib/utils";
 import { useRouter } from "@/i18n/routing";
 import { ReportPost } from "../report/ReportPost";
-import { IconShare3, IconUser, IconAlertTriangle } from '@tabler/icons-react';
+import { IconShare3, IconUser, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 import ShareModal from "@/components/share/ShareModel";
 
 export function ThreeDotPost({ post }: { post: Post }) {
-
   const router = useRouter();
   const user = getUserById(post.userId);
-  const [shareOpen, setShareOpen] = useState(false)
-  const [reportOpen, setReportOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button onClick={(e) => e.stopPropagation()} className="bg-card w-7 h-7  hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer">
+          <Button
+            onClick={(e) => e.stopPropagation()}
+            className="bg-card w-7 h-7  hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer"
+          >
             <EllipsisVertical size={14} />
           </Button>
         </DropdownMenuTrigger>
@@ -87,7 +89,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
               <span>{isSaved ? "Unsave" : "Save"}</span>
             </Toggle>
           </DropdownMenuItem>
-          <DropdownMenuItem >
+          <DropdownMenuItem>
             <button
               onClick={() => setShareOpen(true)}
               className="flex items-center gap-3 px-3 py-2 cursor-pointer"
@@ -98,7 +100,6 @@ export function ThreeDotPost({ post }: { post: Post }) {
           </DropdownMenuItem>
           <DropdownMenuItem>
             <button
-
               onClick={() => setReportOpen(true)}
               className="flex items-center  gap-3 px-3 py-2 cursor-pointer text-destructive focus:text-destructive"
             >
@@ -113,13 +114,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
         onOpenChange={setShareOpen}
         url={`https://psakhmer.com/${toSlug(post.title)}-adid-${post.postId}`}
       />
-      <ReportPost
-        open={reportOpen}
-        onOpenChange={setReportOpen}
-        post={post}
-      />
+      <ReportPost open={reportOpen} onOpenChange={setReportOpen} post={post} />
     </>
-  )
+  );
 }
-
-

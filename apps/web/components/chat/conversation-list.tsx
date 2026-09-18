@@ -81,10 +81,7 @@ export function ConversationList({
           >
             <Avatar className="h-10 w-10 shrink-0">
               {item.otherUser?.profilePhotoUrl && (
-                <AvatarImage
-                  src={item.otherUser.profilePhotoUrl}
-                  alt={name}
-                />
+                <AvatarImage src={item.otherUser.profilePhotoUrl} alt={name} />
               )}
               <AvatarFallback className="font-semibold">
                 {name.charAt(0).toUpperCase()}
