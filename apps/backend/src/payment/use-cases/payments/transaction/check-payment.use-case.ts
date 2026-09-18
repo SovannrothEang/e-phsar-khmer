@@ -1,11 +1,14 @@
 import { Effect } from 'effect';
 import { eq } from 'drizzle-orm';
-import { DbClientTag } from '../../../db/db.provider';
-import { paymentTransactions, type PaymentTransactionRow } from '../../entity';
+import { DbClientTag } from '../../../../db/db.provider';
+import {
+  paymentTransactions,
+  type PaymentTransactionRow,
+} from '../../../entity';
 import {
   PaymentPersistenceError,
   PaymentTransactionNotFoundError,
-} from './errors';
+} from '../errors';
 
 type CheckPaymentError =
   | PaymentTransactionNotFoundError

@@ -1,25 +1,41 @@
 export * from './errors';
-export * from './create-payment.use-case';
-export * from './check-payment.use-case';
-export * from './list-payments.use-case';
-export * from './upsert-payment.use-case';
-export * from './create-payment-attempt.use-case';
-export * from './list-payment-attempts.use-case';
-export * from './enqueue-payment-attempt.use-case';
-export * from './create-payment-provider-event.use-case';
-export * from './enqueue-payment-provider-event.use-case';
-export * from './find-payment-attempt.use-case';
-export * from './find-payment-attempt-by-provider-attempt-id.use-case';
-export * from './update-payment-attempt.use-case';
-export * from './upsert-payment-transaction-detail.use-case';
-export * from './record-payment-status-history.use-case';
-export * from './fail-payment-attempt.use-case';
-export * from './fail-abandoned-payment-job.use-case';
-export * from './find-payment-provider-event.use-case';
-export * from './find-payment-transaction-detail.use-case';
-export * from './settle-payment-provider-event.use-case';
-export * from './process-payment-attempt.use-case';
-export * from './process-provider-event.use-case';
-export * from './enqueue-payment-attempt-poll.use-case';
-export * from './poll-payment-attempt.use-case';
-export * from './enqueue-payment-settled-event.use-case';
+
+// payment_transactions (+ its 1:1 detail satellite and status audit trail)
+// create-payment, find-payment-transaction-detail folded into the
+// processing/ flows below — each had exactly one caller.
+export * from './transaction/check-payment.use-case';
+export * from './transaction/list-payments.use-case';
+export * from './transaction/upsert-payment.use-case';
+export * from './transaction/upsert-payment-transaction-detail.use-case';
+export * from './transaction/record-payment-status-history.use-case';
+
+// payment_attempts
+// create-payment-attempt, enqueue-payment-attempt, list-payment-attempts
+// folded into the processing/ flows below — each had exactly one caller.
+export * from './attempt/find-payment-attempt.use-case';
+export * from './attempt/find-payment-attempt-by-provider-attempt-id.use-case';
+export * from './attempt/update-payment-attempt.use-case';
+export * from './attempt/enqueue-payment-attempt-poll.use-case';
+
+// payment_provider_events
+// create-payment-provider-event, enqueue-payment-provider-event,
+// find-payment-provider-event folded into the processing/ flows below —
+// each had exactly one caller.
+export * from './provider-event/settle-payment-provider-event.use-case';
+
+// Composed, multi-entity flows — the actual business logic the controller
+// and the BullMQ processor call. Everything above this line is a
+// single-table primitive with more than one caller (or a controller-facing
+// read simple enough to need no composition); everything below composes
+// several primitives — some of them fully inlined rather than left as a
+// separate single-caller file — into one business action.
+export * from './processing/create-payment-transaction.use-case';
+export * from './processing/receive-payment-provider-event.use-case';
+export * from './processing/check-owned-payment-transaction.use-case';
+export * from './processing/list-owned-payment-attempts.use-case';
+export * from './processing/process-payment-attempt.use-case';
+export * from './processing/process-provider-event.use-case';
+export * from './processing/poll-payment-attempt.use-case';
+export * from './processing/fail-payment-attempt.use-case';
+export * from './processing/fail-abandoned-payment-job.use-case';
+export * from './processing/enqueue-payment-settled-event.use-case';

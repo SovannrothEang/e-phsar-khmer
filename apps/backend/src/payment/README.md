@@ -37,14 +37,46 @@ Full field-level definitions are in [`entity/`](./entity).
 Two more folders round out the module: [`use-cases/`](./use-cases) is the
 actual business logic — `Effect.fn`-wrapped generators — split into two
 subfolders that mirror the processing/ledger boundary above:
-[`use-cases/payments/`](./use-cases/payments) (create/check/list/upsert a
-transaction; create/list an attempt; enqueue a durable handoff; create a
-provider event; process an attempt; process a provider event; poll an
-attempt; a handful of small single-table reads/writes the processor needs)
-and [`use-cases/ledgers/`](./use-cases/ledgers) (resolve-or-create a system
+[`use-cases/payments/`](./use-cases/payments) and
+[`use-cases/ledgers/`](./use-cases/ledgers) (resolve-or-create a system
 ledger account; post one balanced `ledger_transaction`; the chart-of-accounts
-mapping that turns a settled `payment_transaction` into that posting). Every
-use-case `yield*`s `DbClientTag` (`../db/db.provider.ts`) and, for the three
+mapping that turns a settled `payment_transaction` into that posting).
+
+`use-cases/payments/` itself is further split by role:
+[`transaction/`](./use-cases/payments/transaction),
+[`attempt/`](./use-cases/payments/attempt), and
+[`provider-event/`](./use-cases/payments/provider-event) hold single-table
+primitives that have more than one caller (`checkPayment`, `upsertPayment`,
+`findPaymentAttempt`, `updatePaymentAttempt`, `settlePaymentProviderEvent`,
+...) — genuinely shared across the three processor flows or several
+controller routes, which is what earns a primitive its own file here.
+[`processing/`](./use-cases/payments/processing) holds everything that
+composes several primitives into one business action —
+`createPaymentTransaction`, `receivePaymentProviderEvent`,
+`checkOwnedPaymentTransaction`, `listOwnedPaymentAttempts`, and the three
+processor flows (`processPaymentAttempt`/`processProviderEvent`/
+`pollPaymentAttempt`) plus their shared failure paths. A primitive that
+turned out to have exactly one caller (the original `createPayment`,
+`createPaymentAttempt`, `enqueuePaymentAttempt`, `createPaymentProviderEvent`,
+`enqueuePaymentProviderEvent`, `findPaymentTransactionDetail`,
+`listPaymentAttempts`, `findPaymentProviderEvent`) was folded directly into
+that one caller instead of staying a separate file — splitting only pays
+off when something actually calls the split point more than once; a
+same-file duplicate of the split (e.g. `findOrCreateSystemLedgerAccount`,
+called twice by `postPaymentSettlementLedger` for its two system accounts)
+still earns its own function even with a single caller, since inlining it
+would just duplicate the body at both call sites. `checkOwnedPaymentTransaction`
+and `listOwnedPaymentAttempts` are also where the caller-identity check
+lives: both fail with the exact same `PaymentTransactionNotFoundError` a
+nonexistent id would produce when the caller isn't the transaction's owner —
+so `toHttpException` needs no special case for "wrong owner," and a caller
+can never distinguish "doesn't exist" from "exists but isn't yours" from
+the response alone. `use-cases/payments/index.ts` re-exports all four
+subfolders together, so this split is invisible past the barrel described
+below — nothing needed to change at any `from '../use-cases'` call site
+when it landed.
+
+Every use-case `yield*`s `DbClientTag` (`../db/db.provider.ts`) and, for the three
 processor use-cases, `PaymentGatewayRegistryTag`
 (`./providers/payment-gateway-registry.provider.ts`) instead of taking a
 Drizzle client or the registry as a plain parameter, and fails with the
@@ -103,8 +135,9 @@ jobs, not as alternatives:
   durable handoff from "the DB transaction committed" to "BullMQ has this
   job". `PaymentsController.create()` writes a `payment.attempt.requested`
   outbox row in the _same_ DB transaction as the `payment_transaction` +
-  `payment_attempt` insert (`enqueuePaymentAttempt`,
-  `use-cases/payments/enqueue-payment-attempt.use-case.ts`); `webhook()` and
+  `payment_attempt` insert — all three steps live together in
+  `use-cases/payments/processing/create-payment-transaction.use-case.ts`
+  (see the use-cases split above); `webhook()` and
   `AbaPaywayController.webhook()` do the same with a
   `payment.provider_event.received` row alongside the `payment_provider_event`
   insert. This is what a bare "insert, then `queue.add()`" can't give you: a
@@ -187,7 +220,7 @@ sequenceDiagram
     PaymentsController->>Worker: wakeupAfterCommit() (after commit)
     PaymentsController-->>Client: 201 { transaction, attempt }
 
-    Note over Client,Worker: Implemented — PaymentsController.create(),<br/>createPayment/createPaymentAttempt/enqueuePaymentAttempt
+    Note over Client,Worker: Implemented — PaymentsController.create()<br/>calling createPaymentTransaction, which composes<br/>createPayment/createPaymentAttempt/enqueuePaymentAttempt
 
     Worker->>Outbox: claim due row (FOR UPDATE SKIP LOCKED)
     Worker->>BullMQ: PaymentAttemptOutboxHandler: queue.add(process-attempt, {jobId: attemptId})
@@ -300,7 +333,7 @@ Key properties this gives us:
 | Attempt polling (`pollPaymentAttempt`)                                | Done — the only path to a resolved status for a provider with no webhook at all. Calls `reconcile()`, applies the same transition on a definite outcome (including the ledger posting on `succeeded`), or re-schedules itself (`enqueuePaymentAttemptPoll`) on `pending`. Gives up (attempt `failed`, code `POLL_EXPIRED`) once `ChargeResult.poll.expiresAt` passes. See [`providers/bakong/README.md`](./providers/bakong/README.md) for the full loop.                                                                                                                                                                                                                                          |
 | Provider-specific webhook routes (e.g. ABA PayWay's)                  | Pattern established — a provider whose callback payload doesn't fit the generic `PaymentsController.webhook()` envelope gets its own dedicated route. See the individual provider's README for that route's own status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Ledger posting (`use-cases/ledgers/`)                                 | Done for `payment_transaction.type === 'payment'` — `postPaymentSettlementLedger` resolves/creates the `provider_clearing`/`platform_revenue` system accounts for the transaction's currency (`findOrCreateSystemLedgerAccount`) and posts one balanced `ledger_transaction` + 2 `ledger_entries` (`postLedgerTransaction`) inside the same `runInTransaction` as the status flip, from all three success-transition use-cases above. `refund`/`capture`/`void` are not mapped — see Open items. No business-level outbox event or notification is written yet (next row).                                                                                                                         |
-| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases. `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items). **No consumer registered for either type yet** — see Open items.                                                                                                                                                                                                                                                                                                                                                                                       |
+| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases. `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items). **No consumer registered for either type yet** — see Open items.                                                                                                                                                                                                                                                                                            |
 | Notification emission (success / failure)                             | Not started — no `Notifier`/consumer exists; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered). No unit/e2e tests yet for the use-cases, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (272 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
 

@@ -1,16 +1,16 @@
 import { Effect } from 'effect';
 import { and, eq } from 'drizzle-orm';
-import { DbClientTag } from '../../../db/db.provider';
+import { DbClientTag } from '../../../../db/db.provider';
 import {
   paymentTransactions,
   paymentTransactionStatusEnum,
   type PaymentTransactionRow,
-} from '../../entity';
+} from '../../../entity';
 import {
   PaymentPersistenceError,
   PaymentTransactionConflictError,
   PaymentTransactionNotFoundError,
-} from './errors';
+} from '../errors';
 
 export interface UpsertPaymentInput {
   id: string;

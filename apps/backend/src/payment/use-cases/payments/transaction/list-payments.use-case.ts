@@ -1,12 +1,12 @@
 import { Effect } from 'effect';
 import { and, desc, eq, type SQL } from 'drizzle-orm';
-import { DbClientTag } from '../../../db/db.provider';
+import { DbClientTag } from '../../../../db/db.provider';
 import {
   paymentTransactions,
   paymentTransactionStatusEnum,
   type PaymentTransactionRow,
-} from '../../entity';
-import { PaymentPersistenceError } from './errors';
+} from '../../../entity';
+import { PaymentPersistenceError } from '../errors';
 
 export interface ListPaymentsInput {
   customerId?: string;

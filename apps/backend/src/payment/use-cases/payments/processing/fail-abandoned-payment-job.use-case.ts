@@ -1,10 +1,10 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../../db/db.provider';
-import { PaymentPersistenceError } from './errors';
-import type { PaymentProcessingError } from './errors';
-import { checkPayment } from './check-payment.use-case';
+import { DbClientTag, runInTransaction } from '../../../../db/db.provider';
+import { PaymentPersistenceError } from '../errors';
+import type { PaymentProcessingError } from '../errors';
+import { checkPayment } from '../transaction/check-payment.use-case';
 import { failPaymentAttempt } from './fail-payment-attempt.use-case';
-import { findPaymentAttempt } from './find-payment-attempt.use-case';
+import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
 
 export interface FailAbandonedPaymentJobInput {
   paymentAttemptId: string;

@@ -26,7 +26,7 @@ export const PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE =
 /**
  * A `payment_transaction` reached a terminal `succeeded` status and its
  * ledger posting committed. Written by `enqueuePaymentSettledEvent`
- * (`../use-cases/payments/enqueue-payment-settled-event.use-case.ts`) inside
+ * (`../use-cases/payments/processing/enqueue-payment-settled-event.use-case.ts`) inside
  * the same DB transaction as the ledger posting itself, from all three
  * success-transition use-cases. Unlike the three DB→BullMQ events above,
  * nothing in this module registers a handler for this type — it exists for

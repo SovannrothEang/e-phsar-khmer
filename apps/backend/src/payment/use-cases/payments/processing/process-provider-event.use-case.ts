@@ -1,20 +1,27 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../../db/db.provider';
-import type { OutboxService } from '../../../outbox/outbox.service';
-import type { paymentTransactionStatusEnum } from '../../entity';
-import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
-import type { ProcessProviderEventJobData } from '../../queue/payment-queue.types';
-import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
-import type { PaymentProcessingError } from './errors';
-import { findPaymentProviderEvent } from './find-payment-provider-event.use-case';
-import { settlePaymentProviderEvent } from './settle-payment-provider-event.use-case';
-import { findPaymentAttempt } from './find-payment-attempt.use-case';
-import { checkPayment } from './check-payment.use-case';
-import { updatePaymentAttempt } from './update-payment-attempt.use-case';
-import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-detail.use-case';
-import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
-import { upsertPayment } from './upsert-payment.use-case';
-import { postPaymentSettlementLedger } from '../ledgers';
+import { eq } from 'drizzle-orm';
+import { DbClientTag, runInTransaction } from '../../../../db/db.provider';
+import type { OutboxService } from '../../../../outbox/outbox.service';
+import {
+  paymentProviderEvents,
+  type paymentTransactionStatusEnum,
+} from '../../../entity';
+import { PaymentGatewayRegistryTag } from '../../../providers/payment-gateway-registry.provider';
+import type { ProcessProviderEventJobData } from '../../../queue/payment-queue.types';
+import {
+  PaymentGatewayCallError,
+  PaymentPersistenceError,
+  PaymentProviderEventNotFoundError,
+} from '../errors';
+import type { PaymentProcessingError } from '../errors';
+import { settlePaymentProviderEvent } from '../provider-event/settle-payment-provider-event.use-case';
+import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
+import { checkPayment } from '../transaction/check-payment.use-case';
+import { updatePaymentAttempt } from '../attempt/update-payment-attempt.use-case';
+import { upsertPaymentTransactionDetail } from '../transaction/upsert-payment-transaction-detail.use-case';
+import { recordPaymentStatusHistory } from '../transaction/record-payment-status-history.use-case';
+import { upsertPayment } from '../transaction/upsert-payment.use-case';
+import { postPaymentSettlementLedger } from '../../ledgers';
 import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 
 export type ProcessProviderEventOutcome =
@@ -61,7 +68,22 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
     PaymentProcessingError,
     DbClientTag | PaymentGatewayRegistryTag
   > {
-    const event = yield* findPaymentProviderEvent(input.paymentProviderEventId);
+    // Inlined former findPaymentProviderEvent use-case — this was its only caller.
+    const db = yield* DbClientTag;
+    const eventRows = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(paymentProviderEvents)
+          .where(eq(paymentProviderEvents.id, input.paymentProviderEventId)),
+      catch: (cause) => new PaymentPersistenceError({ cause }),
+    });
+    const event = eventRows[0];
+    if (!event) {
+      return yield* new PaymentProviderEventNotFoundError({
+        id: input.paymentProviderEventId,
+      });
+    }
     if (event.status !== 'received') {
       return 'skipped';
     }

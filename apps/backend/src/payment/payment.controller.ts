@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -10,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Effect } from 'effect';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
@@ -18,15 +16,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PaymentEffectRunner } from './payment-effect-runner.service';
 import {
-  checkPayment,
-  createPayment,
-  createPaymentAttempt,
-  createPaymentProviderEvent,
-  enqueuePaymentAttempt,
-  enqueuePaymentProviderEvent,
-  findPaymentTransactionDetail,
-  listPaymentAttempts,
+  checkOwnedPaymentTransaction,
+  createPaymentTransaction,
+  listOwnedPaymentAttempts,
   listPayments,
+  receivePaymentProviderEvent,
   upsertPayment,
 } from './use-cases';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -40,6 +34,14 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
  */
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
+/**
+ * Every route here does exactly one thing: adapt its DTO/params into a
+ * use-case's input shape, hand it to `PaymentEffectRunner`, return the
+ * `Promise<T>` that comes back. All business logic — including composing
+ * several primitives together, and the owner-only guard on `check`/
+ * `listAttempts` — lives in the use-case itself (`use-cases/payments/`),
+ * not in a service layer sitting between this controller and it.
+ */
 @ApiTags('payments')
 @ApiBearerAuth()
 @Controller('payments')
@@ -53,41 +55,21 @@ export class PaymentsController {
       'hand it off for processing — the full lifecycle up to (not ' +
       'including) the queue processor calling the provider',
   })
-  async create(
-    @CurrentUser() user: RequestUser,
-    @Body() dto: CreatePaymentDto,
-  ) {
-    // The attempt insert and the durable enqueue (an outbox row — see
-    // enqueuePaymentAttempt) commit in the same DB transaction, and the
-    // outbox worker is woken only once that transaction actually commits —
-    // runDurably owns that whole protocol; see its doc comment.
+  create(@CurrentUser() user: RequestUser, @Body() dto: CreatePaymentDto) {
     return this.effectRunner.runDurably((outbox) =>
-      Effect.gen(function* () {
-        const transaction = yield* createPayment({
-          tenantId: DEFAULT_TENANT_ID,
-          reference: dto.reference,
-          idempotencyKey: dto.idempotencyKey,
-          amount: dto.amount.toString(),
-          currency: dto.currency,
-          type: 'payment',
-          customerId: user.id,
-          orderId: dto.orderId,
-          description: dto.description,
-        });
-        const attempt = yield* createPaymentAttempt({
-          paymentTransactionId: transaction.id,
-          provider: dto.provider,
-          method: dto.method,
-          amount: transaction.amount,
-          currency: transaction.currency,
-        });
-        yield* enqueuePaymentAttempt(outbox, {
-          paymentTransactionId: transaction.id,
-          paymentAttemptId: attempt.id,
-          browserReturnUrl: dto.browserReturnUrl,
-          browserCancelUrl: dto.browserCancelUrl,
-        });
-        return { transaction, attempt };
+      createPaymentTransaction(outbox, {
+        tenantId: DEFAULT_TENANT_ID,
+        reference: dto.reference,
+        idempotencyKey: dto.idempotencyKey,
+        amount: dto.amount.toString(),
+        currency: dto.currency,
+        customerId: user.id,
+        orderId: dto.orderId,
+        description: dto.description,
+        provider: dto.provider,
+        method: dto.method,
+        browserReturnUrl: dto.browserReturnUrl,
+        browserCancelUrl: dto.browserCancelUrl,
       }),
     );
   }
@@ -115,43 +97,22 @@ export class PaymentsController {
       'that just POSTed should poll this endpoint rather than expect the ' +
       'artifact in the creation response itself.',
   })
-  async check(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    const transaction = await this.effectRunner.run(checkPayment(id));
-    if (transaction.customerId !== user.id) {
-      // 404, not 403 — don't confirm another user's transaction exists.
-      throw new NotFoundException('Payment transaction not found');
-    }
-    const detail = await this.effectRunner.run(
-      findPaymentTransactionDetail(id),
+  check(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.effectRunner.run(
+      checkOwnedPaymentTransaction({ id, customerId: user.id }),
     );
-    return {
-      ...transaction,
-      checkout: detail
-        ? {
-            providerTransactionId: detail.providerTransactionId,
-            paymentMethodType: detail.paymentMethodType,
-            maskedAccount: detail.maskedAccount,
-            redirectUrl: detail.redirectUrl,
-            rawResponse: detail.rawResponse,
-          }
-        : null,
-    };
   }
 
   @Get(':id/attempts')
   @ApiOperation({
     summary: "List a payment transaction's attempts (owner only)",
   })
-  async listAttempts(
-    @CurrentUser() user: RequestUser,
-    @Param('id') id: string,
-  ) {
-    const transaction = await this.effectRunner.run(checkPayment(id));
-    if (transaction.customerId !== user.id) {
-      throw new NotFoundException('Payment transaction not found');
-    }
+  listAttempts(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.effectRunner.run(
-      listPaymentAttempts({ paymentTransactionId: id }),
+      listOwnedPaymentAttempts({
+        paymentTransactionId: id,
+        customerId: user.id,
+      }),
     );
   }
 
@@ -165,25 +126,14 @@ export class PaymentsController {
       "idempotency). A provider whose wire format doesn't match this " +
       'envelope gets its own intake route instead (see AbaPaywayController).',
   })
-  async webhook(@Body() dto: PaymentWebhookDto) {
-    // Same durable-handoff protocol as create() — a duplicate delivery
-    // still runs inside a transaction, it just has nothing new to enqueue
-    // once createPaymentProviderEvent's dedupe finds the existing row.
+  webhook(@Body() dto: PaymentWebhookDto) {
     return this.effectRunner.runDurably((outbox) =>
-      Effect.gen(function* () {
-        const { event, isNew } = yield* createPaymentProviderEvent({
-          provider: dto.provider,
-          providerEventId: dto.providerEventId,
-          eventType: dto.eventType,
-          payload: dto.payload,
-          paymentAttemptId: dto.paymentAttemptId,
-        });
-        if (isNew) {
-          yield* enqueuePaymentProviderEvent(outbox, {
-            paymentProviderEventId: event.id,
-          });
-        }
-        return { received: true, eventId: event.id, isNew };
+      receivePaymentProviderEvent(outbox, {
+        provider: dto.provider,
+        providerEventId: dto.providerEventId,
+        eventType: dto.eventType,
+        payload: dto.payload,
+        paymentAttemptId: dto.paymentAttemptId,
       }),
     );
   }

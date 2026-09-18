@@ -1,20 +1,20 @@
 import { Effect } from 'effect';
-import { DbClientTag, runInTransaction } from '../../../db/db.provider';
-import type { OutboxService } from '../../../outbox/outbox.service';
-import type { paymentTransactionStatusEnum } from '../../entity';
-import { PaymentGatewayRegistryTag } from '../../providers/payment-gateway-registry.provider';
-import type { PollAttemptJobData } from '../../queue/payment-queue.types';
-import { PaymentGatewayCallError, PaymentPersistenceError } from './errors';
-import type { PaymentProcessingError } from './errors';
-import { enqueuePaymentAttemptPoll } from './enqueue-payment-attempt-poll.use-case';
+import { DbClientTag, runInTransaction } from '../../../../db/db.provider';
+import type { OutboxService } from '../../../../outbox/outbox.service';
+import type { paymentTransactionStatusEnum } from '../../../entity';
+import { PaymentGatewayRegistryTag } from '../../../providers/payment-gateway-registry.provider';
+import type { PollAttemptJobData } from '../../../queue/payment-queue.types';
+import { PaymentGatewayCallError, PaymentPersistenceError } from '../errors';
+import type { PaymentProcessingError } from '../errors';
+import { enqueuePaymentAttemptPoll } from '../attempt/enqueue-payment-attempt-poll.use-case';
 import { failPaymentAttempt } from './fail-payment-attempt.use-case';
-import { findPaymentAttempt } from './find-payment-attempt.use-case';
-import { checkPayment } from './check-payment.use-case';
-import { updatePaymentAttempt } from './update-payment-attempt.use-case';
-import { upsertPaymentTransactionDetail } from './upsert-payment-transaction-detail.use-case';
-import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
-import { upsertPayment } from './upsert-payment.use-case';
-import { postPaymentSettlementLedger } from '../ledgers';
+import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
+import { checkPayment } from '../transaction/check-payment.use-case';
+import { updatePaymentAttempt } from '../attempt/update-payment-attempt.use-case';
+import { upsertPaymentTransactionDetail } from '../transaction/upsert-payment-transaction-detail.use-case';
+import { recordPaymentStatusHistory } from '../transaction/record-payment-status-history.use-case';
+import { upsertPayment } from '../transaction/upsert-payment.use-case';
+import { postPaymentSettlementLedger } from '../../ledgers';
 import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 
 export type PollPaymentAttemptOutcome =

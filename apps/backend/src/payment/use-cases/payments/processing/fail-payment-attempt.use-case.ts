@@ -1,14 +1,14 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../../db/db.provider';
-import type { PaymentAttemptRow, PaymentTransactionRow } from '../../entity';
+import { DbClientTag } from '../../../../db/db.provider';
+import type { PaymentAttemptRow, PaymentTransactionRow } from '../../../entity';
 import {
   PaymentPersistenceError,
   PaymentTransactionConflictError,
   PaymentTransactionNotFoundError,
-} from './errors';
-import { updatePaymentAttempt } from './update-payment-attempt.use-case';
-import { upsertPayment } from './upsert-payment.use-case';
-import { recordPaymentStatusHistory } from './record-payment-status-history.use-case';
+} from '../errors';
+import { updatePaymentAttempt } from '../attempt/update-payment-attempt.use-case';
+import { upsertPayment } from '../transaction/upsert-payment.use-case';
+import { recordPaymentStatusHistory } from '../transaction/record-payment-status-history.use-case';
 
 export interface FailPaymentAttemptInput {
   attempt: Pick<PaymentAttemptRow, 'id'>;

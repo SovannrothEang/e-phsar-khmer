@@ -1,9 +1,12 @@
 import { Effect } from 'effect';
-import { DbClientTag } from '../../../db/db.provider';
-import type { OutboxService } from '../../../outbox/outbox.service';
-import { PAYMENT_SETTLED_OUTBOX_EVENT_TYPE } from '../../outbox/payment-outbox-events';
-import type { LedgerTransactionRow, PaymentTransactionRow } from '../../entity';
-import { PaymentQueueError } from './errors';
+import { DbClientTag } from '../../../../db/db.provider';
+import type { OutboxService } from '../../../../outbox/outbox.service';
+import { PAYMENT_SETTLED_OUTBOX_EVENT_TYPE } from '../../../outbox/payment-outbox-events';
+import type {
+  LedgerTransactionRow,
+  PaymentTransactionRow,
+} from '../../../entity';
+import { PaymentQueueError } from '../errors';
 
 type EnqueuePaymentSettledEventError = PaymentQueueError;
 

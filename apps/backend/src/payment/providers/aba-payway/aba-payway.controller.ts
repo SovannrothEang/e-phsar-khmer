@@ -8,13 +8,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Effect } from 'effect';
 import { Public } from '../../../common/decorators/public.decorator';
 import { PaymentEffectRunner } from '../../payment-effect-runner.service';
 import {
-  createPaymentProviderEvent,
-  enqueuePaymentProviderEvent,
   findPaymentAttemptByProviderAttemptId,
+  receivePaymentProviderEvent,
 } from '../../use-cases';
 import { AbaPaywayProvider } from './aba-payway.provider';
 
@@ -24,6 +22,12 @@ import { AbaPaywayProvider } from './aba-payway.provider';
  * `PaymentsController.webhook()` envelope (`{provider, providerEventId,
  * eventType, payload}`), so it gets a dedicated route rather than requiring
  * ABA to be taught a shape it doesn't send.
+ *
+ * No service layer here: signature verification and payload parsing are
+ * gateway-specific request validation (plain sync calls on the injected
+ * provider, same job a guard would do), not a business action — the one
+ * actual write is `receivePaymentProviderEvent`, the same use-case the
+ * generic webhook route calls.
  */
 @ApiTags('payments')
 @Controller('payments/aba-payway')
@@ -74,20 +78,12 @@ export class AbaPaywayController {
       : undefined;
 
     await this.effectRunner.runDurably((outbox) =>
-      Effect.gen(function* () {
-        const { event, isNew } = yield* createPaymentProviderEvent({
-          provider: providerName,
-          providerEventId: parsed.providerEventId,
-          eventType: parsed.eventType,
-          payload: body,
-          paymentAttemptId: attempt?.id,
-        });
-        if (isNew) {
-          yield* enqueuePaymentProviderEvent(outbox, {
-            paymentProviderEventId: event.id,
-          });
-        }
-        return { eventId: event.id, isNew };
+      receivePaymentProviderEvent(outbox, {
+        provider: providerName,
+        providerEventId: parsed.providerEventId,
+        eventType: parsed.eventType,
+        payload: body,
+        paymentAttemptId: attempt?.id,
       }),
     );
 

@@ -2,9 +2,9 @@ import { Effect } from 'effect';
 import {
   paymentTransactionDetails,
   type PaymentTransactionDetailRow,
-} from '../../entity';
-import { DbClientTag } from '../../../db/db.provider';
-import { PaymentPersistenceError } from './errors';
+} from '../../../entity';
+import { DbClientTag } from '../../../../db/db.provider';
+import { PaymentPersistenceError } from '../errors';
 
 export interface UpsertPaymentTransactionDetailInput {
   paymentTransactionId: string;
