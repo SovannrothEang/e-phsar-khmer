@@ -58,7 +58,12 @@ import { OutboxModule } from '../outbox/outbox.module';
   // BullModule re-exported so any future module (e.g. a subscription
   // checkout flow) can `imports: [PaymentModule]` and `@InjectQueue` the
   // same `payments` queue instead of re-registering it.
-  // PaymentEffectRunner exported for WebhooksModule's controllers.
-  exports: [PaymentGatewayRegistry, PaymentEffectRunner, BullModule],
+  // PaymentEffectRunner and AbaPaywayProvider exported for WebhooksModule.
+  exports: [
+    PaymentGatewayRegistry,
+    PaymentEffectRunner,
+    AbaPaywayProvider,
+    BullModule,
+  ],
 })
 export class PaymentModule {}

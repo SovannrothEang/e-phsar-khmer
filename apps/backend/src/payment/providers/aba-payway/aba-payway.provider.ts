@@ -75,19 +75,19 @@ const SIGNATURE_HEADER = 'x-payway-hmac-sha512';
 @Injectable()
 export class AbaPaywayProvider implements PaymentGatewayProvider {
   readonly name = 'aba_payway';
-
   private readonly apiClient: ApiClient;
 
   constructor(private readonly configService: ConfigService) {
     this.apiClient = createApiClient({
       baseUrl: this.baseUrl(),
-      // Confirmed live (2026-09-16): without this, ABA's purchase endpoint
-      // returns a rendered HTML checkout page (200 OK) instead of the
-      // documented JSON body — silently breaking every `response.status`
-      // check below, since `response` would be an HTML string, not an
-      // object. Applies to every call this client makes (purchase,
-      // check-transaction, transaction-detail).
-      headers: { Accept: 'application/json' },
+      // Confirmed live (2026-09-16): without Accept: application/json,
+      // ABA's purchase endpoint returns a rendered HTML checkout page
+      // (200 OK) instead of the documented JSON body. Content-Type must
+      // also be explicit to ensure ABA treats this as a JSON API call.
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
     });
   }
 
@@ -146,8 +146,8 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
         tranId,
         amount,
         returnUrl,
-        cancelUrl,
-        continueSuccessUrl,
+        cancelUrl: cancelUrl ?? undefined,
+        continueSuccessUrl: continueSuccessUrl ?? undefined,
         currency,
         customFields: request.transactionId,
       },
@@ -161,8 +161,14 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
       amount,
       currency,
       return_url: returnUrl,
-      continue_success_url: continueSuccessUrl,
-      cancel_url: cancelUrl,
+      // ABA signs missing optional fields as empty string. Sending null
+      // would cause the hash to include "null" (the literal string) while
+      // ABA verifies with "", producing a signature mismatch (error code 2
+      // "Invalid Transaction ID"). Omit the fields entirely when not set.
+      ...(continueSuccessUrl
+        ? { continue_success_url: continueSuccessUrl }
+        : {}),
+      ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
       // Our own internal id, for manual lookups against ABA's own
       // tooling only — see the class doc comment. Never read back out of
       // a response by this codebase.
