@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Public } from '../common/decorators/public.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,12 +19,10 @@ import {
   createPaymentTransaction,
   listOwnedPaymentAttempts,
   listPayments,
-  receivePaymentProviderEvent,
   upsertPayment,
 } from './use-cases';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
-import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 /**
@@ -112,28 +109,6 @@ export class PaymentsController {
       listOwnedPaymentAttempts({
         paymentTransactionId: id,
         customerId: user.id,
-      }),
-    );
-  }
-
-  @Post('webhook')
-  @Public()
-  @ApiOperation({
-    summary:
-      'Generic provider webhook intake — dedupes on (provider, ' +
-      'providerEventId) and durably hands off a genuinely new event for ' +
-      'processing. A duplicate delivery is a safe no-op (structural ' +
-      "idempotency). A provider whose wire format doesn't match this " +
-      'envelope gets its own intake route instead (see AbaPaywayController).',
-  })
-  webhook(@Body() dto: PaymentWebhookDto) {
-    return this.effectRunner.runDurably((outbox) =>
-      receivePaymentProviderEvent(outbox, {
-        provider: dto.provider,
-        providerEventId: dto.providerEventId,
-        eventType: dto.eventType,
-        payload: dto.payload,
-        paymentAttemptId: dto.paymentAttemptId,
       }),
     );
   }

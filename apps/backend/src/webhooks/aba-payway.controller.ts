@@ -8,38 +8,39 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Public } from '../../../common/decorators/public.decorator';
-import { PaymentEffectRunner } from '../../payment-effect-runner.service';
+import { Public } from '../common/decorators/public.decorator';
+import { PaymentEffectRunner } from '../payment/payment-effect-runner.service';
 import {
   findPaymentAttemptByProviderAttemptId,
   receivePaymentProviderEvent,
-} from '../../use-cases';
-import { AbaPaywayProvider } from './aba-payway.provider';
+} from '../payment/use-cases';
+import { AbaPaywayProvider } from '../payment/providers/aba-payway/aba-payway.provider';
 
 /**
- * ABA PayWay's own webhook intake. Its documented notification payload
- * (`transaction_id`, `payment_status_code`, ...) doesn't match the generic
- * `PaymentsController.webhook()` envelope (`{provider, providerEventId,
- * eventType, payload}`), so it gets a dedicated route rather than requiring
- * ABA to be taught a shape it doesn't send.
+ * ABA PayWay's webhook intake — separated from the payment CRUD controller
+ * because this is a provider-specific wire-format handler, not part of the
+ * payment lifecycle API. ABA sends its payment notification to this route
+ * (configured via ABA_PAYWAY_WEBHOOK_URL env var).
+ *
+ * Route: POST /api/v1/webhooks/aba-payway
  *
  * No service layer here: signature verification and payload parsing are
  * gateway-specific request validation (plain sync calls on the injected
  * provider, same job a guard would do), not a business action — the one
  * actual write is `receivePaymentProviderEvent`, the same use-case the
- * generic webhook route calls.
+ * payment module's own controller used to expose.
  */
-@ApiTags('payments')
-@Controller('payments/aba-payway')
-export class AbaPaywayController {
-  private readonly logger = new Logger(AbaPaywayController.name);
+@ApiTags('webhooks')
+@Controller('webhooks/aba-payway')
+export class AbaPaywayWebhookController {
+  private readonly logger = new Logger(AbaPaywayWebhookController.name);
 
   constructor(
     private readonly effectRunner: PaymentEffectRunner,
     private readonly provider: AbaPaywayProvider,
   ) {}
 
-  @Post('webhook')
+  @Post()
   @Public()
   @HttpCode(200)
   @ApiOperation({

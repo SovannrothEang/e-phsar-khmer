@@ -58,7 +58,7 @@ const SIGNATURE_HEADER = 'x-payway-hmac-sha512';
  * field: the URL ABA POSTs the payment result to once the payer completes
  * (or abandons) checkout — functionally a per-request webhook target, not
  * a browser redirect. It is always `webhookUrl()` (fixed server config,
- * `ABA_PAYWAY_WEBHOOK_URL`, pointed at `AbaPaywayController`'s own route)
+ * `ABA_PAYWAY_WEBHOOK_URL`, pointed at the webhooks controller's route)
  * and is never sourced from caller input — a client controlling where
  * ABA's payment-result notification goes would be a real vulnerability.
  * `continue_success_url`/`cancel_url` are the actual browser redirects,

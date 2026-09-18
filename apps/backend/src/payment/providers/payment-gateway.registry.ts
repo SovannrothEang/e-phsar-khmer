@@ -14,6 +14,9 @@ export class PaymentGatewayRegistry {
   private readonly providers = new Map<string, PaymentGatewayProvider>();
 
   constructor(
+    // Inject the array of providers registered in payment.module.ts with the unique token PAYMENT_GATEWAY_PROVIDERS.
+    // PAYMENT_GATEWAY_PROVIDERS token
+    //  └── provides: [abaPayway, bakong]  (plain array)
     @Inject(PAYMENT_GATEWAY_PROVIDERS) providers: PaymentGatewayProvider[],
   ) {
     for (const provider of providers) {
