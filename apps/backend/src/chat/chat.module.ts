@@ -5,11 +5,19 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { ConnectionRegistry } from './connection-registry';
 import { HeartbeatService } from './heartbeat.service';
+import { E2eKeysController } from './e2e/e2e-keys.controller';
+import { E2eKeysService } from './e2e/e2e-keys.service';
 
 @Module({
   imports: [AuthModule],
-  controllers: [ChatController],
-  providers: [ChatService, ConnectionRegistry, HeartbeatService, ChatGateway],
+  controllers: [ChatController, E2eKeysController],
+  providers: [
+    ChatService,
+    ConnectionRegistry,
+    HeartbeatService,
+    ChatGateway,
+    E2eKeysService,
+  ],
   exports: [ChatService],
 })
 export class ChatModule {}
