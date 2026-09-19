@@ -32,6 +32,19 @@ export interface PaymentGatewayProvider {
    */
   reconcile?(providerTransactionId: string): Promise<ChargeResult>;
 
+  /**
+   * Whether this provider has the credentials it needs to actually call
+   * out (e.g. an API key/merchant id from env config) — not whether it's
+   * registered (that's `PaymentGatewayRegistry.resolve` succeeding at
+   * all). Optional: a provider whose calls can't fail this way (or that
+   * hasn't needed the distinction yet) can omit it, and callers must treat
+   * a missing implementation as "assume configured" rather than block on
+   * it. `processProviderEvent` uses this to short-circuit before
+   * `reconcile()`, so a missing key settles the event as a clear failure
+   * instead of surfacing only as a thrown Error retried opaquely by BullMQ.
+   */
+  isConfigured?(): boolean;
+
   verifyWebhookSignature(
     rawBody: Buffer | string,
     headers: Record<string, string>,

@@ -20,6 +20,7 @@ import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-
 export type ProcessPaymentAttemptOutcome =
   | 'skipped'
   | 'gateway_not_registered'
+  | 'gateway_not_configured'
   | 'pending'
   | 'succeeded'
   | 'failed';
@@ -91,6 +92,23 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
         (cause) => new PaymentPersistenceError({ cause }),
       );
       return 'gateway_not_registered';
+    }
+
+    // Registered but missing the credentials it needs to actually call out
+    // (see PaymentGatewayProvider.isConfigured's doc comment) — same "give
+    // up outright" treatment as an unregistered provider, since a retry
+    // can't fix a missing env var either.
+    if (provider.isConfigured && !provider.isConfigured()) {
+      yield* runInTransaction(
+        failPaymentAttempt({
+          attempt,
+          transaction,
+          failureCode: 'GATEWAY_NOT_CONFIGURED',
+          failureMessage: `Payment gateway "${attempt.provider}" is not configured`,
+        }),
+        (cause) => new PaymentPersistenceError({ cause }),
+      );
+      return 'gateway_not_configured';
     }
 
     // Outside the DB transaction on purpose — an HTTP call to a gateway has

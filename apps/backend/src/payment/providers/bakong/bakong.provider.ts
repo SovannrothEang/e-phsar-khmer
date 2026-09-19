@@ -162,6 +162,29 @@ export class BakongProvider implements PaymentGatewayProvider {
     return payload;
   }
 
+  /**
+   * Whether Bakong has everything its whole lifecycle needs — not just
+   * `charge()`'s own narrower check. A KHQR generated without `apiKey` set
+   * could never be confirmed (there's no webhook — `reconcile()` polling is
+   * the *only* way this provider learns a payment happened), so this
+   * deliberately also gates charge()/`processPaymentAttempt` on the same
+   * key `charge()` itself doesn't touch: charging into a config that can
+   * never resolve is worse than failing the attempt up front. See
+   * `PaymentGatewayProvider.isConfigured`'s doc comment for how callers use
+   * this.
+   */
+  isConfigured(): boolean {
+    const account = this.accountConfig();
+    if (!account.accountId || !account.displayName) return false;
+    if (
+      account.type === 'merchant' &&
+      (!account.merchantId || !account.acquiringBank)
+    ) {
+      return false;
+    }
+    return Boolean(this.apiKey());
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------

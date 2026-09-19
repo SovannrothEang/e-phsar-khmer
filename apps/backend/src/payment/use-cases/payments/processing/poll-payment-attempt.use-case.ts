@@ -21,6 +21,7 @@ export type PollPaymentAttemptOutcome =
   | 'skipped'
   | 'no_reconcile'
   | 'gateway_not_registered'
+  | 'gateway_not_configured'
   | 'expired'
   | 'still_pending'
   | 'succeeded'
@@ -85,6 +86,23 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
       (cause) => new PaymentPersistenceError({ cause }),
     );
     return 'gateway_not_registered';
+  }
+
+  // Registered but missing the credentials it needs to actually call out
+  // (see PaymentGatewayProvider.isConfigured's doc comment) — same
+  // "give up outright" treatment as an unregistered provider: a config
+  // that went missing mid-poll can't be fixed by trying reconcile() again.
+  if (provider.isConfigured && !provider.isConfigured()) {
+    yield* runInTransaction(
+      failPaymentAttempt({
+        attempt,
+        transaction,
+        failureCode: 'GATEWAY_NOT_CONFIGURED',
+        failureMessage: `Payment gateway "${attempt.provider}" is not configured`,
+      }),
+      (cause) => new PaymentPersistenceError({ cause }),
+    );
+    return 'gateway_not_configured';
   }
 
   if (!provider.reconcile || !attempt.providerAttemptId) {

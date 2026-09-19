@@ -30,6 +30,7 @@ export type ProcessProviderEventOutcome =
   | 'ignored_already_settled'
   | 'ignored_unconfirmed'
   | 'gateway_not_registered'
+  | 'gateway_not_configured'
   | 'succeeded'
   | 'failed'
   | 'pending';
@@ -114,6 +115,16 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
     if (!provider) {
       yield* settlePaymentProviderEvent({ id: event.id, status: 'failed' });
       return 'gateway_not_registered';
+    }
+
+    // A registered-but-unconfigured provider (e.g. ABA PayWay with no
+    // ABA_PAYWAY_API_KEY set) would otherwise only fail once reconcile()
+    // is called — as an opaque thrown Error, retried by BullMQ until the
+    // job's attempts are exhausted with no clear reason recorded anywhere.
+    // Checking directly gives a distinct, immediate outcome instead.
+    if (provider.isConfigured && !provider.isConfigured()) {
+      yield* settlePaymentProviderEvent({ id: event.id, status: 'failed' });
+      return 'gateway_not_configured';
     }
 
     // Re-derive the reported status from the stored raw payload — the same

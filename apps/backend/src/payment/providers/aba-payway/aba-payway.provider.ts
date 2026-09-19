@@ -274,6 +274,18 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     rawBody: Buffer | string,
     headers: Record<string, string>,
   ): WebhookVerification {
+    // Fail closed rather than verifying against an empty-string HMAC key —
+    // charge()/reconcile() refuse to run unconfigured via ensureConfigured(),
+    // and an unconfigured webhook path must refuse the same way instead of
+    // silently accepting any signature computed with key `''`.
+    if (!this.isConfigured()) {
+      return {
+        valid: false,
+        reason:
+          'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY and ABA_PAYWAY_MERCHANT_ID',
+      };
+    }
+
     const received = headers[SIGNATURE_HEADER];
     if (!received) {
       return { valid: false, reason: `Missing ${SIGNATURE_HEADER} header` };
@@ -369,8 +381,18 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     );
   }
 
+  /**
+   * Public so `processProviderEvent` can check this before calling
+   * `reconcile()` — a missing key would otherwise only surface as a thrown
+   * Error inside a BullMQ job, retried opaquely until the job's attempts
+   * are exhausted (see that use-case's own doc comment).
+   */
+  isConfigured(): boolean {
+    return Boolean(this.apiKey() && this.merchantId());
+  }
+
   private ensureConfigured(): void {
-    if (!this.apiKey() || !this.merchantId()) {
+    if (!this.isConfigured()) {
       throw new Error(
         'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY and ABA_PAYWAY_MERCHANT_ID',
       );
