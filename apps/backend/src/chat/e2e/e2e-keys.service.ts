@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
@@ -6,6 +11,7 @@ import {
   userE2eIdentities,
   userE2eOneTimePrekeys,
 } from '../../db/schema/chat.schema';
+import { isBlockedEitherWay } from '../blocks.util';
 import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
 import type { E2eKeyBundle } from './e2e-keys.types';
 
@@ -79,12 +85,24 @@ export class E2eKeysService {
    * so concurrent callers never claim the same row twice. A null
    * `oneTimePrekey` (pool exhausted) is a graceful degradation, not an
    * error: X3DH can proceed on the signed prekey alone.
+   *
+   * Gated by the same block check as ChatService.sendMessage — a block
+   * disables every chat interaction surface, not just sending. Without this,
+   * a blocked user could still enumerate whether the target has E2E enabled
+   * and burn through their one-time prekey pool for sessions that could
+   * never send a message anyway.
    */
-  async getBundle(userId: string): Promise<E2eKeyBundle> {
+  async getBundle(
+    callerId: string,
+    targetUserId: string,
+  ): Promise<E2eKeyBundle> {
+    if (await isBlockedEitherWay(this.db, callerId, targetUserId))
+      throw new ForbiddenException('Messaging unavailable');
+
     const [identity] = await this.db
       .select()
       .from(userE2eIdentities)
-      .where(eq(userE2eIdentities.userId, userId))
+      .where(eq(userE2eIdentities.userId, targetUserId))
       .limit(1);
     if (!identity)
       throw new NotFoundException('User has not registered E2E keys');
@@ -95,7 +113,7 @@ export class E2eKeysService {
       .where(
         sql`${userE2eOneTimePrekeys.id} in (
           select ${userE2eOneTimePrekeys.id} from ${userE2eOneTimePrekeys}
-          where ${userE2eOneTimePrekeys.userId} = ${userId}
+          where ${userE2eOneTimePrekeys.userId} = ${targetUserId}
             and ${userE2eOneTimePrekeys.usedAt} is null
           order by ${userE2eOneTimePrekeys.prekeyId}
           for update skip locked

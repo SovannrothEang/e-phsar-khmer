@@ -35,7 +35,10 @@ export class E2eKeysController {
 
   @Get(':userId/bundle')
   @ApiOperation({ summary: 'Fetch a key bundle to start an X3DH session' })
-  getBundle(@Param('userId', ParseUUIDPipe) userId: string) {
-    return this.e2eKeysService.getBundle(userId);
+  getBundle(
+    @CurrentUser() user: RequestUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.e2eKeysService.getBundle(user.id, userId);
   }
 }

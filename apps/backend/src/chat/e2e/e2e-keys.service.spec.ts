@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { E2eKeysService } from './e2e-keys.service';
 import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
 
@@ -142,13 +142,31 @@ describe('E2eKeysService.registerKeys', () => {
 });
 
 describe('E2eKeysService.getBundle', () => {
+  it('throws ForbiddenException when a block exists in either direction', async () => {
+    const tx = makeTx();
+    const db = makeDb(tx);
+    db.select.mockReturnValue(limitQuery([{ id: 'block-1' }])); // block check
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.getBundle('caller1', 'u1')).rejects.toThrow(
+      ForbiddenException,
+    );
+  });
+
   it('throws NotFoundException when no identity row exists', async () => {
     const tx = makeTx();
     const db = makeDb(tx);
-    db.select.mockReturnValue(limitQuery([]));
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([]); // no block
+      return limitQuery([]); // no identity
+    });
     const service = new E2eKeysService(db as never);
 
-    await expect(service.getBundle('u1')).rejects.toThrow(NotFoundException);
+    await expect(service.getBundle('caller1', 'u1')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   const identity = {
@@ -163,13 +181,18 @@ describe('E2eKeysService.getBundle', () => {
   it('returns oneTimePrekey: null when the pool is exhausted', async () => {
     const tx = makeTx();
     const db = makeDb(tx);
-    db.select.mockReturnValue(limitQuery([identity]));
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([]); // no block
+      return limitQuery([identity]);
+    });
     db.update.mockReturnValue({
       set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
     });
     const service = new E2eKeysService(db as never);
 
-    const bundle = await service.getBundle('u1');
+    const bundle = await service.getBundle('caller1', 'u1');
 
     expect(bundle.oneTimePrekey).toBeNull();
     expect(bundle.identityKey).toBe('idkey');
@@ -178,7 +201,12 @@ describe('E2eKeysService.getBundle', () => {
   it('returns the claimed prekey when one is available', async () => {
     const tx = makeTx();
     const db = makeDb(tx);
-    db.select.mockReturnValue(limitQuery([identity]));
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([]); // no block
+      return limitQuery([identity]);
+    });
     db.update.mockReturnValue({
       set: () => ({
         where: () => ({
@@ -189,7 +217,7 @@ describe('E2eKeysService.getBundle', () => {
     });
     const service = new E2eKeysService(db as never);
 
-    const bundle = await service.getBundle('u1');
+    const bundle = await service.getBundle('caller1', 'u1');
 
     expect(bundle.oneTimePrekey).toEqual({
       prekeyId: 5,

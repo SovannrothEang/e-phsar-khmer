@@ -28,6 +28,7 @@ import type { ConversationRow, MessageRow } from '../db/schema/chat.schema';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
+import { isBlockedEitherWay } from './blocks.util';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
@@ -92,7 +93,7 @@ export class ChatService {
       .limit(1);
     if (!recipient) throw new NotFoundException('Recipient not found');
 
-    if (await this.isBlockedEitherWay(senderId, dto.recipientId))
+    if (await isBlockedEitherWay(this.db, senderId, dto.recipientId))
       throw new ForbiddenException('Messaging unavailable');
 
     if (dto.listingId) {
@@ -514,20 +515,6 @@ export class ChatService {
     )
       throw new NotFoundException('Conversation not found');
     return conversation;
-  }
-
-  private async isBlockedEitherWay(a: string, b: string): Promise<boolean> {
-    const [row] = await this.db
-      .select({ id: userBlocks.id })
-      .from(userBlocks)
-      .where(
-        or(
-          and(eq(userBlocks.blockerId, a), eq(userBlocks.blockedId, b)),
-          and(eq(userBlocks.blockerId, b), eq(userBlocks.blockedId, a)),
-        ),
-      )
-      .limit(1);
-    return Boolean(row);
   }
 
   private async buildInboxItems(
