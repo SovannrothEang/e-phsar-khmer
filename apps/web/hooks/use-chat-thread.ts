@@ -333,6 +333,8 @@ export function useChatThread({
         imagePath: draft.imagePath ?? null,
         readAt: null,
         createdAt: new Date().toISOString(),
+        isE2e: false,
+        e2eHeader: null,
         pending: true,
       };
       setLocal((prev) => [...prev, optimistic]);

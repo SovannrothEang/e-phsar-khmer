@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { E2eHeader } from "@/types/chat";
 
 const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_MAX_MS = 30_000;
@@ -18,6 +19,8 @@ interface WsMessage {
     imagePath: string | null;
     readAt: string | null;
     createdAt: string;
+    isE2e: boolean;
+    e2eHeader: E2eHeader | null;
   };
 }
 
@@ -28,6 +31,7 @@ export interface ChatWsState {
     body?: string;
     listingId?: string;
     imagePath?: string;
+    e2eHeader?: E2eHeader;
   }) => void;
 }
 

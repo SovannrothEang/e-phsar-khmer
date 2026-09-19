@@ -22,6 +22,22 @@ export interface ListingContext {
   thumbnailUrl: string | null;
 }
 
+/**
+ * Signal-protocol envelope carried alongside an E2E message. Mirrors
+ * `E2eHeader` in `apps/backend/src/db/schema/chat.schema.ts`. `body` on
+ * such a message is ciphertext, not plaintext.
+ */
+export interface E2eHeader {
+  v: 1;
+  dh: string;
+  pn: number;
+  n: number;
+  identityKey?: string;
+  ephemeralKey?: string;
+  oneTimePrekeyId?: number;
+  signedPrekeyId?: number;
+}
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
@@ -32,6 +48,8 @@ export interface ChatMessage {
   imagePath: string | null;
   readAt: string | null;
   createdAt: string;
+  isE2e: boolean;
+  e2eHeader: E2eHeader | null;
   listing?: ListingContext | null;
 }
 
@@ -81,6 +99,7 @@ export interface SendMessageInput {
   body?: string;
   listingId?: string;
   imagePath?: string;
+  e2eHeader?: E2eHeader;
 }
 
 export interface SendMessageResult {
