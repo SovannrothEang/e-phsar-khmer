@@ -81,6 +81,8 @@ export class ChatService {
       throw new BadRequestException('Cannot message yourself');
     if (!dto.body && !dto.imagePath)
       throw new BadRequestException('Message must contain text or an image');
+    if (dto.e2eHeader && dto.imagePath)
+      throw new BadRequestException('E2E messages cannot include an image yet');
     if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
 
     const [recipient] = await this.db
@@ -141,6 +143,8 @@ export class ChatService {
         listingId: dto.listingId ?? null,
         imageUrl,
         imagePath: dto.imagePath ?? null,
+        isE2e: Boolean(dto.e2eHeader),
+        e2eHeader: dto.e2eHeader ?? null,
       })
       .returning();
 

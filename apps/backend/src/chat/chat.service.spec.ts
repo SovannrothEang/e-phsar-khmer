@@ -388,6 +388,66 @@ describe('ChatService.sendMessage', () => {
       thumbnailUrl: 'https://cdn/p1.jpg',
     });
   });
+
+  const e2eHeader = {
+    v: 1 as const,
+    dh: 'ratchet-pub-key',
+    pn: 0,
+    n: 0,
+    identityKey: 'idkey',
+    ephemeralKey: 'ephkey',
+    oneTimePrekeyId: 3,
+    signedPrekeyId: 1,
+  };
+
+  it('throws BadRequestException when e2eHeader is combined with imagePath', async () => {
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        imagePath: 'chat/u1/pic.jpg',
+        e2eHeader,
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('stores isE2e: true and the e2eHeader when present', async () => {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([{ id: 'u2' }]);
+      return limitQuery([]);
+    });
+    const captured: Record<string, unknown>[] = [];
+    mockInserts(captured);
+
+    await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'ciphertext-blob',
+      e2eHeader,
+    });
+
+    expect(captured[1]).toMatchObject({
+      body: 'ciphertext-blob',
+      isE2e: true,
+      e2eHeader,
+    });
+  });
+
+  it('stores isE2e: false and a null e2eHeader on a plaintext send', async () => {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([{ id: 'u2' }]);
+      return limitQuery([]);
+    });
+    const captured: Record<string, unknown>[] = [];
+    mockInserts(captured);
+
+    await service.sendMessage('u1', { recipientId: 'u2', body: 'hi' });
+
+    expect(captured[1]).toMatchObject({ isE2e: false, e2eHeader: null });
+  });
 });
 
 describe('ChatService.getMessages', () => {
