@@ -11,6 +11,9 @@
   "dependencies": {
     "@iconify/react": "^6.0.2",
     "@next/font": "^14.2.15",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-form": "^1.33.0",

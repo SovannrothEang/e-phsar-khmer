@@ -10,6 +10,22 @@ export type { E2eHeader };
  */
 export type RatchetSession = Record<string, unknown>;
 
+export interface EncryptResult {
+  header: E2eHeader;
+  ciphertext: string;
+  session: RatchetSession;
+}
+
+/** The public halves of a recipient's key material, as returned by GET /chats/e2e/keys/:userId/bundle. */
+export interface RemoteKeyBundle {
+  identityKey: string;
+  identitySigningKey: string;
+  signedPrekeyId: number;
+  signedPrekeyPublic: string;
+  signedPrekeySignature: string;
+  oneTimePrekey: { prekeyId: number; publicKey: string } | null;
+}
+
 export interface DecryptResult {
   plaintext: string;
   session: RatchetSession;
@@ -30,6 +46,12 @@ export interface RatchetEngine {
     header: E2eHeader,
     ciphertext: string,
   ): Promise<DecryptResult>;
+  /** `bundle` is required exactly when `session` is null — starting a session needs somewhere to start it from. */
+  encrypt(
+    session: RatchetSession | null,
+    plaintext: string,
+    bundle?: RemoteKeyBundle,
+  ): Promise<EncryptResult>;
 }
 
 /** Minimal persistence contract decrypt-message.ts needs — swappable for tests. */
