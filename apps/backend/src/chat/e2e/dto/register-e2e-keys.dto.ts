@@ -13,11 +13,20 @@ import { Type } from 'class-transformer';
 import { OneTimePrekeyDto } from './one-time-prekey.dto';
 
 export class RegisterE2eKeysDto {
-  @ApiProperty()
+  @ApiProperty({ description: 'X25519 public key, base64 (DH)' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   identityKey: string;
+
+  @ApiProperty({
+    description:
+      'Ed25519 public key, base64 (signs signedPrekeyPublic) — separate from identityKey since X3DH needs the identity key to both DH and sign',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  identitySigningKey: string;
 
   @ApiProperty()
   @IsInt()

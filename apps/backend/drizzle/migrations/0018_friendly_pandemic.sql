@@ -1,0 +1,1 @@
+ALTER TABLE "chat"."user_e2e_identities" ADD COLUMN "identity_signing_key" text NOT NULL;

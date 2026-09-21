@@ -118,7 +118,13 @@ export const userE2eIdentities = chatSchema.table('user_e2e_identities', {
   userId: uuid('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  identityKey: text('identity_key').notNull(), // base64 Curve25519 public key
+  identityKey: text('identity_key').notNull(), // base64 X25519 public key (DH)
+  // base64 Ed25519 public key — signs signedPrekeyPublic. Separate from
+  // identityKey because X3DH needs the identity key to both DH (X25519) and
+  // sign (Ed25519); noble/curves doesn't expose the Edwards<->Montgomery
+  // conversion Signal's own XEdDSA uses to make one key do both, and
+  // hand-rolling that curve-point conversion isn't worth the risk.
+  identitySigningKey: text('identity_signing_key').notNull(),
   registrationId: integer('registration_id').notNull(),
   signedPrekeyId: integer('signed_prekey_id').notNull(),
   signedPrekeyPublic: text('signed_prekey_public').notNull(), // base64

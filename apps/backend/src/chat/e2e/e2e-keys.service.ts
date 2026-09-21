@@ -36,6 +36,7 @@ export class E2eKeysService {
         .values({
           userId,
           identityKey: dto.identityKey,
+          identitySigningKey: dto.identitySigningKey,
           registrationId: dto.registrationId,
           signedPrekeyId: dto.signedPrekeyId,
           signedPrekeyPublic: dto.signedPrekeyPublic,
@@ -46,6 +47,7 @@ export class E2eKeysService {
           target: userE2eIdentities.userId,
           set: {
             identityKey: dto.identityKey,
+            identitySigningKey: dto.identitySigningKey,
             registrationId: dto.registrationId,
             signedPrekeyId: dto.signedPrekeyId,
             signedPrekeyPublic: dto.signedPrekeyPublic,
@@ -124,6 +126,7 @@ export class E2eKeysService {
 
     return {
       identityKey: identity.identityKey,
+      identitySigningKey: identity.identitySigningKey,
       registrationId: identity.registrationId,
       signedPrekeyId: identity.signedPrekeyId,
       signedPrekeyPublic: identity.signedPrekeyPublic,

@@ -35,6 +35,7 @@ function baseDto(
 ): RegisterE2eKeysDto {
   return {
     identityKey: 'idkey',
+    identitySigningKey: 'idsignkey',
     registrationId: 1,
     signedPrekeyId: 1,
     signedPrekeyPublic: 'spk-pub',
@@ -83,6 +84,7 @@ describe('E2eKeysService.registerKeys', () => {
     expect(identityValues[0]).toMatchObject({
       userId: 'u1',
       identityKey: 'idkey',
+      identitySigningKey: 'idsignkey',
       registrationId: 1,
       signedPrekeyId: 1,
       signedPrekeyPublic: 'spk-pub',
@@ -172,6 +174,7 @@ describe('E2eKeysService.getBundle', () => {
   const identity = {
     userId: 'u1',
     identityKey: 'idkey',
+    identitySigningKey: 'idsignkey',
     registrationId: 1,
     signedPrekeyId: 1,
     signedPrekeyPublic: 'spk-pub',
