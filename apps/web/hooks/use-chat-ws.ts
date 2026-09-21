@@ -1,68 +1,83 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { E2eHeader } from "@/types/chat";
+import type { ChatMessage } from "@/types/chat";
 
 const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_MAX_MS = 30_000;
 const WS_RECONNECT_ATTEMPTS = 10;
 
-interface WsMessage {
-  type: "message";
-  payload: {
-    id: string;
-    conversationId: string;
-    senderId: string;
-    body: string | null;
-    listingId: string | null;
-    imageUrl: string | null;
-    imagePath: string | null;
-    readAt: string | null;
-    createdAt: string;
-    isE2e: boolean;
-    e2eHeader: E2eHeader | null;
-  };
-}
+export type ChatWsEvent =
+  | { type: "message"; payload: ChatMessage }
+  | { type: "inbox_update" }
+  | { type: "unread_count" };
 
-export interface ChatWsState {
-  isConnected: boolean;
-  send: (envelope: {
+type Listener = (event: ChatWsEvent) => void;
+type ConnectedListener = (connected: boolean) => void;
+
+/**
+ * One physical WebSocket per browser tab, ref-counted across every mounted
+ * consumer (nav unread badge, inbox list, an open thread) instead of one
+ * socket per component. The badge is mounted on every page, so in practice
+ * this keeps a single connection open for the whole session whenever the
+ * user is signed in — which is what lets `inbox_update` / `unread_count`
+ * replace their flat-interval polls instead of only helping while a thread
+ * happens to be open.
+ *
+ * Bounded reconnect (10 attempts, exponential backoff up to 30s, then it
+ * gives up) covers both a real disconnect and a signed-out visitor whose
+ * connection the server rejects — it is not tied to auth state, so there is
+ * no stale "not authenticated" flag to invalidate after a client-side login.
+ */
+class ChatSocket {
+  private ws: WebSocket | null = null;
+  private readonly listeners = new Set<Listener>();
+  private readonly connectedListeners = new Set<ConnectedListener>();
+  private refCount = 0;
+  private attempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  isConnected = false;
+
+  subscribe(listener: Listener): () => void {
+    this.listeners.add(listener);
+    this.refCount += 1;
+    this.ensureConnected();
+    return () => {
+      this.listeners.delete(listener);
+      this.refCount = Math.max(0, this.refCount - 1);
+      if (this.refCount === 0) this.teardown();
+    };
+  }
+
+  onConnectedChange(cb: ConnectedListener): () => void {
+    this.connectedListeners.add(cb);
+    cb(this.isConnected);
+    return () => this.connectedListeners.delete(cb);
+  }
+
+  send(envelope: {
     recipientId: string;
     body?: string;
     listingId?: string;
     imagePath?: string;
-    e2eHeader?: E2eHeader;
-  }) => void;
-}
+  }) {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
+    this.ws.send(
+      JSON.stringify({ event: "send_message", data: { payload: envelope } }),
+    );
+  }
 
-/**
- * WebSocket hook for real-time chat. Connects to the backend gateway using the
- * httpOnly `user_access_token` cookie (same-origin WS upgrades send cookies
- * automatically — no token in the URL needed).
- *
- * The hook is intentionally dumb: it receives an `onMessage` callback and
- * forwards every incoming message to it. All state management lives in the
- * consumer (`use-chat-thread.ts`).
- */
-export function useChatWs({
-  enabled,
-  onMessage,
-}: {
-  enabled: boolean;
-  onMessage: (msg: WsMessage["payload"]) => void;
-}): ChatWsState {
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attemptRef = useRef(0);
-  const [isConnected, setIsConnected] = useState(false);
+  private ensureConnected() {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING)
+    )
+      return;
+    this.connect();
+  }
 
-  const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
-
-  const connect = useCallback(() => {
-    if (!enabled) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
+  private connect() {
     // In dev the Next.js server (port 3001) and backend (port 3000) are on
     // different origins, so cookies won't travel — connect directly to the
     // backend. In production they share an origin and the default works.
@@ -74,78 +89,142 @@ export function useChatWs({
         : "ws:";
     const host = isDev ? "localhost:3000" : window.location.host;
     const ws = new WebSocket(`${proto}//${host}/ws/chat`);
-    wsRef.current = ws;
+    this.ws = ws;
 
     ws.onopen = () => {
-      attemptRef.current = 0;
-      setIsConnected(true);
+      this.attempt = 0;
+      this.setConnected(true);
     };
 
     ws.onmessage = (event) => {
+      let data: ChatWsEvent;
       try {
-        const data = JSON.parse(event.data) as WsMessage;
-        if (data.type === "message") {
-          onMessageRef.current(data.payload);
-        }
+        data = JSON.parse(event.data) as ChatWsEvent;
       } catch {
-        // malformed frame — ignore
+        return; // malformed frame — ignore
       }
+      for (const listener of this.listeners) listener(data);
     };
 
     ws.onclose = () => {
-      setIsConnected(false);
-      wsRef.current = null;
-      scheduleReconnect();
+      this.setConnected(false);
+      this.ws = null;
+      if (this.refCount > 0) this.scheduleReconnect();
     };
 
-    ws.onerror = () => {
-      // onclose fires after onerror — reconnect happens there.
-      ws.close();
+    ws.onerror = () => ws.close();
+  }
+
+  private scheduleReconnect() {
+    if (this.attempt >= WS_RECONNECT_ATTEMPTS) return;
+    const delay = Math.min(
+      WS_RECONNECT_BASE_MS * 2 ** this.attempt,
+      WS_RECONNECT_MAX_MS,
+    );
+    this.attempt += 1;
+    this.reconnectTimer = setTimeout(() => {
+      if (this.refCount > 0) this.connect();
+    }, delay);
+  }
+
+  private setConnected(v: boolean) {
+    this.isConnected = v;
+    for (const cb of this.connectedListeners) cb(v);
+  }
+
+  private teardown() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.ws?.close();
+    this.ws = null;
+    this.attempt = 0;
+    this.setConnected(false);
+  }
+}
+
+// Module-scoped singleton — deliberately not created per-hook-call. Every
+// `useChatWs`/`useChatRealtime` instance across the app shares this one.
+const chatSocket = new ChatSocket();
+
+export interface ChatWsState {
+  isConnected: boolean;
+  send: (envelope: {
+    recipientId: string;
+    body?: string;
+    listingId?: string;
+    imagePath?: string;
+  }) => void;
+}
+
+/**
+ * Full per-thread hook: message delivery + send, on the shared connection.
+ * `enabled` controls this consumer's own subscription — the underlying
+ * socket may still be open because the badge or inbox list is also
+ * subscribed elsewhere on the page.
+ */
+export function useChatWs({
+  enabled,
+  onMessage,
+}: {
+  enabled: boolean;
+  onMessage: (msg: ChatMessage) => void;
+}): ChatWsState {
+  const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
+  const onMessageRef = useRef(onMessage);
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = chatSocket.subscribe((event) => {
+      if (event.type === "message") onMessageRef.current(event.payload);
+    });
+    const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
+    return () => {
+      unsubscribe();
+      unsubscribeConnected();
     };
   }, [enabled]);
 
-  const scheduleReconnect = useCallback(() => {
-    if (!enabled) return;
-    if (attemptRef.current >= WS_RECONNECT_ATTEMPTS) return;
+  const send = useCallback((envelope: Parameters<ChatWsState["send"]>[0]) => {
+    chatSocket.send(envelope);
+  }, []);
 
-    const delay = Math.min(
-      WS_RECONNECT_BASE_MS * 2 ** attemptRef.current,
-      WS_RECONNECT_MAX_MS,
-    );
-    attemptRef.current += 1;
-    reconnectTimer.current = setTimeout(connect, delay);
-  }, [enabled, connect]);
+  return { isConnected: enabled && isConnected, send };
+}
 
-  // Connect / disconnect on enable toggle.
+/**
+ * Lightweight hook for consumers that only care about `inbox_update` /
+ * `unread_count` signals and connection state — the nav badge and the inbox
+ * list. Also keeps the shared socket's ref count alive, since both of these
+ * are typically the only thing mounted outside an open thread.
+ */
+export function useChatRealtimeEvents({
+  enabled,
+  onEvent,
+}: {
+  enabled: boolean;
+  onEvent: (event: Extract<ChatWsEvent, { type: "inbox_update" | "unread_count" }>) => void;
+}): { isConnected: boolean } {
+  const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
+  const onEventRef = useRef(onEvent);
   useEffect(() => {
-    if (enabled) {
-      connect();
-    } else {
-      wsRef.current?.close();
-    }
+    onEventRef.current = onEvent;
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = chatSocket.subscribe((event) => {
+      if (event.type === "inbox_update" || event.type === "unread_count")
+        onEventRef.current(event);
+    });
+    const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
     return () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      wsRef.current?.close();
-      wsRef.current = null;
-      setIsConnected(false);
+      unsubscribe();
+      unsubscribeConnected();
     };
-  }, [enabled, connect]);
+  }, [enabled]);
 
-  const send = useCallback(
-    (envelope: {
-      recipientId: string;
-      body?: string;
-      listingId?: string;
-      imagePath?: string;
-    }) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      ws.send(
-        JSON.stringify({ event: "send_message", data: { payload: envelope } }),
-      );
-    },
-    [],
-  );
-
-  return { isConnected, send };
+  return { isConnected: enabled && isConnected };
 }

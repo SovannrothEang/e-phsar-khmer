@@ -26,8 +26,8 @@ export class ChatController {
   // Tighter than the global 100/60s: sending is the one chat verb that pushes
   // content into someone else's inbox, so it is the harassment/spam surface.
   // 30/min is well above human chat cadence and well below bot cadence.
-  // Caveat: the global ThrottlerGuard keys on IP, so this is shared by every
-  // user behind one NAT — see the follow-up note about a user-id tracker.
+  // Keyed on user id, not IP (UserAwareThrottlerGuard — see app.module.ts),
+  // so this can no longer be shared by every user behind one NAT.
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Send a message (creates the conversation on first message)',

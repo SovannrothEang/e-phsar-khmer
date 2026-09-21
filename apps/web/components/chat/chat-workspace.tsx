@@ -19,6 +19,7 @@ import {
 } from "@/actions/chat";
 import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
+import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import type { InboxItem, ListingContext } from "@/types/chat";
@@ -64,6 +65,18 @@ export function ChatWorkspace({
   });
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
+  // The nav badge's own socket subscription keeps the shared connection alive
+  // sitewide, but this hook still needs its own subscription here: it is what
+  // gates the poll below off, and the badge's connection state isn't visible
+  // outside its own component.
+  const { isConnected: realtimeConnected } = useChatRealtimeEvents({
+    enabled: viewer.isSuccess,
+    onEvent: (event) => {
+      if (event.type === "inbox_update")
+        void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+    },
+  });
+
   const inbox = useInfiniteQuery({
     queryKey: chatKeys.inbox(),
     enabled: viewer.isSuccess,
@@ -71,7 +84,9 @@ export function ChatWorkspace({
     queryFn: async ({ pageParam }) =>
       unwrap(await fetchInbox(pageParam ?? undefined)),
     getNextPageParam: (last) => last.meta.nextCursor,
-    refetchInterval: CHAT_POLL.inboxMs,
+    // Realtime push (see the subscription above) replaces the poll once the
+    // socket is up; the interval stays as the fallback while it isn't.
+    refetchInterval: realtimeConnected ? false : CHAT_POLL.inboxMs,
     refetchIntervalInBackground: false,
   });
 

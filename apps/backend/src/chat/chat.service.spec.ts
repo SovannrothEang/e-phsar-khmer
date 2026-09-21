@@ -28,12 +28,14 @@ function makeService(db: ReturnType<typeof makeDb>) {
     })),
   };
   const config = { get: jest.fn(() => 'listings') };
+  const pubsub = { publish: jest.fn(() => Promise.resolve()) };
   const service = new ChatService(
     db as never,
     supabase as never,
     config as never,
+    pubsub as never,
   );
-  return { service, supabase };
+  return { service, supabase, pubsub };
 }
 
 // .from().where().limit() → rows

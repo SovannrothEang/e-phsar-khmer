@@ -7,7 +7,7 @@ import {
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validate } from './config/config.validation';
 import { AppController } from './app.controller';
@@ -15,6 +15,7 @@ import { AppService } from './app.service';
 import { SupabaseModule } from './common/supabase/supabase.module';
 import { DbModule } from './db/db.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
+import { UserAwareThrottlerGuard } from './common/guards/user-aware-throttler.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -88,8 +89,11 @@ import { WebhooksModule } from './webhooks/webhooks.module';
   controllers: [AppController],
   providers: [
     AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // JwtAuthGuard runs FIRST so req.user is set before the throttler guard
+    // reads it — UserAwareThrottlerGuard keys on user id when present,
+    // falling back to IP only for anonymous/public requests.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: UserAwareThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: LastSeenInterceptor },
   ],
 })

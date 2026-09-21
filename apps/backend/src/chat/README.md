@@ -21,15 +21,16 @@ is a latency optimization on a system that already works without it.
 
 ### Files
 
-| File                     | Purpose                                                                                                                            |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `chat.controller.ts`     | REST surface: send, inbox, unread-count, resolve-with-user, message history/poll, mark-read.                                       |
-| `chat.service.ts`        | All persistence + business rules. The single write path for a message, REST or WS.                                                 |
-| `chat.gateway.ts`        | WebSocket gateway (`/ws/chat`). Authenticates the socket, relays `send_message` into `ChatService`, pushes to an online recipient. |
-| `connection-registry.ts` | In-memory `userId -> sockets` map for this process. Answers "is this user online, and on which socket(s)."                         |
-| `heartbeat.service.ts`   | Pings every open socket every 30s; closes and evicts any that hasn't ponged in 40s.                                                |
-| `chat.types.ts`          | Response-shape interfaces (`InboxItem`, `MessageWithListing`, poll metadata) shared by the service and controller.                 |
-| `dto/`                   | `SendMessageDto`, `QueryChatsDto`, `QueryMessagesDto` — request validation.                                                        |
+| File                     | Purpose                                                                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chat.controller.ts`     | REST surface: send, inbox, unread-count, resolve-with-user, message history/poll, mark-read.                                                                                                                                     |
+| `chat.service.ts`        | All persistence + business rules. The single write path for a message, REST or WS. Publishes realtime events after every send / mark-read.                                                                                       |
+| `chat.gateway.ts`        | WebSocket gateway (`/ws/chat`). Authenticates the socket (JWT + soft-delete check), rate-limits `send_message`, relays it into `ChatService`, and delivers push events to locally-connected sockets.                             |
+| `chat-pubsub.service.ts` | Redis pub/sub wrapper (reuses the BullMQ Redis connection). Fans a `message` / `inbox_update` / `unread_count` event out to every backend instance so a recipient connected to a different process still gets realtime delivery. |
+| `connection-registry.ts` | In-memory `userId -> sockets` map for this process. Answers "is this user online, and on which socket(s)." — always process-local; cross-instance reach comes from `chat-pubsub.service.ts`.                                     |
+| `heartbeat.service.ts`   | Pings every open socket every 30s; closes and evicts any that hasn't ponged in 40s.                                                                                                                                              |
+| `chat.types.ts`          | Response-shape interfaces (`InboxItem`, `MessageWithListing`, poll metadata) shared by the service and controller.                                                                                                               |
+| `dto/`                   | `SendMessageDto`, `QueryChatsDto`, `QueryMessagesDto` — request validation.                                                                                                                                                      |
 
 DB schema lives in [`../db/schema/chat.schema.ts`](../db/schema/chat.schema.ts), not in this folder. Both tables live in a dedicated `chat` Postgres schema (`../db/schema/chat.pg-schema.ts`, mirroring `payment/entity/payment.pg-schema.ts`) rather than `public` — moved there in migration `0016_move_chat_tables_to_chat_schema`. The FKs into `public.users`/`public.listings` are unaffected; Postgres and Drizzle both handle cross-schema foreign keys with no special casing.
 
@@ -71,10 +72,12 @@ One `conversations` row per unordered pair, enforced by a CHECK
 
 Chat doesn't use the transactional outbox or a BullMQ queue at all — every
 write is synchronous, inline, in the request/WS-handler that received it.
-That works because chat has no external system to hand off to; the WS push
-in `chat.gateway.ts` is the closest thing to an async fan-out step, and it's
-best-effort (fire-and-forget over a live socket), not durable like an
-outbox row.
+That works because chat has no external system whose failure must be
+retried durably; the closest thing to an async fan-out step is the Redis
+pub/sub publish in `chat-pubsub.service.ts`, and it's deliberately
+best-effort (a publish failure is logged and swallowed, never rethrown) —
+not durable like an outbox row, because a dropped push just means the
+recipient sees the change on their next poll instead of instantly.
 
 ## Lifecycle, end to end
 
@@ -86,7 +89,9 @@ sequenceDiagram
     participant Entry as ChatController / ChatGateway
     participant Svc as ChatService
     participant DB as Postgres
-    participant Reg as ConnectionRegistry
+    participant PS as ChatPubSubService (Redis)
+    participant GwB as ChatGateway (B's instance)
+    participant Reg as ConnectionRegistry (B's instance)
     participant B as Recipient
 
     A->>Entry: POST /chats/messages  (or WS "send_message")
@@ -94,15 +99,17 @@ sequenceDiagram
     Svc->>DB: find-or-create conversation (canonical-pair upsert)
     Svc->>DB: insert message
     Svc->>DB: advance lastMessageAt (monotonic max, never regresses)
+    Svc->>PS: publish message / inbox_update x2 / unread_count
     Svc-->>Entry: persisted message + listing context
     Entry-->>A: 201 response / WS ack
 
-    Entry->>Reg: isOnline(recipientId)?
-    alt B has an open socket on this process
-        Reg-->>Entry: yes
-        Entry->>B: push {type: "message", payload} over the socket
-    else B offline, on another node, or REST-only
-        Note over B: B's next GET /chats/:id/messages?after=latestCursor<br/>poll returns the message — nothing is lost
+    PS-->>GwB: fan-out (every subscribed instance, including A's own)
+    GwB->>Reg: isOnline(recipientId)?
+    alt B has an open socket on THIS instance
+        Reg-->>GwB: yes
+        GwB->>B: push {type, payload?} over the socket
+    else B offline, or connected to a different instance with no local match
+        Note over B: B's next GET /chats/:id/messages?after=latestCursor<br/>poll (or the badge/inbox poll) returns the change — nothing is lost
     end
 ```
 
@@ -116,7 +123,8 @@ sequenceDiagram
     participant HB as HeartbeatService
 
     Client->>WS: connect (?token= | Authorization header | user_access_token cookie)
-    WS->>WS: jwtService.verify(token) — signature + expiry only
+    WS->>WS: jwtService.verify(token) — signature + expiry
+    WS->>WS: DB check: user exists and is not soft-deleted (parity with JwtStrategy)
     WS->>Reg: add(userId, connection)
     loop every 30s
         HB->>Client: ping
@@ -142,39 +150,38 @@ Key properties this gives us:
 
 ## Current state
 
-| Piece                                                             | Status                                                                                       |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| REST endpoints (send / inbox / unread / resolve / history / read) | Done.                                                                                        |
-| DB schema (`conversations`, `messages`)                           | Done, migrated.                                                                              |
-| Blocking enforcement (403 either direction)                       | Done.                                                                                        |
-| Cursor pagination + `after` delta polling                         | Done.                                                                                        |
-| WebSocket gateway (real-time push)                                | Done — but single-instance only (see Open items).                                            |
-| Heartbeat / stale-connection sweep                                | Done.                                                                                        |
-| Multi-instance WS fan-out                                         | Not started — `ConnectionRegistry` is a local `Map`, not backed by Redis pub/sub or similar. |
-| WS auth parity with REST                                          | Not started — see Open items.                                                                |
-| WS-path rate limiting                                             | Not started — `@Throttle` only guards the REST route.                                        |
-| Push notifications (FCM/APNs)                                     | Not started.                                                                                 |
-| Message delete / private chat-image bucket                        | Not started, by design (see the repo's known-gaps notes).                                    |
+| Piece                                                             | Status                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST endpoints (send / inbox / unread / resolve / history / read) | Done.                                                                                                                                                            |
+| DB schema (`conversations`, `messages`)                           | Done, migrated.                                                                                                                                                  |
+| Blocking enforcement (403 either direction)                       | Done.                                                                                                                                                            |
+| Cursor pagination + `after` delta polling                         | Done — now the fallback path, not the default (see below).                                                                                                       |
+| WebSocket gateway (real-time push)                                | Done, multi-instance (Redis pub/sub fan-out via `chat-pubsub.service.ts`).                                                                                       |
+| Heartbeat / stale-connection sweep                                | Done.                                                                                                                                                            |
+| Multi-instance WS fan-out                                         | Done — `ChatPubSubService` publishes every push through Redis; `ConnectionRegistry` stays local, each instance's subscriber delivers to its own local sockets.   |
+| WS auth parity with REST                                          | Done — `handleConnection` now runs the same soft-delete DB check `JwtStrategy.validate` does.                                                                    |
+| WS-path rate limiting                                             | Done — in-memory 30/min per user in `chat.gateway.ts`, mirroring the REST route's `@Throttle`.                                                                   |
+| Realtime inbox / unread-badge push                                | Done — `inbox_update` / `unread_count` events replace the flat poll on the web client whenever the shared socket (`apps/web/hooks/use-chat-ws.ts`) is connected. |
+| Push notifications (FCM/APNs)                                     | Not started.                                                                                                                                                     |
+| Message delete / private chat-image bucket                        | Not started, by design (see the repo's known-gaps notes).                                                                                                        |
 
 ## Open items
 
-- **`ConnectionRegistry` doesn't survive more than one backend process.**
-  It's an in-memory `Map`, so real-time push only reaches a recipient
-  connected to the _same_ instance as the sender. Correctness doesn't
-  depend on it (REST + polling still delivers everything), but running more
-  than one instance silently degrades "instant" delivery to "next poll" for
-  cross-instance pairs. Needs a shared layer (Redis pub/sub, or similar)
-  before that's a deliberate tradeoff rather than an accident.
-- **WS auth is weaker than REST auth.** `ChatGateway.handleConnection` calls
-  `JwtService.verify()` directly — signature and expiry only. The REST path
-  goes through `JwtAuthGuard` → `JwtStrategy.validate`, which also checks the
-  DB for a soft-deleted user. A user who gets soft-deleted (or loses access)
-  keeps a working socket until their access token's own expiry
-  (`JWT_ACCESS_EXPIRES_IN`, default 15m).
-- **No rate limit on the WS `send_message` event.** The REST
-  `POST /chats/messages` route has a tighter-than-global throttle (30/min)
-  specifically because sending is the harassment/spam surface; the WS event
-  bypasses it entirely since it never goes through `ThrottlerGuard`.
-- **This module has outgrown its own docs.** The root `CLAUDE.md` still
-  describes chat as "REST + polling (no WebSockets)" — worth a follow-up
-  pass there now that `chat.gateway.ts` exists.
+- **The WS rate limiter is per-instance, not global.** `ChatGateway`'s
+  `sendTimestamps` map is in-memory, so under multiple backend instances a
+  user connected round-robin (or reconnecting) could get up to
+  `SEND_LIMIT × instance count` sends per window rather than a strict global
+  30/min. The REST route's throttle has the same per-instance-storage
+  caveat today (no `ThrottlerStorageRedisService` configured) — both would
+  need a shared counter (e.g. Redis) to be exact under horizontal scale.
+  Non-issue at MVP scale; worth revisiting alongside the REST throttle if a
+  real multi-instance deployment lands.
+- **`inbox_update` / `unread_count` are unauthenticated "refetch" signals,
+  not authenticated deltas.** They carry no payload — the client just
+  re-runs `GET /chats` / `GET /chats/unread-count`, which are themselves
+  auth-checked. This keeps `ChatPubSubService` from having to reason about
+  who's allowed to see what; the tradeoff is one extra request per push
+  instead of the socket carrying the data directly.
+- **Push notifications (FCM/APNs) still don't exist.** Realtime now reaches
+  every backend instance, but only a client with a live WebSocket — there's
+  still no fan-out to a backgrounded mobile app or a closed tab.

@@ -1,25 +1,37 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { fetchUnreadCount } from "@/actions/chat";
 import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
+import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { cn } from "@/lib/utils";
 
 /**
- * Nav badge for unread messages. Rides on `GET /chats/unread-count` — cheap,
- * but it sits on every page, so it refreshes on the slowest tier (60s) and
- * never while the tab is backgrounded. Renders nothing when there is nothing
- * to show, including for signed-out visitors (the request 401s and we stay
- * quiet rather than flashing an error).
+ * Nav badge for unread messages. Rides on `GET /chats/unread-count`, but
+ * since this component is mounted on every page it also owns the shared chat
+ * WebSocket's baseline subscription (see `use-chat-ws.ts`) — for a signed-in
+ * user the socket ends up open sitewide, and `unread_count` pushes replace
+ * the 60s poll. `enabled: true` means an anonymous visitor's browser still
+ * attempts the connection; the server rejects it and the hook's bounded
+ * retry (10 attempts, then it stops) caps the cost of that. Renders nothing
+ * when there is nothing to show, including for signed-out visitors (the
+ * count request 401s and we stay quiet rather than flashing an error).
  */
 export function ChatUnreadBadge({ className }: { className?: string }) {
   const t = useTranslations("Chat");
+  const queryClient = useQueryClient();
+  const { isConnected } = useChatRealtimeEvents({
+    enabled: true,
+    onEvent: () => {
+      void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
+    },
+  });
   const { data } = useQuery({
     queryKey: chatKeys.unread(),
     queryFn: async () => unwrap(await fetchUnreadCount()),
-    refetchInterval: CHAT_POLL.unreadBadgeMs,
+    refetchInterval: isConnected ? false : CHAT_POLL.unreadBadgeMs,
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30 * 1000,

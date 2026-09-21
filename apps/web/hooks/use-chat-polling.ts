@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Chat has no WebSocket layer by design — clients poll `?after=<latestCursor>`
- * for deltas. Server cost therefore scales linearly with poll frequency, so a
- * flat 3s timer across every open tab is the single fastest way to melt the
- * API. These tiers are the whole backoff policy; change them here and nowhere
- * else.
+ * These are the fallback tiers for when the WebSocket (`use-chat-ws.ts`) is
+ * not connected — an open thread's message delta poll, and (until the
+ * realtime push wins that race) the inbox/unread-badge poll. Server cost
+ * scales linearly with poll frequency, so a flat 3s timer across every open
+ * tab is the fastest way to melt the API. These tiers are the whole backoff
+ * policy; change them here and nowhere else.
  */
 export const CHAT_POLL = {
   /** Thread visible and recently interacted with. */

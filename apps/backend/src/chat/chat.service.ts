@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -29,6 +30,8 @@ import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { isBlockedEitherWay } from './blocks.util';
+import { ChatPubSubService } from './chat-pubsub.service';
+import type { ChatPushEvent } from './chat-pubsub.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
@@ -62,11 +65,29 @@ export class ChatService {
   private static readonly UUID_RE =
     /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
+    private readonly pubsub: ChatPubSubService,
   ) {}
+
+  /**
+   * Fire-and-forget over Redis (see ChatPubSubService) — a dropped push just
+   * means the recipient sees the change on their next poll, so a publish
+   * failure must never fail the request that triggered it.
+   */
+  private async publishChatEvents(events: ChatPushEvent[]): Promise<void> {
+    await Promise.all(
+      events.map((event) =>
+        this.pubsub.publish(event).catch((err: unknown) => {
+          this.logger.warn(`Chat push failed: ${String(err)}`);
+        }),
+      ),
+    );
+  }
 
   private get bucket(): string {
     return (
@@ -169,13 +190,26 @@ export class ChatService {
     const contexts = await this.batchLoadListingContexts(
       dto.listingId ? [dto.listingId] : [],
     );
-    return {
-      conversationId: conversation.id,
-      message: {
-        ...message,
-        listing: dto.listingId ? (contexts.get(dto.listingId) ?? null) : null,
-      },
+    const withListing = {
+      ...message,
+      listing: dto.listingId ? (contexts.get(dto.listingId) ?? null) : null,
     };
+
+    // Push over the realtime channel regardless of whether this call came
+    // from REST or the WS gateway — ChatGateway only ever writes to LOCAL
+    // sockets, so this is the one path that reaches a recipient connected to
+    // a different backend instance too. `message` carries the row; the inbox
+    // / unread-count events are plain "something changed" signals — the
+    // client re-runs its existing query functions rather than this layer
+    // serializing those shapes a second time.
+    await this.publishChatEvents([
+      { targetUserId: dto.recipientId, type: 'message', payload: withListing },
+      { targetUserId: dto.recipientId, type: 'inbox_update' },
+      { targetUserId: senderId, type: 'inbox_update' },
+      { targetUserId: dto.recipientId, type: 'unread_count' },
+    ]);
+
+    return { conversationId: conversation.id, message: withListing };
   }
 
   async getInbox(
@@ -399,6 +433,16 @@ export class ChatService {
         ),
       )
       .returning({ id: messages.id });
+
+    // Only the reader's own badge/inbox state changed by reading — the
+    // sender's side is unaffected until they next poll or send.
+    if (marked.length > 0) {
+      await this.publishChatEvents([
+        { targetUserId: userId, type: 'unread_count' },
+        { targetUserId: userId, type: 'inbox_update' },
+      ]);
+    }
+
     return { marked: marked.length };
   }
 
