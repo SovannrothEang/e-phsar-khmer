@@ -48,6 +48,17 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
     // issue other commands — so this is deliberately separate from BullMQ's.
     this.pub = new Redis(options);
     this.sub = new Redis(options);
+
+    // ioredis is an EventEmitter: an 'error' event with no listener is a
+    // fatal unhandled exception that crashes the whole process, not just
+    // this service — required even though every call site already treats a
+    // publish/subscribe failure as non-fatal.
+    this.pub.on('error', (err) =>
+      this.logger.warn(`Redis pub error: ${String(err)}`),
+    );
+    this.sub.on('error', (err) =>
+      this.logger.warn(`Redis sub error: ${String(err)}`),
+    );
   }
 
   async onModuleInit() {

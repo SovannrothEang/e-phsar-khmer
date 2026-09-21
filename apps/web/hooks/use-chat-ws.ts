@@ -7,6 +7,38 @@ const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_MAX_MS = 30_000;
 const WS_RECONNECT_ATTEMPTS = 10;
 
+/**
+ * `API_URL` (`lib/api/client.ts`) is deliberately server-only — this hook
+ * runs in the browser and can't read it, so it can't just reuse that value.
+ * Default is same-origin: correct in production (Next.js and the backend
+ * share an origin), and SAFE in dev even when they don't — a same-origin
+ * `/ws/chat` upgrade against the Next.js dev server has no route to match,
+ * so it fails to connect rather than guessing a port. A failed connection
+ * keeps `isConnected` false, so callers correctly fall back to the REST send
+ * path instead of silently losing messages.
+ *
+ * Set `NEXT_PUBLIC_WS_URL` to the backend's origin (e.g. `ws://localhost:8080`
+ * or `https://your-tunnel.example.com`, `http(s)` accepted and normalized to
+ * `ws(s)`) whenever it runs on a different origin than the Next.js server —
+ * which in this repo's dev setup is the common case, not the exception.
+ *
+ * The override's own scheme is NOT trusted as the last word: a page loaded
+ * over HTTPS (e.g. a tunnel) can never open a plain `ws://` connection —
+ * browsers block it outright as mixed content — so an https/wss page always
+ * forces `wss:`, even if `NEXT_PUBLIC_WS_URL` was typo'd as `ws://`.
+ */
+function resolveWsOrigin(): string {
+  const pageIsSecure = window.location.protocol === "https:";
+  const override = process.env.NEXT_PUBLIC_WS_URL;
+  if (override) {
+    const url = new URL(override);
+    const secure = pageIsSecure || url.protocol === "https:" || url.protocol === "wss:";
+    return `${secure ? "wss:" : "ws:"}//${url.host}`;
+  }
+
+  return `${pageIsSecure ? "wss:" : "ws:"}//${window.location.host}`;
+}
+
 export type ChatWsEvent =
   | { type: "message"; payload: ChatMessage }
   | { type: "inbox_update" }
@@ -78,17 +110,7 @@ class ChatSocket {
   }
 
   private connect() {
-    // In dev the Next.js server (port 3001) and backend (port 3000) are on
-    // different origins, so cookies won't travel — connect directly to the
-    // backend. In production they share an origin and the default works.
-    const isDev = window.location.port === "3001";
-    const proto = isDev
-      ? "ws:"
-      : window.location.protocol === "https:"
-        ? "wss:"
-        : "ws:";
-    const host = isDev ? "localhost:3000" : window.location.host;
-    const ws = new WebSocket(`${proto}//${host}/ws/chat`);
+    const ws = new WebSocket(`${resolveWsOrigin()}/ws/chat`);
     this.ws = ws;
 
     ws.onopen = () => {
