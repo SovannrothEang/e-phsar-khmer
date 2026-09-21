@@ -2,6 +2,26 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Approach for Agents
+
+You are a pragmatic senior engineer. Your job is to help design and build a long-term maintainable backend API.
+
+Non-negotiable rules:
+
+1. Prefer modular monolith with strict module boundaries
+2. Evolutionary design — extract services only when there is a clear need
+3. Strong typing + OpenAPI contract-first
+4. PostgreSQL as primary database
+5. Every suggestion must include trade-offs and a path to evolve later
+6. Never introduce complexity (Kafka, microservices, CQRS, etc.) unless explicitly requested
+
+For a design/architecture question (not a direct code-edit request), respond with:
+
+- Reasoning (max 5 bullets)
+- Concrete recommendation
+- Risks
+- What to verify next
+
 ## Monorepo layout
 
 pnpm + Turborepo. Packages are scoped with `pnpm --filter <name>`.
@@ -216,7 +236,7 @@ Key columns on `users`:
 
 **Activity tracking:** `LastSeenInterceptor` (global `APP_INTERCEPTOR`) calls `ActivityService.touch(userId)` on every authenticated request. `touch` is fire-and-forget with a 5-minute in-memory throttle per user.
 
-**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0016` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (categories/subcategories, users, listings, brands/models, idempotency_keys); `0001`–`0002` alter `users`; `0003` adds `listing_photos`; `0004_premium_mephisto` swaps `users` uniques for partial indexes + listing CHECK constraints; `0005_nosy_monster_badoon` adds chat tables + `user_blocks`; `0006_overjoyed_doorman` narrows chat timestamps to `timestamp(3)`; `0007_far_pet_avengers` adds `attribute_options`; `0008_legal_barracuda` adds subscription tables (4-tier hierarchy: categories→plans→packages→terms + `user_subscriptions`); `0009_tidy_screwball` adds report tables (`report_reasons`, `user_reports`, `listing_reports`); `0010`–`0011` are prior uncommitted migrations; `0012_blushing_sentinel` extends `user_role` enum with `'super_admin'` (`ALTER TYPE … ADD VALUE`); `0013_absent_tarantula` adds `outbox_events` (the transactional outbox — see `src/outbox/`); `0014_add_payment_ledger_entities` creates the 9 payment/ledger tables (still in `public` at this point); `0015_move_payment_tables_to_payment_schema` moves all 9 of those tables (+ their enums) from `public` into a dedicated `payment` Postgres schema — see the Payments section; `0016_move_chat_tables_to_chat_schema` does the same for `conversations`/`messages`, moving them into a dedicated `chat` Postgres schema (`src/db/schema/chat.pg-schema.ts`, mirroring `payment.pg-schema.ts`) — cross-schema FKs into `public.users`/`public.listings` are unaffected, Postgres and Drizzle both handle those with no special casing.
+**Migration status:** `drizzle/migrations/` holds generated migrations `0000`–`0018` (plus `meta/`). `0000_perfect_ultimatum` creates all 9 enums and the bulk of the schema (categories/subcategories, users, listings, brands/models, idempotency_keys); `0001`–`0002` alter `users`; `0003` adds `listing_photos`; `0004_premium_mephisto` swaps `users` uniques for partial indexes + listing CHECK constraints; `0005_nosy_monster_badoon` adds chat tables + `user_blocks`; `0006_overjoyed_doorman` narrows chat timestamps to `timestamp(3)`; `0007_far_pet_avengers` adds `attribute_options`; `0008_legal_barracuda` adds subscription tables (4-tier hierarchy: categories→plans→packages→terms + `user_subscriptions`); `0009_tidy_screwball` adds report tables (`report_reasons`, `user_reports`, `listing_reports`); `0010`–`0011` are prior uncommitted migrations; `0012_blushing_sentinel` extends `user_role` enum with `'super_admin'` (`ALTER TYPE … ADD VALUE`); `0013_absent_tarantula` adds `outbox_events` (the transactional outbox — see `src/outbox/`); `0014_add_payment_ledger_entities` creates the 9 payment/ledger tables (still in `public` at this point); `0015_move_payment_tables_to_payment_schema` moves all 9 of those tables (+ their enums) from `public` into a dedicated `payment` Postgres schema — see the Payments section; `0016_move_chat_tables_to_chat_schema` does the same for `conversations`/`messages`, moving them into a dedicated `chat` Postgres schema (`src/db/schema/chat.pg-schema.ts`, mirroring `payment.pg-schema.ts`) — cross-schema FKs into `public.users`/`public.listings` are unaffected, Postgres and Drizzle both handle those with no special casing; `0017_perfect_tarantula` adds the E2E key tables (`user_e2e_identities`, `user_e2e_one_time_prekeys`) and `messages.isE2e`/`messages.e2eHeader`; `0018_friendly_pandemic` adds `user_e2e_identities.identitySigningKey` (the separate Ed25519 signing key — see the Chat section).
 
 **Cambodian geography seed** (`src/db/seeds/cambodia-geography.seed.ts`): 25 provinces, 25 districts (one per province), 0 communes.
 
@@ -262,10 +282,10 @@ Supported query params: `categorySlug`, `subcategorySlug`, `provinceSlug`, `dist
 
 ### Chat
 
-`ChatModule` (`src/chat/`) — 1:1 buyer↔seller messaging, REST + polling (no WebSockets). **Per-contact threads**: exactly one `conversations` row per unordered user pair (CHECK `user_a_id < user_b_id` + unique; the service canonicalizes the pair and upserts with `onConflictDoUpdate`, bumping `last_message_at`). A message may carry an optional `listingId` context card (FK `ON DELETE SET NULL`). All routes require JWT:
+`ChatModule` (`src/chat/`) — 1:1 buyer↔seller messaging. **REST is authoritative; a WebSocket gateway is an optional low-latency push on top, not a replacement.** Every message — REST or WS — goes through the single `ChatService.sendMessage` write path, so validation exists once. **Per-contact threads**: exactly one `conversations` row per unordered user pair (CHECK `user_a_id < user_b_id` + unique; the service canonicalizes the pair and upserts with `onConflictDoUpdate`, bumping `last_message_at`). A message may carry an optional `listingId` context card (FK `ON DELETE SET NULL`). All routes require JWT. Full design + diagrams: `src/chat/README.md`.
 
 ```
-POST /api/v1/chats/messages          → send { recipientId, body?, listingId?, imagePath? }; find-or-creates the conversation
+POST /api/v1/chats/messages          → send { recipientId, body?, listingId?, imagePath?, e2eHeader? }; find-or-creates the conversation
 GET  /api/v1/chats                   → inbox: cursor on (lastMessageAt, id); items carry otherUser, lastMessage, unreadCount
 GET  /api/v1/chats/unread-count      → { total } for the badge
 GET  /api/v1/chats/with/:userId      → resolve thread with a user (read-only — never creates; conversation may be null)
@@ -276,6 +296,10 @@ POST /api/v1/chats/:id/read          → bulk mark-read; returns { marked }
 Send rejections: self (400), no body & no imagePath (400), imagePath outside `chat/{senderId}/` (400), recipient missing/soft-deleted (404), block in either direction (403 `Messaging unavailable`), listing owned by neither participant (400). Non-participants get 404 (not 403) on conversation routes — no existence oracle. Clients poll with `after = meta.latestCursor`; read receipts surface via `peerLastReadAt` (= `max(readAt)` of my messages, valid because mark-read is bulk).
 
 `messages.created_at` and `conversations.last_message_at` are `timestamp(3)` — cursor values roundtrip through JS Dates (ms precision), so µs columns would re-deliver the boundary row on `after` polls.
+
+**WebSocket gateway** (`chat.gateway.ts`, `/ws/chat`): authenticates via `?token=` query param, `Authorization` header, or the `user_access_token` cookie (browser WS can't set headers), verifying signature+expiry only via `JwtService.verify` (weaker than REST's `JwtAuthGuard` — no soft-delete check, so a deactivated user keeps a working socket until access-token expiry). `ConnectionRegistry` is an in-memory per-process `userId -> sockets` map — real-time push only reaches a recipient connected to the *same* backend instance; cross-instance or offline recipients still get the message via their next `after=` poll, so correctness never depends on the socket. `HeartbeatService` pings every open socket every 30s and evicts any that hasn't ponged in 40s. The WS `send_message` event bypasses `ThrottlerGuard` entirely (no rate limit), unlike the REST route's tighter 30/min throttle.
+
+**End-to-end encryption** (X3DH + Double Ratchet over `@noble/curves`, Signal-protocol shaped): `SendMessageDto.e2eHeader` (validated by `E2eHeaderDto`) marks a message as E2E — `body` becomes base64 ciphertext (max 24000 chars vs. plaintext), mutually exclusive with `imagePath` (text only in v1). The header carries the Double Ratchet fields (`dh`, `pn`, `n`) plus, only on a session's first message, the X3DH initial-message fields (`identityKey`, `ephemeralKey`, `oneTimePrekeyId`, `signedPrekeyId`). Stored verbatim in `messages.e2eHeader` (JSONB) alongside `messages.isE2e`. Key material lives in two tables: `user_e2e_identities` (one row per user — X25519 `identityKey` for DH, a **separate** Ed25519 `identitySigningKey` for signing `signedPrekeyPublic`, since `@noble/curves` doesn't expose the Edwards↔Montgomery conversion Signal's XEdDSA uses to make one key do both) and `user_e2e_one_time_prekeys` (claimed one at a time via a partial index on unused rows). `E2eKeysController` (`/api/v1/chats/e2e/keys`): `POST` registers/rotates a user's keys + replenishes one-time prekeys, `GET me/prekey-count` reports remaining stock, `GET :userId/bundle` fetches a peer's bundle (identity key, signing key, signed prekey + signature, one claimed one-time prekey) to start an X3DH session. The backend only stores and relays key material and ciphertext — it never sees plaintext or private keys.
 
 ### Files
 
@@ -563,8 +587,9 @@ Use `crypto.randomUUID()` from Node's built-in `node:crypto`. There is no `uuid`
 - **Communes not seeded.** `COMMUNES = []` in `cambodia-geography.seed.ts`. ~1600 Cambodian communes need to be added before `communeId` FK is useful.
 - **Attribute `:type` param is unvalidated.** Any string works against `attribute_options.type` (`varchar(60)`) — a typo'd type in the API silently creates a new attribute set. Consider validating against the seeded/admin type allowlist.
 - **Motorcycle brands not seeded.** The car set is seeded (91 brands, cars-for-sale); motorcycles-for-sale has no brand list yet.
-- **No push notifications for chat.** New messages reach clients only via polling (`after=` deltas); no FCM/APNs/WebSocket layer exists. The chat schema needs no changes to add one later.
+- **No push notifications for chat.** The WS gateway only reaches a recipient connected to the same backend process (see Chat section); there's still no FCM/APNs layer, and no cross-instance fan-out (`ConnectionRegistry` is a local `Map`, not backed by Redis pub/sub or similar) — needed before running more than one instance.
 - **Chat images are public-bucket URLs.** Same exposure as avatars/listing photos; switch to a private bucket + `createSignedDownloadUrl` if chat privacy is required.
+- **Chat WS auth is weaker than REST, and unthrottled.** `ChatGateway.handleConnection` only checks JWT signature/expiry (no soft-delete DB check), and the WS `send_message` event bypasses `ThrottlerGuard` entirely (the REST route has a tighter 30/min throttle specifically against spam).
 - **Inline `field_schema` duplication.** ~10 no-Type/no-Condition subcategory forms (all of Pets, Foods, and the no-Type Furniture blocks) are byte-identical to `commonListingFields` yet re-inline all 11 fields (~75 lines each) instead of referencing the const. Consistent by current convention but heavy; a one-time systemic refactor (e.g. `fieldSchema: [...commonListingFields]` for exact-match subcats) could DRY it. Non-blocking — do it once across all categories, never per-ship.
 - **`super_admin` vs `admin` permission gradation is role-assignment only.** `AdminService.createUser` and `updateUser` enforce that only `super_admin` can set `role` to `'admin'` or `'super_admin'` (`ForbiddenException` otherwise). The Team management page (`/wanderer/dashboard/team`) is super_admin-only — guarded at both the page level (`redirect` for non-super_admin) and the sidebar (the Team link is hidden from regular admins). Beyond role assignment, `admin` and `super_admin` are treated identically by all other `@Roles('admin', 'super_admin')` guards. Add finer-grained permission distinctions if needed later.
 - **Users page form shows `super_admin` option to regular admins.** `USER_ROLES` in `schemas/user.ts` includes `'super_admin'` so the Team page form can select it. The Users page form (`UserClient.tsx`) shares this constant and will render the option for regular admins too. The backend rejects unauthorized assignments with 403, but the UI should ideally hide the option for non-super_admin (follow-up).
