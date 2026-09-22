@@ -29,11 +29,13 @@ function makeService(db: ReturnType<typeof makeDb>) {
   };
   const config = { get: jest.fn(() => 'listings') };
   const pubsub = { publish: jest.fn(() => Promise.resolve()) };
+  const metrics = { beginSend: jest.fn(), endSend: jest.fn() };
   const service = new ChatService(
     db as never,
     supabase as never,
     config as never,
     pubsub as never,
+    metrics as never,
   );
   return { service, supabase, pubsub };
 }

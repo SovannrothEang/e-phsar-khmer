@@ -30,7 +30,8 @@ export const pgClientProvider = {
   inject: [ConfigService],
   useFactory: (configService: ConfigService) => {
     const url = configService.get<string>('database.url')!;
-    return postgres(url, { prepare: false });
+    const max = configService.get<number>('database.poolMax') ?? 20;
+    return postgres(url, { prepare: false, max });
   },
 };
 

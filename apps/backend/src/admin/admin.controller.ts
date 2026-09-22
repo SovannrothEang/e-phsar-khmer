@@ -10,10 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
+import { ChatMetricsService } from '../chat/chat-metrics.service';
 import { AdminService } from './admin.service';
 import { ListUsersDto } from './dto/list-users.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,7 +28,23 @@ import { TimeseriesQueryDto } from './dto/timeseries-query.dto';
 @UseGuards(RolesGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly chatMetrics: ChatMetricsService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Get('chat-metrics')
+  @ApiOperation({
+    summary:
+      'In-process chat send-latency snapshot (this instance only, resets on restart) — for spot-checking "is chat slow right now" without a live investigation.',
+  })
+  getChatMetrics() {
+    return {
+      ...this.chatMetrics.snapshot(),
+      dbPoolMax: this.configService.get<number>('database.poolMax'),
+    };
+  }
 
   @Get('stats')
   @ApiOperation({

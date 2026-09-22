@@ -27,6 +27,7 @@ import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
@@ -80,6 +81,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     HealthModule,
     ActivityModule,
     ChatModule,
+    NotificationsModule,
     OutboxModule,
     AttributesModule,
     AdminModule,

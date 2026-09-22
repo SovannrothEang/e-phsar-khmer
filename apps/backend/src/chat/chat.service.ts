@@ -30,8 +30,10 @@ import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { isBlockedEitherWay } from './blocks.util';
+import { isUniqueViolation } from './pg-errors.util';
 import { ChatPubSubService } from './chat-pubsub.service';
 import type { ChatPushEvent } from './chat-pubsub.service';
+import { ChatMetricsService } from './chat-metrics.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
@@ -72,6 +74,7 @@ export class ChatService {
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly pubsub: ChatPubSubService,
+    private readonly metrics: ChatMetricsService,
   ) {}
 
   /**
@@ -95,10 +98,51 @@ export class ChatService {
     );
   }
 
+  /**
+   * Above this, a send gets logged with a WARN so it shows up without
+   * anyone needing to be watching — this exact threshold is what a burst of
+   * concurrent sends looked like queueing for a DB pool connection (see
+   * ChatMetricsService / GET /admin/chat-metrics for the running picture).
+   */
+  private static readonly SLOW_SEND_WARN_MS = 500;
+
   async sendMessage(
     senderId: string,
     dto: SendMessageDto,
   ): Promise<{ conversationId: string; message: MessageWithListing }> {
+    const start = process.hrtime.bigint();
+    this.metrics.beginSend();
+    try {
+      return await this.sendMessageInternal(senderId, dto);
+    } finally {
+      const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+      this.metrics.endSend(durationMs);
+      if (durationMs > ChatService.SLOW_SEND_WARN_MS) {
+        this.logger.warn(
+          `Slow chat send: ${durationMs.toFixed(0)}ms (senderId=${senderId})`,
+        );
+      }
+    }
+  }
+
+  private async sendMessageInternal(
+    senderId: string,
+    dto: SendMessageDto,
+  ): Promise<{ conversationId: string; message: MessageWithListing }> {
+    // Idempotent replay: a retried send (WS reconnect racing an ack, a
+    // double-tap) with the same clientMessageId returns the ORIGINAL result
+    // instead of re-validating and re-inserting — same intent as the REST
+    // path's IdempotencyMiddleware, for the transport (WS) that has no
+    // Idempotency-Key header to hang that off of. Skips all validation and
+    // writes entirely on a genuine replay.
+    if (dto.clientMessageId) {
+      const replay = await this.findByClientMessageId(
+        senderId,
+        dto.clientMessageId,
+      );
+      if (replay) return replay;
+    }
+
     if (dto.recipientId === senderId)
       throw new BadRequestException('Cannot message yourself');
     if (!dto.body && !dto.imagePath)
@@ -107,22 +151,32 @@ export class ChatService {
       throw new BadRequestException('E2E messages cannot include an image yet');
     if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
 
-    const [recipient] = await this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.id, dto.recipientId), isNull(users.deletedAt)))
-      .limit(1);
+    // These three checks are independent reads (none depends on another's
+    // result), so they run concurrently instead of as sequential round trips
+    // to the DB — each round trip to a remote Postgres is the dominant cost
+    // on this path, not query execution time. Priority of which error wins
+    // when multiple checks fail stays the same as the old sequential order:
+    // recipient existence, then block, then listing ownership.
+    const [recipient, blocked, listing] = await Promise.all([
+      this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.id, dto.recipientId), isNull(users.deletedAt)))
+        .limit(1)
+        .then((rows) => rows[0]),
+      isBlockedEitherWay(this.db, senderId, dto.recipientId),
+      dto.listingId
+        ? this.db
+            .select({ id: listings.id, userId: listings.userId })
+            .from(listings)
+            .where(eq(listings.id, dto.listingId))
+            .limit(1)
+            .then((rows) => rows[0])
+        : Promise.resolve(undefined),
+    ]);
     if (!recipient) throw new NotFoundException('Recipient not found');
-
-    if (await isBlockedEitherWay(this.db, senderId, dto.recipientId))
-      throw new ForbiddenException('Messaging unavailable');
-
+    if (blocked) throw new ForbiddenException('Messaging unavailable');
     if (dto.listingId) {
-      const [listing] = await this.db
-        .select({ id: listings.id, userId: listings.userId })
-        .from(listings)
-        .where(eq(listings.id, dto.listingId))
-        .limit(1);
       // The context card must reference a listing owned by one of the two participants
       if (
         !listing ||
@@ -156,19 +210,40 @@ export class ChatService {
       imageUrl = data.publicUrl;
     }
 
-    const [message] = await this.db
-      .insert(messages)
-      .values({
-        conversationId: conversation.id,
-        senderId,
-        body: dto.body ?? null,
-        listingId: dto.listingId ?? null,
-        imageUrl,
-        imagePath: dto.imagePath ?? null,
-        isE2e: Boolean(dto.e2eHeader),
-        e2eHeader: dto.e2eHeader ?? null,
-      })
-      .returning();
+    let message: MessageRow;
+    try {
+      [message] = await this.db
+        .insert(messages)
+        .values({
+          conversationId: conversation.id,
+          senderId,
+          body: dto.body ?? null,
+          clientMessageId: dto.clientMessageId ?? null,
+          listingId: dto.listingId ?? null,
+          imageUrl,
+          imagePath: dto.imagePath ?? null,
+          isE2e: Boolean(dto.e2eHeader),
+          e2eHeader: dto.e2eHeader ?? null,
+        })
+        .returning();
+    } catch (err) {
+      // Two near-simultaneous retries with the same clientMessageId (a truly
+      // concurrent double-send, not just a slow one) can both pass the replay
+      // check above before either has inserted — the loser hits the unique
+      // index instead of finding a row to replay. Self-heal: look up what the
+      // winner just inserted and hand back that result instead of a 500.
+      if (
+        dto.clientMessageId &&
+        isUniqueViolation(err, 'messages_sender_client_id_uq')
+      ) {
+        const replay = await this.findByClientMessageId(
+          senderId,
+          dto.clientMessageId,
+        );
+        if (replay) return replay;
+      }
+      throw err;
+    }
 
     // Advance the thread watermark to the message's OWN createdAt. The upsert
     // above bumps lastMessageAt *before* the message row exists, so two
@@ -466,6 +541,37 @@ export class ChatService {
 
   private canonicalPair(a: string, b: string): [string, string] {
     return a < b ? [a, b] : [b, a];
+  }
+
+  /** Looks up a previously-sent message by its client-generated dedup key. */
+  private async findByClientMessageId(
+    senderId: string,
+    clientMessageId: string,
+  ): Promise<{ conversationId: string; message: MessageWithListing } | null> {
+    const [existing] = await this.db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.senderId, senderId),
+          eq(messages.clientMessageId, clientMessageId),
+        ),
+      )
+      .limit(1);
+    if (!existing) return null;
+
+    const contexts = await this.batchLoadListingContexts(
+      existing.listingId ? [existing.listingId] : [],
+    );
+    return {
+      conversationId: existing.conversationId,
+      message: {
+        ...existing,
+        listing: existing.listingId
+          ? (contexts.get(existing.listingId) ?? null)
+          : null,
+      },
+    };
   }
 
   /**

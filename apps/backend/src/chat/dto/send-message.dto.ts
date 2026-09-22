@@ -15,6 +15,15 @@ export class SendMessageDto {
   @IsUUID()
   recipientId: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Client-generated dedup key (e.g. a UUID minted before sending). A retry with the same key replays the original message instead of creating a duplicate — mainly for the WS path, where there is no Idempotency-Key header to fall back on.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  clientMessageId?: string;
+
   // At least one of body/imagePath is required — enforced in the service.
   // 24000 matches messages_body_length_max: an E2E body is base64
   // ciphertext, larger than the plaintext it encodes.

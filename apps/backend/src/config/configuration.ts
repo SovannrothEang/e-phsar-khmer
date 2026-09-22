@@ -19,6 +19,7 @@ export default () => {
     },
     database: {
       url: env.DATABASE_URL,
+      poolMax: env.DATABASE_POOL_MAX,
     },
     jwt: {
       secret: env.JWT_SECRET,

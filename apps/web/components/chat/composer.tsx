@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImageIcon, Loader2, Lock, SendHorizonal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Input } from "@/components/ui/input";
+
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { deleteChatUpload, signChatUpload } from "@/actions/chat";
@@ -37,7 +37,8 @@ export function Composer({
   onActivity?: () => void;
 }) {
   const t = useTranslations("Chat");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedImage | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -137,7 +138,7 @@ export function Composer({
       <div className="flex items-center gap-1.5 px-2 py-2.5 sm:px-3">
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={() => fileInputRef.current?.click()}
           disabled={uploading || sending}
           aria-label={t("composer.attachImage")}
           className="shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
@@ -149,7 +150,8 @@ export function Composer({
           )}
         </button>
 
-        <Input
+        <textarea
+          ref={inputRef}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -157,7 +159,8 @@ export function Composer({
           }}
           placeholder={t("composer.placeholder")}
           aria-label={t("composer.placeholder")}
-          className="h-10 flex-1 rounded-full border-none bg-muted px-4 text-sm focus-visible:ring-0"
+          rows={1}
+          className="h-10 max-h-24 flex-1 resize-none overflow-y-auto overflow-x-hidden whitespace-pre-wrap rounded-full border-none bg-muted px-4 py-2 text-sm focus-visible:ring-0"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -187,7 +190,7 @@ export function Composer({
       </div>
 
       <input
-        ref={inputRef}
+        ref={fileInputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp"
         className="hidden"

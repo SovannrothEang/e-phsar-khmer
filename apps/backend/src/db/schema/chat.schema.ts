@@ -72,6 +72,13 @@ export const messages = chatSchema.table(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     body: text('body'),
+    // Client-generated dedup key (e.g. a UUID minted before the send call) so
+    // a retried send — WS reconnect racing an ack, a double-tap — replays the
+    // original message instead of creating a duplicate. Optional: REST already
+    // gets this from IdempotencyMiddleware; this is the WS-path equivalent,
+    // and works for REST too if a caller chooses to send it. Scoped to the
+    // sender (not global) since IDs are client-minted, not server-issued.
+    clientMessageId: text('client_message_id'),
     // Optional listing context card; the card survives listing removal via SET NULL
     listingId: uuid('listing_id').references(() => listings.id, {
       onDelete: 'set null',
@@ -99,6 +106,12 @@ export const messages = chatSchema.table(
       .on(t.conversationId, t.senderId)
       .where(sql`read_at is null`),
     index('messages_listing_id_idx').on(t.listingId),
+    // Partial: NULLs (the common case — no idempotency key supplied) never
+    // collide, so this only ever rejects a genuine retry of the same
+    // (sender, clientMessageId) pair.
+    uniqueIndex('messages_sender_client_id_uq')
+      .on(t.senderId, t.clientMessageId)
+      .where(sql`client_message_id is not null`),
     check(
       'messages_content_present',
       sql`body is not null or image_path is not null`,

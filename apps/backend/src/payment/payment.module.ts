@@ -10,8 +10,10 @@ import { PaymentEffectRunner } from './payment-effect-runner.service';
 import { PaymentAttemptOutboxHandler } from './outbox/payment-attempt-outbox-handler';
 import { PaymentEventOutboxHandler } from './outbox/payment-event-outbox-handler';
 import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
+import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
 import { OutboxModule } from '../outbox/outbox.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +34,9 @@ import { OutboxModule } from '../outbox/outbox.module';
     // module now both produces outbox rows and publishes them to BullMQ).
     // See ../outbox/outbox.module.ts's own doc comment.
     OutboxModule,
+    // For PaymentSettledOutboxHandler — telling the customer their payment
+    // settled is a notification concern, not a payment-processing one.
+    NotificationsModule,
   ],
   controllers: [PaymentsController],
   providers: [
@@ -54,6 +59,9 @@ import { OutboxModule } from '../outbox/outbox.module';
     PaymentPollOutboxHandler,
     // Consumes all three BullMQ job kinds — the first @Processor in this repo.
     PaymentProcessor,
+    // Consumes the business-level payment.succeeded event — notifies the
+    // customer directly, no BullMQ hop (see its own doc comment).
+    PaymentSettledOutboxHandler,
   ],
   // BullModule re-exported so any future module (e.g. a subscription
   // checkout flow) can `imports: [PaymentModule]` and `@InjectQueue` the

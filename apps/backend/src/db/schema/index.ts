@@ -9,4 +9,5 @@ export * from './idempotency.schema';
 export * from './chat.pg-schema';
 export * from './chat.schema';
 export * from './outbox.schema';
+export * from './notifications.schema';
 export * from '../../payment/entity';

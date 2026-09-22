@@ -25,6 +25,7 @@ coverage
 
 .idea
 .vs
+.vscode
 
 # Build Outputs
 .next/

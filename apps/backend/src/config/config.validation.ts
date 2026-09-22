@@ -14,6 +14,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().refine((v) => v.startsWith('postgres'), {
     message: 'DATABASE_URL must start with postgres',
   }),
+  // postgres.js defaults this to 10, which the whole backend shares (every
+  // module, not just chat) — too small once anything sends concurrent
+  // queries, where requests start queueing for a free pool connection.
+  DATABASE_POOL_MAX: z.coerce.number().default(20),
   JWT_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(16),

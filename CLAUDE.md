@@ -284,7 +284,7 @@ Supported query params: `categorySlug`, `subcategorySlug`, `provinceSlug`, `dist
 
 ### Chat
 
-`ChatModule` (`src/chat/`) — 1:1 buyer↔seller messaging. **REST is authoritative; a WebSocket gateway is an optional low-latency push on top, not a replacement.** Every message — REST or WS — goes through the single `ChatService.sendMessage` write path, so validation exists once. **Per-contact threads**: exactly one `conversations` row per unordered user pair (CHECK `user_a_id < user_b_id` + unique; the service canonicalizes the pair and upserts with `onConflictDoUpdate`, bumping `last_message_at`). A message may carry an optional `listingId` context card (FK `ON DELETE SET NULL`). All routes require JWT. Full design + diagrams: `src/chat/README.md`.
+`ChatModule` (`src/chat/`) — 1:1 buyer↔seller messaging. **REST is authoritative; a WebSocket gateway is an optional low-latency push on top, not a replacement.** Every message — REST or WS — goes through the single `ChatService.sendMessage` write path, so validation exists once. Its three pre-write checks (recipient existence, block check, listing ownership) run concurrently via `Promise.all` rather than sequentially — each is an independent read, and each DB round trip is real latency against the remote Supabase pooler, so this is the difference between one queueing round trip and three under concurrent send load. See `DATABASE_POOL_MAX` above: the shared postgres.js pool (default 20, not chat-specific) is the actual scaling limit under concurrent chat traffic, not `ConnectionRegistry` (verified empirically — 20 concurrent WS sends across 2 connections showed 0 drops/duplicates/misrouting; latency scaled with pool contention instead). **Per-contact threads**: exactly one `conversations` row per unordered user pair (CHECK `user_a_id < user_b_id` + unique; the service canonicalizes the pair and upserts with `onConflictDoUpdate`, bumping `last_message_at`). A message may carry an optional `listingId` context card (FK `ON DELETE SET NULL`). All routes require JWT. Full design + diagrams: `src/chat/README.md`.
 
 ```
 POST /api/v1/chats/messages          → send { recipientId, body?, listingId?, imagePath?, e2eHeader? }; find-or-creates the conversation
@@ -567,11 +567,13 @@ The backend requires a `.env` or `.env.local` file inside `apps/backend/`. Witho
 | `JWT_SECRET`                | ≥ 16 chars                 |
 | `JWT_REFRESH_SECRET`        | ≥ 16 chars                 |
 
-Optional (with defaults): `PORT=3000`, `JWT_ACCESS_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=30d`, `THROTTLE_TTL=60`, `THROTTLE_LIMIT=100`, `SUPABASE_STORAGE_BUCKET=listings`, `TELEGRAM_BOT_TOKEN`, `FRONTEND_ORIGINS` (comma-separated), `DEV_OTP_TOKEN` (dev only — bypasses Supabase SMS, accepts this fixed token for all phone OTP verifications).
+Optional (with defaults): `PORT=3000`, `DATABASE_POOL_MAX=20` (postgres.js connection pool size, shared by the whole backend — raise if concurrent traffic starts queueing for a free connection; see the Chat section), `JWT_ACCESS_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=30d`, `THROTTLE_TTL=60`, `THROTTLE_LIMIT=100`, `SUPABASE_STORAGE_BUCKET=listings`, `TELEGRAM_BOT_TOKEN`, `FRONTEND_ORIGINS` (comma-separated), `DEV_OTP_TOKEN` (dev only — bypasses Supabase SMS, accepts this fixed token for all phone OTP verifications).
 
 Note: the pre-commit hook blocks committing any file matching `*.env*`.
 
 The web app (`apps/web`) reads two optional env vars (server-side only — never `NEXT_PUBLIC_`): `API_URL` (backend API base; defaults to `http://localhost:3000/api/v1`, consumed by `lib/api/client.ts`) and `SUPABASE_URL` (Supabase project URL; `next.config.ts` parses the hostname at build time so `next/image` can optimize Storage URLs — must match the backend's `SUPABASE_URL`).
+
+**`NEXT_PUBLIC_WS_URL`** (optional, client-visible by design — it's the one exception to the server-only rule above): the chat WebSocket's origin (e.g. `ws://localhost:8080`, or `wss://…` for a tunnel/prod), read by `apps/web/hooks/use-chat-ws.ts`. `API_URL` can't serve double duty here — it's server-only and invisible to a `"use client"` hook. Without this var the hook falls back to a dev heuristic (`localhost:3000`, the backend's default port) that silently breaks the moment the backend runs on any other port: the socket "connects" to whatever's listening there (or nothing), `ws.isConnected` still flips true, and every WS-path send gets optimistically marked "sent" client-side and then vanishes — never reaching the real backend, never persisted. REST sends (the fallback path when WS isn't connected) are unaffected since server actions read `API_URL` correctly. **Must mirror `API_URL`'s host** whenever the backend isn't on the default port.
 
 ## IDs
 

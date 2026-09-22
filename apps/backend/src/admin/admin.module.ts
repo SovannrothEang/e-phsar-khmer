@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FilesModule } from '../files/files.module';
+import { ChatModule } from '../chat/chat.module';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminCategoriesController } from './admin-categories.controller';
@@ -18,7 +19,7 @@ import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 
 @Module({
-  imports: [FilesModule],
+  imports: [FilesModule, ChatModule],
   controllers: [
     AdminController,
     AdminCategoriesController,

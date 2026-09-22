@@ -173,25 +173,34 @@ jobs, not as alternatives:
 - **A settled payment telling the rest of the system** (an outbox
   `payment.succeeded` / `payment.refunded` event that notifications or other
   modules subscribe to, written in the same DB transaction as the ledger
-  posting) is a **separate, not-yet-built** use of the same `OutboxModule` —
-  see [Current state](#current-state). The ledger posting itself (inserting
+  posting) is a **separate** use of the same `OutboxModule` — see
+  [Current state](#current-state). The ledger posting itself (inserting
   `ledger_transaction` + `ledger_entries`) is built and runs in that same DB
   transaction today (`postPaymentSettlementLedger`, called from all three
-  success-transition use-cases — see the lifecycle diagram below); only the
-  outbox row announcing it to the rest of the system is not. Don't conflate
-  either of these with the `payment.attempt.requested` /
-  `payment.provider_event.received` plumbing above; same infrastructure,
+  success-transition use-cases — see the lifecycle diagram below).
+  `payment.succeeded` now has a registered consumer —
+  `PaymentSettledOutboxHandler` (`outbox/payment-settled-outbox-handler.ts`)
+  — which notifies the transaction's `customerId` via the new
+  `NotificationsModule` (`src/notifications/`); `payment.refunded` has
+  neither a producer nor a consumer yet (no `refund` transaction type
+  exists — see Open items). Don't conflate either of these with the
+  `payment.attempt.requested` / `payment.provider_event.received` plumbing
+  above; same infrastructure,
   different purpose, different event types.
 - **Notification emission is end-of-life only, and it's asymmetric with the
   outbox.** On the happy path, settlement writes an `outbox_event` _and_
-  emits a notification — the outbox row is the durable "something happened"
-  fact other modules can subscribe to later; the notification emit is the
-  immediate "tell this user now" side effect. On the terminal-failure path
-  there's no ledger posting, so there's no `outbox_event` either — failure
-  notifications are emitted directly off the queue. A retryable failure
-  (new `payment_attempt`, transaction still `pending`) never notifies; the
-  transaction hasn't reached end-of-life yet. **Not built** — see
-  [Current state](#current-state).
+  (once `PaymentSettledOutboxHandler` picks it up) sends a notification —
+  the outbox row is the durable "something happened" fact other modules can
+  subscribe to later; the notification is the "tell this user now" side
+  effect, one `outbox_events` retry cycle behind the ledger posting itself
+  rather than in the same DB transaction (deliberately — notifying isn't
+  part of the atomic settlement write). **Built** for the happy path. On the
+  terminal-failure path there's no ledger posting, so there's no
+  `outbox_event` either — a failure notification would have to be emitted
+  directly off the queue instead. **Not built** — see
+  [Current state](#current-state). A retryable failure (new
+  `payment_attempt`, transaction still `pending`) never notifies either way;
+  the transaction hasn't reached end-of-life yet.
 
 ### Balance invariant
 
@@ -251,7 +260,7 @@ sequenceDiagram
 
     Note over Provider,Processor: Implemented — a provider-specific webhook controller,<br/>processProviderEvent, the registered provider's reconcile()
 
-    Note over Processor,Notifier: Notification emission is not built — see Current state.<br/>Ledger posting and the outbox announcement (the alt block below) are both<br/>built and run inside the same runInTransaction as the status flip that made it true.
+    Note over Processor,Notifier: Success-path notification is built (below).<br/>Failure-path notification is not — see Current state.<br/>Ledger posting and the outbox announcement (the alt block below) are both<br/>built and run inside the same runInTransaction as the status flip that made it true.
 
     alt Happy path (attempt/event/poll succeeded)
         Processor->>Ledger: postPaymentSettlementLedger(transaction, occurredAt)<br/>— same DB transaction as the status update above
@@ -259,8 +268,8 @@ sequenceDiagram
         Ledger->>Postgres: insert ledger_transaction (posted,<br/>idempotencyKey = payment_transaction.id)
         Ledger->>Postgres: insert ledger_entry x2 (debit provider_clearing, credit platform_revenue)
         Processor->>Postgres: enqueuePaymentSettledEvent: insert outbox_event<br/>(payment.succeeded, dedupeKey = payment-succeeded:transaction.id)<br/>— same transaction, only when the ledger posting produced a row
-        Note over Processor,Notifier: NOT BUILT past this point — no handler<br/>is registered for payment.succeeded yet, so the row above<br/>retries on the outbox's normal backoff and eventually lands<br/>as failed until a consumer exists (see Open items)
-        Ledger->>Notifier: emit notification (payment.succeeded)
+        Note over Processor,Notifier: Commit → wakeupAfterCommit() → OutboxWorker claims the row →<br/>PaymentSettledOutboxHandler.handle() — no BullMQ hop, unlike the three plumbing events
+        Processor->>Notifier: NotificationsService.notify(customerId, …)<br/>→ insert notifications row (in-app channel)
     else Terminal failure — NOT BUILT past this point
         Processor->>Notifier: emit notification (payment.failed)
     end
@@ -332,9 +341,10 @@ Key properties this gives us:
 | Provider event processing (`processProviderEvent`)                    | Done — corroborates via `reconcile()` before trusting a webhook's reported status, applies the same transition as attempt processing, including the same ledger posting on `succeeded`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Attempt polling (`pollPaymentAttempt`)                                | Done — the only path to a resolved status for a provider with no webhook at all. Calls `reconcile()`, applies the same transition on a definite outcome (including the ledger posting on `succeeded`), or re-schedules itself (`enqueuePaymentAttemptPoll`) on `pending`. Gives up (attempt `failed`, code `POLL_EXPIRED`) once `ChargeResult.poll.expiresAt` passes. See [`providers/bakong/README.md`](./providers/bakong/README.md) for the full loop.                                                                                                                                                                                                                                          |
 | Provider-specific webhook routes (e.g. ABA PayWay's)                  | Pattern established — a provider whose callback payload doesn't fit the generic `PaymentsController.webhook()` envelope gets its own dedicated route. See the individual provider's README for that route's own status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Ledger posting (`use-cases/ledgers/`)                                 | Done for `payment_transaction.type === 'payment'` — `postPaymentSettlementLedger` resolves/creates the `provider_clearing`/`platform_revenue` system accounts for the transaction's currency (`findOrCreateSystemLedgerAccount`) and posts one balanced `ledger_transaction` + 2 `ledger_entries` (`postLedgerTransaction`) inside the same `runInTransaction` as the status flip, from all three success-transition use-cases above. `refund`/`capture`/`void` are not mapped — see Open items. No business-level outbox event or notification is written yet (next row).                                                                                                                         |
-| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases. `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items). **No consumer registered for either type yet** — see Open items.                                                                                                                                                                                                                                                                                            |
-| Notification emission (success / failure)                             | Not started — no `Notifier`/consumer exists; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Ledger posting (`use-cases/ledgers/`)                                 | Done for `payment_transaction.type === 'payment'` — `postPaymentSettlementLedger` resolves/creates the `provider_clearing`/`platform_revenue` system accounts for the transaction's currency (`findOrCreateSystemLedgerAccount`) and posts one balanced `ledger_transaction` + 2 `ledger_entries` (`postLedgerTransaction`) inside the same `runInTransaction` as the status flip, from all three success-transition use-cases above. `refund`/`capture`/`void` are not mapped — see Open items.                                                                                                                                                                                                   |
+| Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases, **and now has a registered consumer** — `PaymentSettledOutboxHandler` (see next row). `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items).                                                                                                                                                                                                                                                                       |
+| Notification emission (success path)                                  | Done — `PaymentSettledOutboxHandler` (`outbox/payment-settled-outbox-handler.ts`) consumes `payment.succeeded` directly (no BullMQ hop — see its own doc comment) and calls the new `NotificationsModule` (`src/notifications/`). `NotificationsService.notify()` fans out to a small `NotificationChannel[]` — today just `InAppNotificationChannel`, which inserts a `notifications` row a client reads via `GET /notifications` / `/notifications/unread-count` / marks read via `PATCH /notifications/:id/read` \| `/notifications/read-all`. A transaction with no `customerId` no-ops (logged, not retried). Email/SMS/push are unbuilt — see Open items for the extension point.            |
+| Notification emission (failure path)                                  | Not started — no outbox event or handler for a terminal payment failure; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered). No unit/e2e tests yet for the use-cases, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (272 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
 
 ## Open items
@@ -368,22 +378,21 @@ Key properties this gives us:
   case, not a substitute for having the webhook reachable in any real
   deployment. See the individual provider's README for its own
   configuration requirements.
-- **Notification delivery mechanism is undecided.** The lifecycle diagram
-  fixes _when_ a notification fires (once, at end-of-life, on either the
-  success or terminal-failure path) but not _how_ — whether "Notifier" ends
-  up being a consumer of `outbox_events`, a direct call from the queue
-  processor, or its own module. The failure path in particular has no
-  outbox row to key off, so it can't simply be "subscribe to the outbox."
-- **`payment.succeeded` has no registered consumer yet.** The event is
-  written (see Current state), but no `OutboxHandler` is registered for
-  `PAYMENT_SETTLED_OUTBOX_EVENT_TYPE` — `OutboxDispatcher.run()` treats an
-  unregistered type as retryable (a deliberate design choice for rolling
-  deploys, not a bug), so today every `payment.succeeded` row retries on
-  the outbox's normal backoff schedule and eventually lands as `failed`
-  once it exhausts `maxAttempts`. The row itself is never lost (it stays in
-  `outbox_events` for a future handler or manual replay), but this is
-  expected noise until a real consumer (Notifier, or whatever else
-  subscribes) is registered — see the notification item above.
+- **Notification delivery mechanism is decided for the success path, not the
+  failure path.** `payment.succeeded` is consumed by `PaymentSettledOutboxHandler`
+  (`src/payment/outbox/payment-settled-outbox-handler.ts`), a plain
+  `OutboxHandler` that calls the new `NotificationsModule`
+  (`src/notifications/`) directly — no BullMQ hop, since notifying has no
+  gateway call worth isolating behind a worker pool. `NotificationsService`
+  fans out to a `NotificationChannel[]` (currently just
+  `InAppNotificationChannel`, persisting to the new `notifications` table —
+  see its own module for the REST surface); adding email/SMS/push is adding
+  a class implementing `NotificationChannel` and listing it in
+  `notifications.module.ts`'s `NOTIFICATION_CHANNELS` factory, not a new
+  design decision. The terminal-failure path still has no equivalent — no
+  outbox row to key off (a failed attempt/transaction is never announced),
+  so it can't simply reuse this same consumer; it needs its own producer
+  first.
 - **`payment.refunded` has no producer yet.** `enqueuePaymentSettledEvent`
   only fires from the three success-transition use-cases on a `payment`
   transaction reaching `succeeded` (`postPaymentSettlementLedger` returns

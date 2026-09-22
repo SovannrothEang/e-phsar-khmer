@@ -59,7 +59,7 @@ export function MessageBubble({
 
       <div
         className={cn(
-          "flex max-w-[78%] flex-col gap-1 sm:max-w-[65%]",
+          "flex max-w-[78%] flex-col gap-1 sm:max-w-[60%]",
           isMine ? "items-end" : "items-start",
         )}
       >
@@ -89,7 +89,7 @@ export function MessageBubble({
         {message.body && (
           <div
             className={cn(
-              "rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap break-words",
+              "overflow-hidden rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap break-words",
               isMine
                 ? "rounded-br-sm bg-muted text-foreground"
                 : "rounded-bl-sm bg-sky-500 text-white",
