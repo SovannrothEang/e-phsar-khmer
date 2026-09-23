@@ -6,16 +6,18 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { fetchConversationWith } from "@/actions/chat";
+import { startConversationWith } from "@/actions/chat";
+import { storeListingPreview } from "@/lib/chat/listing-handoff";
+import type { ListingContext } from "@/types/chat";
 
 /**
  * "Message seller" entry point for a listing page.
  *
- * Resolves the thread with `GET /chats/with/:userId` first — read-only, it
- * never creates a conversation — then hands off to `/chats`, where the
- * composer sends the first message with `listingId` attached so the seller
- * sees the ad the buyer is asking about. The thread row only comes into
- * existence on that first send.
+ * Creates (or resolves) the thread via `POST /chats/with/:userId` FIRST — so
+ * the conversation exists and shows up in both inboxes as soon as the buyer
+ * opens it, regardless of whether they end up sending a message — then hands
+ * off to `/chats`, where the listing rides along as context for the first
+ * message (see `listingId` in the query string / `ListingContextCard`).
  *
  * Renders nothing when `sellerId` is missing or is the viewer's own id: the
  * backend rejects self-messages with a 400 and there is nothing useful to show.
@@ -23,6 +25,7 @@ import { fetchConversationWith } from "@/actions/chat";
 export function ContactSellerButton({
   sellerId,
   listingId,
+  listing,
   viewerId,
   className,
   size = "default",
@@ -30,6 +33,9 @@ export function ContactSellerButton({
 }: {
   sellerId: string | null | undefined;
   listingId?: string;
+  /** Full preview (title/price/thumbnail) for the ad being asked about — stashed
+   *  for the chat page so it can render the card before any message is sent. */
+  listing?: ListingContext | null;
   /** Pass the signed-in user's id when the host page has it, to hide the
    *  button on your own ad without an extra request. */
   viewerId?: string | null;
@@ -47,7 +53,7 @@ export function ContactSellerButton({
   async function open() {
     if (!sellerId) return;
     setResolving(true);
-    const res = await fetchConversationWith(sellerId);
+    const res = await startConversationWith(sellerId);
     setResolving(false);
 
     if (!res.ok) {
@@ -64,6 +70,8 @@ export function ContactSellerButton({
       toast.error(t("composer.blocked"));
       return;
     }
+
+    if (listingId && listing) storeListingPreview(listing);
 
     const query = listingId
       ? { to: sellerId, listing: listingId }

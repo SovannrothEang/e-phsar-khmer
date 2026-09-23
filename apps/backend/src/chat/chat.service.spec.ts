@@ -1102,3 +1102,183 @@ describe('ChatService cursor tampering (security)', () => {
     expect(collectStrings(wheres[0])).toContain('c1');
   });
 });
+
+describe('ChatService.startConversation', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: ChatService;
+
+  beforeEach(() => {
+    db = makeDb();
+    ({ service } = makeService(db));
+    db.selectDistinctOn.mockReturnValue(orderByQuery([]));
+  });
+
+  it('throws BadRequestException for yourself', async () => {
+    await expect(service.startConversation('u1', 'u1')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundException when the user is missing or soft-deleted', async () => {
+    db.select.mockReturnValue(limitQuery([]));
+
+    await expect(service.startConversation('u1', 'u2')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('throws ForbiddenException when a block exists in either direction', async () => {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1)
+        return limitQuery([
+          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+        ]);
+      return limitQuery([{ id: 'b1' }]); // isBlockedEitherWay
+    });
+
+    await expect(service.startConversation('u1', 'u2')).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('finds-or-creates without requiring a message, and clears only the caller’s delete flag', async () => {
+    let selectCount = 0;
+    db.select.mockImplementation(() => {
+      selectCount++;
+      if (selectCount === 1)
+        return limitQuery([
+          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+        ]);
+      if (selectCount === 2) return limitQuery([]); // not blocked
+      if (selectCount === 3) return groupByQuery([]); // unread counts
+      return whereQuery([
+        { id: 'u2', username: 'dara', profilePhotoUrl: null },
+      ]); // user summaries
+    });
+
+    let capturedSet: unknown;
+    db.insert.mockImplementation(() => ({
+      values: (v: Record<string, unknown>) => {
+        expect(v).toMatchObject({ userAId: 'u1', userBId: 'u2' });
+        return {
+          onConflictDoUpdate: (opts: { set: unknown }) => {
+            capturedSet = opts.set;
+            return { returning: () => Promise.resolve([conversation]) };
+          },
+        };
+      },
+    }));
+
+    const result = await service.startConversation('u1', 'u2');
+
+    // u1 < u2 canonically, so u1 IS userA — only its delete flag is revived.
+    expect(capturedSet).toEqual({ deletedByUserAAt: null });
+    expect(result.otherUser).toEqual({
+      id: 'u2',
+      username: 'dara',
+      profilePhotoUrl: null,
+    });
+    expect(result.canMessage).toBe(true);
+    expect(result.blockedByMe).toBe(false);
+    expect(result.conversation).not.toBeNull();
+  });
+
+  it('never requires body/image content (unlike sendMessage)', async () => {
+    let selectCount = 0;
+    db.select.mockImplementation(() => {
+      selectCount++;
+      if (selectCount === 1)
+        return limitQuery([
+          { id: 'u3', username: 'sopha', profilePhotoUrl: null },
+        ]);
+      if (selectCount === 2) return limitQuery([]);
+      if (selectCount === 3) return groupByQuery([]);
+      return whereQuery([]);
+    });
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([conversation]),
+        }),
+      }),
+    }));
+
+    await expect(service.startConversation('u2', 'u3')).resolves.toBeDefined();
+  });
+});
+
+describe('ChatService.deleteConversation', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: ChatService;
+
+  beforeEach(() => {
+    db = makeDb();
+    ({ service } = makeService(db));
+  });
+
+  it('throws NotFoundException for a non-participant (no existence oracle)', async () => {
+    db.select.mockReturnValue(limitQuery([conversation]));
+
+    await expect(service.deleteConversation('u9', 'c1')).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('sets deletedByUserAAt when the caller is userA', async () => {
+    db.select.mockReturnValue(limitQuery([conversation])); // userAId: 'u1'
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockImplementation(() => ({
+      set: (v: Record<string, unknown>) => {
+        sets.push(v);
+        return { where: () => Promise.resolve(undefined) };
+      },
+    }));
+
+    const result = await service.deleteConversation('u1', 'c1');
+
+    expect(result).toEqual({ deleted: true });
+    expect(sets).toHaveLength(1);
+    expect(Object.keys(sets[0])).toEqual(['deletedByUserAAt']);
+  });
+
+  it('sets deletedByUserBAt when the caller is userB', async () => {
+    db.select.mockReturnValue(limitQuery([conversation])); // userBId: 'u2'
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockImplementation(() => ({
+      set: (v: Record<string, unknown>) => {
+        sets.push(v);
+        return { where: () => Promise.resolve(undefined) };
+      },
+    }));
+
+    await service.deleteConversation('u2', 'c1');
+
+    expect(Object.keys(sets[0])).toEqual(['deletedByUserBAt']);
+  });
+
+  it('leaves the other participant unaffected (per-user hide only)', async () => {
+    // deleteConversation touches only ONE column; the row (and the other
+    // side's copy of the thread) is never removed.
+    db.select.mockReturnValue(limitQuery([conversation]));
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockImplementation(() => ({
+      set: (v: Record<string, unknown>) => {
+        sets.push(v);
+        return { where: () => Promise.resolve(undefined) };
+      },
+    }));
+    db.delete.mockImplementation(() => {
+      throw new Error('deleteConversation must never hard-delete a row');
+    });
+
+    await service.deleteConversation('u1', 'c1');
+
+    expect(db.delete).not.toHaveBeenCalled();
+    expect(sets[0]).not.toHaveProperty('deletedByUserBAt');
+  });
+});

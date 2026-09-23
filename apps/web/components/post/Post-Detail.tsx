@@ -25,6 +25,7 @@ import ListingSpecs from "./ListingSpecs";
 import type { BackendListing } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
+import type { ListingContext } from "@/types/chat";
 import { deriveOldPrice } from "@/lib/utils";
 
 /**
@@ -76,6 +77,27 @@ function toPostView(l: BackendListing): Post {
   };
 }
 
+/** Preview card handed to "Message seller" — see ContactSellerButton. */
+function toListingContext(l: BackendListing): ListingContext {
+  return {
+    id: l.id,
+    title: l.title,
+    price: l.price,
+    currency: l.currency ?? "USD",
+    status: isListingStatus(l.status) ? l.status : "active",
+    thumbnailUrl: l.photos[0]?.url ?? null,
+  };
+}
+
+function isListingStatus(value: string): value is ListingContext["status"] {
+  return (
+    value === "draft" ||
+    value === "active" ||
+    value === "expired" ||
+    value === "deleted"
+  );
+}
+
 export default function PostDetail({
   id,
   real,
@@ -97,6 +119,12 @@ export default function PostDetail({
 
   const hasBrand = !!brand;
   const hasModel = !!model;
+
+  // Mock listings have no matching row in the real `listings` table — attaching
+  // their id would only 400 once a message actually tries to send it.
+  const listingContext: ListingContext | null = isReal
+    ? toListingContext(real.listing)
+    : null;
 
   const displayId = isReal
     ? real.listing.id.slice(0, 8).toUpperCase()
@@ -299,7 +327,8 @@ export default function PostDetail({
               <ProfileSidebar
                 userId={post.userId}
                 user={user}
-                listingId={String(post.postId)}
+                listingId={listingContext ? listingContext.id : undefined}
+                listing={listingContext}
               />
             </div>
           </aside>

@@ -71,7 +71,15 @@
       "previewEmpty": "មិនទាន់មានសារ",
       "previewImage": "រូបភាព",
       "previewListing": "ការផ្សាយ",
-      "unreadCount": "សារមិនទាន់អាន {count}"
+      "unreadCount": "សារមិនទាន់អាន {count}",
+      "actionsLabel": "សកម្មភាពការសន្ទនា",
+      "archive": "ទុកក្នុងប័ណ្ណសារ",
+      "delete": "លុប",
+      "deleteConfirmTitle": "លុបការសន្ទនានេះឬ?",
+      "deleteConfirmDescription": "វានឹងត្រូវបានលុបចេញពីប្រអប់សាររបស់អ្នក។ {name} នៅតែអាចមើលឃើញផ្នែករបស់ពួកគេ។",
+      "deleteCancel": "បោះបង់",
+      "deleteConfirm": "លុប",
+      "deleteSuccess": "បានលុបការសន្ទនា។"
     },
     "thread": {
       "back": "ត្រឡប់ក្រោយ",
@@ -114,7 +122,8 @@
       "loadFailed": "មិនអាចទាញយកសារបានទេ។",
       "loadFailedTitle": "មានបញ្ហាកើតឡើង",
       "sendFailed": "មិនអាចផ្ញើសារបានទេ។",
-      "rateLimited": "អ្នកកំពុងផ្ញើសារញាប់ពេក។ សូមរង់ចាំបន្តិច។"
+      "rateLimited": "អ្នកកំពុងផ្ញើសារញាប់ពេក។ សូមរង់ចាំបន្តិច។",
+      "deleteFailed": "មិនអាចលុបការសន្ទនាបានទេ។"
     }
   }
 }

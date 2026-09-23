@@ -11,15 +11,19 @@ import { type User } from "@/lib/user";
 import { IconPhoneCall, IconWorld, IconMail } from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
 import { ContactSellerButton } from "@/components/chat/contact-seller-button";
+import type { ListingContext } from "@/types/chat";
 
 export default function ProfileSidebar({
   userId,
   user: userProp,
   listingId,
+  listing,
 }: {
   userId: string;
   user?: User;
   listingId?: string;
+  /** Preview card for the ad, stashed for the chat page — see ContactSellerButton. */
+  listing?: ListingContext | null;
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -193,6 +197,7 @@ export default function ProfileSidebar({
           <ContactSellerButton
             sellerId={userId}
             listingId={listingId}
+            listing={listing}
             className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base cursor-pointer"
           />
         </div>

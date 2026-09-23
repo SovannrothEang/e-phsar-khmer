@@ -1,9 +1,24 @@
 "use client";
 
-import { Loader2, MessagesSquare } from "lucide-react";
+import { useState } from "react";
+import { Archive, Loader2, MessagesSquare, MoreVertical, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { previewOf } from "@/lib/chat/format";
@@ -24,6 +39,8 @@ export function ConversationList({
   hasMore,
   isLoadingMore,
   onLoadMore,
+  onDelete,
+  deletingId,
 }: {
   items: InboxItem[];
   activeId: string | null;
@@ -32,8 +49,13 @@ export function ConversationList({
   hasMore: boolean;
   isLoadingMore: boolean;
   onLoadMore: () => void;
+  /** Called after the user confirms deletion in the dialog below. */
+  onDelete: (item: InboxItem) => void;
+  /** Id of the conversation currently being deleted, if any. */
+  deletingId: string | null;
 }) {
   const t = useTranslations("Chat");
+  const [pendingDelete, setPendingDelete] = useState<InboxItem | null>(null);
 
   if (isLoading) {
     return (
@@ -69,60 +91,106 @@ export function ConversationList({
     <div className="flex flex-1 flex-col overflow-y-auto">
       {items.map((item) => {
         const name = item.otherUser?.username ?? t("unknownUser");
+        const deleting = deletingId === item.id;
         return (
-          <button
+          <div
             key={item.id}
-            type="button"
-            onClick={() => onSelect(item)}
             className={cn(
-              "flex w-full items-center gap-3 border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+              "group flex w-full items-center gap-1 border-b border-border/50 pr-2 transition-colors hover:bg-muted/50",
               activeId === item.id && "bg-muted",
             )}
           >
-            <Avatar className="h-10 w-10 shrink-0">
-              {item.otherUser?.profilePhotoUrl && (
-                <AvatarImage src={item.otherUser.profilePhotoUrl} alt={name} />
-              )}
-              <AvatarFallback className="font-semibold">
-                {name.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-semibold">{name}</span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  <RelativeTime iso={item.lastMessageAt} />
-                </span>
-              </div>
-              <div className="mt-0.5 flex items-center justify-between gap-2">
-                <p
-                  className={cn(
-                    "truncate text-xs",
-                    item.unreadCount > 0
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {previewOf(item.lastMessage, {
-                    image: t("inbox.previewImage"),
-                    listing: t("inbox.previewListing"),
-                    none: t("inbox.previewEmpty"),
-                  })}
-                </p>
-                {item.unreadCount > 0 && (
-                  <span
-                    aria-label={t("inbox.unreadCount", {
-                      count: item.unreadCount,
-                    })}
-                    className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 text-[10px] font-bold text-white"
-                  >
-                    {item.unreadCount > 99 ? "99+" : item.unreadCount}
-                  </span>
+            <button
+              type="button"
+              onClick={() => onSelect(item)}
+              className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+            >
+              <Avatar className="h-10 w-10 shrink-0">
+                {item.otherUser?.profilePhotoUrl && (
+                  <AvatarImage
+                    src={item.otherUser.profilePhotoUrl}
+                    alt={name}
+                  />
                 )}
+                <AvatarFallback className="font-semibold">
+                  {name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">
+                    {name}
+                  </span>
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    <RelativeTime iso={item.lastMessageAt} />
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <p
+                    className={cn(
+                      "truncate text-xs",
+                      item.unreadCount > 0
+                        ? "font-medium text-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {previewOf(item.lastMessage, {
+                      image: t("inbox.previewImage"),
+                      listing: t("inbox.previewListing"),
+                      none: t("inbox.previewEmpty"),
+                    })}
+                  </p>
+                  {item.unreadCount > 0 && (
+                    <span
+                      aria-label={t("inbox.unreadCount", {
+                        count: item.unreadCount,
+                      })}
+                      className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 text-[10px] font-bold text-white"
+                    >
+                      {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("inbox.actionsLabel")}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={deleting}
+                  // Always visible on touch (no hover state to reveal it —
+                  // this market is phone-first, see ChatWorkspace); fades in
+                  // on hover/focus only at desktop widths.
+                  className="shrink-0 rounded-full p-1.5 text-muted-foreground opacity-100 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 data-[state=open]:bg-muted data-[state=open]:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                >
+                  {deleting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <MoreVertical className="size-4" />
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                {/* Archive isn't built yet — kept visible so the affordance
+                    is discoverable, but it deliberately does nothing. */}
+                <DropdownMenuItem>
+                  <Archive className="size-4" />
+                  {t("inbox.archive")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => setPendingDelete(item)}
+                >
+                  <Trash2 className="size-4" />
+                  {t("inbox.delete")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       })}
 
@@ -140,6 +208,36 @@ export function ConversationList({
           </Button>
         </div>
       )}
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("inbox.deleteConfirmTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("inbox.deleteConfirmDescription", {
+                name: pendingDelete?.otherUser?.username ?? t("unknownUser"),
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDelete(null)}>
+              {t("inbox.deleteCancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) onDelete(pendingDelete);
+                setPendingDelete(null);
+              }}
+            >
+              {t("inbox.deleteConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

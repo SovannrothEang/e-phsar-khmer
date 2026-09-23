@@ -137,6 +137,46 @@ export async function fetchConversationWith(
 }
 
 /**
+ * Find-or-create the conversation with `userId` — unlike `fetchConversationWith`
+ * this ALWAYS results in a persisted conversation row, even if no message is
+ * ever sent. Backs "Message seller": the redirect to `/chats` must land on a
+ * thread that already exists (and shows up in the seller's inbox), not one
+ * that only materializes once the buyer types something and hits send.
+ */
+export async function startConversationWith(
+  userId: string,
+): Promise<ChatActionResult<ConversationWithUser>> {
+  try {
+    const { data } = await userServerFetch<ConversationWithUser>(
+      `/chats/with/${userId}`,
+      { method: "POST" },
+    );
+    return { ok: true, data };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/**
+ * Delete a conversation from MY inbox only — the other participant's copy
+ * (and the message history) is untouched. Reappears automatically the next
+ * time either side sends a message or re-opens it via `startConversationWith`.
+ */
+export async function deleteConversation(
+  conversationId: string,
+): Promise<ChatActionResult<{ deleted: boolean }>> {
+  try {
+    const { data } = await userServerFetch<{ deleted: boolean }>(
+      `/chats/${conversationId}`,
+      { method: "DELETE" },
+    );
+    return { ok: true, data };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/**
  * Message page. Two mutually exclusive modes:
  *  - `cursor` → history, strictly older, newest-first (scrolling up)
  *  - `after`  → poll delta, strictly newer, oldest-first (live tail)

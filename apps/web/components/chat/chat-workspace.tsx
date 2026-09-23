@@ -11,13 +11,16 @@ import { Loader2, LogIn, MessagesSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import {
+  deleteConversation,
   fetchConversationWith,
   fetchInbox,
   getChatViewer,
 } from "@/actions/chat";
 import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
+import { readListingPreview } from "@/lib/chat/listing-handoff";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { ConversationList } from "@/components/chat/conversation-list";
@@ -55,6 +58,16 @@ export function ChatWorkspace({
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(
     peerFromUrl,
   );
+
+  // Preview card for `listingFromUrl` before the first message rides it to
+  // the server — stashed by ContactSellerButton for this tab (see
+  // lib/chat/listing-handoff.ts). Lazy initializer: read once at mount, not
+  // in an effect — `listingFromUrl` is a one-shot deep-link param that never
+  // changes for the life of this component.
+  const [listingPreview] = useState<ListingContext | null>(() => {
+    if (initialListing !== undefined) return initialListing ?? null;
+    return listingFromUrl ? readListingPreview(listingFromUrl) : null;
+  });
 
   // ── Viewer ────────────────────────────────────────────────────────────────
   const viewer = useQuery({
@@ -112,6 +125,30 @@ export function ChatWorkspace({
   }, []);
 
   const handleBack = useCallback(() => setSelectedPeerId(null), []);
+
+  // ── Delete conversation (per-participant hide, see DELETE /chats/:id) ─────
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const handleDelete = useCallback(
+    async (item: InboxItem) => {
+      setDeletingId(item.id);
+      const res = await deleteConversation(item.id);
+      setDeletingId(null);
+
+      if (!res.ok) {
+        toast.error(res.message || t("errors.generic"));
+        return;
+      }
+
+      toast.success(t("inbox.deleteSuccess"));
+      void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
+      // The deleted thread was open — back out to the list rather than
+      // leaving a stale/gone conversation on screen.
+      if (item.otherUser && selectedPeerId === item.otherUser.id) {
+        setSelectedPeerId(null);
+      }
+    },
+    [queryClient, selectedPeerId, t],
+  );
 
   const handleConversationCreated = useCallback(() => {
     // The thread now exists — refresh the inbox and re-resolve `with` so the
@@ -191,6 +228,8 @@ export function ChatWorkspace({
           hasMore={inbox.hasNextPage}
           isLoadingMore={inbox.isFetchingNextPage}
           onLoadMore={() => void inbox.fetchNextPage()}
+          onDelete={handleDelete}
+          deletingId={deletingId}
         />
       </aside>
 
@@ -245,7 +284,7 @@ export function ChatWorkspace({
             }
             listing={
               peer.id === peerFromUrl && listingFromUrl
-                ? (initialListing ?? null)
+                ? listingPreview
                 : undefined
             }
             onBack={handleBack}

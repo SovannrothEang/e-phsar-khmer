@@ -71,7 +71,15 @@
       "previewEmpty": "Chưa có tin nhắn",
       "previewImage": "Ảnh",
       "previewListing": "Tin đăng",
-      "unreadCount": "{count} tin nhắn chưa đọc"
+      "unreadCount": "{count} tin nhắn chưa đọc",
+      "actionsLabel": "Thao tác cuộc trò chuyện",
+      "archive": "Lưu trữ",
+      "delete": "Xóa",
+      "deleteConfirmTitle": "Xóa cuộc trò chuyện này?",
+      "deleteConfirmDescription": "Cuộc trò chuyện sẽ bị xóa khỏi hộp thư của bạn. {name} vẫn có thể thấy phía của họ.",
+      "deleteCancel": "Hủy",
+      "deleteConfirm": "Xóa",
+      "deleteSuccess": "Đã xóa cuộc trò chuyện."
     },
     "thread": {
       "back": "Quay lại",
@@ -114,7 +122,8 @@
       "loadFailed": "Không thể tải tin nhắn.",
       "loadFailedTitle": "Đã xảy ra lỗi",
       "sendFailed": "Không gửi được tin nhắn.",
-      "rateLimited": "Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi một lát."
+      "rateLimited": "Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi một lát.",
+      "deleteFailed": "Không thể xóa cuộc trò chuyện."
     }
   }
 }

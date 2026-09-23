@@ -37,6 +37,14 @@ export const conversations = chatSchema.table(
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
+    // Per-participant "delete conversation" — hides the thread from ONLY the
+    // deleting side's inbox; the row (and the other participant's view of it)
+    // survives. Cleared automatically whenever either side sends a new
+    // message (see ChatService.sendMessageInternal) or explicitly re-opens
+    // the thread via startConversation, so a deleted thread comes back the
+    // moment it's relevant again instead of staying hidden forever.
+    deletedByUserAAt: timestamp('deleted_by_user_a_at', { withTimezone: true }),
+    deletedByUserBAt: timestamp('deleted_by_user_b_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('conversations_pair_uq').on(t.userAId, t.userBId),

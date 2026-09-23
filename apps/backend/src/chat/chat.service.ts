@@ -197,7 +197,13 @@ export class ChatService {
       .values({ userAId: a, userBId: b })
       .onConflictDoUpdate({
         target: [conversations.userAId, conversations.userBId],
-        set: { lastMessageAt: sql`now()` },
+        // A real message is a real interaction — revive the thread for BOTH
+        // sides even if one (or both) had deleted it, not just the sender.
+        set: {
+          lastMessageAt: sql`now()`,
+          deletedByUserAAt: null,
+          deletedByUserBAt: null,
+        },
       })
       .returning();
 
@@ -293,7 +299,18 @@ export class ChatService {
   ): Promise<{ data: InboxItem[]; meta: PaginationMeta }> {
     const limit = query.limit ?? 20;
     const conditions: SQL[] = [
-      or(eq(conversations.userAId, userId), eq(conversations.userBId, userId))!,
+      // Participant AND not hidden by ME specifically — the other side's
+      // delete flag is irrelevant to what I see in my own inbox.
+      or(
+        and(
+          eq(conversations.userAId, userId),
+          isNull(conversations.deletedByUserAAt),
+        ),
+        and(
+          eq(conversations.userBId, userId),
+          isNull(conversations.deletedByUserBAt),
+        ),
+      )!,
     ];
 
     if (query.cursor) {
@@ -379,6 +396,97 @@ export class ChatService {
       blockedByMe: blocks.some((row) => row.blockerId === userId),
       canMessage: blocks.length === 0,
     };
+  }
+
+  /**
+   * Find-or-create the conversation with `otherUserId`, WITHOUT sending a
+   * message. Backs "Message seller" → redirect-to-chat: the thread (and its
+   * listing context, attached client-side until the first real send) must
+   * exist and show up in both inboxes the moment the buyer opens the thread,
+   * not only once they type something.
+   *
+   * Same rejects as sendMessage (self, missing/soft-deleted recipient,
+   * block in either direction) MINUS the body/image requirement — there is
+   * no content yet. Unlike the upsert in sendMessageInternal, this does NOT
+   * bump lastMessageAt on an existing row (no message actually happened) and
+   * only revives the conversation for the CALLER's own delete flag — the
+   * other participant's inbox is unaffected by someone merely opening the
+   * thread on their side.
+   */
+  async startConversation(
+    userId: string,
+    otherUserId: string,
+  ): Promise<ConversationWithUser> {
+    if (otherUserId === userId)
+      throw new BadRequestException('Cannot chat with yourself');
+
+    const [otherUser] = await this.db
+      .select({
+        id: users.id,
+        username: users.username,
+        profilePhotoUrl: users.profilePhotoUrl,
+      })
+      .from(users)
+      .where(and(eq(users.id, otherUserId), isNull(users.deletedAt)))
+      .limit(1);
+    if (!otherUser) throw new NotFoundException('User not found');
+
+    const blocked = await isBlockedEitherWay(this.db, userId, otherUserId);
+    if (blocked) throw new ForbiddenException('Messaging unavailable');
+
+    const [a, b] = this.canonicalPair(userId, otherUserId);
+    const meIsA = userId === a;
+    const [conversation] = await this.db
+      .insert(conversations)
+      .values({ userAId: a, userBId: b })
+      .onConflictDoUpdate({
+        target: [conversations.userAId, conversations.userBId],
+        set: meIsA ? { deletedByUserAAt: null } : { deletedByUserBAt: null },
+      })
+      .returning();
+
+    const items = await this.buildInboxItems(userId, [conversation]);
+
+    await this.publishChatEvents([
+      { targetUserId: userId, type: 'inbox_update' },
+    ]);
+
+    return {
+      conversation: items[0] ?? null,
+      otherUser,
+      blockedByMe: false,
+      canMessage: true,
+    };
+  }
+
+  /**
+   * Per-participant hide — see the `deletedByUser{A,B}At` comment on the
+   * schema. Never deletes rows: the other participant's copy of the thread,
+   * and every message in it, is untouched.
+   */
+  async deleteConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<{ deleted: true }> {
+    const conversation = await this.getConversationForUserOrThrow(
+      conversationId,
+      userId,
+    );
+    const meIsA = conversation.userAId === userId;
+    await this.db
+      .update(conversations)
+      .set(
+        meIsA
+          ? { deletedByUserAAt: sql`now()` }
+          : { deletedByUserBAt: sql`now()` },
+      )
+      .where(eq(conversations.id, conversationId));
+
+    await this.publishChatEvents([
+      { targetUserId: userId, type: 'inbox_update' },
+    ]);
+
+    return { deleted: true };
   }
 
   async getMessages(
@@ -628,6 +736,8 @@ export class ChatService {
         userBId: conversations.userBId,
         lastMessageAt: conversations.lastMessageAt,
         createdAt: conversations.createdAt,
+        deletedByUserAAt: conversations.deletedByUserAAt,
+        deletedByUserBAt: conversations.deletedByUserBAt,
         // Aggregate over the join rather than a scalar subquery in the select
         // list: drizzle rewrites top-level columns inside a `sql` select field
         // to BARE identifiers on single-table selects, which would silently

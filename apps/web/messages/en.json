@@ -71,7 +71,15 @@
       "previewEmpty": "No messages yet",
       "previewImage": "Photo",
       "previewListing": "Listing",
-      "unreadCount": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}"
+      "unreadCount": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}",
+      "actionsLabel": "Conversation actions",
+      "archive": "Archive",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete this conversation?",
+      "deleteConfirmDescription": "It will be removed from your inbox. {name} can still see their side of the conversation.",
+      "deleteCancel": "Cancel",
+      "deleteConfirm": "Delete",
+      "deleteSuccess": "Conversation deleted."
     },
     "thread": {
       "back": "Back",
@@ -114,7 +122,8 @@
       "loadFailed": "Couldn't load messages.",
       "loadFailedTitle": "Something went wrong",
       "sendFailed": "Message not sent.",
-      "rateLimited": "You're sending messages too quickly. Please wait a moment."
+      "rateLimited": "You're sending messages too quickly. Please wait a moment.",
+      "deleteFailed": "Couldn't delete the conversation."
     }
   }
 }

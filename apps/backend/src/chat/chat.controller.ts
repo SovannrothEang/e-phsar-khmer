@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -57,6 +58,28 @@ export class ChatController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
     return this.chatService.getConversationWith(user.id, userId);
+  }
+
+  @Post('with/:userId')
+  @ApiOperation({
+    summary: 'Find-or-create the conversation with a specific user',
+  })
+  startConversation(
+    @CurrentUser() user: RequestUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.chatService.startConversation(user.id, userId);
+  }
+
+  @Delete(':conversationId')
+  @ApiOperation({
+    summary: 'Delete (hide) a conversation from my own inbox only',
+  })
+  deleteConversation(
+    @CurrentUser() user: RequestUser,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+  ) {
+    return this.chatService.deleteConversation(user.id, conversationId);
   }
 
   @Get(':conversationId/messages')

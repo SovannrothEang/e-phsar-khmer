@@ -71,7 +71,15 @@
       "previewEmpty": "Belum ada pesan",
       "previewImage": "Foto",
       "previewListing": "Iklan",
-      "unreadCount": "{count} pesan belum dibaca"
+      "unreadCount": "{count} pesan belum dibaca",
+      "actionsLabel": "Tindakan percakapan",
+      "archive": "Arsipkan",
+      "delete": "Hapus",
+      "deleteConfirmTitle": "Hapus percakapan ini?",
+      "deleteConfirmDescription": "Percakapan akan dihapus dari kotak masuk Anda. {name} masih dapat melihat sisi mereka.",
+      "deleteCancel": "Batal",
+      "deleteConfirm": "Hapus",
+      "deleteSuccess": "Percakapan dihapus."
     },
     "thread": {
       "back": "Kembali",
@@ -114,7 +122,8 @@
       "loadFailed": "Tidak dapat memuat pesan.",
       "loadFailedTitle": "Terjadi kesalahan",
       "sendFailed": "Pesan gagal dikirim.",
-      "rateLimited": "Anda mengirim pesan terlalu cepat. Tunggu sebentar."
+      "rateLimited": "Anda mengirim pesan terlalu cepat. Tunggu sebentar.",
+      "deleteFailed": "Tidak dapat menghapus percakapan."
     }
   }
 }

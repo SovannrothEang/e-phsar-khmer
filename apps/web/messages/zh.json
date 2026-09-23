@@ -71,7 +71,15 @@
       "previewEmpty": "暂无消息",
       "previewImage": "图片",
       "previewListing": "商品",
-      "unreadCount": "{count} 条未读消息"
+      "unreadCount": "{count} 条未读消息",
+      "actionsLabel": "对话操作",
+      "archive": "归档",
+      "delete": "删除",
+      "deleteConfirmTitle": "删除此对话？",
+      "deleteConfirmDescription": "将从您的收件箱中移除。{name} 仍可看到他们那一侧的对话。",
+      "deleteCancel": "取消",
+      "deleteConfirm": "删除",
+      "deleteSuccess": "对话已删除。"
     },
     "thread": {
       "back": "返回",
@@ -114,7 +122,8 @@
       "loadFailed": "无法加载消息。",
       "loadFailedTitle": "出了点问题",
       "sendFailed": "消息发送失败。",
-      "rateLimited": "您发送消息过于频繁，请稍候再试。"
+      "rateLimited": "您发送消息过于频繁，请稍候再试。",
+      "deleteFailed": "无法删除对话。"
     }
   }
 }
