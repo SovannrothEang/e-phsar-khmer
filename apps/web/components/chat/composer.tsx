@@ -1,27 +1,32 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ImageIcon, Loader2, Lock, SendHorizonal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
-import { deleteChatUpload, signChatUpload } from "@/actions/chat";
-
-// Mirrors the backend FilesService image validation (5MB, image/*).
-const MAX_SIZE = 5 * 1024 * 1024;
+import {
+  storeDraftImage,
+  removeDraftImage,
+  clearAllDrafts,
+} from "@/lib/chat-draft-images";
 
 export interface ComposerDraft {
   body?: string;
-  imagePath?: string;
-  imageUrl?: string;
+  /** localStorage keys for draft images — uploaded to Supabase on send. */
+  draftKeys?: string[];
 }
 
 interface StagedImage {
-  path: string;
-  url: string;
+  key: string;
+  dataUrl: string;
 }
+
+// Mirrors the backend FilesService image validation (5MB).
+const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGES = 5;
 
 export function Composer({
   disabled,
@@ -29,33 +34,47 @@ export function Composer({
   sending,
   onSend,
   onActivity,
+  hasListing = false,
 }: {
   disabled: boolean;
   disabledReason?: string;
   sending: boolean;
   onSend: (draft: ComposerDraft) => void;
   onActivity?: () => void;
+  /** When true, listing counts toward the 5-image limit. */
+  hasListing?: boolean;
 }) {
   const t = useTranslations("Chat");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
-  const [staged, setStaged] = useState<StagedImage | null>(null);
+  const [staged, setStaged] = useState<StagedImage[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  const canSend =
-    !disabled && !sending && (text.trim() !== "" || staged !== null);
+  const maxAllowed = hasListing ? MAX_IMAGES - 1 : MAX_IMAGES;
+  const remaining = maxAllowed - staged.length;
 
-  function submit() {
+  // Cleanup all drafts when tab/window closes.
+  useEffect(() => {
+    function handleBeforeUnload() {
+      clearAllDrafts();
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  const canSend =
+    !disabled && !sending && (text.trim() !== "" || staged.length > 0);
+
+  const submit = useCallback(() => {
     if (!canSend) return;
     onSend({
       body: text.trim() || undefined,
-      imagePath: staged?.path,
-      imageUrl: staged?.url,
+      draftKeys: staged.map((s) => s.key),
     });
     setText("");
-    setStaged(null);
-  }
+    setStaged([]);
+  }, [canSend, text, staged, onSend]);
 
   async function handleFile(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -66,39 +85,31 @@ export function Composer({
       toast.error(t("composer.imageSizeError"));
       return;
     }
+    if (staged.length >= maxAllowed) {
+      toast.error(t("composer.imageLimitError", { max: maxAllowed }));
+      return;
+    }
     setUploading(true);
     try {
-      // Signed via `signChatUpload`, which runs on the USER token — the
-      // backend mints `chat/{myUserId}/…` and rejects any send whose
-      // imagePath sits outside the sender's own prefix.
-      const signed = await signChatUpload(file.name);
-      if (!signed.ok) {
-        toast.error(signed.message || t("composer.uploadFailed"));
-        return;
-      }
-      const res = await fetch(signed.data.signedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!res.ok) {
-        toast.error(t("composer.uploadFailed"));
-        return;
-      }
-      setStaged({ path: signed.data.path, url: signed.data.publicUrl });
+      // Use random ID to avoid key collisions on rapid picks.
+      const tempId = crypto.randomUUID();
+      const draft = await storeDraftImage(tempId, staged.length, file);
+      setStaged((prev) => [...prev, { key: draft.key, dataUrl: draft.dataUrl }]);
       onActivity?.();
-    } catch {
-      toast.error(t("composer.uploadFailed"));
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("composer.uploadFailed"),
+      );
     } finally {
       setUploading(false);
     }
   }
 
-  function discardStaged() {
-    const current = staged;
-    setStaged(null);
-    // Fire-and-forget cleanup so an abandoned pick doesn't linger in storage.
-    if (current) void deleteChatUpload(current.path);
+  function discardStaged(index: number) {
+    const item = staged[index];
+    if (!item) return;
+    removeDraftImage(item.key);
+    setStaged((prev) => prev.filter((_, i) => i !== index));
   }
 
   if (disabled) {
@@ -112,26 +123,28 @@ export function Composer({
 
   return (
     <div className="shrink-0 border-t border-border bg-card">
-      {staged && (
-        <div className="flex items-center gap-2 px-3 pt-3">
-          <div className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
-            <Image
-              src={staged.url}
-              alt={t("composer.stagedImageAlt")}
-              fill
-              sizes="64px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-          <button
-            type="button"
-            onClick={discardStaged}
-            aria-label={t("composer.removeImage")}
-            className="rounded-full border border-border p-1 text-muted-foreground transition-colors hover:bg-muted"
-          >
-            <X className="size-3" />
-          </button>
+      {staged.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
+          {staged.map((s, i) => (
+            <div key={s.key} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
+              <Image
+                src={s.dataUrl}
+                alt={t("composer.stagedImageAlt")}
+                fill
+                sizes="64px"
+                className="object-cover"
+                unoptimized
+              />
+              <button
+                type="button"
+                onClick={() => discardStaged(i)}
+                aria-label={t("composer.removeImage")}
+                className="absolute right-0 top-0 rounded-full border border-border bg-background/80 p-0.5 text-muted-foreground transition-colors hover:bg-muted"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -139,7 +152,7 @@ export function Composer({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || sending}
+          disabled={uploading || sending || remaining <= 0}
           aria-label={t("composer.attachImage")}
           className="shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
@@ -193,10 +206,13 @@ export function Composer({
         ref={fileInputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
+          const files = e.target.files;
+          if (files) {
+            Array.from(files).forEach((f) => void handleFile(f));
+          }
           e.target.value = "";
         }}
       />

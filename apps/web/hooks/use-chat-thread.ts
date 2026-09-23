@@ -10,11 +10,15 @@ import {
   fetchMessages,
   markConversationRead,
   sendChatMessage,
+  signChatUpload,
 } from "@/actions/chat";
 import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { mergeMessages } from "@/lib/chat/format";
 import { useAdaptivePolling } from "@/hooks/use-chat-polling";
 import { useChatWs } from "@/hooks/use-chat-ws";
+import {
+  dataUrlToFile,
+} from "@/lib/chat-draft-images";
 import type {
   ChatMessage,
   MessagePage,
@@ -47,8 +51,8 @@ function advanceWatermark(
 
 export interface SendDraft {
   body?: string;
-  imagePath?: string;
-  imageUrl?: string;
+  /** localStorage keys for draft images — uploaded to Supabase at send-time. */
+  draftKeys?: string[];
   listingId?: string;
 }
 
@@ -256,54 +260,116 @@ export function useChatThread({
       if (!recipientId || !viewerId) return;
       setIsSending(true);
 
-      // Prefer WebSocket when connected — instant delivery, no HTTP round trip.
-      if (ws.isConnected && conversationId) {
-        ws.send({
+      const draftKeys = draft.draftKeys ?? [];
+      const imageCount = draftKeys.length;
+      const hasBody = !!draft.body;
+
+      // Upload and send each image as a separate message.
+      for (let i = 0; i < imageCount; i++) {
+        const key = draftKeys[i];
+        try {
+          const dataUrl = localStorage.getItem(key);
+          if (!dataUrl) continue;
+          const filename = `chat-image-${Date.now()}-${i}.jpg`;
+          const file = dataUrlToFile(dataUrl, filename);
+          const signed = await signChatUpload(filename);
+          if (!signed.ok) throw new Error(signed.message);
+          const res = await fetch(signed.data.signedUrl, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+          });
+          if (!res.ok) throw new Error("Upload failed");
+
+          // Send image message via WS or HTTP.
+          if (ws.isConnected && conversationId) {
+            ws.send({
+              recipientId,
+              imagePath: signed.data.path,
+              listingId: i === 0 ? draft.listingId : undefined,
+            });
+          } else {
+            const input: SendMessageInput = {
+              recipientId,
+              imagePath: signed.data.path,
+              listingId: i === 0 ? draft.listingId : undefined,
+            };
+            const sendRes = await sendChatMessage(input);
+            if (!sendRes.ok) throw new Error(sendRes.message);
+          }
+
+          // Cleanup this key after successful upload+send.
+          localStorage.removeItem(key);
+        } catch {
+          // Upload/send failed — mark as failed, keep remaining drafts.
+          setIsSending(false);
+          setLocal((prev) =>
+            prev.map((m) =>
+              m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
+            ),
+          );
+          onSendError?.("Image upload failed", 0);
+          return;
+        }
+      }
+
+      // Send text body as final message (if any).
+      if (hasBody) {
+        if (ws.isConnected && conversationId) {
+          ws.send({
+            recipientId,
+            body: draft.body,
+            // Listing only attaches to first image; if no images, attach here.
+            listingId: imageCount === 0 ? draft.listingId : undefined,
+          });
+          setIsSending(false);
+          setLocal((prev) =>
+            prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
+          );
+          if (conversationId === null) {
+            onConversationCreated?.(conversationId);
+          }
+          onMutated?.();
+          return;
+        }
+
+        // HTTP fallback for text message.
+        const input: SendMessageInput = {
           recipientId,
           body: draft.body,
-          listingId: draft.listingId,
-          imagePath: draft.imagePath,
-        });
+          listingId: imageCount === 0 ? draft.listingId : undefined,
+        };
+        const res = await sendChatMessage(input);
         setIsSending(false);
-        // Optimistic echo is already in `local`; the WS echo handler will
-        // confirm or the timeout will mark it failed.
-        setLocal((prev) =>
-          prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
-        );
+
+        if (!res.ok) {
+          setLocal((prev) =>
+            prev.map((m) =>
+              m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
+            ),
+          );
+          onSendError?.(res.message, res.status);
+          return;
+        }
+
+        setLocal((prev) => [
+          ...prev.filter((m) => m.tempId !== tempId),
+          { ...res.data.message, pending: false, failed: false },
+        ]);
         if (conversationId === null) {
-          onConversationCreated?.(conversationId);
+          onConversationCreated?.(res.data.conversationId);
         }
         onMutated?.();
         return;
       }
 
-      // Fallback: HTTP when WS is not connected.
-      const input: SendMessageInput = {
-        recipientId,
-        body: draft.body,
-        listingId: draft.listingId,
-        imagePath: draft.imagePath,
-      };
-      const res = await sendChatMessage(input);
+      // No body — all images sent, clean up optimistic echo.
       setIsSending(false);
-
-      if (!res.ok) {
-        setLocal((prev) =>
-          prev.map((m) =>
-            m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
-          ),
-        );
-        onSendError?.(res.message, res.status);
-        return;
-      }
-
-      setLocal((prev) => [
-        ...prev.filter((m) => m.tempId !== tempId),
-        { ...res.data.message, pending: false, failed: false },
-      ]);
-      if (conversationId === null) {
-        onConversationCreated?.(res.data.conversationId);
-      }
+      setLocal((prev) =>
+        prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
+      );
+      // After sending images, we don't have a conversationId from the server
+      // (images were sent individually). Just notify mutation.
       onMutated?.();
     },
     [
@@ -322,6 +388,17 @@ export function useChatThread({
       if (!recipientId || !viewerId) return;
       markActivity();
       const tempId = `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      // Read dataUrls from localStorage for optimistic preview.
+      const previewUrls: string[] = [];
+      if (draft.draftKeys && draft.draftKeys.length > 0) {
+        for (const key of draft.draftKeys) {
+          const dataUrl = localStorage.getItem(key);
+          if (dataUrl) previewUrls.push(dataUrl);
+        }
+      }
+
+      // Create optimistic echo — first image shows preview, text shows body.
       const optimistic: ThreadMessage = {
         id: tempId,
         tempId,
@@ -329,8 +406,8 @@ export function useChatThread({
         senderId: viewerId,
         body: draft.body ?? null,
         listingId: draft.listingId ?? null,
-        imageUrl: draft.imageUrl ?? null,
-        imagePath: draft.imagePath ?? null,
+        imageUrl: previewUrls[0] ?? null,
+        imagePath: null,
         readAt: null,
         createdAt: new Date().toISOString(),
         isE2e: false,
@@ -353,11 +430,11 @@ export function useChatThread({
             : m,
         ),
       );
+      // Retry with existing imagePath (already uploaded) or no image (upload failed).
+      // Draft keys are lost after failure — user must re-attach if upload failed.
       void dispatch(
         {
           body: message.body ?? undefined,
-          imagePath: message.imagePath ?? undefined,
-          imageUrl: message.imageUrl ?? undefined,
           listingId: message.listingId ?? undefined,
         },
         message.tempId,

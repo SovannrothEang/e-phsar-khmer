@@ -150,8 +150,7 @@ export function MessageThread({
       if (showListingAttachment) setListingSent(true);
       send({
         body: draft.body,
-        imagePath: draft.imagePath,
-        imageUrl: draft.imageUrl,
+        draftKeys: draft.draftKeys,
         listingId: showListingAttachment ? listingId : undefined,
       });
     },
@@ -336,6 +335,7 @@ export function MessageThread({
         sending={isSending}
         onSend={handleSend}
         onActivity={markActivity}
+        hasListing={showListingAttachment}
       />
 
       <Dialog

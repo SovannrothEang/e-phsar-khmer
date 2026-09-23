@@ -114,7 +114,8 @@
       "blockedError": "Messaging unavailable.",
       "uploadFailed": "Image upload failed.",
       "imageSizeError": "Image is too large.",
-      "imageTypeError": "Unsupported image type."
+      "imageTypeError": "Unsupported image type.",
+      "imageLimitError": "Maximum {max} images allowed."
     },
     "listing": {
       "noPrice": "Price on request",
