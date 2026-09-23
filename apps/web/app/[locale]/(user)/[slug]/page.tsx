@@ -3,6 +3,7 @@ import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
 import HomeProfile from "@/components/profile/Home";
 import { buildRealDetailData, getListingById } from "@/lib/api/categories";
 import { getLocale } from "next-intl/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { posts } from "@/lib/posts";
 import { users } from "@/lib/user";
 import type { Metadata } from "next";
@@ -70,11 +71,13 @@ export default async function SlugPage({
   // listing UUIDs render through the real detail template.
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
+    const viewer = await getCurrentUser();
     if (UUID_RE.test(actualId)) {
       const real = await buildRealDetailData(actualId, await getLocale());
-      if (real) return <PostDetail id={actualId} real={real} />;
+      if (real)
+        return <PostDetail id={actualId} real={real} viewerId={viewer?.id} />;
     }
-    return <PostDetail id={actualId} />;
+    return <PostDetail id={actualId} viewerId={viewer?.id} />;
   }
 
   // Handle Public Profile

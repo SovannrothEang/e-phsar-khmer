@@ -101,9 +101,13 @@ function isListingStatus(value: string): value is ListingContext["status"] {
 export default function PostDetail({
   id,
   real,
+  viewerId,
 }: {
   id: string;
   real?: RealDetailData;
+  /** Signed-in viewer's id, if any — lets the sidebar tell "your ad" apart
+   *  from a stranger's and hide seller-contact actions accordingly. */
+  viewerId?: string | null;
 }) {
   const isReal = !!real;
   const post = isReal ? toPostView(real.listing) : getPostById(id);
@@ -329,6 +333,7 @@ export default function PostDetail({
                 user={user}
                 listingId={listingContext ? listingContext.id : undefined}
                 listing={listingContext}
+                viewerId={viewerId}
               />
             </div>
           </aside>

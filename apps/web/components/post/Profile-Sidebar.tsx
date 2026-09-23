@@ -18,17 +18,22 @@ export default function ProfileSidebar({
   user: userProp,
   listingId,
   listing,
+  viewerId,
 }: {
   userId: string;
   user?: User;
   listingId?: string;
   /** Preview card for the ad, stashed for the chat page — see ContactSellerButton. */
   listing?: ListingContext | null;
+  /** Signed-in viewer's id, if any — when it matches `userId` this is the
+   *  viewer's own ad, so follow/message actions don't make sense. */
+  viewerId?: string | null;
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
   const user = userProp ?? getUserById(userId);
   if (!user) return null;
+  const isOwnAd = !!viewerId && viewerId === userId;
 
   const phone0 = user.phone?.[0];
   const phone1 = user.phone?.[1];
@@ -97,26 +102,32 @@ export default function ProfileSidebar({
             </div>
           </Link>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleFollow();
-            }}
-            disabled={loading}
-            className="bg-card text-foreground hover:bg-gray-100 h-7 mt-9 rounded-sm flex items-center cursor-pointer"
-          >
-            {isFollowing ? (
-              <UserCheck className="!w-4 !h-4" />
-            ) : (
-              <UserPlus className="!w-4 !h-4" />
-            )}
-
-            <span className="text-xs">
-              {isFollowing ? "Following" : "Follow"}
+          {isOwnAd ? (
+            <span className="bg-card text-foreground h-7 mt-9 rounded-sm flex items-center px-2 text-xs font-medium">
+              Your Ad
             </span>
-          </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFollow();
+              }}
+              disabled={loading}
+              className="bg-card text-foreground hover:bg-gray-100 h-7 mt-9 rounded-sm flex items-center cursor-pointer"
+            >
+              {isFollowing ? (
+                <UserCheck className="!w-4 !h-4" />
+              ) : (
+                <UserPlus className="!w-4 !h-4" />
+              )}
+
+              <span className="text-xs">
+                {isFollowing ? "Following" : "Follow"}
+              </span>
+            </Button>
+          )}
         </div>
 
         {/* Contact Info Section */}
@@ -194,12 +205,19 @@ export default function ProfileSidebar({
           </div>
           <div className="border-t border-muted-foreground/30" />
 
-          <ContactSellerButton
-            sellerId={userId}
-            listingId={listingId}
-            listing={listing}
-            className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base cursor-pointer"
-          />
+          {isOwnAd ? (
+            <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm font-medium text-sm flex items-center justify-center text-center px-2">
+              This is your own ad — buyers will see Message Seller here
+            </div>
+          ) : (
+            <ContactSellerButton
+              sellerId={userId}
+              listingId={listingId}
+              listing={listing}
+              viewerId={viewerId}
+              className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base cursor-pointer"
+            />
+          )}
         </div>
       </div>
       <div className="bg-card rounded-sm border border-border p-4 shadow-sm">

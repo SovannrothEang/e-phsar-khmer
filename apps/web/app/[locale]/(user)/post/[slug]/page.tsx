@@ -1,6 +1,7 @@
 import PostDetail from "@/components/post/Post-Detail";
 import { buildRealDetailData, getListingById } from "@/lib/api/categories";
 import { getLocale } from "next-intl/server";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { posts } from "@/lib/posts";
 import type { Metadata } from "next";
 
@@ -52,11 +53,13 @@ export default async function PostDetailPage({
   const { slug } = await params;
   const actualId = extractId(slug);
   const locale = await getLocale();
+  const viewer = await getCurrentUser();
 
   if (UUID_RE.test(actualId)) {
     const real = await buildRealDetailData(actualId, locale);
-    if (real) return <PostDetail id={actualId} real={real} />;
+    if (real)
+      return <PostDetail id={actualId} real={real} viewerId={viewer?.id} />;
   }
 
-  return <PostDetail id={actualId} />;
+  return <PostDetail id={actualId} viewerId={viewer?.id} />;
 }
