@@ -38,19 +38,11 @@ function nextTransactionStatus(
 }
 
 /**
- * The other half of a `ChargeResult.poll` request. Where
- * `processPaymentAttempt` calls `charge()` once, this calls `reconcile()`
- * repeatedly — it's the loop body for a provider with no webhook at all
- * (see `../providers/bakong/README.md`). Structurally a hybrid of
- * `processPaymentAttempt` (calls a gateway, applies the same transition)
- * and `processProviderEvent` (reconcile() is the source of truth, not a
- * charge response) — but with a third outcome neither of those has: "ask
- * again later", which re-enqueues itself via `enqueuePaymentAttemptPoll`
- * rather than terminating.
- *
- * Written for BullMQ's at-least-once delivery exactly like
- * `processPaymentAttempt`: a redelivered job for an attempt that already
- * resolved (by this poll, a webhook, or a manual reconcile) is a no-op.
+ * The other half of a `ChargeResult.poll` request — the loop body for a
+ * provider with no webhook at all (see `../providers/bakong/README.md`).
+ * Calls `reconcile()` repeatedly instead of `charge()` once; on `pending`
+ * it re-enqueues itself via `enqueuePaymentAttemptPoll` rather than
+ * terminating. Redelivered jobs for an already-resolved attempt no-op.
  */
 export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
   outbox: OutboxService,
@@ -88,10 +80,7 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
     return 'gateway_not_registered';
   }
 
-  // Registered but missing the credentials it needs to actually call out
-  // (see PaymentGatewayProvider.isConfigured's doc comment) — same
-  // "give up outright" treatment as an unregistered provider: a config
-  // that went missing mid-poll can't be fixed by trying reconcile() again.
+  // Missing credentials mid-poll — same give-up treatment as unregistered.
   if (provider.isConfigured && !provider.isConfigured()) {
     yield* runInTransaction(
       failPaymentAttempt({
@@ -106,10 +95,8 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
   }
 
   if (!provider.reconcile || !attempt.providerAttemptId) {
-    // Nothing to poll against. Shouldn't happen for a provider that asked
-    // to be polled in the first place (ChargeResult.poll implies
-    // reconcile() exists and providerAttemptId was set) — guarded anyway
-    // rather than looping on a job that can never make progress.
+    // Shouldn't happen (ChargeResult.poll implies both) — guarded rather
+    // than looping on a job that can never make progress.
     return 'no_reconcile';
   }
 
@@ -127,19 +114,15 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
     return 'expired';
   }
 
-  // Outside any DB transaction on purpose, same rationale as
-  // processPaymentAttempt's own charge() call — an HTTP call has no
-  // business holding a Postgres transaction open.
+  // Outside any DB transaction — an HTTP call shouldn't hold locks open.
   const result = yield* Effect.tryPromise({
     try: () => provider.reconcile!(attempt.providerAttemptId!),
     catch: (cause) => new PaymentGatewayCallError({ cause }),
   });
 
   if (result.status === 'pending') {
-    // Nothing changed. No DB write happens on this branch at all, so
-    // there is nothing for this outbox insert to be atomic with — see
-    // enqueuePaymentAttemptPoll's own doc comment on why it doesn't need
-    // runInTransaction here.
+    // No DB write on this branch, so nothing for the outbox insert to be
+    // atomic with — see enqueuePaymentAttemptPoll's own doc comment.
     yield* enqueuePaymentAttemptPoll(outbox, input);
     return 'still_pending';
   }

@@ -16,24 +16,13 @@ export interface FailAbandonedPaymentJobInput {
 export type FailAbandonedPaymentJobOutcome = 'failed' | 'skipped';
 
 /**
- * The safety net for a `process-attempt`/`poll-attempt` BullMQ job that
+ * Safety net for a `process-attempt`/`poll-attempt` BullMQ job that
  * exhausted its retries — called from `PaymentProcessor`'s `'failed'`
- * worker-event listener, never from the job-processing path itself (see
- * that listener's own doc comment for why: a job's own retries are meant to
- * cover *transient* failures, this covers "retries ran out and we're
- * giving up").
- *
- * Without this, an attempt whose gateway call keeps throwing (bad
- * credentials, gateway outage, ...) sits at `pending` — and its
- * transaction at `processing` — forever, indistinguishable from a payer
- * who just hasn't paid yet. `failureMessage` carries the underlying error
- * so this is actually debuggable from `payment_attempts.failure_message`
- * instead of only ever existing in a BullMQ job's (eventually evicted)
- * failure log.
- *
- * `skipped` when the attempt already left `pending` some other way (a poll
- * round that resolved it after this job was queued but before the listener
- * ran, for instance) — never clobber a real outcome with a stale failure.
+ * listener, not the job path itself. Without it, a gateway call that keeps
+ * throwing leaves an attempt stuck `pending` forever, indistinguishable
+ * from a payer who hasn't paid. `skipped` when the attempt already
+ * resolved some other way (e.g. a poll round beat the listener) — never
+ * clobber a real outcome with a stale failure.
  */
 export const failAbandonedPaymentJob = Effect.fn('failAbandonedPaymentJob')(
   function* (

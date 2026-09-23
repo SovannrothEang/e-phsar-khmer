@@ -22,25 +22,13 @@ export interface PaymentSettledEventPayload {
 }
 
 /**
- * Announces a settled payment to the rest of the system — the
- * business-level companion to `enqueuePaymentAttempt`/
- * `enqueuePaymentProviderEvent`'s internal DB→BullMQ plumbing, not a
- * replacement for it (see `PAYMENT_SETTLED_OUTBOX_EVENT_TYPE`'s own doc
- * comment). Nothing in this module subscribes to this event yet — it
- * exists for other modules (notifications, orders) to pick up later.
- *
- * Callers must invoke this only when `postPaymentSettlementLedger` actually
- * produced a `ledgerTransaction` (i.e. inside the same `if (toStatus ===
- * 'succeeded')` branch, after the ledger posting), and inside the same
- * `runInTransaction` block — same durability contract as every other
- * outbox write in this module: a crash between the ledger posting and this
- * announcement can never happen, because they commit together or not at
- * all.
- *
- * `dedupeKey` mirrors `ledger_transactions.idempotencyKey` (both keyed on
- * the payment_transaction id), so a redelivered job that reaches settlement
- * twice — already prevented from double-posting the ledger by that same
- * key — can never double-write this event either.
+ * Announces a settled payment to the rest of the system — consumed today by
+ * `PaymentSettledOutboxHandler` (`../../outbox/payment-settled-outbox-handler.ts`).
+ * Callers must invoke this only after `postPaymentSettlementLedger` actually
+ * produced a `ledgerTransaction`, inside the same `runInTransaction` block —
+ * the announcement commits with the ledger posting or not at all.
+ * `dedupeKey` mirrors `ledger_transactions.idempotencyKey`, so a redelivered
+ * job can't double-write this event either.
  */
 export const enqueuePaymentSettledEvent = Effect.fn(
   'enqueuePaymentSettledEvent',

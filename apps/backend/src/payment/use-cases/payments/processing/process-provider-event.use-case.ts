@@ -47,18 +47,11 @@ function nextTransactionStatus(
 
 /**
  * Applies a received payment_provider_event to the attempt/transaction it
- * correlates to. Trust here is deliberately layered: the event row is
- * whatever a `@Public()` webhook route received, so before acting on it the
- * gateway is asked directly what it currently knows
- * (`PaymentGatewayProvider.reconcile()`) — this is the mitigation for a
- * provider (like ABA PayWay) whose documented webhook carries no
- * signature. A gateway with no `reconcile()` falls back to trusting the
+ * correlates to. The event row is whatever a `@Public()` webhook route
+ * received, so before acting on it the gateway is asked directly what it
+ * currently knows (`reconcile()`) — mitigation for a provider whose webhook
+ * carries no signature. A gateway with no `reconcile()` trusts the
  * re-parsed payload directly.
- *
- * `outbox` is a plain parameter, same convention as `processPaymentAttempt`
- * — it's only needed on the `succeeded` branch, to durably announce the
- * settlement (`enqueuePaymentSettledEvent`) inside the same transaction as
- * the ledger posting.
  */
 export const processProviderEvent = Effect.fn('processProviderEvent')(
   function* (
@@ -69,7 +62,6 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
     PaymentProcessingError,
     DbClientTag | PaymentGatewayRegistryTag
   > {
-    // Inlined former findPaymentProviderEvent use-case — this was its only caller.
     const db = yield* DbClientTag;
     const eventRows = yield* Effect.tryPromise({
       try: () =>
@@ -98,8 +90,7 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
     const transaction = yield* checkPayment(attempt.paymentTransactionId);
 
     if (attempt.status !== 'pending') {
-      // Already resolved by a prior attempt-processing run or an earlier
-      // event — a later delivery for the same attempt is a duplicate.
+      // Already resolved — a later delivery for the same attempt is a duplicate.
       yield* settlePaymentProviderEvent({ id: event.id, status: 'ignored' });
       return 'ignored_already_settled';
     }
@@ -117,18 +108,13 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
       return 'gateway_not_registered';
     }
 
-    // A registered-but-unconfigured provider (e.g. ABA PayWay with no
-    // ABA_PAYWAY_API_KEY set) would otherwise only fail once reconcile()
-    // is called — as an opaque thrown Error, retried by BullMQ until the
-    // job's attempts are exhausted with no clear reason recorded anywhere.
-    // Checking directly gives a distinct, immediate outcome instead.
+    // Checked directly so a missing credential is a clear outcome, not an
+    // opaque thrown Error retried until reconcile() eventually fails anyway.
     if (provider.isConfigured && !provider.isConfigured()) {
       yield* settlePaymentProviderEvent({ id: event.id, status: 'failed' });
       return 'gateway_not_configured';
     }
 
-    // Re-derive the reported status from the stored raw payload — the same
-    // parser intake used, so this is deterministic and idempotent.
     const parsed = provider.parseWebhookEvent(
       JSON.stringify(event.payload),
       {},
@@ -144,18 +130,14 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
         try: () => provider.reconcile!(reconcileRef),
         catch: (cause) => new PaymentGatewayCallError({ cause }),
       });
-      // The freshly-pulled reconcile result is authoritative — it overrides
-      // whatever the (unsigned) webhook payload itself claimed.
+      // Authoritative — overrides whatever the (unsigned) webhook claimed.
       outcome = reconciled.status;
       rawResponse = reconciled.rawResponse ?? rawResponse;
     }
 
     if (outcome === 'pending') {
-      // Could not be corroborated as a definite outcome yet — do not act on
-      // an unconfirmed status change, but the event is not lost: leave it
-      // out of "processed" so an operator can see it, without retrying the
-      // BullMQ job forever (a future delivery/reconcile call is what
-      // resolves this, not blind resubmission of the same payload).
+      // Not yet corroborated — marked ignored (not processed, not retried
+      // forever); a future delivery/reconcile is what resolves this.
       yield* settlePaymentProviderEvent({ id: event.id, status: 'ignored' });
       return 'ignored_unconfirmed';
     }

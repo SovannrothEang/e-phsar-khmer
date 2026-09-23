@@ -8,16 +8,9 @@ import type {
 const CHECK_TRANSACTION_PATH = 'v1/check_transaction_by_md5';
 
 /**
- * The check-transaction action for Bakong — the only real network call this
- * provider makes. Bakong pushes no webhooks for KHQR payments, so this is
- * also the *only* way to learn a payment's outcome; `BakongProvider.reconcile()`
- * is primary here, unlike ABA where reconcile() is a fallback behind a
- * signed webhook.
- *
- * `apiClient` arrives as a plain parameter rather than a `yield*`-ed service
- * tag — same convention as `enqueuePaymentAttempt` taking `OutboxService` as
- * a closure value (see its doc comment): this handler has exactly one
- * caller (`BakongProvider`), so a `Context.Tag` would only add ceremony.
+ * The only real network call this provider makes — Bakong pushes no
+ * webhooks, so `BakongProvider.reconcile()` (which calls this) is the
+ * primary way to learn a payment's outcome, not a fallback like ABA's.
  */
 export const checkBakongTransaction = Effect.fn('checkBakongTransaction')(
   function* (

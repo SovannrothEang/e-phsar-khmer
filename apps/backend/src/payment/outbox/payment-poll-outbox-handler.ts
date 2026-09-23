@@ -13,24 +13,13 @@ import {
 import { PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE } from './payment-outbox-events';
 
 /**
- * Publishes a durably-recorded `payment.attempt.poll_requested` outbox row
- * to BullMQ, same "make sure BullMQ has this job" role
- * `PaymentAttemptOutboxHandler` plays for the initial charge — except this
- * one fires repeatedly for the life of one attempt (see
- * `../providers/bakong/README.md`).
- *
- * The BullMQ `delay` is what actually paces the poll loop — the outbox row
- * itself is dispatched as soon as a worker picks it up; delaying *when the
- * job runs* rather than *when it's published* keeps the outbox's own
- * due/backoff machinery, which already has its own opinions about timing,
- * out of this.
- *
- * `jobId` is the outbox event's own id, not the attempt id (contrast
- * `PaymentAttemptOutboxHandler`, which uses `paymentAttemptId` as a
- * one-shot dedupe key). A fixed `paymentAttemptId` jobId would collide
- * across rounds — the whole point here is that the *same* attempt gets
- * many of these jobs over its lifetime, one per round, each needing its own
- * BullMQ job.
+ * Publishes a `payment.attempt.poll_requested` outbox row to BullMQ — same
+ * role `PaymentAttemptOutboxHandler` plays for the initial charge, but this
+ * fires repeatedly for one attempt's lifetime (see
+ * `../providers/bakong/README.md`). The BullMQ `delay` paces the poll loop,
+ * not the outbox's own due/backoff timing. `jobId` is the outbox event's
+ * own id rather than `paymentAttemptId`, since one attempt produces many of
+ * these jobs and a fixed id would collide across rounds.
  */
 @Injectable()
 export class PaymentPollOutboxHandler implements OutboxHandler, OnModuleInit {

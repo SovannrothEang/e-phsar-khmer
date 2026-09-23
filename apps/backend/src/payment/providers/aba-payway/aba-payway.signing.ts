@@ -1,26 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
- * ABA PayWay's **outbound request** signature for `check-transaction-2`
- * and `transaction-detail`: HMAC-SHA512 over the plain concatenation of
- * `req_time + merchant_id + tran_id` (the only three fields either
- * endpoint takes), keyed by the merchant's API key, base64-encoded.
- * Confirmed against ABA's own developer docs
- * (developer.payway.com.kh/check-transaction-14530826e0), including its
- * PHP sample (`$req_time . $merchant_id . $tran_id`) — this one was
- * already correct.
- *
- * **Not used for `purchase`** — that endpoint signs a much longer,
- * mostly-optional field list where a missing field must still occupy its
- * position as an empty string (see `signAbaPaywayPurchase` below); this
- * function's null/undefined-skipping behavior would silently shift every
- * field after the first gap; that's fine here because check-transaction
- * and transaction-detail only ever have their three required fields.
- *
- * This is also a *different* algorithm from `signAbaPaywayCallback` below
- * — ABA documents the two separately (fixed field order for requests you
- * send it; sort-by-key over the whole payload for callbacks it sends you)
- * — do not assume they're interchangeable.
+ * ABA's **outbound request** signature for `check-transaction-2`/
+ * `transaction-detail`: HMAC-SHA512 over `req_time + merchant_id + tran_id`,
+ * base64-encoded. Not used for `purchase` (see `signAbaPaywayPurchase`,
+ * which pads missing fields instead of skipping them — this function's
+ * skip-on-null would desync a longer field list) or for callbacks (
+ * `signAbaPaywayCallback` sorts by key instead of using a fixed order).
  */
 export function signAbaPayway(values: unknown[], apiKey: string): string {
   const data = values
@@ -31,31 +17,13 @@ export function signAbaPayway(values: unknown[], apiKey: string): string {
 }
 
 /**
- * ABA PayWay's **purchase** signature — a distinct, longer algorithm from
- * `signAbaPayway` above, confirmed against ABA's own developer docs
- * (developer.payway.com.kh/purchase-14530820e0): HMAC-SHA512 over the
- * plain concatenation of exactly these 23 fields, in this fixed positional
- * order, base64-encoded:
- *
- * `req_time, merchant_id, tran_id, amount, items, shipping, firstname,
- * lastname, email, phone, type, payment_option, return_url, cancel_url,
- * continue_success_url, return_deeplink, currency, custom_fields,
- * return_params, payout, lifetime, additional_params, google_pay_token,
- * skip_success_page`
- *
- * Unlike `signAbaPayway`, a missing optional field contributes an **empty
- * string at its position**, never a skip — this is positional
- * concatenation (confirmed by ABA's PHP sample style, where an unset
- * variable interpolates as `''`), so dropping a field instead of leaving
- * its slot empty would shift every field after it and desync the whole
- * signature. Pass whatever value ends up in the actual request body for
- * a field that IS sent (e.g. `returnUrl` already base64-encoded) — the
- * hash must sign exactly what's transmitted, not the pre-transform value.
- *
- * This superseded a previous 5-field implementation (`req_time,
- * merchant_id, tran_id, amount, currency`, in that order) that was wrong
- * on both field order and field count — see the module README's Open
- * items for how this was found and confirmed.
+ * ABA's **purchase** signature — HMAC-SHA512 over exactly the 23 fields
+ * concatenated in `signAbaPaywayPurchase` below, in that fixed positional
+ * order. Unlike `signAbaPayway`, a missing field contributes an empty
+ * string at its position rather than being skipped — dropping it instead
+ * would shift every later field and desync the signature. Pass whatever
+ * value actually ends up in the request body (e.g. `returnUrl` already
+ * base64-encoded) — the hash must sign what's transmitted.
  */
 export interface AbaPaywayPurchaseHashFields {
   reqTime: string;
@@ -119,21 +87,10 @@ export function signAbaPaywayPurchase(
 }
 
 /**
- * ABA PayWay's **callback verification** signature, confirmed against
- * ABA's own documentation ("Verify Callback Signature"):
- *
- * 1. Sort the payload's top-level keys ascending.
- * 2. Concatenate the values in that key order — a nested object/array is
- *    JSON-encoded first; every field ABA documents for this payload
- *    (`tran_id`, `apv`, `status`, `return_params`, `merchant_ref`) is a
- *    plain string, so in practice this is just those five values in key
- *    order, but any other JSON-scalar type is handled too.
- * 3. HMAC-SHA512 over that string, keyed by the merchant API key, digest
- *    base64-encoded.
- *
- * The result is compared against the `X-PayWay-Hmac-Sha512` request header
- * — see `verifyAbaPaywayCallbackSignature`, which does that comparison in
- * constant time.
+ * ABA's **callback verification** signature: sort the payload's top-level
+ * keys ascending, concatenate the values (non-strings JSON-encoded first),
+ * HMAC-SHA512, base64. Compared against `X-PayWay-Hmac-Sha512` by
+ * `verifyAbaPaywayCallbackSignature` below, in constant time.
  */
 export function signAbaPaywayCallback(
   payload: Record<string, unknown>,

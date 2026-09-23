@@ -1,11 +1,7 @@
 /**
- * `bakong-khqr` (the NBC-published KHQR SDK, `bakong-khqr@1.0.20`) ships no
- * type declarations of its own (`main` points at plain `.js`, no `types`
- * field) — this covers only the surface CreateTransactionHandler actually
- * calls. Field names verified by reading the SDK's own source
- * (`src/model/information.js`, `src/model/response.js`,
- * `src/controller/generateKHQR.js`) in `node_modules`, not from published
- * docs.
+ * `bakong-khqr` ships no type declarations of its own — this covers only
+ * the surface `CreateTransactionHandler` calls, verified against the SDK's
+ * own source in `node_modules`, not published docs.
  */
 declare module 'bakong-khqr' {
   export interface BakongKhqrStatus {

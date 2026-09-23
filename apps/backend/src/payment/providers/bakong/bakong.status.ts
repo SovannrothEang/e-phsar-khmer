@@ -5,14 +5,10 @@ import type { CheckTransactionByMd5Response } from './bakong.types';
 export const BAKONG_API_OK = 0;
 
 /**
- * Maps a check_transaction_by_md5 response onto our own
- * `payment_attempts.status` values. Unlike ABA, Bakong's API has no
- * explicit "rejected" outcome for a KHQR — a payer either scans and pays or
- * doesn't, so anything short of a found transaction stays `pending`. This
- * provider never returns `failed` from reconcile() itself; a stale/expired
- * QR that's never getting paid is a lifetime concern the caller has to
- * enforce (see the module README's Open items) — reconcile() only reports
- * what Bakong currently knows.
+ * Maps a check_transaction_by_md5 response onto `payment_attempts.status`.
+ * Bakong has no "rejected" outcome for a KHQR — anything short of a found
+ * transaction stays `pending`; this never returns `failed` (an expired QR
+ * is the caller's lifetime concern, not something reconcile() decides).
  */
 export function toPaymentAttemptOutcome(
   response: CheckTransactionByMd5Response,

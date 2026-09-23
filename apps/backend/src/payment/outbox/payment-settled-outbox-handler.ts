@@ -7,12 +7,10 @@ import type { PaymentSettledEventPayload } from '../use-cases/payments/processin
 import { PAYMENT_SETTLED_OUTBOX_EVENT_TYPE } from './payment-outbox-events';
 
 /**
- * The consumer for `payment.succeeded` — the one `PAYMENT_SETTLED_OUTBOX_EVENT_TYPE`'s
- * own doc comment said didn't exist yet. Tells the payment's owner it
- * settled. Unlike the three DB→BullMQ plumbing handlers in this folder,
- * this one does the actual work itself rather than re-queueing to BullMQ:
- * notifying is cheap and has no gateway call to isolate behind a worker
- * pool, so the outbox's own retry/backoff is enough durability on its own.
+ * Consumes `payment.succeeded` and notifies the payment's owner. Unlike the
+ * other handlers in this folder, it does the work directly instead of
+ * re-queueing to BullMQ — notifying has no gateway call worth isolating
+ * behind a worker pool, so the outbox's own retry is durability enough.
  */
 @Injectable()
 export class PaymentSettledOutboxHandler

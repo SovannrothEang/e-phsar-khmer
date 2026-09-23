@@ -3,17 +3,12 @@ import type { BakongKhqrGenerateResult } from 'bakong-khqr';
 export type { BakongKhqrGenerateResult };
 
 /**
- * The Bakong account identity fed to `bakong-khqr` — sourced from config
- * (`bakong.*`), never from `ChargeRequest`. A client controlling whose KHQR
- * gets generated would let it redirect payer funds to an account we don't
- * control.
- *
- * Two shapes, matching the SDK's own `MerchantInfo`/`IndividualInfo` split:
- * `merchant` needs a registered `merchantId` + `acquiringBank` (business
- * onboarding through a participating bank/PSP); `individual` needs neither
- * — just the personal Bakong account alias (`name@bank`) anyone with a
- * Bakong-linked bank account already has. `BAKONG_MERCHANT_TYPE` picks
- * which one `BakongProvider` builds.
+ * The Bakong account identity fed to `bakong-khqr` — sourced from config,
+ * never `ChargeRequest` (a client controlling whose KHQR gets generated
+ * could redirect payer funds). Two shapes matching the SDK's
+ * `MerchantInfo`/`IndividualInfo` split: `merchant` needs a registered
+ * `merchantId` + `acquiringBank`; `individual` just needs a personal Bakong
+ * alias. `BAKONG_MERCHANT_TYPE` picks which one `BakongProvider` builds.
  */
 export type BakongAccountConfig =
   | {

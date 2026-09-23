@@ -8,23 +8,13 @@ import { PaymentQueueError } from '../errors';
 type EnqueuePaymentAttemptPollError = PaymentQueueError;
 
 /**
- * Durably schedules one round of "ask Bakong again" — the same
- * DB-commit-to-BullMQ handoff `enqueuePaymentAttempt` does for the initial
- * charge, reused here for a provider with no webhook (see
- * `../providers/bakong/README.md`).
- *
- * `outbox` arrives as a plain parameter, same convention as
- * `enqueuePaymentAttempt` — see its own doc comment on why (in short:
- * `runInTransaction` only ever puts `DbClientTag` in scope, so anything
- * else has to come in as an ordinary closure value). Unlike that use-case,
- * this one is *not* required to run inside `runInTransaction`: the "still
- * pending, poll again" branch that calls this makes no other DB write to be
- * atomic with (see `poll-payment-attempt.use-case.ts`) — it still works
- * fine inside a transaction too, for the one call site that schedules the
- * *first* round alongside the attempt's own pending-status write.
- *
- * No `dedupeKey` — see `PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE`'s doc
- * comment on why every call here is meant to insert a fresh row.
+ * Durably schedules one round of "ask Bakong again" — same DB→BullMQ
+ * handoff shape as the initial charge, for a provider with no webhook (see
+ * `../providers/bakong/README.md`). Not required to run inside
+ * `runInTransaction` (the "still pending" branch that calls this has no
+ * other write to be atomic with) but works fine there too, for the call
+ * site scheduling the first round. No `dedupeKey` — see
+ * `PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE`'s own doc comment.
  */
 export const enqueuePaymentAttemptPoll = Effect.fn('enqueuePaymentAttemptPoll')(
   function* (

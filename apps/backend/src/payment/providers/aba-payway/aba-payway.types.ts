@@ -106,13 +106,9 @@ export interface GetTransactionDetailResponse {
 }
 
 /**
- * ABA's async payment notification ("Pushback Data") POSTed to `return_url`.
- * Not documented in spec.md (which only covers the 5 REST endpoints) — this
- * is the real, doc-confirmed shape (the "Handle Callback URL" guide's
- * schema + sample payload), which turned out to differ from what the
- * `payway-gateway` reference's own webhook intake assumed (it used
- * `transaction_id`/`payment_status_code`/`payment_status`, none of which
- * appear in ABA's actual callback body).
+ * ABA's async payment notification ("Pushback Data") POSTed to `return_url`
+ * — per the "Handle Callback URL" guide, not the 5 REST endpoints spec.md
+ * covers.
  */
 export interface AbaPaywayWebhookPayload {
   /** Echoes the `tran_id` sent on the purchase call. */

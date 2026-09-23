@@ -36,24 +36,12 @@ function nextTransactionStatus(
 }
 
 /**
- * Turns a committed, `pending` payment_attempt into a provider charge. The
- * only place that calls a gateway for initiation.
- *
- * Written for BullMQ's at-least-once delivery: a redelivered job for an
- * attempt that already resolved is a no-op (step 1). A gateway that isn't
- * registered is a wiring mistake, not a transient fault, and is handled as
- * a normal (non-retried) outcome — it fails the attempt outright rather
- * than yielding a typed error, which would ask the caller to retry
- * something a retry can never fix. A gateway call that produces no answer
- * (network error, timeout) *is* thrown, via `PaymentGatewayCallError` —
- * that's what asks BullMQ's own backoff to try again.
- *
- * `outbox` is a plain parameter (same convention as `enqueuePaymentAttempt`
- * — see its doc comment) so a `pending` result carrying `ChargeResult.poll`
- * (a provider with no webhook, e.g. Bakong — see
- * `../providers/bakong/README.md`) can durably schedule the first
- * `reconcile()` poll round in the same transaction as this attempt's own
- * status write.
+ * Turns a committed, `pending` payment_attempt into a provider charge — the
+ * only place that calls a gateway for initiation. Redelivered jobs for an
+ * already-resolved attempt no-op. An unregistered gateway is a wiring
+ * mistake, not transient, so it fails the attempt outright instead of
+ * retrying; a gateway call that produces no answer throws
+ * `PaymentGatewayCallError` so BullMQ's backoff retries instead.
  */
 export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
   function* (
@@ -72,8 +60,6 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
     const transaction = yield* checkPayment(input.paymentTransactionId);
     const registry = yield* PaymentGatewayRegistryTag;
 
-    // Synchronous and never throws in a way worth an Effect channel for —
-    // caught inline and turned into the "not registered" branch below.
     let provider: ReturnType<typeof registry.resolve> | undefined;
     try {
       provider = registry.resolve(attempt.provider);
@@ -94,10 +80,7 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
       return 'gateway_not_registered';
     }
 
-    // Registered but missing the credentials it needs to actually call out
-    // (see PaymentGatewayProvider.isConfigured's doc comment) — same "give
-    // up outright" treatment as an unregistered provider, since a retry
-    // can't fix a missing env var either.
+    // Missing credentials, not just unregistered — same give-up treatment.
     if (provider.isConfigured && !provider.isConfigured()) {
       yield* runInTransaction(
         failPaymentAttempt({
@@ -111,8 +94,7 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
       return 'gateway_not_configured';
     }
 
-    // Outside the DB transaction on purpose — an HTTP call to a gateway has
-    // no business holding a Postgres transaction (and its locks) open.
+    // Outside the DB transaction — a gateway HTTP call shouldn't hold locks.
     const result = yield* Effect.tryPromise({
       try: () =>
         provider.charge({

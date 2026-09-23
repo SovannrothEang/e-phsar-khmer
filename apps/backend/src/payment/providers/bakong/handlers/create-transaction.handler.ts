@@ -35,26 +35,12 @@ function toBakongCurrency(currency: string): number {
 }
 
 /**
- * The create-transaction action for Bakong. Bakong has no server-side
- * "create purchase" endpoint (see `../../README.md`'s Bakong section) —
- * this handler *is* that action, and it never touches the network: it
- * builds a KHQR string + its MD5 entirely offline via the `bakong-khqr`
- * SDK. No error channel — a rejected KHQR (e.g. an amount the SDK won't
- * accept) is a normal, modeled outcome via `CreateTransactionResult.ok`,
- * the same way ABA's non-"00" purchase status becomes a `failed`
- * `ChargeResult` rather than a thrown error (see `PaymentGatewayCallError`'s
- * doc comment in `../../../use-cases/payments/errors.ts`).
- *
- * Branches on `account.type` — `generateMerchant`/`generateIndividual` are
- * two different SDK entry points, not one function with an optional field
- * (see `BakongAccountConfig`'s doc comment for why `individual` exists at
- * all: it needs no registered merchant account, just a personal Bakong
- * alias).
- *
- * The returned `md5` is the only correlation key Bakong understands going
- * forward — it's what `checkBakongTransaction` polls with, so it becomes
- * both `providerAttemptId` and `providerTransactionId` on the `ChargeResult`
- * `BakongProvider` builds from this.
+ * Bakong has no server-side "create purchase" endpoint — this handler *is*
+ * that action, entirely offline via the `bakong-khqr` SDK. No error
+ * channel: a rejected KHQR is a normal outcome via `CreateTransactionResult.ok`,
+ * not a thrown error. The returned `md5` is Bakong's only correlation key
+ * going forward — `checkBakongTransaction` polls with it, and it becomes
+ * both `providerAttemptId` and `providerTransactionId` on the `ChargeResult`.
  */
 export const createBakongTransaction = Effect.fn('createBakongTransaction')(
   // A plain function returning an Effect, not a generator — there's nothing

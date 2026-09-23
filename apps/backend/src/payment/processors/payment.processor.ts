@@ -30,24 +30,12 @@ import {
 const FAILURE_MESSAGE_MAX_LENGTH = 2000;
 
 /**
- * Consumes all three job kinds the `payments` queue carries. Deliberately
- * thin: every decision (claiming via the attempt/event's own status,
- * calling the gateway, persisting) belongs to the use-case; this only
- * translates a modeled failure or a DB error into a throw, which is what
- * asks BullMQ's own `attempts`/`backoff` (wired in `payment.module.ts`) for
- * a retry.
- *
- * Unlike `PaymentsController.run()`, a failure here is never mapped to an
- * `HttpException` — there is no HTTP response to produce, only a job that
- * either completed or needs another try.
- *
- * `onJobFailed` (below) is the backstop for when "another try" runs out: a
- * `process-attempt`/`poll-attempt` job that keeps throwing (bad gateway
- * credentials, a persistent outage) would otherwise leave its attempt
- * silently stuck at `pending` forever once BullMQ's own retry budget is
- * exhausted — indistinguishable from a payer who just hasn't paid yet. See
- * `fail-abandoned-payment-job.use-case.ts`'s doc comment for the full
- * rationale.
+ * Consumes all three job kinds on the `payments` queue. Deliberately thin —
+ * every decision belongs to the use-case; this only turns a modeled failure
+ * into a throw, which asks BullMQ's `attempts`/`backoff` for a retry (no
+ * `HttpException` mapping here, unlike `PaymentEffectRunner.run()` — there's
+ * no HTTP response to produce). `onJobFailed` below is the backstop once
+ * BullMQ's retry budget runs out.
  */
 // `@Processor`'s options are evaluated at class-decoration time, before Nest's
 // DI container exists — ConfigService isn't reachable here, so this reads
@@ -112,19 +100,13 @@ export class PaymentProcessor extends WorkerHost {
   }
 
   /**
-   * Fires on every failed attempt of every job on this queue, not just the
-   * final one — `attemptsMade >= opts.attempts` is what distinguishes "will
-   * retry" from "BullMQ has given up," per BullMQ's own documented pattern
-   * for this listener. Only `process-attempt`/`poll-attempt` jobs carry
-   * enough context (a `paymentAttemptId`/`paymentTransactionId`) to act on;
-   * `process-provider-event` jobs are left alone; an event exhausting its
-   * retries just stays `received` for an operator to investigate, same as
-   * today (see `../README.md`'s Current state on `processProviderEvent`).
-   *
-   * Never lets a failure here propagate: this runs outside `process()`, so
-   * a thrown error wouldn't be interpreted as "retry the job" (there is no
-   * job attempt in flight anymore) — it would just be an unhandled
-   * rejection in a worker event listener. Logged instead.
+   * Fires on every failed attempt, not just the final one — the
+   * `attemptsMade < maxAttempts` check below is what distinguishes "will
+   * retry" from "BullMQ has given up." Only `process-attempt`/`poll-attempt`
+   * jobs carry enough context to act on; a `process-provider-event` job
+   * exhausting its retries is left alone, staying `received` for an
+   * operator to investigate. Errors here are logged, not thrown — this runs
+   * outside `process()`, so a throw would just be an unhandled rejection.
    */
   @OnWorkerEvent('failed')
   async onJobFailed(

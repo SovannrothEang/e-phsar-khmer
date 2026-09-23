@@ -15,27 +15,15 @@ import { createApiClient, type ApiClient } from '../../../utils/api-client';
 import type { BakongAccountConfig } from './bakong.types';
 
 /**
- * Bakong's implementation of the gateway seam — and a genuinely different
- * shape from ABA PayWay's. ABA has a server-side "create purchase" call and
- * an optional signed webhook; Bakong has **neither**. A KHQR is generated
- * entirely offline (no network round trip), and the only way to learn
- * whether a payer actually scanned and paid is to poll
- * `check_transaction_by_md5` — there is no push channel at all in this flow.
- *
- * This class is deliberately thin: `createBakongTransaction` and
- * `checkBakongTransaction` (`./handlers/`) are the actual actions, written
- * as `Effect.fn`s (typed failures, free tracing spans, easy to layer
- * retry/timeout onto later) so they compose the same way the module's other
- * use-cases do. `PaymentGatewayProvider` itself has to stay Promise-based —
- * NestJS DI and the interface both require it — so this provider is the
- * thin Promise boundary that runs those Effects, the same role
- * `PaymentEffectRunner` plays for the controllers.
- *
- * `charge()` sets `ChargeResult.poll` on its `pending` result, which is what
- * asks `processPaymentAttempt` to schedule the first `reconcile()` poll
- * (`poll-attempt` BullMQ job, via `payment.attempt.poll_requested` in the
- * outbox) instead of waiting for a callback that will never arrive — see
- * `README.md` in this directory for the full poll-loop architecture.
+ * Bakong's gateway seam — a genuinely different shape from ABA's. No
+ * server-side "create purchase" call and no webhook: a KHQR is generated
+ * entirely offline, and polling `check_transaction_by_md5` is the only way
+ * to learn if it was paid. `createBakongTransaction`/`checkBakongTransaction`
+ * (`./handlers/`) are the real actions, as `Effect.fn`s; this class is the
+ * thin Promise boundary `PaymentGatewayProvider` requires. `charge()` sets
+ * `ChargeResult.poll` on `pending`, which schedules the first `reconcile()`
+ * poll instead of waiting for a callback that never arrives — see this
+ * directory's `README.md` for the full loop.
  */
 @Injectable()
 export class BakongProvider implements PaymentGatewayProvider {
@@ -163,15 +151,10 @@ export class BakongProvider implements PaymentGatewayProvider {
   }
 
   /**
-   * Whether Bakong has everything its whole lifecycle needs — not just
-   * `charge()`'s own narrower check. A KHQR generated without `apiKey` set
-   * could never be confirmed (there's no webhook — `reconcile()` polling is
-   * the *only* way this provider learns a payment happened), so this
-   * deliberately also gates charge()/`processPaymentAttempt` on the same
-   * key `charge()` itself doesn't touch: charging into a config that can
-   * never resolve is worse than failing the attempt up front. See
-   * `PaymentGatewayProvider.isConfigured`'s doc comment for how callers use
-   * this.
+   * Checks the whole lifecycle's config needs, not just `charge()`'s own —
+   * a KHQR generated without reconcile()'s key set could never be
+   * confirmed (no webhook exists to fall back on), so this gates `charge()`
+   * up front rather than letting it succeed into an unconfirmable attempt.
    */
   isConfigured(): boolean {
     const account = this.accountConfig();

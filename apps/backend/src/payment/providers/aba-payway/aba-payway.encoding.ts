@@ -1,28 +1,14 @@
 /**
- * ABA PayWay's purchase API documents `return_url` as: "URL to receive
- * callbacks upon payment completion, encrypted with Base64." Despite the
- * word "encrypted", this is base64 *encoding* (reversible, no key) — there
- * is no separate encrypt key involved in the purchase request, only the
- * HMAC `apiKey` used for `hash` (see `aba-payway.signing.ts`). Confirmed
- * against ABA's own documented field description, not inferred from the
- * `payway-gateway` reference implementation — that reference never
- * actually applies this encoding to `return_url` (it has an unused
- * `EncodeBase64Builder` utility sitting dead in `common/utils/`, which is
- * a hint this exact step was left unfinished there).
+ * ABA docs call `return_url` "encrypted with Base64" — despite the wording
+ * this is plain base64 *encoding* (reversible, no key); the only key
+ * involved anywhere in the purchase request is the HMAC `apiKey` used for
+ * `hash` (see `aba-payway.signing.ts`).
  */
 export function base64EncodeAbaPaywayUrl(url: string): string {
   return Buffer.from(url, 'utf-8').toString('base64');
 }
 
-/**
- * ABA PayWay's `req_time` wire format, confirmed against ABA's own
- * developer docs (developer.payway.com.kh/purchase-14530820e0 and
- * .../check-transaction-14530826e0, both state "Request date and time in
- * UTC format as YYYYMMDDHHmmss"): a 14-digit UTC timestamp, not epoch
- * milliseconds. This superseded a previous `String(Date.now())`
- * implementation that would never have matched what ABA expects on a live
- * call — see the module README's Open items for how this was found.
- */
+/** ABA's `req_time` wire format: a 14-digit UTC timestamp (`YYYYMMDDHHmmss`), not epoch milliseconds — per ABA's developer docs. */
 export function formatAbaPaywayReqTime(date: Date): string {
   const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
   return (

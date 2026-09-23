@@ -36,41 +36,22 @@ import { Effect } from 'effect';
 const SIGNATURE_HEADER = 'x-payway-hmac-sha512';
 
 /**
- * ABA PayWay's implementation of the gateway seam. The only place that
- * knows PayWay's wire format: the request signature, `status.code`'s
- * meaning, and which response fields become the checkout artifact.
+ * ABA PayWay's implementation of the gateway seam — the only place that
+ * knows PayWay's wire format.
  *
- * `tran_id` sent to ABA is a freshly generated short opaque id — **not**
- * `payment_transactions.id` or `payment_attempts.id` (both 36-character
- * UUIDs, confirmed live to exceed ABA's `tran_id` limit; see
- * `CreatePurchaseRequest.tran_id`'s own doc comment). ABA echoes `tran_id`
- * back verbatim on every subsequent call (check-transaction, the callback
- * body's own `tran_id`), and that echoed value is what `charge()` returns
- * as `ChargeResult.providerAttemptId` — `updatePaymentAttempt` persists it
- * to `payment_attempts.provider_attempt_id`, which is what lets a webhook
- * or a reconcile lookup correlate back to the right attempt. Our own
- * `payment_transactions.id` still travels with the request — as
- * `custom_fields` — purely for manual lookups against ABA's own tooling;
- * nothing in this codebase reads it back out of a response.
+ * `tran_id` sent to ABA is a freshly generated short opaque id, not
+ * `payment_transactions.id`/`payment_attempts.id` (both UUIDs exceed ABA's
+ * limit). ABA echoes it back on every subsequent call; that's what
+ * `charge()` returns as `ChargeResult.providerAttemptId` and what
+ * `payment_attempts.provider_attempt_id` correlates a webhook/reconcile
+ * back to. Our own `payment_transactions.id` still travels as
+ * `custom_fields`, for manual lookups only.
  *
- * **`return_url` vs `continue_success_url`/`cancel_url` — do not conflate
- * these.** Despite the name, ABA's `return_url` is a *server-to-server*
- * field: the URL ABA POSTs the payment result to once the payer completes
- * (or abandons) checkout — functionally a per-request webhook target, not
- * a browser redirect. It is always `webhookUrl()` (fixed server config,
- * `ABA_PAYWAY_WEBHOOK_URL`, pointed at the webhooks controller's route)
- * and is never sourced from caller input — a client controlling where
- * ABA's payment-result notification goes would be a real vulnerability.
- * `continue_success_url`/`cancel_url` are the actual browser redirects,
- * and those *are* legitimately caller-supplied, via
- * `ChargeRequest.returnUrl`/`.cancelUrl`. Only `return_url` is
- * base64-encoded before being sent — confirmed against both ABA's own
- * documented field description ("URL to receive callbacks upon payment
- * completion, encrypted with Base64") and its developer docs
- * (developer.payway.com.kh/purchase-14530820e0), which call out base64
- * for `return_url` specifically and say nothing of the sort for
- * `continue_success_url`/`cancel_url` — those two are sent as plain URLs.
- * See `aba-payway.encoding.ts`.
+ * `return_url` (always `webhookUrl()`, never caller-supplied — it's the
+ * server-to-server payment-result target, not a browser redirect) is
+ * distinct from `continue_success_url`/`cancel_url` (the actual browser
+ * redirects, from `ChargeRequest`). Only `return_url` is base64-encoded —
+ * see `aba-payway.encoding.ts`.
  */
 @Injectable()
 export class AbaPaywayProvider implements PaymentGatewayProvider {
@@ -262,13 +243,9 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
   }
 
   /**
-   * ABA PayWay signs its callback: HMAC-SHA512 over the payload (sorted
-   * keys, values concatenated), keyed by the merchant API key, sent as the
-   * `X-PayWay-Hmac-Sha512` header — confirmed against ABA's own
-   * documentation ("Verify Callback Signature"). See
-   * `signAbaPaywayCallback`/`verifyAbaPaywayCallbackSignature` in
-   * `aba-payway.signing.ts` for the algorithm itself; this method is just
-   * the header lookup + JSON parse around it.
+   * Looks up the `X-PayWay-Hmac-Sha512` header and JSON-parses the body —
+   * the actual HMAC algorithm lives in `signAbaPaywayCallback`/
+   * `verifyAbaPaywayCallbackSignature` (`aba-payway.signing.ts`).
    */
   verifyWebhookSignature(
     rawBody: Buffer | string,
