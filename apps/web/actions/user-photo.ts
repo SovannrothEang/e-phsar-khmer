@@ -1,6 +1,6 @@
 "use server";
 
-import { ApiError, serverFetch } from "@/lib/api/client";
+import { ApiError, userServerFetch } from "@/lib/api/client";
 
 /**
  * Subset of the backend `PublicUser` — only the fields we need after an upload.
@@ -22,7 +22,7 @@ export async function uploadUserPhoto(kind: "avatar" | "cover", file: File) {
   const formData = new FormData();
   formData.append("file", file);
   try {
-    const { data } = await serverFetch<UploadPhotoResponse>(
+    const { data } = await userServerFetch<UploadPhotoResponse>(
       `/users/me/${kind}`,
       { method: "POST", body: formData },
     );
