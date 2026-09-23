@@ -264,7 +264,13 @@ export function useChatThread({
       const imageCount = draftKeys.length;
       const hasBody = !!draft.body;
 
-      // Upload and send each image as a separate message.
+      // Generate a shared groupId for all images in this batch.
+      const groupId = imageCount > 0 ? crypto.randomUUID() : undefined;
+
+      // Track sent message IDs to replace optimistic.
+      const sentMessageIds: string[] = [];
+
+      // Upload and send each image via HTTP (returns full message with imageUrl).
       for (let i = 0; i < imageCount; i++) {
         const key = draftKeys[i];
         try {
@@ -274,29 +280,29 @@ export function useChatThread({
           const file = dataUrlToFile(dataUrl, filename);
           const signed = await signChatUpload(filename);
           if (!signed.ok) throw new Error(signed.message);
-          const res = await fetch(signed.data.signedUrl, {
+          const uploadRes = await fetch(signed.data.signedUrl, {
             method: "PUT",
             body: file,
             headers: { "Content-Type": file.type },
           });
-          if (!res.ok) throw new Error("Upload failed");
+          if (!uploadRes.ok) throw new Error("Upload failed");
 
-          // Send image message via WS or HTTP.
-          if (ws.isConnected && conversationId) {
-            ws.send({
-              recipientId,
-              imagePath: signed.data.path,
-              listingId: i === 0 ? draft.listingId : undefined,
-            });
-          } else {
-            const input: SendMessageInput = {
-              recipientId,
-              imagePath: signed.data.path,
-              listingId: i === 0 ? draft.listingId : undefined,
-            };
-            const sendRes = await sendChatMessage(input);
-            if (!sendRes.ok) throw new Error(sendRes.message);
-          }
+          // Always use HTTP for images — returns full message with imageUrl.
+          const input: SendMessageInput = {
+            recipientId,
+            imagePath: signed.data.path,
+            groupId,
+            listingId: i === 0 ? draft.listingId : undefined,
+          };
+          const sendRes = await sendChatMessage(input);
+          if (!sendRes.ok) throw new Error(sendRes.message);
+          sentMessageIds.push(sendRes.data.message.id);
+
+          // Replace optimistic with server message.
+          setLocal((prev) => [
+            ...prev.filter((m) => m.tempId !== tempId),
+            { ...sendRes.data.message, pending: false, failed: false },
+          ]);
 
           // Cleanup this key after successful upload+send.
           localStorage.removeItem(key);
@@ -366,10 +372,8 @@ export function useChatThread({
       // No body — all images sent, clean up optimistic echo.
       setIsSending(false);
       setLocal((prev) =>
-        prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
+        prev.filter((m) => m.tempId !== tempId),
       );
-      // After sending images, we don't have a conversationId from the server
-      // (images were sent individually). Just notify mutation.
       onMutated?.();
     },
     [
@@ -408,6 +412,7 @@ export function useChatThread({
         listingId: draft.listingId ?? null,
         imageUrl: previewUrls[0] ?? null,
         imagePath: null,
+        groupId: null,
         readAt: null,
         createdAt: new Date().toISOString(),
         isE2e: false,

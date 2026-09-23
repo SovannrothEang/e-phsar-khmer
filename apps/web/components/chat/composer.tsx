@@ -85,16 +85,23 @@ export function Composer({
       toast.error(t("composer.imageSizeError"));
       return;
     }
-    if (staged.length >= maxAllowed) {
-      toast.error(t("composer.imageLimitError", { max: maxAllowed }));
-      return;
-    }
     setUploading(true);
     try {
       // Use random ID to avoid key collisions on rapid picks.
       const tempId = crypto.randomUUID();
       const draft = await storeDraftImage(tempId, staged.length, file);
-      setStaged((prev) => [...prev, { key: draft.key, dataUrl: draft.dataUrl }]);
+      let accepted = false;
+      setStaged((prev) => {
+        // Re-check limit inside the updater — concurrent pastes see stale state.
+        if (prev.length >= maxAllowed) return prev;
+        accepted = true;
+        return [...prev, { key: draft.key, dataUrl: draft.dataUrl }];
+      });
+      if (!accepted) {
+        removeDraftImage(draft.key);
+        toast.error(t("composer.imageLimitError", { max: maxAllowed }));
+        return;
+      }
       onActivity?.();
     } catch (err) {
       toast.error(
@@ -180,6 +187,19 @@ export function Composer({
               submit();
             }
           }}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData.files).filter((f) =>
+              f.type.startsWith("image/"),
+            );
+            if (files.length === 0) return;
+            e.preventDefault();
+            // Sequential so limit/quota checks see prior staged results.
+            void (async () => {
+              for (const f of files) {
+                await handleFile(f);
+              }
+            })();
+          }}
         />
 
         <button
@@ -211,7 +231,12 @@ export function Composer({
         onChange={(e) => {
           const files = e.target.files;
           if (files) {
-            Array.from(files).forEach((f) => void handleFile(f));
+            // Sequential so limit/quota checks see prior staged results.
+            void (async () => {
+              for (const f of Array.from(files)) {
+                await handleFile(f);
+              }
+            })();
           }
           e.target.value = "";
         }}

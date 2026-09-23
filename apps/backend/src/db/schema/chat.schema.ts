@@ -93,6 +93,8 @@ export const messages = chatSchema.table(
     }),
     imageUrl: text('image_url'),
     imagePath: text('image_path'),
+    // Links related images (e.g. multiple photos in one send). Null for text messages.
+    groupId: uuid('group_id'),
     readAt: timestamp('read_at', { withTimezone: true }),
     isE2e: boolean('is_e2e').default(false).notNull(),
     e2eHeader: jsonb('e2e_header').$type<E2eHeader | null>(),

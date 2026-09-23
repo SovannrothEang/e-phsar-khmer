@@ -28,6 +28,8 @@ import { useChatThread } from "@/hooks/use-chat-thread";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
+import { ImageGroup } from "@/components/chat/image-group";
+import { groupImageMessages, type MessageNode } from "@/lib/chat/group-images";
 import type { ChatUserSummary, ListingContext } from "@/types/chat";
 
 export function MessageThread({
@@ -158,14 +160,19 @@ export function MessageThread({
   );
 
   const grouped = useMemo(() => {
-    const out: { day: string; items: typeof messages }[] = [];
+    // First group by day.
+    const dayBuckets: { day: string; items: typeof messages }[] = [];
     for (const message of messages) {
       const day = dayKey(message.createdAt);
-      const last = out[out.length - 1];
+      const last = dayBuckets[dayBuckets.length - 1];
       if (last && last.day === day) last.items.push(message);
-      else out.push({ day, items: [message] });
+      else dayBuckets.push({ day, items: [message] });
     }
-    return out;
+    // Then group consecutive image messages within each day.
+    return dayBuckets.map((bucket) => ({
+      day: bucket.day,
+      nodes: groupImageMessages(bucket.items),
+    }));
   }, [messages]);
 
   // A 404 on a conversation route means "not a participant" — the backend
@@ -288,18 +295,27 @@ export function MessageThread({
                     })}
                   </span>
                 </div>
-                {group.items.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    isMine={message.senderId === viewerId}
-                    peerLastReadAt={peerLastReadAt}
-                    peerName={peerName}
-                    peerAvatarUrl={peer.profilePhotoUrl}
-                    onRetry={retry}
-                    onOpenImage={setLightbox}
-                  />
-                ))}
+                {group.nodes.map((node) =>
+                  node.kind === "image-group" ? (
+                    <ImageGroup
+                      key={`group-${node.messages[0].id}`}
+                      messages={node.messages}
+                      isMine={node.senderId === viewerId}
+                      onOpenImage={setLightbox}
+                    />
+                  ) : (
+                    <MessageBubble
+                      key={node.message.id}
+                      message={node.message}
+                      isMine={node.message.senderId === viewerId}
+                      peerLastReadAt={peerLastReadAt}
+                      peerName={peerName}
+                      peerAvatarUrl={peer.profilePhotoUrl}
+                      onRetry={retry}
+                      onOpenImage={setLightbox}
+                    />
+                  ),
+                )}
               </div>
             ))}
           </>

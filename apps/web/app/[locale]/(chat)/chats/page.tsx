@@ -9,8 +9,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function ChatsPage() {
   return (
-    <div className="bg-muted py-0">
-      <div className="mx-auto max-w-6xl md:px-4">
+    <div className="bg-muted min-h-[calc(100dvh-3.5rem)] py-0 pt-4">
+      <div className="mx-auto">
         <Chats />
       </div>
     </div>

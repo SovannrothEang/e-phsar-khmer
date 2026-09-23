@@ -92,6 +92,7 @@ class ChatSocket {
     body?: string;
     listingId?: string;
     imagePath?: string;
+    groupId?: string | null;
   }) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(
@@ -175,6 +176,7 @@ export interface ChatWsState {
     body?: string;
     listingId?: string;
     imagePath?: string;
+    groupId?: string | null;
   }) => void;
 }
 

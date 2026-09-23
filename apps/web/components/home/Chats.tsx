@@ -19,7 +19,7 @@ export default function Chats() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-[calc(100dvh-8rem)] min-h-[480px] items-center justify-center border border-border bg-background md:rounded-lg">
+        <div className="flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] items-center justify-center border border-border bg-background md:rounded-lg">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
       }

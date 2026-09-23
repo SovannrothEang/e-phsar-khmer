@@ -46,6 +46,7 @@ export interface ChatMessage {
   listingId: string | null;
   imageUrl: string | null;
   imagePath: string | null;
+  groupId: string | null;
   readAt: string | null;
   createdAt: string;
   isE2e: boolean;
@@ -99,6 +100,7 @@ export interface SendMessageInput {
   body?: string;
   listingId?: string;
   imagePath?: string;
+  groupId?: string;
   e2eHeader?: E2eHeader;
 }
 

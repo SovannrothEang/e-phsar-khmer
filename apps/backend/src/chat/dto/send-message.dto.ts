@@ -51,6 +51,14 @@ export class SendMessageDto {
 
   @ApiPropertyOptional({
     description:
+      'Groups related images together (e.g. multiple photos in one send). Shared across messages in the same batch.',
+  })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
+
+  @ApiPropertyOptional({
+    description:
       'Signal-protocol envelope for this message. Presence marks the message as E2E (body is ciphertext). Cannot be combined with imagePath — E2E covers text only in v1.',
     type: E2eHeaderDto,
   })

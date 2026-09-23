@@ -398,7 +398,7 @@ export function ChatWorkspace({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-[calc(100dvh-8rem)] min-h-[480px] overflow-hidden border border-border bg-background md:rounded-lg">
+    <div className="flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] overflow-hidden border border-border bg-background ">
       {children}
     </div>
   );

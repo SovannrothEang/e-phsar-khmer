@@ -228,6 +228,7 @@ export class ChatService {
           listingId: dto.listingId ?? null,
           imageUrl,
           imagePath: dto.imagePath ?? null,
+          groupId: dto.groupId ?? null,
           isE2e: Boolean(dto.e2eHeader),
           e2eHeader: dto.e2eHeader ?? null,
         })
