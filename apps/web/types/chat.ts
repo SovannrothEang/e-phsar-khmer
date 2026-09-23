@@ -102,6 +102,12 @@ export interface SendMessageInput {
   imagePath?: string;
   groupId?: string;
   e2eHeader?: E2eHeader;
+  /**
+   * Stable client-minted dedup key. Mint once per logical send (optimistic
+   * echo / draft) and reuse on every retry so a lost response or double-tap
+   * replays the original row instead of inserting twice.
+   */
+  clientMessageId?: string;
 }
 
 export interface SendMessageResult {
@@ -129,4 +135,10 @@ export interface ThreadMessage extends ChatMessage {
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */
   tempId?: string;
+  /**
+   * Dedup key for this logical send — minted with the optimistic echo and
+   * kept across retries so `POST /chats/messages` can replay instead of
+   * duplicating. Client-only; not part of the server message wire type.
+   */
+  clientMessageId?: string;
 }

@@ -59,12 +59,25 @@ export function formatPrice(
   }
 }
 
-/** One-line inbox preview for a conversation's last message. */
+/**
+ * One-line inbox preview for a conversation's last message.
+ *
+ * `decryptedPlaintext` is the resolved body for an E2E row (from the local
+ * decrypt cache or a completed decrypt). When it's missing, the preview is
+ * left blank rather than showing ciphertext or a "Encrypted message" badge —
+ * personal chat should read like any other message list.
+ */
 export function previewOf(
   message: ChatMessage | null,
   labels: { image: string; listing: string; none: string },
+  decryptedPlaintext?: string | null,
 ): string {
   if (!message) return labels.none;
+  if (message.isE2e) {
+    if (decryptedPlaintext) return decryptedPlaintext;
+    // Still decrypting (or failed): never surface base64 ciphertext.
+    return "";
+  }
   if (message.body) return message.body;
   if (message.imageUrl) return labels.image;
   if (message.listingId) return labels.listing;

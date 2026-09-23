@@ -81,15 +81,21 @@ export class ChatService {
    * Fire-and-forget over Redis (see ChatPubSubService) — a dropped push just
    * means the recipient sees the change on their next poll, so a publish
    * failure must never fail the request that triggered it.
+   *
+   * Call sites must NOT `await` this: Redis RTT would sit on the sender's
+   * response path for zero durability gain (no outbox by design). Kick it
+   * off and return; errors are already swallowed here.
    */
-  private async publishChatEvents(events: ChatPushEvent[]): Promise<void> {
-    await Promise.all(
-      events.map((event) =>
-        this.pubsub.publish(event).catch((err: unknown) => {
-          this.logger.warn(`Chat push failed: ${String(err)}`);
-        }),
-      ),
-    );
+  private publishChatEvents(events: ChatPushEvent[]): void {
+    void (async () => {
+      await Promise.all(
+        events.map((event) =>
+          this.pubsub.publish(event).catch((err: unknown) => {
+            this.logger.warn(`Chat push failed: ${String(err)}`);
+          }),
+        ),
+      );
+    })();
   }
 
   private get bucket(): string {
@@ -283,8 +289,9 @@ export class ChatService {
     // a different backend instance too. `message` carries the row; the inbox
     // / unread-count events are plain "something changed" signals — the
     // client re-runs its existing query functions rather than this layer
-    // serializing those shapes a second time.
-    await this.publishChatEvents([
+    // serializing those shapes a second time. Not awaited: keep Redis RTT
+    // off the 201; a lost push is recovered by the recipient's next poll.
+    this.publishChatEvents([
       { targetUserId: dto.recipientId, type: 'message', payload: withListing },
       { targetUserId: dto.recipientId, type: 'inbox_update' },
       { targetUserId: senderId, type: 'inbox_update' },
@@ -448,9 +455,7 @@ export class ChatService {
 
     const items = await this.buildInboxItems(userId, [conversation]);
 
-    await this.publishChatEvents([
-      { targetUserId: userId, type: 'inbox_update' },
-    ]);
+    this.publishChatEvents([{ targetUserId: userId, type: 'inbox_update' }]);
 
     return {
       conversation: items[0] ?? null,
@@ -483,9 +488,7 @@ export class ChatService {
       )
       .where(eq(conversations.id, conversationId));
 
-    await this.publishChatEvents([
-      { targetUserId: userId, type: 'inbox_update' },
-    ]);
+    this.publishChatEvents([{ targetUserId: userId, type: 'inbox_update' }]);
 
     return { deleted: true };
   }
@@ -621,7 +624,7 @@ export class ChatService {
     // Only the reader's own badge/inbox state changed by reading — the
     // sender's side is unaffected until they next poll or send.
     if (marked.length > 0) {
-      await this.publishChatEvents([
+      this.publishChatEvents([
         { targetUserId: userId, type: 'unread_count' },
         { targetUserId: userId, type: 'inbox_update' },
       ]);

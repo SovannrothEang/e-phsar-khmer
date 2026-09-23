@@ -16,9 +16,9 @@ import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { mergeMessages } from "@/lib/chat/format";
 import { useAdaptivePolling } from "@/hooks/use-chat-polling";
 import { useChatWs } from "@/hooks/use-chat-ws";
-import {
-  dataUrlToFile,
-} from "@/lib/chat-draft-images";
+import { dataUrlToFile } from "@/lib/chat-draft-images";
+import { getE2eEngine } from "@/lib/e2e/engine-provider";
+import { sendE2eText } from "@/lib/e2e/send-encrypt";
 import type {
   ChatMessage,
   MessagePage,
@@ -256,7 +256,7 @@ export function useChatThread({
 
   // ── Send ──────────────────────────────────────────────────────────────────
   const dispatch = useCallback(
-    async (draft: SendDraft, tempId: string) => {
+    async (draft: SendDraft, tempId: string, clientMessageId: string) => {
       if (!recipientId || !viewerId) return;
       setIsSending(true);
 
@@ -266,9 +266,6 @@ export function useChatThread({
 
       // Generate a shared groupId for all images in this batch.
       const groupId = imageCount > 0 ? crypto.randomUUID() : undefined;
-
-      // Track sent message IDs to replace optimistic.
-      const sentMessageIds: string[] = [];
 
       // Upload and send each image via HTTP (returns full message with imageUrl).
       for (let i = 0; i < imageCount; i++) {
@@ -288,15 +285,17 @@ export function useChatThread({
           if (!uploadRes.ok) throw new Error("Upload failed");
 
           // Always use HTTP for images — returns full message with imageUrl.
+          // Per-image dedup key: one logical draft → many rows; index i keeps
+          // retries of the same draft from re-inserting a delivered image.
           const input: SendMessageInput = {
             recipientId,
             imagePath: signed.data.path,
             groupId,
             listingId: i === 0 ? draft.listingId : undefined,
+            clientMessageId: `${clientMessageId}-img-${i}`,
           };
           const sendRes = await sendChatMessage(input);
           if (!sendRes.ok) throw new Error(sendRes.message);
-          sentMessageIds.push(sendRes.data.message.id);
 
           // Replace optimistic with server message.
           setLocal((prev) => [
@@ -320,50 +319,56 @@ export function useChatThread({
       }
 
       // Send text body as final message (if any).
+      // Always E2E for text (spec decision #6 — fail closed, no plaintext
+      // fallback). sendE2eText runs encrypt → HTTP → session commit under
+      // one per-conversation lock and never uses the WS envelope, because
+      // the commit needs conversationId + message.id from the HTTP response.
       if (hasBody) {
-        if (ws.isConnected && conversationId) {
-          ws.send({
-            recipientId,
-            body: draft.body,
-            // Listing only attaches to first image; if no images, attach here.
-            listingId: imageCount === 0 ? draft.listingId : undefined,
-          });
-          setIsSending(false);
-          setLocal((prev) =>
-            prev.map((m) => (m.tempId === tempId ? { ...m, pending: false } : m)),
-          );
-          if (conversationId === null) {
-            onConversationCreated?.(conversationId);
-          }
-          onMutated?.();
-          return;
-        }
-
-        // HTTP fallback for text message.
-        const input: SendMessageInput = {
+        const engine = await getE2eEngine(viewerId).catch(() => null);
+        const outcome = await sendE2eText(engine, {
+          conversationId,
           recipientId,
-          body: draft.body,
+          plaintext: draft.body as string,
           listingId: imageCount === 0 ? draft.listingId : undefined,
-        };
-        const res = await sendChatMessage(input);
+          clientMessageId,
+          send: sendChatMessage,
+        });
         setIsSending(false);
 
-        if (!res.ok) {
+        if (!outcome.ok) {
           setLocal((prev) =>
             prev.map((m) =>
               m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
             ),
           );
-          onSendError?.(res.message, res.status);
+          if (outcome.reason === "no-recipient-keys") {
+            onSendError?.("E2E_NO_KEYS", 404);
+          } else if (outcome.reason === "engine-unavailable") {
+            onSendError?.("E2E_UNAVAILABLE", 0);
+          } else if (outcome.reason === "send-failed") {
+            onSendError?.(outcome.message, outcome.status);
+          } else {
+            onSendError?.("E2E_UNAVAILABLE", 0);
+          }
           return;
         }
 
+        // Replace the optimistic echo with the server row. Override body
+        // with the plaintext we already know — the server copy is ciphertext,
+        // and rendering it for one frame before the decrypt hook runs would
+        // flash base64 at the user. History refetches re-resolve via the
+        // decrypt cache (committed inside sendE2eText).
         setLocal((prev) => [
           ...prev.filter((m) => m.tempId !== tempId),
-          { ...res.data.message, pending: false, failed: false },
+          {
+            ...outcome.result.message,
+            body: draft.body ?? null,
+            pending: false,
+            failed: false,
+          },
         ]);
         if (conversationId === null) {
-          onConversationCreated?.(res.data.conversationId);
+          onConversationCreated?.(outcome.result.conversationId);
         }
         onMutated?.();
         return;
@@ -371,16 +376,13 @@ export function useChatThread({
 
       // No body — all images sent, clean up optimistic echo.
       setIsSending(false);
-      setLocal((prev) =>
-        prev.filter((m) => m.tempId !== tempId),
-      );
+      setLocal((prev) => prev.filter((m) => m.tempId !== tempId));
       onMutated?.();
     },
     [
       recipientId,
       viewerId,
       conversationId,
-      ws,
       onConversationCreated,
       onMutated,
       onSendError,
@@ -392,6 +394,9 @@ export function useChatThread({
       if (!recipientId || !viewerId) return;
       markActivity();
       const tempId = `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      // Minted once per logical send; reused on every retry so a lost
+      // response / double-tap replays instead of inserting twice.
+      const clientMessageId = crypto.randomUUID();
 
       // Read dataUrls from localStorage for optimistic preview.
       const previewUrls: string[] = [];
@@ -406,6 +411,7 @@ export function useChatThread({
       const optimistic: ThreadMessage = {
         id: tempId,
         tempId,
+        clientMessageId,
         conversationId: conversationId ?? "",
         senderId: viewerId,
         body: draft.body ?? null,
@@ -420,7 +426,7 @@ export function useChatThread({
         pending: true,
       };
       setLocal((prev) => [...prev, optimistic]);
-      void dispatch(draft, tempId);
+      void dispatch(draft, tempId, clientMessageId);
     },
     [recipientId, viewerId, conversationId, dispatch, markActivity],
   );
@@ -428,10 +434,11 @@ export function useChatThread({
   const retry = useCallback(
     (message: ThreadMessage) => {
       if (!message.tempId) return;
+      const clientMessageId = message.clientMessageId ?? crypto.randomUUID();
       setLocal((prev) =>
         prev.map((m) =>
           m.tempId === message.tempId
-            ? { ...m, pending: true, failed: false }
+            ? { ...m, pending: true, failed: false, clientMessageId }
             : m,
         ),
       );
@@ -443,6 +450,7 @@ export function useChatThread({
           listingId: message.listingId ?? undefined,
         },
         message.tempId,
+        clientMessageId,
       );
     },
     [dispatch],

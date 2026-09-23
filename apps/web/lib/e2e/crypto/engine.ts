@@ -10,8 +10,7 @@ import type { E2eHeader, EncryptResult, RatchetEngine, RatchetSession } from "..
  * Deliberately not sourced or persisted by this module — createSignalEngine
  * only consumes it, so it stays agnostic to where keys are generated, how
  * they're stored, or how/when they get registered via POST /chats/e2e/keys.
- * That bootstrap flow (spec §9) doesn't exist yet; this is the seam it will
- * plug into once it does.
+ * That bootstrap flow lives in lib/e2e/keys.ts + engine-provider.ts.
  *
  * getOneTimePrekey's caller (the engine) does not — and cannot — mark the
  * returned prekey as consumed; implementations MUST do that themselves.
@@ -35,8 +34,8 @@ const utf8Decoder = new TextDecoder();
 
 /**
  * Real RatchetEngine over @noble/curves + @noble/ciphers, replacing
- * stub-engine.ts. Not yet wired into any UI — the caller still needs to
- * source `LocalKeyMaterial` from somewhere (see the interface doc above).
+ * stub-engine.ts. `LocalKeyMaterial` is sourced by lib/e2e/engine-provider.ts
+ * (IndexedDB-backed identity store + POST /chats/e2e/keys registration).
  */
 export function createSignalEngine(myKeys: LocalKeyMaterial): RatchetEngine {
   return {

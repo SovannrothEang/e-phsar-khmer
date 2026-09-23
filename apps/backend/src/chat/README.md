@@ -75,9 +75,12 @@ write is synchronous, inline, in the request/WS-handler that received it.
 That works because chat has no external system whose failure must be
 retried durably; the closest thing to an async fan-out step is the Redis
 pub/sub publish in `chat-pubsub.service.ts`, and it's deliberately
-best-effort (a publish failure is logged and swallowed, never rethrown) —
-not durable like an outbox row, because a dropped push just means the
-recipient sees the change on their next poll instead of instantly.
+best-effort **and non-blocking** (kicked off fire-and-forget; a publish
+failure is logged and swallowed, never rethrown) — not durable like an
+outbox row, because a dropped push just means the recipient sees the
+change on their next poll instead of instantly. Keeping Redis off the
+response path is intentional: the 201 / WS completion waits only on
+Postgres, not on fan-out RTT.
 
 ## Lifecycle, end to end
 
@@ -99,10 +102,11 @@ sequenceDiagram
     Svc->>DB: find-or-create conversation (canonical-pair upsert)
     Svc->>DB: insert message
     Svc->>DB: advance lastMessageAt (monotonic max, never regresses)
-    Svc->>PS: publish message / inbox_update x2 / unread_count
     Svc-->>Entry: persisted message + listing context
     Entry-->>A: 201 response / WS ack
+    Note over Svc,PS: publish is fire-and-forget (not on A's response path)
 
+    Svc--)PS: publish message / inbox_update x2 / unread_count
     PS-->>GwB: fan-out (every subscribed instance, including A's own)
     GwB->>Reg: isOnline(recipientId)?
     alt B has an open socket on THIS instance

@@ -25,12 +25,14 @@ import { cn } from "@/lib/utils";
 import { dayKey } from "@/lib/chat/format";
 import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
+import { useE2eEngine } from "@/hooks/use-e2e-engine";
+import { useDecryptedMessages } from "@/hooks/use-decrypted-messages";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ImageGroup } from "@/components/chat/image-group";
-import { groupImageMessages, type MessageNode } from "@/lib/chat/group-images";
-import type { ChatUserSummary, ListingContext } from "@/types/chat";
+import { groupImageMessages } from "@/lib/chat/group-images";
+import type { ChatUserSummary, ListingContext, ThreadMessage } from "@/types/chat";
 
 export function MessageThread({
   conversationId,
@@ -83,6 +85,15 @@ export function MessageThread({
         toast.error(t("errors.rateLimited"));
         return;
       }
+      // Fail-closed E2E markers from use-chat-thread (spec decision #6).
+      if (message === "E2E_NO_KEYS") {
+        toast.error(t("errors.e2eNoKeys"));
+        return;
+      }
+      if (message === "E2E_UNAVAILABLE") {
+        toast.error(t("errors.e2eUnavailable"));
+        return;
+      }
       toast.error(
         status === 403
           ? t("composer.blockedError")
@@ -113,8 +124,30 @@ export function MessageThread({
     retry,
     isSending,
     markActivity,
-    wsConnected,
   } = thread;
+
+  // ── E2E decrypt ──────────────────────────────────────────────────────────
+  // Own optimistic echoes already carry plaintext; only server rows need
+  // resolving. A still-bootstrapping or failed engine yields a null map —
+  // we render a neutral placeholder, never the raw ciphertext.
+  const e2eEngine = useE2eEngine(viewerId);
+  const decrypted = useDecryptedMessages(messages, e2eEngine);
+
+  const displayMessages = useMemo<ThreadMessage[]>(() => {
+    if (!messages.some((m) => m.isE2e)) return messages;
+    return messages.map((m) => {
+      if (!m.isE2e) return m;
+      // Local optimistic / failed rows already hold the user's plaintext.
+      if (m.tempId) return m;
+      const outcome = decrypted.get(m.id);
+      if (outcome?.status === "ok") return { ...m, body: outcome.plaintext };
+      if (outcome?.status === "failed")
+        return { ...m, body: t("message.decryptFailed") };
+      // Pending decrypt (or engine not ready): hide ciphertext behind a
+      // stable placeholder so bubble layout doesn't jump when it lands.
+      return { ...m, body: t("message.decrypting") };
+    });
+  }, [messages, decrypted, t]);
 
   // ── Scroll management ─────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -145,7 +178,7 @@ export function MessageThread({
       return;
     }
     if (atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [displayMessages]);
 
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
@@ -161,8 +194,8 @@ export function MessageThread({
 
   const grouped = useMemo(() => {
     // First group by day.
-    const dayBuckets: { day: string; items: typeof messages }[] = [];
-    for (const message of messages) {
+    const dayBuckets: { day: string; items: ThreadMessage[] }[] = [];
+    for (const message of displayMessages) {
       const day = dayKey(message.createdAt);
       const last = dayBuckets[dayBuckets.length - 1];
       if (last && last.day === day) last.items.push(message);
@@ -173,7 +206,7 @@ export function MessageThread({
       day: bucket.day,
       nodes: groupImageMessages(bucket.items),
     }));
-  }, [messages]);
+  }, [displayMessages]);
 
   // A 404 on a conversation route means "not a participant" — the backend
   // deliberately refuses to distinguish that from "no such thread", so we must
@@ -264,7 +297,7 @@ export function MessageThread({
               </div>
             )}
 
-            {messages.length === 0 && (
+            {displayMessages.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
                 {listing !== undefined && showListingAttachment && (
                   <div className="flex flex-col items-center gap-1.5">
@@ -324,7 +357,7 @@ export function MessageThread({
 
       {/* Pending listing context — shown until it rides out on the first
           send, or the buyer removes it before sending. */}
-      {showListingAttachment && messages.length > 0 && (
+      {showListingAttachment && displayMessages.length > 0 && (
         <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <p className="text-[11px] text-muted-foreground">

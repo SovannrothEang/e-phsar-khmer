@@ -100,7 +100,9 @@
       "read": "Read",
       "sent": "Sent",
       "sending": "Sending…",
-      "retry": "Retry"
+      "retry": "Retry",
+      "decrypting": "Decrypting…",
+      "decryptFailed": "Couldn't decrypt this message."
     },
     "composer": {
       "placeholder": "Write a message…",
@@ -137,6 +139,8 @@
       "loadFailedTitle": "Something went wrong",
       "sendFailed": "Message not sent.",
       "rateLimited": "You're sending messages too quickly. Please wait a moment.",
+      "e2eNoKeys": "This person hasn't set up encrypted messaging yet. Ask them to open Messages once.",
+      "e2eUnavailable": "Encrypted messaging isn't ready. Please try again.",
       "deleteFailed": "Couldn't delete the conversation."
     }
   }

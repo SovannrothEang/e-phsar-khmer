@@ -100,7 +100,9 @@
       "read": "Đã xem",
       "sent": "Đã gửi",
       "sending": "Đang gửi…",
-      "retry": "Thử lại"
+      "retry": "Thử lại",
+      "decrypting": "Đang giải mã…",
+      "decryptFailed": "Không thể giải mã tin nhắn này."
     },
     "composer": {
       "placeholder": "Nhập tin nhắn…",
@@ -136,6 +138,8 @@
       "loadFailedTitle": "Đã xảy ra lỗi",
       "sendFailed": "Không gửi được tin nhắn.",
       "rateLimited": "Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi một lát.",
+      "e2eNoKeys": "Người này chưa bật tin nhắn mã hóa. Hãy nhờ họ mở Tin nhắn một lần.",
+      "e2eUnavailable": "Tin nhắn mã hóa chưa sẵn sàng. Vui lòng thử lại.",
       "deleteFailed": "Không thể xóa cuộc trò chuyện."
     }
   }

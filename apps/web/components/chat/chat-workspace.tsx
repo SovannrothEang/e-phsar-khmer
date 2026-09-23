@@ -35,6 +35,7 @@ import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
 import { readListingPreview } from "@/lib/chat/listing-handoff";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
+import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import type { InboxItem, ListingContext } from "@/types/chat";
@@ -123,6 +124,10 @@ export function ChatWorkspace({
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+
+  // Warm E2E bootstrap as soon as the viewer is known so key registration
+  // races ahead of the first send (fail-closed on send if still pending).
+  useE2eEngine(viewer.isSuccess ? (viewer.data?.id ?? null) : null);
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
   // The nav badge's own socket subscription keeps the shared connection alive
@@ -321,6 +326,7 @@ export function ChatWorkspace({
         </div>
         <ConversationList
           items={items}
+          viewerId={viewerId}
           activeId={conversationId}
           onSelect={handleSelect}
           isLoading={inbox.isPending}

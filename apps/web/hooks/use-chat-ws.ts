@@ -32,7 +32,8 @@ function resolveWsOrigin(): string {
   const override = process.env.NEXT_PUBLIC_WS_URL;
   if (override) {
     const url = new URL(override);
-    const secure = pageIsSecure || url.protocol === "https:" || url.protocol === "wss:";
+    const secure =
+      pageIsSecure || url.protocol === "https:" || url.protocol === "wss:";
     return `${secure ? "wss:" : "ws:"}//${url.host}`;
   }
 
@@ -93,6 +94,7 @@ class ChatSocket {
     listingId?: string;
     imagePath?: string;
     groupId?: string | null;
+    clientMessageId?: string;
   }) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(
@@ -177,6 +179,8 @@ export interface ChatWsState {
     listingId?: string;
     imagePath?: string;
     groupId?: string | null;
+    /** Stable client dedup key — mirrors `SendMessageInput.clientMessageId`. */
+    clientMessageId?: string;
   }) => void;
 }
 
@@ -229,7 +233,9 @@ export function useChatRealtimeEvents({
   onEvent,
 }: {
   enabled: boolean;
-  onEvent: (event: Extract<ChatWsEvent, { type: "inbox_update" | "unread_count" }>) => void;
+  onEvent: (
+    event: Extract<ChatWsEvent, { type: "inbox_update" | "unread_count" }>,
+  ) => void;
 }): { isConnected: boolean } {
   const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
   const onEventRef = useRef(onEvent);

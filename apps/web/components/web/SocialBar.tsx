@@ -26,6 +26,7 @@ import { useState } from "react";
 import { Link, useRouter } from "@/i18n/routing";
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { userLogout } from "@/actions/logout";
+import { resetE2eEngine } from "@/lib/e2e/engine-provider";
 
 interface SocialBarUser {
   username: string;
@@ -201,6 +202,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
+                // Drop the cached engine so a subsequent login bootstraps
+                // for the new account rather than reusing the old promise
+                // (engine-provider keys by userId).
+                resetE2eEngine();
                 void userLogout();
               }}
               className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"

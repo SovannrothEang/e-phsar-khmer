@@ -100,7 +100,9 @@
       "read": "Dibaca",
       "sent": "Terkirim",
       "sending": "Mengirim…",
-      "retry": "Coba lagi"
+      "retry": "Coba lagi",
+      "decrypting": "Mendekripsi…",
+      "decryptFailed": "Tidak dapat mendekripsi pesan ini."
     },
     "composer": {
       "placeholder": "Tulis pesan…",
@@ -136,6 +138,8 @@
       "loadFailedTitle": "Terjadi kesalahan",
       "sendFailed": "Pesan gagal dikirim.",
       "rateLimited": "Anda mengirim pesan terlalu cepat. Tunggu sebentar.",
+      "e2eNoKeys": "Orang ini belum mengaktifkan pesan terenkripsi. Minta mereka membuka Pesan sekali.",
+      "e2eUnavailable": "Pesan terenkripsi belum siap. Silakan coba lagi.",
       "deleteFailed": "Tidak dapat menghapus percakapan."
     }
   }

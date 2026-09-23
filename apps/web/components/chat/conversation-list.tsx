@@ -28,6 +28,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { previewOf } from "@/lib/chat/format";
+import { useE2eEngine } from "@/hooks/use-e2e-engine";
+import { useE2eInboxPreviews } from "@/hooks/use-e2e-inbox-previews";
 import type { InboxItem } from "@/types/chat";
 
 function RelativeTime({ iso }: { iso: string }) {
@@ -39,6 +41,7 @@ function RelativeTime({ iso }: { iso: string }) {
 
 export function ConversationList({
   items,
+  viewerId,
   activeId,
   onSelect,
   isLoading,
@@ -50,6 +53,8 @@ export function ConversationList({
   collapsed = false,
 }: {
   items: InboxItem[];
+  /** Signed-in user — bootstraps E2E so inbox previews can show plaintext. */
+  viewerId: string | null;
   activeId: string | null;
   onSelect: (item: InboxItem) => void;
   isLoading: boolean;
@@ -65,6 +70,8 @@ export function ConversationList({
 }) {
   const t = useTranslations("Chat");
   const [pendingDelete, setPendingDelete] = useState<InboxItem | null>(null);
+  const e2eEngine = useE2eEngine(viewerId);
+  const e2ePreviews = useE2eInboxPreviews(items, e2eEngine);
 
   if (isLoading) {
     return (
@@ -197,11 +204,17 @@ export function ConversationList({
                         : "text-muted-foreground",
                     )}
                   >
-                    {previewOf(item.lastMessage, {
-                      image: t("inbox.previewImage"),
-                      listing: t("inbox.previewListing"),
-                      none: t("inbox.previewEmpty"),
-                    })}
+                    {previewOf(
+                      item.lastMessage,
+                      {
+                        image: t("inbox.previewImage"),
+                        listing: t("inbox.previewListing"),
+                        none: t("inbox.previewEmpty"),
+                      },
+                      item.lastMessage
+                        ? e2ePreviews.get(item.lastMessage.id)
+                        : null,
+                    )}
                   </p>
                   {item.unreadCount > 0 && (
                     <span

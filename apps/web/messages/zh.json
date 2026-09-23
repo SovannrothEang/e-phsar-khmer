@@ -100,7 +100,9 @@
       "read": "已读",
       "sent": "已发送",
       "sending": "发送中…",
-      "retry": "重试"
+      "retry": "重试",
+      "decrypting": "正在解密…",
+      "decryptFailed": "无法解密此消息。"
     },
     "composer": {
       "placeholder": "输入消息…",
@@ -136,6 +138,8 @@
       "loadFailedTitle": "出了点问题",
       "sendFailed": "消息发送失败。",
       "rateLimited": "您发送消息过于频繁，请稍候再试。",
+      "e2eNoKeys": "对方尚未启用加密消息。请让对方打开一次“消息”。",
+      "e2eUnavailable": "加密消息尚未就绪，请重试。",
       "deleteFailed": "无法删除对话。"
     }
   }
