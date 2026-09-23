@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, Loader2, MessagesSquare, MoreVertical, Trash2 } from "lucide-react";
+import {
+  Archive,
+  Loader2,
+  MessagesSquare,
+  MoreVertical,
+  Trash2,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -41,6 +47,7 @@ export function ConversationList({
   onLoadMore,
   onDelete,
   deletingId,
+  collapsed = false,
 }: {
   items: InboxItem[];
   activeId: string | null;
@@ -53,27 +60,39 @@ export function ConversationList({
   onDelete: (item: InboxItem) => void;
   /** Id of the conversation currently being deleted, if any. */
   deletingId: string | null;
+  /** Narrow avatar-only rail (desktop sidebar collapse) — no swipe actions. */
+  collapsed?: boolean;
 }) {
   const t = useTranslations("Chat");
   const [pendingDelete, setPendingDelete] = useState<InboxItem | null>(null);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-3 p-4">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-40" />
+      <div
+        className={cn(
+          "flex flex-col gap-3 p-4",
+          collapsed && "items-center p-2",
+        )}
+      >
+        {[0, 1, 2, 3, 4].map((i) =>
+          collapsed ? (
+            <Skeleton key={i} className="h-10 w-10 shrink-0 rounded-full" />
+          ) : (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-40" />
+              </div>
             </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
     );
   }
 
   if (items.length === 0) {
+    if (collapsed) return null;
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MessagesSquare className="size-8 text-muted-foreground" />
@@ -83,6 +102,51 @@ export function ConversationList({
         <p className="text-xs text-muted-foreground">
           {t("inbox.emptyDescription")}
         </p>
+      </div>
+    );
+  }
+
+  // Collapsed rail: avatars only, no swipe/delete affordance — expand to act
+  // on a specific conversation.
+  if (collapsed) {
+    return (
+      <div className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-2">
+        {items.map((item) => {
+          const name = item.otherUser?.username ?? t("unknownUser");
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item)}
+              title={name}
+              aria-label={name}
+              className={cn(
+                "relative shrink-0 rounded-full p-0.5 transition-colors hover:bg-muted",
+                activeId === item.id && "bg-muted",
+              )}
+            >
+              <Avatar className="h-10 w-10">
+                {item.otherUser?.profilePhotoUrl && (
+                  <AvatarImage
+                    src={item.otherUser.profilePhotoUrl}
+                    alt={name}
+                  />
+                )}
+                <AvatarFallback className="font-semibold">
+                  {name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              {item.unreadCount > 0 && (
+                <span
+                  aria-label={t("inbox.unreadCount", {
+                    count: item.unreadCount,
+                  })}
+                  className="absolute top-0 right-0 h-3 w-3 rounded-full bg-[#f04d4e] ring-2 ring-card"
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -119,9 +183,7 @@ export function ConversationList({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">
-                    {name}
-                  </span>
+                  <span className="truncate text-sm font-semibold">{name}</span>
                   <span className="shrink-0 text-[10px] text-muted-foreground">
                     <RelativeTime iso={item.lastMessageAt} />
                   </span>
@@ -174,7 +236,10 @@ export function ConversationList({
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuContent
+                align="end"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {/* Archive isn't built yet — kept visible so the affordance
                     is discoverable, but it deliberately does nothing. */}
                 <DropdownMenuItem>

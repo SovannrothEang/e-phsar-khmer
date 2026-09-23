@@ -79,7 +79,9 @@
       "deleteConfirmDescription": "វានឹងត្រូវបានលុបចេញពីប្រអប់សាររបស់អ្នក។ {name} នៅតែអាចមើលឃើញផ្នែករបស់ពួកគេ។",
       "deleteCancel": "បោះបង់",
       "deleteConfirm": "លុប",
-      "deleteSuccess": "បានលុបការសន្ទនា។"
+      "deleteSuccess": "បានលុបការសន្ទនា។",
+      "collapse": "បង្រួមបញ្ជីការសន្ទនា",
+      "expand": "ពង្រីកបញ្ជីការសន្ទនា"
     },
     "thread": {
       "back": "ត្រឡប់ក្រោយ",
@@ -87,6 +89,7 @@
       "emptyTitle": "ចាប់ផ្តើមសន្ទនាជាមួយ {name}",
       "loadOlder": "មើលសារចាស់ៗ",
       "attachingListing": "អំពីការផ្សាយនេះ",
+      "removeListing": "លុបការផ្សាយចេញ",
       "blocked": "អ្នកលែងអាចផ្ញើសារទៅអ្នកប្រើនេះបានទៀតហើយ។",
       "blockedByMe": "អ្នកបានទប់ស្កាត់អ្នកប្រើនេះ។",
       "notFoundTitle": "រកមិនឃើញការសន្ទនា",
@@ -115,7 +118,17 @@
     },
     "listing": {
       "noPrice": "សុំតម្លៃ",
-      "unavailable": "ការផ្សាយនេះលែងមានទៀតហើយ"
+      "unavailable": "ការផ្សាយនេះលែងមានទៀតហើយ",
+      "confirmTitle": "ចាកចេញពីការជជែក",
+      "confirmDescription": "អ្នកជិតនឹងបើកការផ្សាយនេះនៅទំព័រថ្មី។ ការសន្ទនារបស់អ្នកនៅតែស្ថិតនៅទីនេះ។",
+      "confirmCancel": "បោះបង់",
+      "confirmContinue": "មើលការផ្សាយ",
+      "status": {
+        "draft": "សេចក្តីព្រាង",
+        "active": "សកម្ម",
+        "expired": "ផុតកំណត់",
+        "deleted": "បានលុប"
+      }
     },
     "errors": {
       "generic": "មានបញ្ហាកើតឡើង។",

@@ -1,13 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
   useInfiniteQuery,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Loader2, LogIn, MessagesSquare } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  LogIn,
+  MessagesSquare,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
@@ -26,6 +38,41 @@ import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import type { InboxItem, ListingContext } from "@/types/chat";
+
+const SIDEBAR_COLLAPSED_KEY = "chat_sidebar_collapsed";
+
+// `localStorage.setItem` never fires a `storage` event in the SAME tab that
+// wrote it (only OTHER tabs get notified) — so `setSidebarCollapsed` below
+// notifies this tiny listener set itself after every write, which is what
+// lets `useSyncExternalStore` re-render this tab immediately on toggle.
+const sidebarCollapsedListeners = new Set<() => void>();
+
+function getSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false; // private mode / quota
+  }
+}
+
+function getSidebarCollapsedServerSnapshot(): boolean {
+  return false;
+}
+
+function setSidebarCollapsed(next: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+  } catch {
+    // Private mode / quota — the toggle still works for this render, it
+    // just won't survive a reload.
+  }
+  sidebarCollapsedListeners.forEach((listener) => listener());
+}
+
+function subscribeSidebarCollapsed(listener: () => void): () => void {
+  sidebarCollapsedListeners.add(listener);
+  return () => sidebarCollapsedListeners.delete(listener);
+}
 
 export interface ChatWorkspaceProps {
   /** Deep-link: open (or start) the thread with this user. */
@@ -126,6 +173,23 @@ export function ChatWorkspace({
 
   const handleBack = useCallback(() => setSelectedPeerId(null), []);
 
+  // ── Sidebar collapse (desktop only — mobile already toggles list/thread
+  // via threadOpen, so there's no room to also collapse there) ──────────────
+  // useSyncExternalStore, not useState+effect: reading localStorage during an
+  // effect and then calling setState is the classic hydration-mismatch trap
+  // (server has no localStorage, so first paint and the post-mount update
+  // disagree). useSyncExternalStore's getServerSnapshot is exactly the
+  // sanctioned way to read a browser-only store safely — React renders the
+  // server snapshot through hydration, then reconciles to the real one.
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeSidebarCollapsed,
+    getSidebarCollapsed,
+    getSidebarCollapsedServerSnapshot,
+  );
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
   // ── Delete conversation (per-participant hide, see DELETE /chats/:id) ─────
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const handleDelete = useCallback(
@@ -207,18 +271,53 @@ export function ChatWorkspace({
 
   return (
     <Panel>
-      {/* Inbox column — full width on mobile until a thread is opened */}
+      {/* Inbox column — full width on mobile until a thread is opened.
+          Collapsible to a narrow avatar rail on desktop only (md:). */}
       <aside
         className={cn(
           "flex w-full shrink-0 flex-col border-border bg-card md:w-[300px] md:border-r lg:w-[340px]",
           threadOpen && "hidden md:flex",
+          sidebarCollapsed && "md:w-16 lg:w-16",
         )}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-          <h1 className="text-sm font-semibold">{t("inbox.title")}</h1>
-          {inbox.isFetching && !inbox.isFetchingNextPage && (
-            <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+        <div
+          className={cn(
+            "flex shrink-0 items-center border-b border-border px-4 py-3",
+            sidebarCollapsed ? "md:justify-center md:px-2" : "justify-between",
           )}
+        >
+          <h1
+            className={cn(
+              "text-sm font-semibold",
+              sidebarCollapsed && "md:hidden",
+            )}
+          >
+            {t("inbox.title")}
+          </h1>
+          <div className="flex items-center gap-1.5">
+            {inbox.isFetching && !inbox.isFetchingNextPage && (
+              <Loader2
+                className={cn(
+                  "size-3.5 animate-spin text-muted-foreground",
+                  sidebarCollapsed && "md:hidden",
+                )}
+              />
+            )}
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              aria-label={
+                sidebarCollapsed ? t("inbox.expand") : t("inbox.collapse")
+              }
+              className="hidden shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:inline-flex"
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="size-4" />
+              ) : (
+                <ChevronLeft className="size-4" />
+              )}
+            </button>
+          </div>
         </div>
         <ConversationList
           items={items}
@@ -230,6 +329,7 @@ export function ChatWorkspace({
           onLoadMore={() => void inbox.fetchNextPage()}
           onDelete={handleDelete}
           deletingId={deletingId}
+          collapsed={sidebarCollapsed}
         />
       </aside>
 

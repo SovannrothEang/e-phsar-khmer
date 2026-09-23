@@ -79,7 +79,9 @@
       "deleteConfirmDescription": "Cuộc trò chuyện sẽ bị xóa khỏi hộp thư của bạn. {name} vẫn có thể thấy phía của họ.",
       "deleteCancel": "Hủy",
       "deleteConfirm": "Xóa",
-      "deleteSuccess": "Đã xóa cuộc trò chuyện."
+      "deleteSuccess": "Đã xóa cuộc trò chuyện.",
+      "collapse": "Thu gọn danh sách trò chuyện",
+      "expand": "Mở rộng danh sách trò chuyện"
     },
     "thread": {
       "back": "Quay lại",
@@ -87,6 +89,7 @@
       "emptyTitle": "Bắt đầu trò chuyện với {name}",
       "loadOlder": "Tải tin nhắn cũ hơn",
       "attachingListing": "Về tin đăng này",
+      "removeListing": "Xóa tin đăng",
       "blocked": "Bạn không thể nhắn tin cho người dùng này nữa.",
       "blockedByMe": "Bạn đã chặn người dùng này.",
       "notFoundTitle": "Không tìm thấy cuộc trò chuyện",
@@ -115,7 +118,17 @@
     },
     "listing": {
       "noPrice": "Giá thương lượng",
-      "unavailable": "Tin đăng này không còn khả dụng"
+      "unavailable": "Tin đăng này không còn khả dụng",
+      "confirmTitle": "Rời khỏi cuộc trò chuyện",
+      "confirmDescription": "Bạn sắp mở tin đăng này ở trang mới. Cuộc trò chuyện của bạn vẫn ở đây.",
+      "confirmCancel": "Hủy",
+      "confirmContinue": "Xem tin đăng",
+      "status": {
+        "draft": "Bản nháp",
+        "active": "Đang hoạt động",
+        "expired": "Hết hạn",
+        "deleted": "Đã xóa"
+      }
     },
     "errors": {
       "generic": "Đã xảy ra lỗi.",

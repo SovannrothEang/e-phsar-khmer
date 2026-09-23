@@ -79,7 +79,9 @@
       "deleteConfirmDescription": "将从您的收件箱中移除。{name} 仍可看到他们那一侧的对话。",
       "deleteCancel": "取消",
       "deleteConfirm": "删除",
-      "deleteSuccess": "对话已删除。"
+      "deleteSuccess": "对话已删除。",
+      "collapse": "收起对话列表",
+      "expand": "展开对话列表"
     },
     "thread": {
       "back": "返回",
@@ -87,6 +89,7 @@
       "emptyTitle": "与 {name} 开始对话",
       "loadOlder": "加载更早的消息",
       "attachingListing": "关于此商品",
+      "removeListing": "移除商品",
       "blocked": "您已无法向该用户发送消息。",
       "blockedByMe": "您已屏蔽该用户。",
       "notFoundTitle": "未找到对话",
@@ -115,7 +118,17 @@
     },
     "listing": {
       "noPrice": "价格面议",
-      "unavailable": "该商品已不可用"
+      "unavailable": "该商品已不可用",
+      "confirmTitle": "离开此对话",
+      "confirmDescription": "您即将在新页面打开此商品。您的对话将保留在这里。",
+      "confirmCancel": "取消",
+      "confirmContinue": "查看商品",
+      "status": {
+        "draft": "草稿",
+        "active": "在售",
+        "expired": "已过期",
+        "deleted": "已删除"
+      }
     },
     "errors": {
       "generic": "出了点问题。",

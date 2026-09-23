@@ -7,6 +7,7 @@ import {
   Loader2,
   MessageSquareOff,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
@@ -56,6 +57,11 @@ export function MessageThread({
   const queryClient = useQueryClient();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [listingSent, setListingSent] = useState(false);
+  const [listingDismissed, setListingDismissed] = useState(false);
+  // True while the listing preview is still pending a decision (send it, or
+  // remove it) — gates both render spots below and the attach in handleSend.
+  const showListingAttachment =
+    Boolean(listingId) && !listingSent && !listingDismissed;
 
   const peerName = peer.username ?? t("unknownUser");
 
@@ -141,16 +147,15 @@ export function MessageThread({
 
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
-      const attachListing = listingId && !listingSent;
-      if (attachListing) setListingSent(true);
+      if (showListingAttachment) setListingSent(true);
       send({
         body: draft.body,
         imagePath: draft.imagePath,
         imageUrl: draft.imageUrl,
-        listingId: attachListing ? listingId : undefined,
+        listingId: showListingAttachment ? listingId : undefined,
       });
     },
-    [send, listingId, listingSent],
+    [send, listingId, showListingAttachment],
   );
 
   const grouped = useMemo(() => {
@@ -255,8 +260,17 @@ export function MessageThread({
 
             {messages.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-                {listing !== undefined && (
-                  <ListingContextCard listing={listing} />
+                {listing !== undefined && showListingAttachment && (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <ListingContextCard listing={listing} />
+                    <button
+                      type="button"
+                      onClick={() => setListingDismissed(true)}
+                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                    >
+                      {t("thread.removeListing")}
+                    </button>
+                  </div>
                 )}
                 <p className="text-sm text-muted-foreground">
                   {t("thread.emptyTitle", { name: peerName })}
@@ -293,12 +307,23 @@ export function MessageThread({
         )}
       </div>
 
-      {/* Pending listing context — shown until it rides out on the first send */}
-      {listingId && !listingSent && messages.length > 0 && (
+      {/* Pending listing context — shown until it rides out on the first
+          send, or the buyer removes it before sending. */}
+      {showListingAttachment && messages.length > 0 && (
         <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
-          <p className="mb-1.5 text-[11px] text-muted-foreground">
-            {t("thread.attachingListing")}
-          </p>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted-foreground">
+              {t("thread.attachingListing")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setListingDismissed(true)}
+              aria-label={t("thread.removeListing")}
+              className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
           <ListingContextCard listing={listing ?? null} />
         </div>
       )}

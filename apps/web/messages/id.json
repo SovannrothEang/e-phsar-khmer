@@ -79,7 +79,9 @@
       "deleteConfirmDescription": "Percakapan akan dihapus dari kotak masuk Anda. {name} masih dapat melihat sisi mereka.",
       "deleteCancel": "Batal",
       "deleteConfirm": "Hapus",
-      "deleteSuccess": "Percakapan dihapus."
+      "deleteSuccess": "Percakapan dihapus.",
+      "collapse": "Ciutkan daftar percakapan",
+      "expand": "Luaskan daftar percakapan"
     },
     "thread": {
       "back": "Kembali",
@@ -87,6 +89,7 @@
       "emptyTitle": "Mulai percakapan dengan {name}",
       "loadOlder": "Muat pesan sebelumnya",
       "attachingListing": "Tentang iklan ini",
+      "removeListing": "Hapus iklan",
       "blocked": "Anda tidak dapat lagi mengirim pesan ke pengguna ini.",
       "blockedByMe": "Anda memblokir pengguna ini.",
       "notFoundTitle": "Percakapan tidak ditemukan",
@@ -115,7 +118,17 @@
     },
     "listing": {
       "noPrice": "Harga nego",
-      "unavailable": "Iklan ini sudah tidak tersedia"
+      "unavailable": "Iklan ini sudah tidak tersedia",
+      "confirmTitle": "Meninggalkan obrolan",
+      "confirmDescription": "Anda akan membuka iklan ini di halaman baru. Percakapan Anda akan tetap di sini.",
+      "confirmCancel": "Batal",
+      "confirmContinue": "Lihat iklan",
+      "status": {
+        "draft": "Draf",
+        "active": "Aktif",
+        "expired": "Kedaluwarsa",
+        "deleted": "Dihapus"
+      }
     },
     "errors": {
       "generic": "Terjadi kesalahan.",

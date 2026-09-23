@@ -79,7 +79,9 @@
       "deleteConfirmDescription": "It will be removed from your inbox. {name} can still see their side of the conversation.",
       "deleteCancel": "Cancel",
       "deleteConfirm": "Delete",
-      "deleteSuccess": "Conversation deleted."
+      "deleteSuccess": "Conversation deleted.",
+      "collapse": "Collapse the conversation list",
+      "expand": "Expand the conversation list"
     },
     "thread": {
       "back": "Back",
@@ -87,6 +89,7 @@
       "emptyTitle": "Start a conversation with {name}",
       "loadOlder": "Load earlier messages",
       "attachingListing": "About this listing",
+      "removeListing": "Remove listing",
       "blocked": "You can no longer message this user.",
       "blockedByMe": "You blocked this user.",
       "notFoundTitle": "Conversation not found",
@@ -115,7 +118,17 @@
     },
     "listing": {
       "noPrice": "Price on request",
-      "unavailable": "This listing is no longer available"
+      "unavailable": "This listing is no longer available",
+      "confirmTitle": "Leaving this chat",
+      "confirmDescription": "You're about to open this ad in a new page. Your conversation will stay right here.",
+      "confirmCancel": "Cancel",
+      "confirmContinue": "View ad",
+      "status": {
+        "draft": "Draft",
+        "active": "Active",
+        "expired": "Expired",
+        "deleted": "Removed"
+      }
     },
     "errors": {
       "generic": "Something went wrong.",
