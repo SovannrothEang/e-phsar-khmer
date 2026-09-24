@@ -1,18 +1,27 @@
 import { IconMapPin, IconPhoneCall } from "@tabler/icons-react";
-import { Button } from "../ui/button";
 import CarrierBadge from "./CarrierBadge";
+import ListingLocationMap from "./ListingLocationMap";
 
 export default function ContactUser({
   user,
   district,
   province,
+  coords,
+  locationLine,
 }: {
   user: { phone?: string[] };
   district?: { name?: string };
   province?: { name?: string };
+  /** The listing's saved map pin, when it was posted with one. */
+  coords?: { lat: number; lng: number } | null;
+  /** The listing's location as text (real listings carry it on the row). */
+  locationLine?: string;
 }) {
   const phone0 = user?.phone?.[0];
   const phone1 = user?.phone?.[1];
+  const heading =
+    locationLine ??
+    [district?.name, province?.name].filter(Boolean).join(", ");
 
   return (
     <>
@@ -62,17 +71,9 @@ export default function ContactUser({
       <div className="mt-4">
         <h3 className="text-base font-medium flex items-center mb-2">
           <IconMapPin className="scale-80 mr-2 text-muted-foreground" />
-          {district?.name}, {province?.name}
+          {heading}
         </h3>
-        <div className="relative w-full max-w-3xl h-[120px] bg-muted rounded-sm overflow-hidden flex items-center justify-center mx-6 cursor-pointer">
-          <div className="absolute inset-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=11.5564,104.9282&zoom=15&size=800x400&sensor=false')] bg-cover bg-center opacity-50 grayscale" />
-          <Button className="relative z-10 bg-card cursor-pointer shadow-sm h-9 text-sm flex items-center rounded-sm hover:bg-white/30 transition-colors">
-            <IconMapPin className="scale-120 text-muted-foreground" />
-            <p className="text-muted-foreground text-xs px-2">
-              Show on Google Map
-            </p>
-          </Button>
-        </div>
+        <ListingLocationMap coords={coords ?? null} locationLine={heading} />
       </div>
     </>
   );

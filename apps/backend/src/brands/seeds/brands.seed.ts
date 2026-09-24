@@ -4,6 +4,7 @@ import {
   brands,
   brandSubcategoryLinks,
   models,
+  modelSubcategoryLinks,
 } from '../../db/schema/brands.schema';
 import { subcategories } from '../../db/schema/categories.schema';
 
@@ -16,202 +17,304 @@ interface BrandSeed {
 }
 
 /**
- * Starter models per brand slug. The spec never enumerates models (only
- * examples like "iPhone 12, Galaxy S21"), so this is a curated baseline of
- * common devices — admins add the rest via the Models admin page.
- * Keyed by brand slug; models are insert-only (never overwrite admin edits).
+ * Starter models, **grouped by the subcategory each model belongs to** — the
+ * grouping IS the classification, and it is what `model_subcategory_links` is
+ * seeded from.
+ *
+ * Before this the list was flat (`Record<brandSlug, string[]>`) and models had
+ * no subcategory at all, so `GET /brands/:id/models` returned a brand's whole
+ * catalogue for every subcategory: Tablets under Apple listed iPhones, and
+ * Xiaomi's phones showed under Cars For Sale.
+ *
+ * A model may appear under more than one subcategory (Surface Pro is a tablet
+ * *and* a laptop). A model whose kind genuinely does not fit any subcategory
+ * its brand is linked to is left out of the seed's groups entirely — see the
+ * stragglers noted at the bottom of this block.
+ *
+ * Insert-only, like the rest of this seed: existing rows are never updated, and
+ * the links are added by a second pass in `seedModels`.
  */
-const MODEL_SEEDS: Record<string, string[]> = {
-  apple: [
-    'iPhone 16 Pro Max',
-    'iPhone 16 Pro',
-    'iPhone 16 Plus',
-    'iPhone 16',
-    'iPhone 15 Pro Max',
-    'iPhone 15 Pro',
-    'iPhone 15 Plus',
-    'iPhone 15',
-    'iPhone 14 Pro Max',
-    'iPhone 14 Pro',
-    'iPhone 14',
-    'iPhone 13 Pro Max',
-    'iPhone 13 Pro',
-    'iPhone 13',
-    'iPhone 12 Pro Max',
-    'iPhone 12 Pro',
-    'iPhone 12',
-    'iPhone SE (3rd gen)',
-    'iPad Pro',
-    'iPad Air',
-    'iPad',
-    'iPad mini',
-    'MacBook Pro',
-    'MacBook Air',
-    'iMac',
-    'Mac mini',
-    'Apple Watch Ultra 2',
-    'Apple Watch Series 9',
-  ],
-  samsung: [
-    'Galaxy S25 Ultra',
-    'Galaxy S25+',
-    'Galaxy S25',
-    'Galaxy S24 Ultra',
-    'Galaxy S24+',
-    'Galaxy S24',
-    'Galaxy S23 Ultra',
-    'Galaxy S23+',
-    'Galaxy S23',
-    'Galaxy S22 Ultra',
-    'Galaxy S22+',
-    'Galaxy S22',
-    'Galaxy S21 Ultra',
-    'Galaxy S21+',
-    'Galaxy S21',
-    'Galaxy Z Fold 6',
-    'Galaxy Z Flip 6',
-    'Galaxy A55',
-    'Galaxy A35',
-    'Galaxy A15',
-    'Galaxy Tab S9',
-    'Galaxy Tab S8',
-    'Galaxy Watch 6',
-  ],
-  xiaomi: [
-    'Xiaomi 15',
-    'Xiaomi 14',
-    'Xiaomi 14 Ultra',
-    'Xiaomi 13',
-    'Xiaomi 13T',
-    'Xiaomi 12',
-    'Redmi Note 13 Pro',
-    'Redmi Note 13',
-    'Redmi Note 12',
-    'Redmi 13C',
-    'Redmi 12',
-    'Poco X6 Pro',
-    'Poco X6',
-    'Poco F5',
-    'Xiaomi Pad 6',
-    'Xiaomi Smart Band 8',
-  ],
-  huawei: [
-    'Huawei Mate 60 Pro',
-    'Huawei P60 Pro',
-    'Huawei Nova 12',
-    'Huawei MatePad 11',
-  ],
-  oppo: [
-    'Oppo Find X8',
-    'Oppo Find X7 Ultra',
-    'Oppo Reno 12',
-    'Oppo Reno 11',
-    'Oppo A78',
-  ],
-  vivo: ['Vivo X200', 'Vivo X100', 'Vivo V40', 'Vivo V30', 'Vivo Y36'],
-  nokia: ['Nokia X30', 'Nokia G42', 'Nokia C32'],
-  motorola: [
-    'Motorola Edge 50 Pro',
-    'Motorola Edge 40',
-    'Motorola G84',
-    'Moto G54',
-  ],
-  oneplus: ['OnePlus 12', 'OnePlus 12R', 'OnePlus Nord 4', 'OnePlus 11'],
-  google: ['Pixel 9 Pro', 'Pixel 9', 'Pixel 8a', 'Pixel 8', 'Pixel 7a'],
-  realme: ['Realme 12 Pro+', 'Realme 12', 'Realme C67', 'Realme Narzo 70'],
-  honor: ['Honor 200 Pro', 'Honor 200', 'Honor Magic6 Pro', 'Honor X8b'],
-  tecno: ['Tecno Camon 30', 'Tecno Spark 20', 'Tecno Phantom V2'],
-  infinix: ['Infinix Note 40', 'Infinix Hot 40', 'Infinix Zero 30'],
-  sony: ['Xperia 1 V', 'Xperia 5 V', 'Xperia 10 V'],
-  lg: ['LG G4', 'LG V60'],
-  asus: ['ZenFone 11 Ultra', 'ZenFone 10', 'ROG Phone 8', 'ROG Phone 7'],
-  alldocube: ['Alldocube iPlay 60', 'Alldocube iPlay 50'],
-  blackview: ['Blackview BV9300', 'Blackview A90', 'Blackview Tab 16'],
-  vertu: ['Vertu Signature', 'Vertu Aster P'],
-  amazfit: ['Amazfit GTR 4', 'Amazfit Bip 5', 'Amazfit Band 7'],
-  coros: ['COROS PACE 3', 'COROS VERTIX 2', 'COROS APEX 2'],
-  fitbit: ['Fitbit Charge 6', 'Fitbit Versa 4', 'Fitbit Sense 2'],
-  garmin: [
-    'Garmin Forerunner 265',
-    'Garmin Fenix 7',
-    'Garmin Venu 3',
-    'Garmin Instinct 2',
-  ],
-  kieslect: ['Kieslect K10 Pro', 'Kieslect K9'],
-  dell: [
-    'Dell XPS 15',
-    'Dell XPS 13',
-    'Dell Inspiron 15',
-    'Dell Latitude 7440',
-  ],
-  hp: ['HP Spectre x360', 'HP Envy 16', 'HP Pavilion 15', 'HP EliteBook 840'],
-  lenovo: [
-    'Lenovo ThinkPad X1 Carbon',
-    'Lenovo ThinkPad T14',
-    'Lenovo IdeaPad 5',
-    'Lenovo Legion 5',
-  ],
-  msi: ['MSI Katana 15', 'MSI Stealth 14', 'MSI Prestige 14', 'MSI Modern 14'],
-  microsoft: [
-    'Surface Laptop 6',
-    'Surface Pro 10',
-    'Surface Book 3',
-    'Surface Go 4',
-  ],
-  toshiba: ['Toshiba Satellite Pro', 'Toshiba Portege X30'],
-  fujitsu: ['Fujitsu Lifebook U7', 'Fujitsu Lifebook E5'],
-  gateway: ['Gateway 15.6', 'Gateway 14.1'],
-  averatec: ['Averatec N4500', 'Averatec N2300'],
-  viewsonic: ['ViewSonic VA2432', 'ViewSonic VX2758'],
-  aoc: ['AOC 24G2', 'AOC 27B2H', 'AOC U27V4'],
-  canon: ['Canon EOS R50', 'Canon EOS 250D', 'Canon PIXMA TS3320'],
-  epson: ['Epson EcoTank L3250', 'Epson WorkForce WF-110'],
-  panasonic: ['Panasonic Toughbook 55', 'Panasonic Lumix GH6'],
-  itronix: ['Itronix IX270', 'Itronix GD8000'],
-  cardpressp: ['CardPresso CP150', 'CardPresso CP350'],
-  evolvis: ['Evolis Primacy 2', 'Evolis Zenius'],
-  hid: ['HID FARGO DTC4500e', 'HID FARGO DTC1250e'],
-  inkanto: ['Inkanto X20', 'Inkanto S1'],
-  kyocera: ['Kyocera Ecosys M2040', 'Kyocera TASKalfa 2020'],
-  soppos: ['Soppos D-4500', 'Soppos F-3000'],
-  zebra: ['Zebra ZD421', 'Zebra GC420', 'Zebra ZQ521'],
-  brother: ['Brother DCP-L2550DW', 'Brother HL-L2460DW', 'Brother QL-820NWB'],
-  hmd: ['HMD Fusion', 'HMD Skyline'],
-  meizu: ['Meizu 21', 'Meizu 20'],
-  redmi: ['Redmi Note 13 Pro', 'Redmi Note 13', 'Redmi 13C', 'Redmi A3'],
-  poco: ['Poco X6 Pro', 'Poco X6', 'Poco F5'],
-  zte: ['ZTE Blade V60', 'ZTE Axon 40'],
-  blu: ['BLU Bold N1', 'BLU G91'],
-  camfone: ['Camfone CF2024'],
-  iqoo: ['iQOO 12', 'iQOO Z9', 'iQOO Neo9'],
-  meitu: ['Meitu 8', 'Meitu V7'],
-  myteb: ['MYTEB MT101', 'MYTEB MT2024'],
-  philips: ['Philips 27E1N', 'Philips 242V8', 'Philips 32M1'],
-  singtech: ['SingTech S100', 'SingTech S200'],
-  htc: ['HTC U23 Pro', 'HTC Desire 22'],
-  ulefone: ['Ulefone Armor 26', 'Ulefone Power Armor 18'],
-  yealink: ['Yealink SIP-T31G', 'Yealink WH62'],
-  // car-brand models per the mock design (insert-only; the mock's "Pirus"
+const MODEL_SEEDS: Record<string, Record<string, string[]>> = {
+  apple: {
+    phones: [
+      'iPhone 16 Pro Max',
+      'iPhone 16 Pro',
+      'iPhone 16 Plus',
+      'iPhone 16',
+      'iPhone 15 Pro Max',
+      'iPhone 15 Pro',
+      'iPhone 15 Plus',
+      'iPhone 15',
+      'iPhone 14 Pro Max',
+      'iPhone 14 Pro',
+      'iPhone 14',
+      'iPhone 13 Pro Max',
+      'iPhone 13 Pro',
+      'iPhone 13',
+      'iPhone 12 Pro Max',
+      'iPhone 12 Pro',
+      'iPhone 12',
+      'iPhone SE (3rd gen)',
+    ],
+    tablets: ['iPad Pro', 'iPad Air', 'iPad', 'iPad mini'],
+    laptops: ['MacBook Pro', 'MacBook Air'],
+    desktops: ['Mac mini'],
+    'all-in-one': ['iMac'],
+    'smart-watches': ['Apple Watch Ultra 2', 'Apple Watch Series 9'],
+  },
+  samsung: {
+    phones: [
+      'Galaxy S25 Ultra',
+      'Galaxy S25+',
+      'Galaxy S25',
+      'Galaxy S24 Ultra',
+      'Galaxy S24+',
+      'Galaxy S24',
+      'Galaxy S23 Ultra',
+      'Galaxy S23+',
+      'Galaxy S23',
+      'Galaxy S22 Ultra',
+      'Galaxy S22+',
+      'Galaxy S22',
+      'Galaxy S21 Ultra',
+      'Galaxy S21+',
+      'Galaxy S21',
+      'Galaxy Z Fold 6',
+      'Galaxy Z Flip 6',
+      'Galaxy A55',
+      'Galaxy A35',
+      'Galaxy A15',
+    ],
+    tablets: ['Galaxy Tab S9', 'Galaxy Tab S8'],
+    'smart-watches': ['Galaxy Watch 6'],
+  },
+  xiaomi: {
+    phones: [
+      'Xiaomi 15',
+      'Xiaomi 14',
+      'Xiaomi 14 Ultra',
+      'Xiaomi 13',
+      'Xiaomi 13T',
+      'Xiaomi 12',
+      'Redmi Note 13 Pro',
+      'Redmi Note 13',
+      'Redmi Note 12',
+      'Redmi 13C',
+      'Redmi 12',
+      'Poco X6 Pro',
+      'Poco X6',
+      'Poco F5',
+    ],
+    tablets: ['Xiaomi Pad 6'],
+    'smart-watches': ['Xiaomi Smart Band 8'],
+  },
+  huawei: {
+    phones: ['Huawei Mate 60 Pro', 'Huawei P60 Pro', 'Huawei Nova 12'],
+    tablets: ['Huawei MatePad 11'],
+  },
+  oppo: {
+    phones: [
+      'Oppo Find X8',
+      'Oppo Find X7 Ultra',
+      'Oppo Reno 12',
+      'Oppo Reno 11',
+      'Oppo A78',
+    ],
+  },
+  vivo: {
+    phones: ['Vivo X200', 'Vivo X100', 'Vivo V40', 'Vivo V30', 'Vivo Y36'],
+  },
+  nokia: { phones: ['Nokia X30', 'Nokia G42', 'Nokia C32'] },
+  motorola: {
+    phones: [
+      'Motorola Edge 50 Pro',
+      'Motorola Edge 40',
+      'Motorola G84',
+      'Moto G54',
+    ],
+  },
+  oneplus: {
+    phones: ['OnePlus 12', 'OnePlus 12R', 'OnePlus Nord 4', 'OnePlus 11'],
+  },
+  google: {
+    phones: ['Pixel 9 Pro', 'Pixel 9', 'Pixel 8a', 'Pixel 8', 'Pixel 7a'],
+  },
+  realme: {
+    phones: ['Realme 12 Pro+', 'Realme 12', 'Realme C67', 'Realme Narzo 70'],
+  },
+  honor: {
+    phones: ['Honor 200 Pro', 'Honor 200', 'Honor Magic6 Pro', 'Honor X8b'],
+  },
+  tecno: {
+    phones: ['Tecno Camon 30', 'Tecno Spark 20', 'Tecno Phantom V2'],
+  },
+  infinix: {
+    phones: ['Infinix Note 40', 'Infinix Hot 40', 'Infinix Zero 30'],
+  },
+  sony: { phones: ['Xperia 1 V', 'Xperia 5 V', 'Xperia 10 V'] },
+  lg: { phones: ['LG G4', 'LG V60'] },
+  // ASUS's seeded models are all phones, but the brand is not linked to the
+  // `phones` subcategory — see the stragglers note below.
+  alldocube: { tablets: ['Alldocube iPlay 60', 'Alldocube iPlay 50'] },
+  // BV9300 / A90 are rugged phones and Blackview is linked to `tablets` only;
+  // the Tab 16 is the one that belongs here.
+  blackview: { tablets: ['Blackview Tab 16'] },
+  amazfit: {
+    'smart-watches': ['Amazfit GTR 4', 'Amazfit Bip 5', 'Amazfit Band 7'],
+  },
+  coros: {
+    'smart-watches': ['COROS PACE 3', 'COROS VERTIX 2', 'COROS APEX 2'],
+  },
+  fitbit: {
+    'smart-watches': ['Fitbit Charge 6', 'Fitbit Versa 4', 'Fitbit Sense 2'],
+  },
+  garmin: {
+    'smart-watches': [
+      'Garmin Forerunner 265',
+      'Garmin Fenix 7',
+      'Garmin Venu 3',
+      'Garmin Instinct 2',
+    ],
+  },
+  kieslect: { 'smart-watches': ['Kieslect K10 Pro', 'Kieslect K9'] },
+  dell: {
+    laptops: [
+      'Dell XPS 15',
+      'Dell XPS 13',
+      'Dell Inspiron 15',
+      'Dell Latitude 7440',
+    ],
+  },
+  hp: {
+    laptops: [
+      'HP Spectre x360',
+      'HP Envy 16',
+      'HP Pavilion 15',
+      'HP EliteBook 840',
+    ],
+  },
+  lenovo: {
+    laptops: [
+      'Lenovo ThinkPad X1 Carbon',
+      'Lenovo ThinkPad T14',
+      'Lenovo IdeaPad 5',
+      'Lenovo Legion 5',
+    ],
+  },
+  msi: {
+    laptops: [
+      'MSI Katana 15',
+      'MSI Stealth 14',
+      'MSI Prestige 14',
+      'MSI Modern 14',
+    ],
+  },
+  // Surface Pro and Surface Go are detachables, so each carries TWO links —
+  // the case the link table exists for. Surface Pro is a 2-in-1 (laptop and
+  // tablet); Surface Go is a tablet first.
+  microsoft: {
+    laptops: ['Surface Laptop 6', 'Surface Pro 10', 'Surface Book 3'],
+    tablets: ['Surface Pro 10', 'Surface Go 4'],
+  },
+  toshiba: { laptops: ['Toshiba Satellite Pro', 'Toshiba Portege X30'] },
+  fujitsu: { laptops: ['Fujitsu Lifebook U7', 'Fujitsu Lifebook E5'] },
+  gateway: { laptops: ['Gateway 15.6', 'Gateway 14.1'] },
+  averatec: { laptops: ['Averatec N4500', 'Averatec N2300'] },
+  viewsonic: { monitors: ['ViewSonic VA2432', 'ViewSonic VX2758'] },
+  aoc: { monitors: ['AOC 24G2', 'AOC 27B2H', 'AOC U27V4'] },
+  // The two EOS bodies are cameras and Canon is not linked to
+  // `cameras-and-camcorders`; only the printer belongs to a linked subcategory.
+  canon: { 'printers-and-scanners': ['Canon PIXMA TS3320'] },
+  epson: {
+    'printers-and-scanners': ['Epson EcoTank L3250', 'Epson WorkForce WF-110'],
+  },
+  // Panasonic is linked to `laptops` only; the Lumix is a camera.
+  panasonic: { laptops: ['Panasonic Toughbook 55'] },
+  itronix: { laptops: ['Itronix IX270', 'Itronix GD8000'] },
+  cardpressp: {
+    'printers-and-scanners': ['CardPresso CP150', 'CardPresso CP350'],
+  },
+  evolvis: { 'printers-and-scanners': ['Evolis Primacy 2', 'Evolis Zenius'] },
+  hid: {
+    'printers-and-scanners': ['HID FARGO DTC4500e', 'HID FARGO DTC1250e'],
+  },
+  inkanto: { 'printers-and-scanners': ['Inkanto X20', 'Inkanto S1'] },
+  kyocera: {
+    'printers-and-scanners': ['Kyocera Ecosys M2040', 'Kyocera TASKalfa 2020'],
+  },
+  soppos: { 'printers-and-scanners': ['Soppos D-4500', 'Soppos F-3000'] },
+  zebra: {
+    'printers-and-scanners': ['Zebra ZD421', 'Zebra GC420', 'Zebra ZQ521'],
+  },
+  brother: {
+    'printers-and-scanners': [
+      'Brother DCP-L2550DW',
+      'Brother HL-L2460DW',
+      'Brother QL-820NWB',
+    ],
+  },
+  hmd: { phones: ['HMD Fusion', 'HMD Skyline'] },
+  meizu: { phones: ['Meizu 21', 'Meizu 20'] },
+  redmi: {
+    phones: ['Redmi Note 13 Pro', 'Redmi Note 13', 'Redmi 13C', 'Redmi A3'],
+  },
+  poco: { phones: ['Poco X6 Pro', 'Poco X6', 'Poco F5'] },
+  zte: { phones: ['ZTE Blade V60', 'ZTE Axon 40'] },
+  blu: { phones: ['BLU Bold N1', 'BLU G91'] },
+  camfone: { phones: ['Camfone CF2024'] },
+  iqoo: { phones: ['iQOO 12', 'iQOO Z9', 'iQOO Neo9'] },
+  meitu: { phones: ['Meitu 8', 'Meitu V7'] },
+  myteb: { phones: ['MYTEB MT101', 'MYTEB MT2024'] },
+  // Philips is linked to `phones` and `smart-watches`, but its seeded models
+  // are all monitors — see the stragglers note below.
+  singtech: { phones: ['SingTech S100', 'SingTech S200'] },
+  htc: { phones: ['HTC U23 Pro', 'HTC Desire 22'] },
+  ulefone: { phones: ['Ulefone Armor 26', 'Ulefone Power Armor 18'] },
+  // Yealink's models are VoIP desk phones and a headset; the `phones`
+  // subcategory is a consumer mobile category, so they are left unlinked.
+  // Car-brand models per the mock design (insert-only; the mock's "Pirus"
   // typo is seeded verbatim)
-  mg: [
-    '3',
-    '6',
-    '7',
-    'D60',
-    'GS',
-    'GT',
-    'HS',
-    'Marvel R',
-    'RX5',
-    'RX8',
-    'RX9',
-    'T60',
-    'ZS',
-    'Other',
-  ],
-  leapmotor: ['B10', 'C10'],
-  toyota: ['Camry', 'Pirus'],
+  mg: {
+    'cars-for-sale': [
+      '3',
+      '6',
+      '7',
+      'D60',
+      'GS',
+      'GT',
+      'HS',
+      'Marvel R',
+      'RX5',
+      'RX8',
+      'RX9',
+      'T60',
+      'ZS',
+      'Other',
+    ],
+  },
+  leapmotor: { 'cars-for-sale': ['B10', 'C10'] },
+  toyota: { 'cars-for-sale': ['Camry', 'Pirus'] },
 };
+
+/**
+ * Seeded models deliberately left OUT of the groups above, because the brand is
+ * not linked to the subcategory that model would belong to (so it could never
+ * be reached there anyway). Listed here so they are a recorded decision rather
+ * than an omission — fixing any of them is a `brands.seed.ts` link decision,
+ * not a model one:
+ *
+ *   asus        ZenFone 11 Ultra, ZenFone 10, ROG Phone 8, ROG Phone 7  (phones — brand not linked)
+ *   blackview   BV9300, A90                                             (phones — brand linked to tablets only)
+ *   canon       EOS R50, EOS 250D                                       (cameras — brand not linked)
+ *   panasonic   Lumix GH6                                               (cameras — brand linked to laptops only)
+ *   philips     27E1N, 242V8, 32M1                                      (monitors — brand not linked)
+ *   vertu       Signature, Aster P                                      (phones — brand linked to smart-watches only)
+ *   yealink     SIP-T31G, WH62                                          (desk phones/headset — no fitting subcategory)
+ *
+ * They stay in the `models` table (insert-only seeding never deletes) and are
+ * simply unlinked, which under the API's filter rule means they still show for
+ * every subcategory of their brand — i.e. unchanged from today.
+ */
 
 /**
  * Motorcycle model starter baseline (insert-only; admins add the rest via the
@@ -653,7 +756,10 @@ export const BRANDS: BrandSeed[] = [
   {
     slug: 'microsoft',
     name: 'Microsoft',
-    subcategories: ['laptops', 'desktops', 'all-in-one', 'monitors'],
+    // `tablets` added 2026-09-22 (captain): the Surface Pro and Surface Go are
+    // detachables, so Microsoft belongs in the Tablets brand grid and those
+    // models can finally carry a tablet link.
+    subcategories: ['laptops', 'desktops', 'all-in-one', 'monitors', 'tablets'],
     sortOrder: 47,
   },
   {
@@ -1747,32 +1853,206 @@ export async function seedBrands(db: DbClient): Promise<void> {
  * The spec never enumerates models, so this is a curated baseline of common
  * devices per brand; admins add the rest via the Models admin page.
  */
+/**
+ * Slug-collision guard.
+ *
+ * `onConflictDoNothing` discards a colliding model without a word, so a seeded
+ * name whose slug is already taken by a DIFFERENT name vanishes silently. That
+ * is exactly how `Galaxy S25+` and `Galaxy S25` — which both slugified to
+ * `galaxy-s25` — cost the database the plain Galaxy S21…S25 until it was found
+ * by hand (see migration `0020_fix_plus_model_slugs`).
+ *
+ * Comparing the stored **name** against the seeded one is what separates a
+ * genuine collision from an ordinary idempotent re-run, where every model
+ * "conflicts" because it is already there. A guard that warned on every
+ * conflict would fire ~390 times per seed and be ignored within a day.
+ *
+ * Pure, and exported so it can be unit-tested without running the seed.
+ */
+export function findSlugCollisions(
+  wanted: { brandSlug: string; modelSlug: string; name: string }[],
+  stored: Map<string, { slug: string; name: string }>,
+  brandSlugToId: Map<string, string>,
+): string[] {
+  const collisions: string[] = [];
+  const seen = new Set<string>();
+  for (const { brandSlug, modelSlug, name } of wanted) {
+    const brandId = brandSlugToId.get(brandSlug);
+    const existing = brandId
+      ? stored.get(`${brandId}:${modelSlug}`)
+      : undefined;
+    if (!existing || existing.name === name) continue;
+    const key = `${brandSlug}:${modelSlug}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    collisions.push(
+      `${brandSlug}: "${name}" collides with "${existing.name}" on slug "${modelSlug}"`,
+    );
+  }
+  return collisions;
+}
+
 export async function seedModels(db: DbClient): Promise<void> {
   const brandRows = await db
     .select({ id: brands.id, slug: brands.slug })
     .from(brands);
   const brandSlugToId = new Map(brandRows.map((r) => [r.slug, r.id]));
 
-  let total = 0;
-  for (const [brandSlug, modelNames] of Object.entries({
+  // Every motorcycle model belongs to `motorcycles-for-sale`, so that list
+  // stays flat and is wrapped here rather than nested 26 times over.
+  const grouped: Record<string, Record<string, string[]>> = {
     ...MODEL_SEEDS,
-    ...MOTO_MODEL_SEEDS,
-  })) {
+    ...Object.fromEntries(
+      Object.entries(MOTO_MODEL_SEEDS).map(([brandSlug, names]) => [
+        brandSlug,
+        { 'motorcycles-for-sale': names },
+      ]),
+    ),
+  };
+
+  const subcategoryRows = await db
+    .select({ id: subcategories.id, slug: subcategories.slug })
+    .from(subcategories);
+  const subSlugToId = new Map(subcategoryRows.map((r) => [r.slug, r.id]));
+
+  // Which subcategories each brand is actually linked to — a model linked to a
+  // subcategory its brand is not in could never be reached there, so that is
+  // warned about rather than silently written.
+  const brandSubRows = await db
+    .select({
+      brandId: brandSubcategoryLinks.brandId,
+      subcategoryId: brandSubcategoryLinks.subcategoryId,
+    })
+    .from(brandSubcategoryLinks);
+  const brandSubKeys = new Set(
+    brandSubRows.map((r) => `${r.brandId}:${r.subcategoryId}`),
+  );
+
+  // A trailing "+" is meaningful — "Galaxy S25+" is a different phone from
+  // "Galaxy S25" — but "+" is outside the admin DTO's slug charset, so spell it
+  // out. Before this both collapsed to `galaxy-s25`: the "+" entry won the slug
+  // and the PLAIN Galaxy S21…S25 were silently dropped by onConflictDoNothing,
+  // so the database was missing the base models entirely.
+  const slugify = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/\+/g, '-plus')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+  let total = 0;
+  // name → subcategory slugs, remembered so pass 2 can write the links.
+  const linksWanted: {
+    brandSlug: string;
+    modelSlug: string;
+    subSlug: string;
+    name: string;
+  }[] = [];
+
+  // Pass 1 — insert the models themselves (insert-only, as before). The
+  // sortOrder runs across the whole brand, so the design order survives the
+  // regrouping by subcategory.
+  const modelValues: {
+    brandId: string;
+    slug: string;
+    name: string;
+    sortOrder: number;
+  }[] = [];
+
+  for (const [brandSlug, groups] of Object.entries(grouped)) {
     const brandId = brandSlugToId.get(brandSlug);
     if (!brandId) continue;
-    for (let i = 0; i < modelNames.length; i++) {
-      const name = modelNames[i].trim();
-      const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-      await db
-        .insert(models)
-        .values({ brandId, slug, name, sortOrder: i })
-        .onConflictDoNothing();
-      total++;
+    let order = 0;
+    for (const [subSlug, modelNames] of Object.entries(groups)) {
+      for (const raw of modelNames) {
+        const name = raw.trim();
+        const slug = slugify(name);
+        modelValues.push({ brandId, slug, name, sortOrder: order });
+        linksWanted.push({ brandSlug, modelSlug: slug, subSlug, name });
+        order++;
+        total++;
+      }
     }
   }
 
-  console.log(`  ✓ seeded ${total} models`);
+  // Batched, for the same reason as the links below: one INSERT round-trip per
+  // row made this seed take ~6 minutes against the remote database.
+  const CHUNK = 200;
+  for (let i = 0; i < modelValues.length; i += CHUNK) {
+    await db
+      .insert(models)
+      .values(modelValues.slice(i, i + CHUNK))
+      .onConflictDoNothing();
+  }
+
+  // Pass 2 — the links. This is what makes the change apply to the models that
+  // already exist: pass 1 is insert-only and never touches those rows, but the
+  // links are additive and resolve against whatever is in the table.
+  const modelRows = await db
+    .select({
+      id: models.id,
+      brandId: models.brandId,
+      slug: models.slug,
+      name: models.name,
+    })
+    .from(models);
+  const modelKey = new Map(modelRows.map((r) => [`${r.brandId}:${r.slug}`, r]));
+
+  const collisions = findSlugCollisions(linksWanted, modelKey, brandSlugToId);
+  for (const c of collisions) console.warn(`  ⚠ ${c} — not seeded`);
+
+  let linked = 0;
+  const warned = new Set<string>();
+  const pending: { modelId: string; subcategoryId: string }[] = [];
+  for (const { brandSlug, modelSlug, subSlug } of linksWanted) {
+    const brandId = brandSlugToId.get(brandSlug);
+    const modelId = brandId
+      ? modelKey.get(`${brandId}:${modelSlug}`)?.id
+      : undefined;
+    const subcategoryId = subSlugToId.get(subSlug);
+    // No row means a collision was reported above, or the brand is unknown.
+    if (!modelId) continue;
+    if (!subcategoryId) {
+      if (!warned.has(subSlug)) {
+        warned.add(subSlug);
+        console.warn(
+          `  ⚠ unknown subcategory slug "${subSlug}" — links skipped`,
+        );
+      }
+      continue;
+    }
+    if (brandId && !brandSubKeys.has(`${brandId}:${subcategoryId}`)) {
+      if (!warned.has(`${brandSlug}:${subSlug}`)) {
+        warned.add(`${brandSlug}:${subSlug}`);
+        console.warn(
+          `  ⚠ ${brandSlug} is not linked to ${subSlug} — model links skipped`,
+        );
+      }
+      continue;
+    }
+    pending.push({ modelId, subcategoryId });
+    linked++;
+    // Batched: one round-trip per row made this seed take minutes against a
+    // remote database.
+    if (pending.length >= 200) {
+      await db
+        .insert(modelSubcategoryLinks)
+        .values(pending.splice(0, pending.length))
+        .onConflictDoNothing();
+    }
+  }
+
+  if (pending.length > 0) {
+    await db
+      .insert(modelSubcategoryLinks)
+      .values(pending)
+      .onConflictDoNothing();
+  }
+
+  console.log(
+    `  ✓ seeded ${total} models, ${linked} model→subcategory links` +
+      (collisions.length > 0
+        ? ` — ${collisions.length} slug collision(s), see warnings above`
+        : ''),
+  );
 }

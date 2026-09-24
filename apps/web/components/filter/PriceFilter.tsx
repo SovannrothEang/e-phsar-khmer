@@ -35,6 +35,10 @@ export function filterPostsByPrice(
   if (min === undefined && max === undefined) return posts;
 
   return posts.filter((post) => {
+    // A "Negotiable" listing has no price to compare, so it cannot be said to
+    // fall inside a range — exclude it while a range is active. (It would
+    // otherwise coerce to 0 and appear in every "under $X" filter.)
+    if (post.price === null) return false;
     if (min !== undefined && post.price < min) return false;
     if (max !== undefined && post.price > max) return false;
     return true;

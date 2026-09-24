@@ -8,7 +8,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { getUserById } from "@/lib/data";
 import { type User } from "@/lib/user";
-import { IconPhoneCall, IconWorld, IconMail } from "@tabler/icons-react";
+import {
+  IconBuilding,
+  IconPhoneCall,
+  IconWorld,
+  IconMail,
+} from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
 import { ContactSellerButton } from "@/components/chat/contact-seller-button";
 
@@ -117,6 +122,27 @@ export default function ProfileSidebar({
 
         {/* Contact Info Section */}
         <div className="p-3 space-y-3 text-sm">
+          {/* The jobs form's Company leads this list. Every row follows the
+              same design — a muted icon square plus its text — and the first
+              row is normally the username, so a job listing swaps in the
+              employer instead (captain, 2026-09-24: "for job, this has company
+              row as the first row, instead of username (or name)"). Plain
+              text: the company is never a link. */}
+          {user?.company ? (
+            <>
+              <div className="flex gap-2">
+                <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
+                  <IconBuilding
+                    size={18}
+                    className="text-muted-foreground"
+                    stroke={1.5}
+                  />
+                </div>
+                <p className="truncate leading-tight mt-1">{user.company}</p>
+              </div>
+              <div className="border-t border-muted-foreground/30" />
+            </>
+          ) : null}
           <div className="flex gap-2">
             <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center">
               <IconWorld
@@ -136,59 +162,71 @@ export default function ProfileSidebar({
             </Link>
           </div>
           <div className="border-t border-muted-foreground/30" />
-          {/* Phone Number */}
-          <div className="flex gap-2">
-            <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
-              <IconPhoneCall size={18} className="text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <div className="flex gap-3">
-                {phone0 ? (
-                  <span className="flex items-center gap-1 font-bold">
-                    <CarrierBadge
-                      phone={phone0}
-                      fallback={
-                        <span className="bg-orange-400 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
-                          C
-                        </span>
-                      }
-                    />
-                    {phone0}
-                  </span>
-                ) : null}
-                {phone1 ? (
-                  <span className="flex items-center gap-1 font-bold">
-                    <CarrierBadge
-                      phone={phone1}
-                      fallback={
-                        <span className="bg-green-600 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
-                          S
-                        </span>
-                      }
-                    />
-                    {phone1}
-                  </span>
-                ) : null}
+          {/* Phone Number — the row and its divider render only when the
+              seller actually gave a number; a row whose only content is the
+              "Show Phone Number" button is worse than no row. */}
+          {phone0 || phone1 ? (
+            <>
+              <div className="flex gap-2">
+                <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
+                  <IconPhoneCall size={18} className="text-muted-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex gap-3">
+                    {phone0 ? (
+                      <span className="flex items-center gap-1 font-bold">
+                        <CarrierBadge
+                          phone={phone0}
+                          fallback={
+                            <span className="bg-orange-400 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
+                              C
+                            </span>
+                          }
+                        />
+                        {phone0}
+                      </span>
+                    ) : null}
+                    {phone1 ? (
+                      <span className="flex items-center gap-1 font-bold">
+                        <CarrierBadge
+                          phone={phone1}
+                          fallback={
+                            <span className="bg-green-600 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
+                              S
+                            </span>
+                          }
+                        />
+                        {phone1}
+                      </span>
+                    ) : null}
+                  </div>
+                  <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
+                    Show Phone Number
+                  </button>
+                </div>
               </div>
-              <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
-                Show Phone Number
-              </button>
-            </div>
-          </div>
-          <div className="border-t border-muted-foreground/30" />
-          {/* Email */}
-          <div className="flex gap-3">
-            <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
-              <IconMail size={18} className="text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">{user?.email}</p>
-              <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
-                Show Email Address
-              </button>
-            </div>
-          </div>
-          <div className="border-t border-muted-foreground/30" />
+              <div className="border-t border-muted-foreground/30" />
+            </>
+          ) : null}
+          {/* Email — same rule: no address, no row (captain, 2026-09-24:
+              "if it has no data don't let it appear … I don't enter any then
+              it still show email row"). */}
+          {user?.email ? (
+            <>
+              <div className="flex gap-3">
+                <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
+                  <IconMail size={18} className="text-muted-foreground" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">{user.email}</p>
+                  <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
+                    Show Email Address
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-muted-foreground/30" />
+            </>
+          ) : null}
 
           <ContactSellerButton
             sellerId={userId}

@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { ListingsService } from './listings.service';
 
 function makeDb() {
@@ -168,5 +169,89 @@ describe('ListingsService.findFeed filters', () => {
 
     expect(result.data).toEqual([]);
     expect(result.meta.hasMore).toBe(false);
+  });
+
+  /**
+   * The attribute filters are the one part of this method whose *SQL* matters,
+   * not just its call count — `attrKey` is a JSONB path segment, so a test that
+   * only counted calls would pass while the key was being interpolated straight
+   * into the statement. These compile the WHERE clause and assert on it.
+   */
+  describe('attribute filters', () => {
+    /** Captures the WHERE clause so the generated SQL can be inspected. */
+    function captureListingsQuery(capture: { where?: unknown }) {
+      return {
+        from: () => ({
+          where: (w: unknown) => {
+            capture.where = w;
+            return { orderBy: () => ({ limit: () => Promise.resolve([]) }) };
+          },
+        }),
+      };
+    }
+
+    async function whereSqlFor(query: Parameters<typeof service.findFeed>[0]) {
+      const capture: { where?: unknown } = {};
+      let callCount = 0;
+      db.select.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) return slugLookup([{ id: 'sub-1' }]);
+        return captureListingsQuery(capture);
+      });
+
+      await service.findFeed({ subcategorySlug: 'house-for-sale', ...query });
+
+      return new PgDialect().sqlToQuery(capture.where as never);
+    }
+
+    it('binds attrKey as a parameter instead of interpolating it', async () => {
+      const { sql: text, params } = await whereSqlFor({
+        attrKey: 'type',
+        attrValue: 'Flat',
+      });
+
+      // `->>$n`, never `->>'type'` — the key is a bound param.
+      expect(text).toContain('->>');
+      expect(text).not.toContain('type');
+      expect(text).not.toContain('Flat');
+      expect(params).toContain('type');
+      expect(params).toContain('Flat');
+    });
+
+    it('filters on an arbitrary key, not just bodyType', async () => {
+      const { params } = await whereSqlFor({
+        attrKey: 'vehicleType',
+        attrValue: 'City Bus',
+      });
+
+      expect(params).toContain('vehicleType');
+      expect(params).toContain('City Bus');
+    });
+
+    it('applies no attribute filter when only attrKey is sent', async () => {
+      const { params } = await whereSqlFor({ attrKey: 'type' });
+
+      expect(params).not.toContain('type');
+    });
+
+    it('applies no attribute filter when only attrValue is sent', async () => {
+      const { params } = await whereSqlFor({ attrValue: 'Flat' });
+
+      expect(params).not.toContain('Flat');
+    });
+
+    it('leaves the existing brand and bodyType filters intact', async () => {
+      const { sql: text, params } = await whereSqlFor({
+        brand: 'Toyota',
+        bodyType: 'Sedan',
+      });
+
+      // The pre-existing filters still inline their hardcoded keys — they are
+      // literals in the query, not caller-supplied path segments.
+      expect(text).toContain("->>'brand'");
+      expect(text).toContain("->>'bodyType'");
+      expect(params).toContain('Toyota');
+      expect(params).toContain('Sedan');
+    });
   });
 });

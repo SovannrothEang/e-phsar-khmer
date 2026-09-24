@@ -17,6 +17,10 @@ type Props = {
   paramKey: "brand" | "body_type" | "model";
   /** Section heading rendered above the grid (e.g. "Brand", "Body Type"). */
   title?: string;
+  /** Declared design: true = the icon-circle grid, whether or not a single row
+   *  carries an image yet. Omitted = the bordered text design (models, and any
+   *  set the browse page does not declare). */
+  imageTiles?: boolean;
 };
 
 export default function OptionGrid({
@@ -24,6 +28,7 @@ export default function OptionGrid({
   baseHref,
   paramKey,
   title,
+  imageTiles,
 }: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -34,15 +39,18 @@ export default function OptionGrid({
   const router = useRouter();
 
   // The design follows the SET, never the load result: an image-bearing set
-  // (brands, body types, musical-instrument types, …) uses the icon-circle
-  // design even while an object is missing — one dead image leaves a gap in its
-  // circle, it never re-styles the tile or the grid. A text set (models,
-  // furniture/property Type, job types) uses the bordered text design.
-  // Majority, not "any": a shared option row (the `other` row is linked across
-  // families) can carry an image from another family, and a single stray image
-  // must not flip a whole grid's design.
-  const withImage = options.filter((o) => !!o.image).length;
-  const textTiles = paramKey === "model" || withImage * 2 < options.length;
+  // (brands, body types, accessories, job types, type pickers, …) uses the
+  // icon-circle design even while an object is missing — a dead image, or a set
+  // whose images no admin has uploaded yet, leaves an EMPTY CIRCLE; it never
+  // re-styles the tile or the grid.
+  //
+  // Nothing here is sniffed from the rows. It used to be: "icon tiles when the
+  // set is majority image-bearing" read the images as a proxy for the set's
+  // design, and since images are never seeded the proxy was wrong nearly
+  // everywhere — Phone Accessories (0 of 16 rows) and every Type grid but
+  // musical instruments (the shared `other` row is their only image, 1 of N)
+  // silently fell to the text design. The caller declares the design instead.
+  const textTiles = paramKey === "model" || !imageTiles;
 
   const handleClick = (e: React.MouseEvent, slug: string) => {
     // Prevent the Link from performing a full navigation

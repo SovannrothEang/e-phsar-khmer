@@ -34,7 +34,9 @@ import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 
 export function ListCardPost({ post }: { post: Post }) {
-  const discountAmount = post.oldPrice ? post.oldPrice - post.price : 0;
+  // See GridCardPost — a "Negotiable" listing has no price to subtract from.
+  const discountAmount =
+    post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -214,7 +216,9 @@ export function ListCardPost({ post }: { post: Post }) {
           {/* Price row */}
           <div className="flex items-center gap-2 mt-1">
             <span className="text-red-500 font-bold text-lg leading-none">
-              ${post.price.toLocaleString()}
+              {post.price === null
+                ? "Negotiable"
+                : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (
               <span className="text-sm text-zinc-400 line-through">

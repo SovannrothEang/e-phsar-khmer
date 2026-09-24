@@ -4,7 +4,14 @@ export type Post = {
   title: string;
   images: string[];
   imageCount?: number;
-  price: number;
+  /**
+   * `null` means the listing genuinely has no price — its subcategory's
+   * `field_schema` declares no `price` key at all (Properties Wanted, Agent
+   * Services, Others). The surfaces print **"Negotiable"** for it rather than
+   * a fabricated `$0`. Do not coalesce it to 0 in an adapter: that is exactly
+   * what made a wanting-to-buy ad advertise a $0 price (captain, 2026-09-23).
+   */
+  price: number | null;
   cateId: string;
   subId: string;
   brandId?: string;

@@ -120,6 +120,34 @@
       "when": 1789025014768,
       "tag": "0016_move_chat_tables_to_chat_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789190192904,
+      "tag": "0017_jittery_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789193513142,
+      "tag": "0018_fantastic_malcolm_colcord",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790020755941,
+      "tag": "0019_massive_venom",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790061785624,
+      "tag": "0020_fix_plus_model_slugs",
+      "breakpoints": true
     }
   ]
 }

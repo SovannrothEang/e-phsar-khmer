@@ -88,8 +88,16 @@ const ATTRIBUTE_SET_TITLES: Record<string, string> = {
   networks: "Network",
   jobtypes: "Job Type",
   enginetypes: "Engine Type",
-  vehicletypes: "Vehicle Type",
-  colors: "Color",
+  // `vehicletypes` is deliberately absent (2026-09-16): it duplicated
+  // `bodytypes`, and Vehicles For Rent rendered both grids with 5 values
+  // appearing twice. The duplicate set is retired; rent's grid is Body Type.
+  //
+  // `colors` is deliberately absent too (2026-09-16). Colour is a FORM-only
+  // field by design ("the plain dropdown, no image sets are deliberately left
+  // unlinked so they never become browse grids"). That used to be enforced by
+  // leaving the rows unlinked — but they had to be scoped to make unticking
+  // work in the form, and a linked set whose type is listed here renders a
+  // grid. This map is now the control, not the absence of links.
   bedrooms: "Bedroom",
   bathrooms: "Bathroom",
   facings: "Facing",
@@ -103,6 +111,76 @@ const ATTRIBUTE_SET_TITLES: Record<string, string> = {
   vgas: "VGA",
 };
 const ATTRIBUTE_SET_TYPES = Object.keys(ATTRIBUTE_SET_TITLES);
+
+/**
+ * Which attribute key a grid's value is stored under.
+ *
+ * The option-set type is NOT that key: `types` → `type`, `accessories` →
+ * `accessory`, `bodytypes` → `bodyType` on cars/lorries **but `vehicleType` on
+ * vehicles-for-rent and parts** (the same set, stored under a different key
+ * depending on the subcategory's own schema). So each entry lists its
+ * candidates in preference order and the first one the subcategory's
+ * `field_schema` actually declares wins — the schema is the arbiter, not this
+ * table.
+ *
+ * Getting this wrong is not a no-op: the feed filters a key the listings do
+ * not have and returns NOTHING, which is what made every non-car grid — the
+ * Type grid above all — empty the feed on click (2026-09-23).
+ */
+const SET_FIELD_KEYS: Record<string, string[]> = {
+  bodytypes: ["bodyType", "vehicleType"],
+  types: ["type"],
+  accessories: ["accessory"],
+  networks: ["network"],
+  jobtypes: ["jobType"],
+  enginetypes: ["engineType"],
+  experiences: ["experience"],
+  bedrooms: ["bedroom"],
+  bathrooms: ["bathroom"],
+  facings: ["facing"],
+  rams: ["ram"],
+  cpus: ["cpu"],
+  vgas: ["vga"],
+  storage_phone: ["storage"],
+  storage_computer: ["storage"],
+  screensize_laptop: ["screenSize"],
+  screensize_monitor: ["screenSize"],
+};
+
+/** The first candidate key this subcategory's schema declares, if any. */
+function resolveAttrKey(
+  setType: string,
+  schemaKeys: string[],
+): string | undefined {
+  return (SET_FIELD_KEYS[setType] ?? []).find((k) => schemaKeys.includes(k));
+}
+// ─── Sets whose DESIGN is the icon-circle grid — the mock draws each of them
+//     with icons (Phone Accessories = 10 accessory icons, Fashion Accessories
+//     = 7, Body Types, Job Types, carrier Networks, and every Type picker:
+//     computer parts, cameras, TVs/audio, fashion, musical instruments,
+//     property). The design belongs to the SET, not to the rows: these sets
+//     keep the icon grid while no admin has uploaded their images yet, so they
+//     render empty circles instead of silently falling back to the text design
+//     (captain, 2026-09-10: "if the thing that we have to use image, then use
+//     the image design"). Brands are declared at the call site — every brand
+//     grid in the mock is icon tiles. ─────────────────────────────────────────
+const IMAGE_TILE_SETS = new Set([
+  "accessories",
+  "bodytypes",
+  "jobtypes",
+  "networks",
+  "types",
+]);
+// ─── The exception, by MAIN CATEGORY: Furniture & Decor draws its Type grid as
+//     bordered TEXT tiles. It is the only text-drawn slice of `types` in the
+//     mock — furniture's type rows carry no `image` key at all, while every
+//     other slice does. Keyed by category rather than by subcategory so a new
+//     Type link anywhere under furniture cannot silently re-grow icon circles.
+//     (Property's kind rows — Flat/House/Villa, Factory/Warehouse/… — are drawn
+//     with icons in the mock too, so Home & Land stays on the icon grid.) ─────
+const TEXT_TILE_SETS_BY_CATEGORY: Record<string, Set<string>> = {
+  "furniture-and-decor": new Set(["types"]),
+};
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function SubcategoryPage({
   params,
@@ -151,9 +229,12 @@ export default async function SubcategoryPage({
   // denormalized subcategoryIds mirror of the admin UI); rows are grouped
   // into per-set grids below.
   const linkedRows = await getLinkedAttributeOptions(subcategory.id);
+  const textTileSets = TEXT_TILE_SETS_BY_CATEGORY[category.slug];
   const sets = ATTRIBUTE_SET_TYPES.map((type) => ({
     slug: type,
     title: ATTRIBUTE_SET_TITLES[type],
+    // Declared design — never sniffed from the rows (see IMAGE_TILE_SETS).
+    imageTiles: IMAGE_TILE_SETS.has(type) && !textTileSets?.has(type),
     options: linkedRows
       .filter((r) => r.type === type)
       .map((r) => ({ slug: r.slug, name: r.name, image: r.image })),
@@ -163,7 +244,9 @@ export default async function SubcategoryPage({
   if (sp.ad_field) {
     const selected = brandRows.find((b) => b.slug === sp.ad_field);
     if (selected) {
-      const modelRows = await getModelsForBrand(selected.id);
+      // Scoped to this subcategory — a tablet page must not show iPhone
+      // models in its Model grid.
+      const modelRows = await getModelsForBrand(selected.id, subcategorySlug);
       if (modelRows.length > 0) {
         models = modelRows.map((m) => ({ slug: m.slug, name: m.name }));
       }
@@ -171,24 +254,47 @@ export default async function SubcategoryPage({
   }
 
   const brand = sp.ad_field;
-  const bodyType = sp.ad_type;
-  const isFiltered = !!(brand || bodyType);
+  const adType = sp.ad_type;
+  const isFiltered = !!(brand || adType);
 
   // OptionGrid links carry slugs; the feed filters on the display names the
   // post form stores in `attributes` — map slug → name before fetching.
   const brandName = brand
     ? brandRows.find((b) => b.slug === brand)?.name
     : undefined;
-  const bodyTypeName = bodyType
-    ? sets.flatMap((s) => s.options).find((o) => o.slug === bodyType)?.name
+
+  // A grid click carries only the option's slug, so WHICH attribute it filters
+  // has to be resolved here: the set the option belongs to says which key this
+  // subcategory's schema writes that value under (see SET_FIELD_KEYS).
+  const clickedSet = adType
+    ? sets.find((s) => s.options.some((o) => o.slug === adType))
     : undefined;
+  const clickedOption = clickedSet?.options.find((o) => o.slug === adType);
+  const attrKey = clickedSet
+    ? resolveAttrKey(
+        clickedSet.slug,
+        (subcategory.fieldSchema ?? []).map((f) => f.key),
+      )
+    : undefined;
+  // Unresolvable set → keep the pre-existing `bodyType` path. The status quo
+  // beats a second way to silently empty the feed.
+  const bodyTypeName =
+    !attrKey && adType
+      ? sets.flatMap((s) => s.options).find((o) => o.slug === adType)?.name
+      : undefined;
 
   // Real active listings — every subcategory now runs the real feed; the
   // grid/list toggle drives the two TabsContent views below.
   const feedItems: Post[] = (
     (
       await getListingsFeed(
-        { subcategorySlug, brand: brandName, bodyType: bodyTypeName },
+        {
+          subcategorySlug,
+          brand: brandName,
+          bodyType: bodyTypeName,
+          attrKey,
+          attrValue: attrKey ? clickedOption?.name : undefined,
+        },
         locale,
       )
     )?.items ?? []
@@ -202,8 +308,14 @@ export default async function SubcategoryPage({
 
   // ── Active filter label — display names when available (slug-derived
   //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
+  // `clickedOption.name` is the clicked option's display name — the same value
+  // the old `bodyTypeName` lookup produced, so the resolved-attrKey path keeps
+  // reading "Flat" rather than falling through to the slug-derived "flat".
   const filterLabel =
-    brandName ?? bodyTypeName ?? (brand ?? bodyType)?.replace(/-/g, " ");
+    brandName ??
+    clickedOption?.name ??
+    bodyTypeName ??
+    (brand ?? adType)?.replace(/-/g, " ");
 
   return (
     <main className="min-h-screen flex flex-col bg-gray-100">

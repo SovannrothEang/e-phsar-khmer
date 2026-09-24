@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { postad } from "@/lib/post-ad";
 import { Link } from "@/i18n/routing";
 import { Separator } from "@/components/ui/separator";
 import { Category, Subcategory } from "@/types/post-form";
@@ -18,11 +17,147 @@ import {
   Truck,
 } from "lucide-react";
 import ImageUpload from "@/components/post/ImageUpload";
-import CarsPostForm from "@/components/post/CarsPostForm";
+import ListingPostForm from "@/components/post/ListingPostForm";
+import DbImage from "@/components/common/DbImage";
+import { getPostCategories } from "@/actions/post-categories";
 import { toast } from "@/components/ui/sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FormData = Record<string, string | number | boolean | string[]>;
+
+/**
+ * Subcategories on the real listing form (`ListingPostForm`), which renders
+ * exactly the fields the subcategory's own `field_schema` declares. Everything
+ * else still falls through to the mock `DynamicForm` below, whose submit is
+ * deliberately unwired — so this list is an explicit opt-in, not a guess.
+ */
+const REAL_FORM_SUBCATEGORIES = [
+  "cars-for-sale",
+  "bicycles",
+  "motorcycles-for-sale",
+  "vehicles-for-rent",
+  "maintenance-and-repair",
+  "lorries-vans-and-tractors",
+  "financing-and-insurance",
+  "tuk-tuk-and-remork",
+  "parts-and-accessories",
+  "vehicles-others",
+  // Phones & Tablets — opted in 2026-09-22 once the `storage`, `accessory`
+  // and `network` blocks existed (they were the family's only unrenderable
+  // keys; a key with no block vanishes silently).
+  "phones",
+  "tablets",
+  "smart-watches",
+  "phone-accessories",
+  "phone-numbers",
+  // Computers & Accessories — opted in 2026-09-22 once the `screenSize`,
+  // `ram`, `cpu`, `vga` and `type` blocks existed (the family's only
+  // unrenderable keys; a key with no block vanishes silently). Note the parts
+  // subcategory's slug is `computers-parts-and-accessories` — the cars family
+  // already owns the bare `parts-and-accessories`.
+  "laptops",
+  "desktops",
+  "all-in-one",
+  "monitors",
+  "printers-and-scanners",
+  "computers-parts-and-accessories",
+  "softwares",
+  // Electronics & Appliances — opted in 2026-09-22. No new block was needed:
+  // the family's 13 keys (photos/title/type/condition/price/discount/
+  // description/location/address/deliveryFree/contact trio) are all already
+  // renderable, `type` by the same block the computers parts form uses.
+  // All 12 declare Condition (captain, 2026-09-22) — spec-detail-four.md
+  // omits it on machinery/security-cameras/lighting, but the captain's mock
+  // groups those with the Fridges & Freezers form, so the seed and the
+  // ListingSpecs condition list both carry it.
+  "washing-machines-and-dryers",
+  "fridges-and-freezers",
+  "air-conditioning-and-heating",
+  "tools",
+  "machinery",
+  "consumer-electronics",
+  "security-cameras",
+  "lighting",
+  "cameras-and-camcorders",
+  "tvs-videos-and-audio",
+  "home-appliances",
+  "video-games-consoles-toys",
+  // Home & Land — opted in 2026-09-22 once the `bedroom`, `bathroom`, `facing`
+  // and `size` blocks existed (the family's only unrenderable keys; a key with
+  // no block vanishes silently). The property cluster renders above the
+  // identity cluster so Type lands after Size, per the captain's mock. Note
+  // `facing` was dropped from apartment-for-rent in the seed the same day
+  // (mock wins over spec-detail-five.md, which listed it) — the block simply
+  // does not render for a subcategory that does not declare it.
+  "house-for-sale",
+  "house-for-rent",
+  "condo-for-sale",
+  "apartment-for-rent",
+  // The rest of Home & Land — opted in 2026-09-23. **No new block was needed
+  // this time**: every key these eight declare (`size`, `type`, `price`,
+  // `description`, `location`, `address`, the contact trio) already had a
+  // render block, because the property cluster added for the four above
+  // (2026-09-22) covered `size` and the `type` block already existed for the
+  // computers/electronics forms. Three of them — properties-wanted,
+  // agent-services and home-and-land-others — declare **no `size` and no
+  // `price`**, which the schema gating handles on its own: the Price block is
+  // skipped at render, at validation and in the payload, and `listings.price`
+  // is nullable.
+  "land-for-sale",
+  "land-for-rent",
+  "commercial-properties-for-sale",
+  "commercial-properties-for-rent",
+  "room-for-rent",
+  "properties-wanted",
+  "agent-services",
+  "home-and-land-others",
+  // Jobs — all 36 subcategories, opted in 2026-09-23. They share one form
+  // (spec-detail-six.md: "they have the same form"), which needed three new
+  // blocks: `jobType`, `experience` and `company`. The first two are pickers
+  // whose lists come from the admin-managed `jobtypes` set and the (global)
+  // `experiences` set; `company` is a plain text field. The job-type key was
+  // ALSO renamed from `type` to `jobType` in the seed the same day — `type`
+  // maps to the `types` set, whose rows are ticked for computers/property and
+  // for no jobs subcategory at all, so the picker resolved to an empty list on
+  // a starred field; `jobType` is what `SET_FIELD_KEYS`, `ListingSpecs` and
+  // the `jobtypes` admin page already expected.
+  "accounting-jobs",
+  "administration",
+  "architecture-engineering",
+  "assistant-secretary",
+  "audit-taxation",
+  "banking-insurance",
+  "cashier-receptionist",
+  "catering-restaurant",
+  "cleaner-maid",
+  "consultancy",
+  "customer-service",
+  "design",
+  "education-training",
+  "finance",
+  "freight-shipping-delivery-warehouse",
+  "hotel-hospitality",
+  "human-resources",
+  "information-technology",
+  "lawyer-legal-services",
+  "management",
+  "manufacturing",
+  "marketing",
+  "media-advertising",
+  "medical-health-nursing",
+  "merchandising-purchasing",
+  "operations",
+  "project-management",
+  "quality-control",
+  "resort-casino",
+  "sales",
+  "security-driver",
+  "technicians",
+  "telecommunications",
+  "translations-interpretation",
+  "travel-agents-ticket-sales",
+  "jobs-others",
+];
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: 1 | 2 }) {
@@ -60,6 +195,21 @@ function CategorySelector({
   onSelect: (cat: Category, sub: Subcategory) => void;
 }) {
   const [hoveredCat, setHoveredCat] = useState<Category | null>(null);
+  const [categories, setCategories] = useState<Category[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPostCategories("en")
+      .then((rows) => {
+        if (!cancelled) setCategories(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCatEnter = (cat: Category) => {
@@ -87,7 +237,7 @@ function CategorySelector({
           </span>
         </div>
         <ul>
-          {postad.map((cat) => (
+          {(categories ?? []).map((cat) => (
             <li
               key={cat.slug}
               onMouseEnter={() => handleCatEnter(cat)}
@@ -100,12 +250,17 @@ function CategorySelector({
                 }`}
             >
               <div className="w-8 h-8 relative flex-shrink-0">
-                <Image
+                <DbImage
                   src={cat.cateIcon}
                   alt={cat.name}
-                  width={200}
-                  height={200}
+                  width={32}
+                  height={32}
                   className="object-contain"
+                  fallback={
+                    <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted text-xs font-medium text-muted-foreground">
+                      {cat.name.charAt(0)}
+                    </span>
+                  }
                 />
               </div>
               <span
@@ -159,12 +314,17 @@ function CategorySelector({
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-100 transition-colors group text-left"
                 >
                   <div className="w-8 h-8 relative flex-shrink-0">
-                    <Image
+                    <DbImage
                       src={sub.subcate}
                       alt={sub.name}
-                      width={200}
-                      height={200}
+                      width={32}
+                      height={32}
                       className="object-contain"
+                      fallback={
+                        <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted text-xs font-medium text-muted-foreground">
+                          {sub.name.charAt(0)}
+                        </span>
+                      }
                     />
                   </div>
                   <span className="text-sm text-foreground group-hover:text-[#00a0e9] flex-1 transition-colors">
@@ -1003,8 +1163,10 @@ export default function PostPage() {
           ) : (
             selectedCategory &&
             selectedSub &&
-            (selectedSub.slug === "cars-for-sale" ? (
-              <CarsPostForm
+            (REAL_FORM_SUBCATEGORIES.includes(selectedSub.slug) ? (
+              <ListingPostForm
+                categorySlug={selectedCategory.slug}
+                subcategorySlug={selectedSub.slug}
                 categoryName={selectedCategory.name}
                 subName={selectedSub.name}
                 onBack={handleBack}

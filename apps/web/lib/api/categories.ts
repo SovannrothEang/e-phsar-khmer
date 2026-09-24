@@ -18,10 +18,18 @@ const slugify = (s: string) =>
 function toSellerView(l: BackendListing): User {
   const name = l.contactName && l.contactName.trim() ? l.contactName : "Seller";
   const username = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  // The jobs form's `company` rides in `attributes` (it is not a contact
+  // column). It shows on the seller card, never in the specs grid.
+  const rawCompany = l.attributes?.company;
+  const company =
+    typeof rawCompany === "string" && rawCompany.trim()
+      ? rawCompany.trim()
+      : undefined;
   return {
     userId: l.userId,
     username,
     name,
+    company,
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`,
     cover: "",
     locations: "",
@@ -84,11 +92,24 @@ export interface BackendCategory {
   subcategories: BackendSubcategory[];
 }
 
+/** One listing-form field the backend declares for a subcategory (`field_schema`). */
+export interface BackendFieldDef {
+  key: string;
+  type: string;
+  required?: boolean;
+  max?: number;
+  options?: string[];
+  /** Localized display name; `en` is always present, `km`/`zh` may not be yet. */
+  label?: { en?: string; km?: string; zh?: string };
+}
+
 export interface BackendSubcategory {
   id: string;
   slug: string;
   name: string;
   icon: string | null;
+  /** Which listing-form blocks this subcategory has; absent on older rows. */
+  fieldSchema?: BackendFieldDef[] | null;
 }
 
 export interface BackendBrand {
@@ -134,6 +155,9 @@ export interface BackendListing {
   attributes: Record<string, unknown> | null;
   location: string | null;
   address: string | null;
+  /** Drizzle returns numeric columns as strings; parse before use. */
+  latitude: string | null;
+  longitude: string | null;
   deliveryFree: boolean;
   contactName: string | null;
   contactPhones: string[];
@@ -214,11 +238,25 @@ export async function getLinkedAttributeOptions(
   );
 }
 
+/**
+ * A brand's models, optionally narrowed to one subcategory.
+ *
+ * The subcategory matters: models carry their own subcategory links, so
+ * without it the Tablets page under Apple would offer iPhones. Pass the
+ * subcategory the caller is actually rendering for.
+ */
 export async function getModelsForBrand(
   brandId: string,
+  subcategorySlug?: string,
 ): Promise<BackendModel[]> {
+  const query = subcategorySlug
+    ? `?subcategory=${encodeURIComponent(subcategorySlug)}`
+    : "";
   return (
-    (await getJson<BackendModel[]>(`/brands/${brandId}/models`, "en")) ?? []
+    (await getJson<BackendModel[]>(
+      `/brands/${brandId}/models${query}`,
+      "en",
+    )) ?? []
   );
 }
 
@@ -247,6 +285,14 @@ export async function getListingsFeed(
     subcategorySlug?: string;
     brand?: string;
     bodyType?: string;
+    /**
+     * Generic attribute filter — the key the *subcategory's own schema* uses
+     * for the clicked grid (see `resolveAttrKey` in the subcategory page).
+     * `bodyType` above is only right for cars/lorries; every other grid stores
+     * its value under its own key (`type`, `vehicleType`, `accessory`, …).
+     */
+    attrKey?: string;
+    attrValue?: string;
     limit?: number;
   },
   locale: string,
@@ -256,6 +302,10 @@ export async function getListingsFeed(
   if (params.subcategorySlug) qs.set("subcategorySlug", params.subcategorySlug);
   if (params.brand) qs.set("brand", params.brand);
   if (params.bodyType) qs.set("bodyType", params.bodyType);
+  if (params.attrKey && params.attrValue) {
+    qs.set("attrKey", params.attrKey);
+    qs.set("attrValue", params.attrValue);
+  }
   qs.set("limit", String(params.limit ?? 20));
   try {
     const res = await fetch(`${API_URL}/listings?${qs.toString()}`, {
@@ -284,7 +334,13 @@ export async function getListingsFeed(
  * the cards receive plain serializable data.
  */
 export function toCardPost(l: BackendListing): Post {
-  const price = l.price !== null ? Number(l.price) : 0;
+  // A null price is a real state, not zero — it means the subcategory has no
+  // price field at all (Properties Wanted / Agent Services / Others). Keep it
+  // null so the card can print "Negotiable" instead of a fabricated $0.
+  const price =
+    l.price !== null && Number.isFinite(Number(l.price))
+      ? Number(l.price)
+      : null;
   return {
     postId: l.id,
     userId: l.userId,
@@ -293,11 +349,10 @@ export function toCardPost(l: BackendListing): Post {
     // The listing price is the ORIGINAL; the discount applies on top — the
     // bold price is the final, the strikethrough is the original, and the
     // %-OFF / $-OFF badges derive from oldPrice − price.
-    price: applyDiscount(
-      Number.isFinite(price) ? price : 0,
-      l.discountValue,
-      l.discountType,
-    ),
+    price:
+      price === null
+        ? null
+        : applyDiscount(price, l.discountValue, l.discountType),
     cateId: "",
     subId: "",
     description: l.description ?? "",
@@ -309,12 +364,42 @@ export function toCardPost(l: BackendListing): Post {
     freeDelivery: l.deliveryFree,
     location: [l.location, l.address].filter(Boolean).join(", ") || undefined,
     oldPrice:
-      l.discountValue && l.discountType
-        ? Number.isFinite(price)
-          ? price
-          : 0
-        : undefined,
+      price !== null && l.discountValue && l.discountType ? price : undefined,
   };
+}
+
+/** Public lookup rows for the post form's Location cascade. */
+export interface BackendPlace {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export async function getProvinces(): Promise<BackendPlace[]> {
+  return (await getJson<BackendPlace[]>("/locations/provinces", "en")) ?? [];
+}
+
+export async function getDistricts(
+  provinceSlug: string,
+): Promise<BackendPlace[]> {
+  return (
+    (await getJson<BackendPlace[]>(
+      `/locations/provinces/${encodeURIComponent(provinceSlug)}/districts`,
+      "en",
+    )) ?? []
+  );
+}
+
+export async function getCommunes(
+  provinceSlug: string,
+  districtSlug: string,
+): Promise<BackendPlace[]> {
+  return (
+    (await getJson<BackendPlace[]>(
+      `/locations/provinces/${encodeURIComponent(provinceSlug)}/districts/${encodeURIComponent(districtSlug)}/communes`,
+      "en",
+    )) ?? []
+  );
 }
 
 export async function getYears(): Promise<BackendAttributeRow[]> {
@@ -328,3 +413,8 @@ export async function getColors(): Promise<BackendAttributeRow[]> {
     (await getJson<BackendAttributeRow[]>("/attributes/colors", "en")) ?? []
   );
 }
+
+// `getVehicleTypes()` was removed 2026-09-16. The duplicate `vehicletypes`
+// attribute set is retired in favour of `bodytypes`, so there is no second
+// "kind of vehicle" list: Vehicles For Rent's Vehicle Type field now reads
+// `getBodyTypes()` and therefore follows the admin's Body Type ticks.
