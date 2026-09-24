@@ -18,8 +18,15 @@ type Props = {
   /** Models of the selected brand — null unless a brand is selected. */
   models?: OptionRow[] | null;
   /** Linked attribute sets (body types, types, bedrooms, …) — each has a
-   *  design title (e.g. "Body Type") and non-empty options. */
-  sets?: { slug: string; title: string; options: OptionRow[] }[];
+   *  design title (e.g. "Body Type") and non-empty options. `imageTiles` is the
+   *  set's declared design (icon-circle grid); when it is absent the set draws
+   *  the bordered text tiles. */
+  sets?: {
+    slug: string;
+    title: string;
+    imageTiles?: boolean;
+    options: OptionRow[];
+  }[];
 };
 
 export default function SubcategoryContent({
@@ -56,6 +63,9 @@ export default function SubcategoryContent({
           baseHref={baseHref}
           paramKey="brand"
           title="Brand"
+          /* Every brand grid in the mock is icon tiles, so the design is
+             declared rather than derived from the rows' `icon` values. */
+          imageTiles
         />
       )}
 
@@ -79,6 +89,7 @@ export default function SubcategoryContent({
           baseHref={baseHref}
           paramKey="body_type"
           title={set.title}
+          imageTiles={set.imageTiles}
         />
       ))}
     </>

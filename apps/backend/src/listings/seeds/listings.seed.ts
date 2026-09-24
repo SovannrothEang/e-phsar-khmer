@@ -391,11 +391,16 @@ const DEMO_LISTINGS: DemoListing[] = [
     address: 'Kok Chok, Svay Dangkum',
     contactName: 'Chanthy',
     contactPhones: ['+85511767011'],
+    // Keys are the subcategory's own `field_schema` ones — singular
+    // `bedroom`/`bathroom`, matching what the post form writes and what
+    // `ListingSpecs` reads. They were plural here before house-for-sale had a
+    // form, and the detail page silently dropped both rows.
     attributes: {
       type: 'Villa',
-      bedrooms: '4',
-      bathrooms: '5',
+      bedroom: '4',
+      bathroom: '5',
       facing: 'South',
+      size: '320',
     },
   },
   {
@@ -454,7 +459,7 @@ const DEMO_LISTINGS: DemoListing[] = [
     contactPhones: ['+85512767015'],
     attributes: {
       jobType: 'Full-time',
-      experience: '2Year+',
+      experience: '2 Years+',
     },
   },
 ];

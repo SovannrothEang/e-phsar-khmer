@@ -1,0 +1,11818 @@
+{
+"meta": {
+"source": "https://github.com/NorakGithub/cambodia-gazetteer (MIT), derived from the NCDD gazetteer (db.ncdd.gov.kh)",
+"retrieved": "2026-09-12",
+"levels": "province > district > commune (villages omitted)",
+"crossCheck": "MEF open data — Cambodia District List 2025 (data.mef.gov.kh)"
+},
+"provinces": [
+{
+"key": "banteay_meanchey",
+"slug": "banteay-meanchey",
+"name": "Banteay Meanchey",
+"nameKm": "បន្ទាយមានជ័យ",
+"code": "01",
+"districts": [
+{
+"name": "Mongkol Borei",
+"nameKm": "មង្គលបូរី",
+"code": "102",
+"slug": "mongkol-borei",
+"communes": [
+{
+"name": "Banteay Neang",
+"nameKm": "បន្ទាយនាង",
+"code": "10201",
+"slug": "banteay-neang"
+},
+{
+"name": "Bat Trang",
+"nameKm": "បត់ត្រង់",
+"code": "10202",
+"slug": "bat-trang"
+},
+{
+"name": "Chamnaom",
+"nameKm": "ចំណោម",
+"code": "10203",
+"slug": "chamnaom"
+},
+{
+"name": "Kouk Ballangk",
+"nameKm": "គោកបល្ល័ង្គ",
+"code": "10204",
+"slug": "kouk-ballangk"
+},
+{
+"name": "Koy Maeng",
+"nameKm": "គយម៉ែង",
+"code": "10205",
+"slug": "koy-maeng"
+},
+{
+"name": "Ou Prasat",
+"nameKm": "អូរប្រាសាទ",
+"code": "10206",
+"slug": "ou-prasat"
+},
+{
+"name": "Phnum Touch",
+"nameKm": "ភ្នំតូច",
+"code": "10207",
+"slug": "phnum-touch"
+},
+{
+"name": "Rohat Tuek",
+"nameKm": "រហាត់ទឹក",
+"code": "10208",
+"slug": "rohat-tuek"
+},
+{
+"name": "Ruessei Kraok",
+"nameKm": "ឫស្សីក្រោក",
+"code": "10209",
+"slug": "ruessei-kraok"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "10210",
+"slug": "sambuor"
+},
+{
+"name": "Soea",
+"nameKm": "សឿ",
+"code": "10211",
+"slug": "soea"
+},
+{
+"name": "Srah Reang",
+"nameKm": "ស្រះរាំង",
+"code": "10212",
+"slug": "srah-reang"
+},
+{
+"name": "Ta Lam",
+"nameKm": "តាឡំ",
+"code": "10213",
+"slug": "ta-lam"
+}
+]
+},
+{
+"name": "Phnum Srok",
+"nameKm": "ភ្នំស្រុក",
+"code": "103",
+"slug": "phnum-srok",
+"communes": [
+{
+"name": "Nam Tau",
+"nameKm": "ណាំតៅ",
+"code": "10301",
+"slug": "nam-tau"
+},
+{
+"name": "Poy Char",
+"nameKm": "ប៉ោយចារ",
+"code": "10302",
+"slug": "poy-char"
+},
+{
+"name": "Ponley",
+"nameKm": "ពន្លៃ",
+"code": "10303",
+"slug": "ponley"
+},
+{
+"name": "Spean Sraeng",
+"nameKm": "ស្ពានស្រែង",
+"code": "10304",
+"slug": "spean-sraeng"
+},
+{
+"name": "Srah Chik",
+"nameKm": "ស្រះជីក",
+"code": "10305",
+"slug": "srah-chik"
+},
+{
+"name": "Phnum Dei",
+"nameKm": "ភ្នំដី",
+"code": "10306",
+"slug": "phnum-dei"
+}
+]
+},
+{
+"name": "Preah Netr Preah",
+"nameKm": "ព្រះនេត្រព្រះ",
+"code": "104",
+"slug": "preah-netr-preah",
+"communes": [
+{
+"name": "Chnuor Mean Chey",
+"nameKm": "ឈ្នួរមានជ័យ",
+"code": "10401",
+"slug": "chnuor-mean-chey"
+},
+{
+"name": "Chob Vari",
+"nameKm": "ជប់វារី",
+"code": "10402",
+"slug": "chob-vari"
+},
+{
+"name": "Phnum Lieb",
+"nameKm": "ភ្នំលៀប",
+"code": "10403",
+"slug": "phnum-lieb"
+},
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "10404",
+"slug": "prasat"
+},
+{
+"name": "Preak Netr Preah",
+"nameKm": "ព្រះនេត្រព្រះ",
+"code": "10405",
+"slug": "preak-netr-preah"
+},
+{
+"name": "Rohal",
+"nameKm": "រហាល",
+"code": "10406",
+"slug": "rohal"
+},
+{
+"name": "Tean Kam",
+"nameKm": "ទានកាំ",
+"code": "10407",
+"slug": "tean-kam"
+},
+{
+"name": "Tuek Chour",
+"nameKm": "ទឹកជោរ",
+"code": "10408",
+"slug": "tuek-chour"
+},
+{
+"name": "Bos Sbov",
+"nameKm": "បុស្បូវ",
+"code": "10409",
+"slug": "bos-sbov"
+}
+]
+},
+{
+"name": "Ou Chrov",
+"nameKm": "អូរជ្រៅ",
+"code": "105",
+"slug": "ou-chrov",
+"communes": [
+{
+"name": "Changha",
+"nameKm": "ចង្ហា",
+"code": "10501",
+"slug": "changha"
+},
+{
+"name": "Koub",
+"nameKm": "កូប",
+"code": "10502",
+"slug": "koub"
+},
+{
+"name": "Kuttasat",
+"nameKm": "គុត្ដសត",
+"code": "10503",
+"slug": "kuttasat"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "10505",
+"slug": "samraong"
+},
+{
+"name": "Souphi",
+"nameKm": "សូភី",
+"code": "10506",
+"slug": "souphi"
+},
+{
+"name": "Soengh",
+"nameKm": "សឹង្ហ",
+"code": "10507",
+"slug": "soengh"
+},
+{
+"name": "Ou Beichoan",
+"nameKm": "អូរបីជាន់",
+"code": "10509",
+"slug": "ou-beichoan"
+}
+]
+},
+{
+"name": "Serei Saophoan",
+"nameKm": "សិរីសោភ័ណ",
+"code": "106",
+"slug": "serei-saophoan",
+"communes": [
+{
+"name": "Kampong Svay",
+"nameKm": "កំពង់ស្វាយ",
+"code": "10602",
+"slug": "kampong-svay"
+},
+{
+"name": "Kaoh Pong Satv",
+"nameKm": "កោះពងសត្វ",
+"code": "10603",
+"slug": "kaoh-pong-satv"
+},
+{
+"name": "Mkak",
+"nameKm": "ម្កាក់",
+"code": "10604",
+"slug": "mkak"
+},
+{
+"name": "Ou Ambel",
+"nameKm": "អូរអំបិល",
+"code": "10605",
+"slug": "ou-ambel"
+},
+{
+"name": "Phniet",
+"nameKm": "ភ្នៀត",
+"code": "10606",
+"slug": "phniet"
+},
+{
+"name": "Preah Ponlea",
+"nameKm": "ព្រះពន្លា",
+"code": "10607",
+"slug": "preah-ponlea"
+},
+{
+"name": "Tuek Thla",
+"nameKm": "ទឹកថ្លា",
+"code": "10608",
+"slug": "tuek-thla"
+}
+]
+},
+{
+"name": "Thma Puok",
+"nameKm": "ថ្មពួក",
+"code": "107",
+"slug": "thma-puok",
+"communes": [
+{
+"name": "Banteay Chhmar",
+"nameKm": "បន្ទាយឆ្មារ",
+"code": "10701",
+"slug": "banteay-chhmar"
+},
+{
+"name": "Kouk Romiet",
+"nameKm": "គោករមៀត",
+"code": "10702",
+"slug": "kouk-romiet"
+},
+{
+"name": "Phum Thmei",
+"nameKm": "ភូមិថ្មី",
+"code": "10703",
+"slug": "phum-thmei"
+},
+{
+"name": "Thma Puok",
+"nameKm": "ថ្មពួក",
+"code": "10704",
+"slug": "thma-puok"
+},
+{
+"name": "Kouk Kakthen",
+"nameKm": "គោកកឋិន",
+"code": "10705",
+"slug": "kouk-kakthen"
+},
+{
+"name": "Kumru",
+"nameKm": "គំរូ",
+"code": "10706",
+"slug": "kumru"
+}
+]
+},
+{
+"name": "Svay Chek",
+"nameKm": "ស្វាយចេក",
+"code": "108",
+"slug": "svay-chek",
+"communes": [
+{
+"name": "Phkoam",
+"nameKm": "ផ្គាំ",
+"code": "10801",
+"slug": "phkoam"
+},
+{
+"name": "Sarongk",
+"nameKm": "សារង្គ",
+"code": "10802",
+"slug": "sarongk"
+},
+{
+"name": "Sla Kram",
+"nameKm": "ស្លក្រាម",
+"code": "10803",
+"slug": "sla-kram"
+},
+{
+"name": "Svay Chek",
+"nameKm": "ស្វាយចេក",
+"code": "10804",
+"slug": "svay-chek"
+},
+{
+"name": "Ta Baen",
+"nameKm": "តាបែន",
+"code": "10805",
+"slug": "ta-baen"
+},
+{
+"name": "Ta Phou",
+"nameKm": "តាផូ",
+"code": "10806",
+"slug": "ta-phou"
+},
+{
+"name": "Treas",
+"nameKm": "ទ្រាស",
+"code": "10807",
+"slug": "treas"
+},
+{
+"name": "Roluos",
+"nameKm": "រលួស",
+"code": "10808",
+"slug": "roluos"
+}
+]
+},
+{
+"name": "Malai",
+"nameKm": "ម៉ាឡៃ",
+"code": "109",
+"slug": "malai",
+"communes": [
+{
+"name": "Boeng Beng",
+"nameKm": "បឹងបេង",
+"code": "10901",
+"slug": "boeng-beng"
+},
+{
+"name": "Malai",
+"nameKm": "ម៉ាឡៃ",
+"code": "10902",
+"slug": "malai"
+},
+{
+"name": "Ou Sampoar",
+"nameKm": "អូរសំព័រ",
+"code": "10903",
+"slug": "ou-sampoar"
+},
+{
+"name": "Ou Sralau",
+"nameKm": "អូរស្រឡៅ",
+"code": "10904",
+"slug": "ou-sralau"
+},
+{
+"name": "Tuol Pongro",
+"nameKm": "ទួលពង្រ",
+"code": "10905",
+"slug": "tuol-pongro"
+},
+{
+"name": "Ta Kong",
+"nameKm": "តាគង់",
+"code": "10906",
+"slug": "ta-kong"
+}
+]
+},
+{
+"name": "Paoy Paet",
+"nameKm": "ប៉ោយប៉ែត",
+"code": "110",
+"slug": "paoy-paet",
+"communes": [
+{
+"name": "Nimitt",
+"nameKm": "និមិត្ដ",
+"code": "11001",
+"slug": "nimitt"
+},
+{
+"name": "Paoy Paet",
+"nameKm": "ប៉ោយប៉ែត",
+"code": "11002",
+"slug": "paoy-paet"
+},
+{
+"name": "Phsar Kandal",
+"nameKm": "ផ្សារកណ្តាល",
+"code": "11003",
+"slug": "phsar-kandal"
+},
+{
+"name": "Ou Chrov",
+"nameKm": "អូរជ្រៅ",
+"code": "11004",
+"slug": "ou-chrov"
+},
+{
+"name": "Ou Reusey",
+"nameKm": "អូរឫស្សី",
+"code": "11005",
+"slug": "ou-reusey"
+}
+]
+}
+]
+},
+{
+"key": "battambang",
+"slug": "battambang",
+"name": "Battambang",
+"nameKm": "បាត់ដំបង",
+"code": "02",
+"districts": [
+{
+"name": "Banan",
+"nameKm": "បាណន់",
+"code": "201",
+"slug": "banan",
+"communes": [
+{
+"name": "Kantueu Muoy",
+"nameKm": "កន្ទឺ ១",
+"code": "20101",
+"slug": "kantueu-muoy"
+},
+{
+"name": "Kantueu Pir",
+"nameKm": "កន្ទឺ ២",
+"code": "20102",
+"slug": "kantueu-pir"
+},
+{
+"name": "Bay Damram",
+"nameKm": "បាយដំរាំ",
+"code": "20103",
+"slug": "bay-damram"
+},
+{
+"name": "Chheu Teal",
+"nameKm": "ឈើទាល",
+"code": "20104",
+"slug": "chheu-teal"
+},
+{
+"name": "Chaeng Mean Chey",
+"nameKm": "ចែងមានជ័យ",
+"code": "20105",
+"slug": "chaeng-mean-chey"
+},
+{
+"name": "Phnum Sampov",
+"nameKm": "ភ្នំសំពៅ",
+"code": "20106",
+"slug": "phnum-sampov"
+},
+{
+"name": "Snoeng",
+"nameKm": "ស្នឹង",
+"code": "20107",
+"slug": "snoeng"
+},
+{
+"name": "Ta Kream",
+"nameKm": "តាគ្រាម",
+"code": "20108",
+"slug": "ta-kream"
+}
+]
+},
+{
+"name": "Thma Koul",
+"nameKm": "ថ្មគោល",
+"code": "202",
+"slug": "thma-koul",
+"communes": [
+{
+"name": "Ta Pung",
+"nameKm": "តាពូង",
+"code": "20201",
+"slug": "ta-pung"
+},
+{
+"name": "Ta Meun",
+"nameKm": "តាម៉ឺន",
+"code": "20202",
+"slug": "ta-meun"
+},
+{
+"name": "Ou Ta Ki",
+"nameKm": "អូរតាគី",
+"code": "20203",
+"slug": "ou-ta-ki"
+},
+{
+"name": "Chrey",
+"nameKm": "ជ្រៃ",
+"code": "20204",
+"slug": "chrey"
+},
+{
+"name": "Anlong Run",
+"nameKm": "អន្លង់រុន",
+"code": "20205",
+"slug": "anlong-run"
+},
+{
+"name": "Chrouy Sdau",
+"nameKm": "ជ្រោយស្ដៅ",
+"code": "20206",
+"slug": "chrouy-sdau"
+},
+{
+"name": "Boeng Pring",
+"nameKm": "បឹងព្រីង",
+"code": "20207",
+"slug": "boeng-pring"
+},
+{
+"name": "Kouk Khmum",
+"nameKm": "គោកឃ្មុំ",
+"code": "20208",
+"slug": "kouk-khmum"
+},
+{
+"name": "Bansay Traeng",
+"nameKm": "បន្សាយត្រែង",
+"code": "20209",
+"slug": "bansay-traeng"
+},
+{
+"name": "Rung Chrey",
+"nameKm": "រូងជ្រៃ",
+"code": "20210",
+"slug": "rung-chrey"
+}
+]
+},
+{
+"name": "Battambang",
+"nameKm": "បាត់ដំបង",
+"code": "203",
+"slug": "battambang",
+"communes": [
+{
+"name": "Tuol Ta Ek",
+"nameKm": "ទួលតាឯក",
+"code": "20301",
+"slug": "tuol-ta-ek"
+},
+{
+"name": "Prek Preah Sdach",
+"nameKm": "ព្រែកព្រះស្ដេច",
+"code": "20302",
+"slug": "prek-preah-sdach"
+},
+{
+"name": "Rottanak",
+"nameKm": "រតនៈ",
+"code": "20303",
+"slug": "rottanak"
+},
+{
+"name": "Chomkar Somraong",
+"nameKm": "ចំការសំរោង",
+"code": "20304",
+"slug": "chomkar-somraong"
+},
+{
+"name": "Sla Ket",
+"nameKm": "ស្លាកែត",
+"code": "20305",
+"slug": "sla-ket"
+},
+{
+"name": "Kdol Doun Teav",
+"nameKm": "ក្ដុលដូនទាវ",
+"code": "20306",
+"slug": "kdol-doun-teav"
+},
+{
+"name": "OMal",
+"nameKm": "អូរម៉ាល់",
+"code": "20307",
+"slug": "omal"
+},
+{
+"name": "wat Kor",
+"nameKm": "វត្ដគរ",
+"code": "20308",
+"slug": "wat-kor"
+},
+{
+"name": "Ou Char",
+"nameKm": "អូរចារ",
+"code": "20309",
+"slug": "ou-char"
+},
+{
+"name": "Svay Por",
+"nameKm": "ស្វាយប៉ោ",
+"code": "20310",
+"slug": "svay-por"
+}
+]
+},
+{
+"name": "Bavel",
+"nameKm": "បវេល",
+"code": "204",
+"slug": "bavel",
+"communes": [
+{
+"name": "Bavel",
+"nameKm": "បវេល",
+"code": "20401",
+"slug": "bavel"
+},
+{
+"name": "Khnach Romeas",
+"nameKm": "ខ្នាចរមាស",
+"code": "20402",
+"slug": "khnach-romeas"
+},
+{
+"name": "Lvea",
+"nameKm": "ល្វា",
+"code": "20403",
+"slug": "lvea"
+},
+{
+"name": "Prey Khpos",
+"nameKm": "ព្រៃខ្ពស់",
+"code": "20404",
+"slug": "prey-khpos"
+},
+{
+"name": "Ampil Pram Daeum",
+"nameKm": "អំពិលប្រាំដើម",
+"code": "20405",
+"slug": "ampil-pram-daeum"
+},
+{
+"name": "Kdol Ta Haen",
+"nameKm": "ក្ដុលតាហែន",
+"code": "20406",
+"slug": "kdol-ta-haen"
+},
+{
+"name": "Khlaeng Meas",
+"nameKm": "ឃ្លាំងមាស",
+"code": "20407",
+"slug": "khlaeng-meas"
+},
+{
+"name": "Boeung Pram",
+"nameKm": "បឹងប្រាំ",
+"code": "20408",
+"slug": "boeung-pram"
+},
+{
+"name": "Bouvel",
+"nameKm": "បួវិល",
+"code": "20409",
+"slug": "bouvel"
+}
+]
+},
+{
+"name": "Aek Phnum",
+"nameKm": "ឯកភ្នំ",
+"code": "205",
+"slug": "aek-phnum",
+"communes": [
+{
+"name": "Preaek Norint",
+"nameKm": "ព្រែកនរិន្ទ",
+"code": "20501",
+"slug": "preaek-norint"
+},
+{
+"name": "Samraong Knong",
+"nameKm": "សំរោងក្នុង",
+"code": "20502",
+"slug": "samraong-knong"
+},
+{
+"name": "Preaek Khpob",
+"nameKm": "ព្រែកខ្ពប",
+"code": "20503",
+"slug": "preaek-khpob"
+},
+{
+"name": "Preaek Luong",
+"nameKm": "ព្រែកហ្លួង",
+"code": "20504",
+"slug": "preaek-luong"
+},
+{
+"name": "Peam Aek",
+"nameKm": "ពាមឯក",
+"code": "20505",
+"slug": "peam-aek"
+},
+{
+"name": "Prey Chas",
+"nameKm": "ព្រៃចាស់",
+"code": "20506",
+"slug": "prey-chas"
+},
+{
+"name": "Kaoh Chiveang",
+"nameKm": "កោះជីវាំង",
+"code": "20507",
+"slug": "kaoh-chiveang"
+}
+]
+},
+{
+"name": "Moung Ruessei",
+"nameKm": "មោងឫស្សី",
+"code": "206",
+"slug": "moung-ruessei",
+"communes": [
+{
+"name": "Moung",
+"nameKm": "មោង",
+"code": "20601",
+"slug": "moung"
+},
+{
+"name": "Kear",
+"nameKm": "គារ",
+"code": "20602",
+"slug": "kear"
+},
+{
+"name": "Prey Svay",
+"nameKm": "ព្រៃស្វាយ",
+"code": "20603",
+"slug": "prey-svay"
+},
+{
+"name": "Ruessei Krang",
+"nameKm": "ឫស្សីក្រាំង",
+"code": "20604",
+"slug": "ruessei-krang"
+},
+{
+"name": "Chrey",
+"nameKm": "ជ្រៃ",
+"code": "20605",
+"slug": "chrey"
+},
+{
+"name": "Ta Loas",
+"nameKm": "តាលាស់",
+"code": "20606",
+"slug": "ta-loas"
+},
+{
+"name": "Kakaoh",
+"nameKm": "កកោះ",
+"code": "20607",
+"slug": "kakaoh"
+},
+{
+"name": "Prey Touch",
+"nameKm": "ព្រៃតូច",
+"code": "20608",
+"slug": "prey-touch"
+},
+{
+"name": "Robas Mongkol",
+"nameKm": "របស់មង្គល",
+"code": "20609",
+"slug": "robas-mongkol"
+}
+]
+},
+{
+"name": "Rotonak Mondol",
+"nameKm": "រតនមណ្ឌល",
+"code": "207",
+"slug": "rotonak-mondol",
+"communes": [
+{
+"name": "Sdau",
+"nameKm": "ស្ដៅ",
+"code": "20701",
+"slug": "sdau"
+},
+{
+"name": "Andaeuk Haeb",
+"nameKm": "អណ្ដើកហែប",
+"code": "20702",
+"slug": "andaeuk-haeb"
+},
+{
+"name": "Phlov Meas",
+"nameKm": "ផ្លូវមាស",
+"code": "20703",
+"slug": "phlov-meas"
+},
+{
+"name": "Traeng",
+"nameKm": "ត្រែង",
+"code": "20704",
+"slug": "traeng"
+},
+{
+"name": "Reaksmei Songha",
+"nameKm": "រស្មីសង្ហារ",
+"code": "20705",
+"slug": "reaksmei-songha"
+}
+]
+},
+{
+"name": "Sangkae",
+"nameKm": "សង្កែ",
+"code": "208",
+"slug": "sangkae",
+"communes": [
+{
+"name": "Anlong Vil",
+"nameKm": "អន្លង់វិល",
+"code": "20801",
+"slug": "anlong-vil"
+},
+{
+"name": "Norea",
+"nameKm": "នរា",
+"code": "20802",
+"slug": "norea"
+},
+{
+"name": "Ta Pon",
+"nameKm": "តាប៉ុន",
+"code": "20803",
+"slug": "ta-pon"
+},
+{
+"name": "Roka",
+"nameKm": "រកា",
+"code": "20804",
+"slug": "roka"
+},
+{
+"name": "Kampong Preah",
+"nameKm": "កំពង់ព្រះ",
+"code": "20805",
+"slug": "kampong-preah"
+},
+{
+"name": "Kampong Prieng",
+"nameKm": "កំពង់ព្រៀង",
+"code": "20806",
+"slug": "kampong-prieng"
+},
+{
+"name": "Reang Kesei",
+"nameKm": "រាំងកេសី",
+"code": "20807",
+"slug": "reang-kesei"
+},
+{
+"name": "Ou Dambang Muoy",
+"nameKm": "អូរដំបង ១",
+"code": "20808",
+"slug": "ou-dambang-muoy"
+},
+{
+"name": "Ou Dambang Pir",
+"nameKm": "អូរដំបង ២",
+"code": "20809",
+"slug": "ou-dambang-pir"
+},
+{
+"name": "Vaot Ta Muem",
+"nameKm": "វត្ដតាមិម",
+"code": "20810",
+"slug": "vaot-ta-muem"
+}
+]
+},
+{
+"name": "Samlout",
+"nameKm": "សំឡូត",
+"code": "209",
+"slug": "samlout",
+"communes": [
+{
+"name": "Ta Taok",
+"nameKm": "តាតោក",
+"code": "20901",
+"slug": "ta-taok"
+},
+{
+"name": "Kampong Lpov",
+"nameKm": "កំពង់ល្ពៅ",
+"code": "20902",
+"slug": "kampong-lpov"
+},
+{
+"name": "Ou Samril",
+"nameKm": "អូរសំរិល",
+"code": "20903",
+"slug": "ou-samril"
+},
+{
+"name": "Sung",
+"nameKm": "ស៊ុង",
+"code": "20904",
+"slug": "sung"
+},
+{
+"name": "Samlout",
+"nameKm": "សំឡូត",
+"code": "20905",
+"slug": "samlout"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "20906",
+"slug": "mean-chey"
+},
+{
+"name": "Ta Sanh",
+"nameKm": "តាសាញ",
+"code": "20907",
+"slug": "ta-sanh"
+}
+]
+},
+{
+"name": "Sampov Lun",
+"nameKm": "សំពៅលូន",
+"code": "210",
+"slug": "sampov-lun",
+"communes": [
+{
+"name": "Sampov Lun",
+"nameKm": "សំពៅលូន",
+"code": "21001",
+"slug": "sampov-lun"
+},
+{
+"name": "Angkor Ban",
+"nameKm": "អង្គរបាន",
+"code": "21002",
+"slug": "angkor-ban"
+},
+{
+"name": "Ta Sda",
+"nameKm": "តាស្ដា",
+"code": "21003",
+"slug": "ta-sda"
+},
+{
+"name": "Santepheap",
+"nameKm": "សន្ដិភាព",
+"code": "21004",
+"slug": "santepheap"
+},
+{
+"name": "Serei Mean Chey",
+"nameKm": "សេរីមានជ័យ",
+"code": "21005",
+"slug": "serei-mean-chey"
+},
+{
+"name": "Chrey Seima",
+"nameKm": "ជ្រៃសីមា",
+"code": "21006",
+"slug": "chrey-seima"
+}
+]
+},
+{
+"name": "Phnum Proek",
+"nameKm": "ភ្នំព្រឹក",
+"code": "211",
+"slug": "phnum-proek",
+"communes": [
+{
+"name": "Phnum Proek",
+"nameKm": "ភ្នំព្រឹក",
+"code": "21101",
+"slug": "phnum-proek"
+},
+{
+"name": "Pech Chenda",
+"nameKm": "ពេជ្រចិន្ដា",
+"code": "21102",
+"slug": "pech-chenda"
+},
+{
+"name": "Bour",
+"nameKm": "បួរ",
+"code": "21103",
+"slug": "bour"
+},
+{
+"name": "Barang Thleak",
+"nameKm": "បារាំងធ្លាក់",
+"code": "21104",
+"slug": "barang-thleak"
+},
+{
+"name": "Ou Rumduol",
+"nameKm": "អូររំដួល",
+"code": "21105",
+"slug": "ou-rumduol"
+}
+]
+},
+{
+"name": "Kamrieng",
+"nameKm": "កំរៀង",
+"code": "212",
+"slug": "kamrieng",
+"communes": [
+{
+"name": "Kamrieng",
+"nameKm": "កំរៀង",
+"code": "21201",
+"slug": "kamrieng"
+},
+{
+"name": "Boeng Reang",
+"nameKm": "បឹងរាំង",
+"code": "21202",
+"slug": "boeng-reang"
+},
+{
+"name": "Ou Da",
+"nameKm": "អូរដា",
+"code": "21203",
+"slug": "ou-da"
+},
+{
+"name": "Trang",
+"nameKm": "ត្រាង",
+"code": "21204",
+"slug": "trang"
+},
+{
+"name": "Ta Saen",
+"nameKm": "តាសែន",
+"code": "21205",
+"slug": "ta-saen"
+},
+{
+"name": "Ta Krei",
+"nameKm": "តាក្រី",
+"code": "21206",
+"slug": "ta-krei"
+}
+]
+},
+{
+"name": "Koas Krala",
+"nameKm": "គាស់ក្រឡ",
+"code": "213",
+"slug": "koas-krala",
+"communes": [
+{
+"name": "Thipakdei",
+"nameKm": "ធិបតី",
+"code": "21301",
+"slug": "thipakdei"
+},
+{
+"name": "Kaos Krala",
+"nameKm": "គាស់ក្រឡ",
+"code": "21302",
+"slug": "kaos-krala"
+},
+{
+"name": "Hab",
+"nameKm": "ហប់",
+"code": "21303",
+"slug": "hab"
+},
+{
+"name": "Preah Phos",
+"nameKm": "ព្រះផុស",
+"code": "21304",
+"slug": "preah-phos"
+},
+{
+"name": "Doun Ba",
+"nameKm": "ដូនបា",
+"code": "21305",
+"slug": "doun-ba"
+},
+{
+"name": "Chhnal Moan",
+"nameKm": "ឆ្នាល់មាន់",
+"code": "21306",
+"slug": "chhnal-moan"
+}
+]
+},
+{
+"name": "Rukh Kiri",
+"nameKm": "រុក្ខគិរី",
+"code": "214",
+"slug": "rukh-kiri",
+"communes": [
+{
+"name": "Preaek Chik",
+"nameKm": "ព្រែកជីក",
+"code": "21401",
+"slug": "preaek-chik"
+},
+{
+"name": "Prey Tralach",
+"nameKm": "ព្រៃត្រឡាច",
+"code": "21402",
+"slug": "prey-tralach"
+},
+{
+"name": "Mukh Reah",
+"nameKm": "មុខរាហ៍",
+"code": "21403",
+"slug": "mukh-reah"
+},
+{
+"name": "Sdok Pravoek",
+"nameKm": "ស្តុកប្រវឹក",
+"code": "21404",
+"slug": "sdok-pravoek"
+},
+{
+"name": "Basak",
+"nameKm": "បាសាក់",
+"code": "21405",
+"slug": "basak"
+}
+]
+}
+]
+},
+{
+"key": "kampong_cham",
+"slug": "kampong-cham",
+"name": "Kampong Cham",
+"nameKm": "កំពង់ចាម",
+"code": "03",
+"districts": [
+{
+"name": "Batheay",
+"nameKm": "បាធាយ",
+"code": "301",
+"slug": "batheay",
+"communes": [
+{
+"name": "Batheay",
+"nameKm": "បាធាយ",
+"code": "30101",
+"slug": "batheay"
+},
+{
+"name": "Chbar Ampov",
+"nameKm": "ច្បារអំពៅ",
+"code": "30102",
+"slug": "chbar-ampov"
+},
+{
+"name": "Chealea",
+"nameKm": "ជាលា",
+"code": "30103",
+"slug": "chealea"
+},
+{
+"name": "Cheung Prey",
+"nameKm": "ជើងព្រៃ",
+"code": "30104",
+"slug": "cheung-prey"
+},
+{
+"name": "Me Pring",
+"nameKm": "មេព្រីង",
+"code": "30105",
+"slug": "me-pring"
+},
+{
+"name": "Ph'av",
+"nameKm": "ផ្អាវ",
+"code": "30106",
+"slug": "ph-av"
+},
+{
+"name": "Sambour",
+"nameKm": "សំបូរ",
+"code": "30107",
+"slug": "sambour"
+},
+{
+"name": "Sandaek",
+"nameKm": "សណ្ដែក",
+"code": "30108",
+"slug": "sandaek"
+},
+{
+"name": "Tang Krang",
+"nameKm": "តាំងក្រាំង",
+"code": "30109",
+"slug": "tang-krang"
+},
+{
+"name": "Tang Krasang",
+"nameKm": "តាំងក្រសាំង",
+"code": "30110",
+"slug": "tang-krasang"
+},
+{
+"name": "Trab",
+"nameKm": "ត្រប់",
+"code": "30111",
+"slug": "trab"
+},
+{
+"name": "Tumnob",
+"nameKm": "ទំនប់",
+"code": "30112",
+"slug": "tumnob"
+}
+]
+},
+{
+"name": "Chamkar Leu",
+"nameKm": "ចំការលើ",
+"code": "302",
+"slug": "chamkar-leu",
+"communes": [
+{
+"name": "Bos Khnor",
+"nameKm": "បុសខ្នុរ",
+"code": "30201",
+"slug": "bos-khnor"
+},
+{
+"name": "Chamkar Andoung",
+"nameKm": "ចំការអណ្ដូង",
+"code": "30202",
+"slug": "chamkar-andoung"
+},
+{
+"name": "Cheyyou",
+"nameKm": "ជយោ",
+"code": "30203",
+"slug": "cheyyou"
+},
+{
+"name": "Lvea Leu",
+"nameKm": "ល្វាលើ",
+"code": "30204",
+"slug": "lvea-leu"
+},
+{
+"name": "Spueu",
+"nameKm": "ស្ពឺ",
+"code": "30205",
+"slug": "spueu"
+},
+{
+"name": "Svay Teab",
+"nameKm": "ស្វាយទាប",
+"code": "30206",
+"slug": "svay-teab"
+},
+{
+"name": "Ta Ong",
+"nameKm": "តាអុង",
+"code": "30207",
+"slug": "ta-ong"
+},
+{
+"name": "Ta Prok",
+"nameKm": "តាប្រុក",
+"code": "30208",
+"slug": "ta-prok"
+}
+]
+},
+{
+"name": "Cheung Prey",
+"nameKm": "ជើងព្រៃ",
+"code": "303",
+"slug": "cheung-prey",
+"communes": [
+{
+"name": "Khnor Dambang",
+"nameKm": "ខ្នុរដំបង",
+"code": "30301",
+"slug": "khnor-dambang"
+},
+{
+"name": "Kouk Rovieng",
+"nameKm": "គោករវៀង",
+"code": "30302",
+"slug": "kouk-rovieng"
+},
+{
+"name": "Pdau Chum",
+"nameKm": "ផ្ដៅជុំ",
+"code": "30303",
+"slug": "pdau-chum"
+},
+{
+"name": "Prey Char",
+"nameKm": "ព្រៃចារ",
+"code": "30304",
+"slug": "prey-char"
+},
+{
+"name": "Pring Chrum",
+"nameKm": "ព្រីងជ្រុំ",
+"code": "30305",
+"slug": "pring-chrum"
+},
+{
+"name": "Sampong Chey",
+"nameKm": "សំពងជ័យ",
+"code": "30306",
+"slug": "sampong-chey"
+},
+{
+"name": "Sdaeung Chey",
+"nameKm": "ស្ដើងជ័យ",
+"code": "30307",
+"slug": "sdaeung-chey"
+},
+{
+"name": "Soutib",
+"nameKm": "សូទិព្វ",
+"code": "30308",
+"slug": "soutib"
+},
+{
+"name": "Sramar",
+"nameKm": "ស្រម៉រ",
+"code": "30309",
+"slug": "sramar"
+},
+{
+"name": "Trapeang Kor",
+"nameKm": "ត្រពាំងគរ",
+"code": "30310",
+"slug": "trapeang-kor"
+}
+]
+},
+{
+"name": "Kampong Cham",
+"nameKm": "កំពង់ចាម",
+"code": "305",
+"slug": "kampong-cham",
+"communes": [
+{
+"name": "Boeng Kok",
+"nameKm": "បឹងកុក",
+"code": "30501",
+"slug": "boeng-kok"
+},
+{
+"name": "Kampong Cham",
+"nameKm": "កំពង់ចាម",
+"code": "30502",
+"slug": "kampong-cham"
+},
+{
+"name": "Sambuor Meas",
+"nameKm": "សំបួរមាស",
+"code": "30503",
+"slug": "sambuor-meas"
+},
+{
+"name": "Veal Vong",
+"nameKm": "វាលវង់",
+"code": "30504",
+"slug": "veal-vong"
+}
+]
+},
+{
+"name": "Kampong Siem",
+"nameKm": "កំពង់សៀម",
+"code": "306",
+"slug": "kampong-siem",
+"communes": [
+{
+"name": "Ampil",
+"nameKm": "អំពិល",
+"code": "30601",
+"slug": "ampil"
+},
+{
+"name": "Hanchey",
+"nameKm": "ហាន់ជ័យ",
+"code": "30602",
+"slug": "hanchey"
+},
+{
+"name": "Kien Chrey",
+"nameKm": "កៀនជ្រៃ",
+"code": "30603",
+"slug": "kien-chrey"
+},
+{
+"name": "Kokor",
+"nameKm": "គគរ",
+"code": "30604",
+"slug": "kokor"
+},
+{
+"name": "Kaoh Mitt",
+"nameKm": "កោះមិត្ដ",
+"code": "30605",
+"slug": "kaoh-mitt"
+},
+{
+"name": "Kaoh Roka",
+"nameKm": "កោះរកា",
+"code": "30606",
+"slug": "kaoh-roka"
+},
+{
+"name": "Kaoh Samraong",
+"nameKm": "កោះសំរោង",
+"code": "30607",
+"slug": "kaoh-samraong"
+},
+{
+"name": "Kaoh Tontuem",
+"nameKm": "កោះទន្ទឹម",
+"code": "30608",
+"slug": "kaoh-tontuem"
+},
+{
+"name": "Krala",
+"nameKm": "ក្រឡា",
+"code": "30609",
+"slug": "krala"
+},
+{
+"name": "Ou Svay",
+"nameKm": "អូរស្វាយ",
+"code": "30610",
+"slug": "ou-svay"
+},
+{
+"name": "Ro'ang",
+"nameKm": "រអាង",
+"code": "30611",
+"slug": "ro-ang"
+},
+{
+"name": "Rumchek",
+"nameKm": "រំចេក",
+"code": "30612",
+"slug": "rumchek"
+},
+{
+"name": "Srak",
+"nameKm": "ស្រក",
+"code": "30613",
+"slug": "srak"
+},
+{
+"name": "Trean",
+"nameKm": "ទ្រាន",
+"code": "30614",
+"slug": "trean"
+},
+{
+"name": "Vihear Thum",
+"nameKm": "វិហារធំ",
+"code": "30615",
+"slug": "vihear-thum"
+}
+]
+},
+{
+"name": "Kang Meas",
+"nameKm": "កងមាស",
+"code": "307",
+"slug": "kang-meas",
+"communes": [
+{
+"name": "Angkor Ban",
+"nameKm": "អង្គរបាន",
+"code": "30701",
+"slug": "angkor-ban"
+},
+{
+"name": "Kang Ta Noeng",
+"nameKm": "កងតាណឹង",
+"code": "30702",
+"slug": "kang-ta-noeng"
+},
+{
+"name": "Khchau",
+"nameKm": "ខ្ចៅ",
+"code": "30703",
+"slug": "khchau"
+},
+{
+"name": "Peam Chi Kang",
+"nameKm": "ពាមជីកង",
+"code": "30704",
+"slug": "peam-chi-kang"
+},
+{
+"name": "Preaek Koy",
+"nameKm": "ព្រែកកុយ",
+"code": "30705",
+"slug": "preaek-koy"
+},
+{
+"name": "Preaek Krabau",
+"nameKm": "ព្រែកក្របៅ",
+"code": "30706",
+"slug": "preaek-krabau"
+},
+{
+"name": "Reay Pay",
+"nameKm": "រាយប៉ាយ",
+"code": "30707",
+"slug": "reay-pay"
+},
+{
+"name": "Roka Ar",
+"nameKm": "រកាអារ",
+"code": "30708",
+"slug": "roka-ar"
+},
+{
+"name": "Roka Koy",
+"nameKm": "រកាគយ",
+"code": "30709",
+"slug": "roka-koy"
+},
+{
+"name": "Sdau",
+"nameKm": "ស្ដៅ",
+"code": "30710",
+"slug": "sdau"
+},
+{
+"name": "Sour Kong",
+"nameKm": "សូរគង",
+"code": "30711",
+"slug": "sour-kong"
+}
+]
+},
+{
+"name": "Kaoh Soutin",
+"nameKm": "កោះសូទិន",
+"code": "308",
+"slug": "kaoh-soutin",
+"communes": [
+{
+"name": "Kampong Reab",
+"nameKm": "កំពង់រាប",
+"code": "30801",
+"slug": "kampong-reab"
+},
+{
+"name": "Kaoh Sotin",
+"nameKm": "កោះសូទិន",
+"code": "30802",
+"slug": "kaoh-sotin"
+},
+{
+"name": "Lve",
+"nameKm": "ល្វេ",
+"code": "30803",
+"slug": "lve"
+},
+{
+"name": "Moha Leaph",
+"nameKm": "មហាលាភ",
+"code": "30804",
+"slug": "moha-leaph"
+},
+{
+"name": "Moha Khnhoung",
+"nameKm": "មហាខ្ញូង",
+"code": "30805",
+"slug": "moha-khnhoung"
+},
+{
+"name": "Peam Prathnuoh",
+"nameKm": "ពាមប្រធ្នោះ",
+"code": "30806",
+"slug": "peam-prathnuoh"
+},
+{
+"name": "Pongro",
+"nameKm": "ពង្រ",
+"code": "30807",
+"slug": "pongro"
+},
+{
+"name": "Preaek Ta Nong",
+"nameKm": "ព្រែកតានង់",
+"code": "30808",
+"slug": "preaek-ta-nong"
+}
+]
+},
+{
+"name": "Prey Chhor",
+"nameKm": "ព្រៃឈរ",
+"code": "313",
+"slug": "prey-chhor",
+"communes": [
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "31301",
+"slug": "baray"
+},
+{
+"name": "Boeng Nay",
+"nameKm": "បឹងណាយ",
+"code": "31302",
+"slug": "boeng-nay"
+},
+{
+"name": "Chrey Vien",
+"nameKm": "ជ្រៃវៀន",
+"code": "31303",
+"slug": "chrey-vien"
+},
+{
+"name": "Khvet Thum",
+"nameKm": "ខ្វិតធំ",
+"code": "31304",
+"slug": "khvet-thum"
+},
+{
+"name": "Kor",
+"nameKm": "គរ",
+"code": "31305",
+"slug": "kor"
+},
+{
+"name": "Krouch",
+"nameKm": "ក្រូច",
+"code": "31306",
+"slug": "krouch"
+},
+{
+"name": "Lvea",
+"nameKm": "ល្វា",
+"code": "31307",
+"slug": "lvea"
+},
+{
+"name": "Mien",
+"nameKm": "មៀន",
+"code": "31308",
+"slug": "mien"
+},
+{
+"name": "Prey Chhor",
+"nameKm": "ព្រៃឈរ",
+"code": "31309",
+"slug": "prey-chhor"
+},
+{
+"name": "Sour Saen",
+"nameKm": "សូរ្យសែន",
+"code": "31310",
+"slug": "sour-saen"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "31311",
+"slug": "samraong"
+},
+{
+"name": "Sragnae",
+"nameKm": "ស្រង៉ែ",
+"code": "31312",
+"slug": "sragnae"
+},
+{
+"name": "Thma Pun",
+"nameKm": "ថ្មពូន",
+"code": "31313",
+"slug": "thma-pun"
+},
+{
+"name": "Tong Rong",
+"nameKm": "តុងរ៉ុង",
+"code": "31314",
+"slug": "tong-rong"
+},
+{
+"name": "Trapeang Preah",
+"nameKm": "ត្រពាំងព្រះ",
+"code": "31315",
+"slug": "trapeang-preah"
+}
+]
+},
+{
+"name": "Srei Santhor",
+"nameKm": "ស្រីសន្ធរ",
+"code": "314",
+"slug": "srei-santhor",
+"communes": [
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "31401",
+"slug": "baray"
+},
+{
+"name": "Chi Bal",
+"nameKm": "ជីបាល",
+"code": "31402",
+"slug": "chi-bal"
+},
+{
+"name": "Khnar Sa",
+"nameKm": "ខ្នារស",
+"code": "31403",
+"slug": "khnar-sa"
+},
+{
+"name": "Kaoh Andaet",
+"nameKm": "កោះអណ្ដែត",
+"code": "31404",
+"slug": "kaoh-andaet"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "31405",
+"slug": "mean-chey"
+},
+{
+"name": "Phteah Kandal",
+"nameKm": "ផ្ទះកណ្ដាល",
+"code": "31406",
+"slug": "phteah-kandal"
+},
+{
+"name": "Pram Yam",
+"nameKm": "ប្រាំយ៉ាម",
+"code": "31407",
+"slug": "pram-yam"
+},
+{
+"name": "Preaek Dambouk",
+"nameKm": "ព្រែកដំបូក",
+"code": "31408",
+"slug": "preaek-dambouk"
+},
+{
+"name": "Preaek Pou",
+"nameKm": "ព្រែកពោធិ",
+"code": "31409",
+"slug": "preaek-pou"
+},
+{
+"name": "Preaek Rumdeng",
+"nameKm": "ព្រែករំដេង",
+"code": "31410",
+"slug": "preaek-rumdeng"
+},
+{
+"name": "Ruessei Srok",
+"nameKm": "ឫស្សីស្រុក",
+"code": "31411",
+"slug": "ruessei-srok"
+},
+{
+"name": "Svay Pou",
+"nameKm": "ស្វាយពោធិ",
+"code": "31412",
+"slug": "svay-pou"
+},
+{
+"name": "Svay Khsach Phnum",
+"nameKm": "ស្វាយខ្សាច់ភ្នំ",
+"code": "31413",
+"slug": "svay-khsach-phnum"
+},
+{
+"name": "Tong Tralach",
+"nameKm": "ទងត្រឡាច",
+"code": "31414",
+"slug": "tong-tralach"
+}
+]
+},
+{
+"name": "Stueng Trang",
+"nameKm": "ស្ទឹងត្រង់",
+"code": "315",
+"slug": "stueng-trang",
+"communes": [
+{
+"name": "Areaks Tnot",
+"nameKm": "អារក្សត្នោត",
+"code": "31501",
+"slug": "areaks-tnot"
+},
+{
+"name": "Dang Kdar",
+"nameKm": "ដងក្ដារ",
+"code": "31503",
+"slug": "dang-kdar"
+},
+{
+"name": "Khpob Ta Nguon",
+"nameKm": "ខ្ពបតាងួន",
+"code": "31504",
+"slug": "khpob-ta-nguon"
+},
+{
+"name": "Me Sar Chrey",
+"nameKm": "មេសរជ្រៃ",
+"code": "31505",
+"slug": "me-sar-chrey"
+},
+{
+"name": "Ou Mlu",
+"nameKm": "អូរម្លូ",
+"code": "31506",
+"slug": "ou-mlu"
+},
+{
+"name": "Peam Kaoh Snar",
+"nameKm": "ពាមកោះស្នា",
+"code": "31507",
+"slug": "peam-kaoh-snar"
+},
+{
+"name": "Preah Andoung",
+"nameKm": "ព្រះអណ្ដូង",
+"code": "31508",
+"slug": "preah-andoung"
+},
+{
+"name": "Preaek Bak",
+"nameKm": "ព្រែកបាក់",
+"code": "31509",
+"slug": "preaek-bak"
+},
+{
+"name": "Preak Kak",
+"nameKm": "ព្រែកកក់",
+"code": "31510",
+"slug": "preak-kak"
+},
+{
+"name": "Soupheas",
+"nameKm": "សូភាស",
+"code": "31512",
+"slug": "soupheas"
+},
+{
+"name": "Tuol Preah Khleang",
+"nameKm": "ទួលព្រះឃ្លាំង",
+"code": "31513",
+"slug": "tuol-preah-khleang"
+},
+{
+"name": "Tuol Sambuor",
+"nameKm": "ទួលសំបួរ",
+"code": "31514",
+"slug": "tuol-sambuor"
+}
+]
+}
+]
+},
+{
+"key": "kampong_chhnang",
+"slug": "kampong-chhnang",
+"name": "Kampong Chhnang",
+"nameKm": "កំពង់ឆ្នាំង",
+"code": "04",
+"districts": [
+{
+"name": "Baribour",
+"nameKm": "បរិបូណ៌",
+"code": "401",
+"slug": "baribour",
+"communes": [
+{
+"name": "Anhchanh Rung",
+"nameKm": "អញ្ចាញរូង",
+"code": "40101",
+"slug": "anhchanh-rung"
+},
+{
+"name": "Chhnok Tru",
+"nameKm": "ឆ្នុកទ្រូ",
+"code": "40102",
+"slug": "chhnok-tru"
+},
+{
+"name": "Chak",
+"nameKm": "ចក",
+"code": "40103",
+"slug": "chak"
+},
+{
+"name": "Khon Rang",
+"nameKm": "ខុនរ៉ង",
+"code": "40104",
+"slug": "khon-rang"
+},
+{
+"name": "Kampong Preah Kokir",
+"nameKm": "កំពង់ព្រះគគីរ",
+"code": "40105",
+"slug": "kampong-preah-kokir"
+},
+{
+"name": "Melum",
+"nameKm": "មេលំ",
+"code": "40106",
+"slug": "melum"
+},
+{
+"name": "Phsar",
+"nameKm": "ផ្សារ",
+"code": "40107",
+"slug": "phsar"
+},
+{
+"name": "Pech Changvar",
+"nameKm": "ពេជចង្វារ",
+"code": "40108",
+"slug": "pech-changvar"
+},
+{
+"name": "Popel",
+"nameKm": "ពពេល",
+"code": "40109",
+"slug": "popel"
+},
+{
+"name": "Ponley",
+"nameKm": "ពន្លៃ",
+"code": "40110",
+"slug": "ponley"
+},
+{
+"name": "Trapeang Chan",
+"nameKm": "ត្រពាំងចាន់",
+"code": "40111",
+"slug": "trapeang-chan"
+}
+]
+},
+{
+"name": "Chol Kiri",
+"nameKm": "ជលគីរី",
+"code": "402",
+"slug": "chol-kiri",
+"communes": [
+{
+"name": "Chol Sar",
+"nameKm": "ជលសា",
+"code": "40201",
+"slug": "chol-sar"
+},
+{
+"name": "Kaoh Thkov",
+"nameKm": "កោះថ្កូវ",
+"code": "40202",
+"slug": "kaoh-thkov"
+},
+{
+"name": "Kampong Ous",
+"nameKm": "កំពង់អុស",
+"code": "40203",
+"slug": "kampong-ous"
+},
+{
+"name": "Peam Chhkaok",
+"nameKm": "ពាមឆ្កោក",
+"code": "40204",
+"slug": "peam-chhkaok"
+},
+{
+"name": "Prey Kri",
+"nameKm": "ព្រៃគ្រី",
+"code": "40205",
+"slug": "prey-kri"
+}
+]
+},
+{
+"name": "Kampong Chhnang",
+"nameKm": "កំពង់ឆ្នាំង",
+"code": "403",
+"slug": "kampong-chhnang",
+"communes": [
+{
+"name": "Phsar Chhnang",
+"nameKm": "ផ្សារឆ្នាំង",
+"code": "40301",
+"slug": "phsar-chhnang"
+},
+{
+"name": "Kampong Chhnang",
+"nameKm": "កំពង់ឆ្នាំង",
+"code": "40302",
+"slug": "kampong-chhnang"
+},
+{
+"name": "B'er",
+"nameKm": "ប្អេរ",
+"code": "40303",
+"slug": "b-er"
+},
+{
+"name": "Khsam",
+"nameKm": "ខ្សាម",
+"code": "40304",
+"slug": "khsam"
+}
+]
+},
+{
+"name": "Kampong Leaeng",
+"nameKm": "កំពង់លែង",
+"code": "404",
+"slug": "kampong-leaeng",
+"communes": [
+{
+"name": "Chranouk",
+"nameKm": "ច្រណូក",
+"code": "40401",
+"slug": "chranouk"
+},
+{
+"name": "Dar",
+"nameKm": "ដារ",
+"code": "40402",
+"slug": "dar"
+},
+{
+"name": "Kampong Hau",
+"nameKm": "កំពង់ហៅ",
+"code": "40403",
+"slug": "kampong-hau"
+},
+{
+"name": "Phlov Tuk",
+"nameKm": "ផ្លូវទូក",
+"code": "40404",
+"slug": "phlov-tuk"
+},
+{
+"name": "Pou",
+"nameKm": "ពោធិ៍",
+"code": "40405",
+"slug": "pou"
+},
+{
+"name": "Pralay Meas",
+"nameKm": "ប្រឡាយមាស",
+"code": "40406",
+"slug": "pralay-meas"
+},
+{
+"name": "Samraong Saen",
+"nameKm": "សំរោងសែន",
+"code": "40407",
+"slug": "samraong-saen"
+},
+{
+"name": "Svay Rumpear",
+"nameKm": "ស្វាយរំពារ",
+"code": "40408",
+"slug": "svay-rumpear"
+},
+{
+"name": "Trangel",
+"nameKm": "ត្រងិល",
+"code": "40409",
+"slug": "trangel"
+}
+]
+},
+{
+"name": "Kampong Tralach",
+"nameKm": "កំពង់ត្រឡាច",
+"code": "405",
+"slug": "kampong-tralach",
+"communes": [
+{
+"name": "Ampil Tuek",
+"nameKm": "អំពិលទឹក",
+"code": "40501",
+"slug": "ampil-tuek"
+},
+{
+"name": "Chhuk Sa",
+"nameKm": "ឈូកស",
+"code": "40502",
+"slug": "chhuk-sa"
+},
+{
+"name": "Chres",
+"nameKm": "ច្រេស",
+"code": "40503",
+"slug": "chres"
+},
+{
+"name": "Kampong Tralach",
+"nameKm": "កំពង់ត្រឡាច",
+"code": "40504",
+"slug": "kampong-tralach"
+},
+{
+"name": "Longveaek",
+"nameKm": "លង្វែក",
+"code": "40505",
+"slug": "longveaek"
+},
+{
+"name": "Ou Ruessei",
+"nameKm": "អូរឫស្សី",
+"code": "40506",
+"slug": "ou-ruessei"
+},
+{
+"name": "Peani",
+"nameKm": "ពានី",
+"code": "40507",
+"slug": "peani"
+},
+{
+"name": "Saeb",
+"nameKm": "សែប",
+"code": "40508",
+"slug": "saeb"
+},
+{
+"name": "Ta Ches",
+"nameKm": "តាជេស",
+"code": "40509",
+"slug": "ta-ches"
+},
+{
+"name": "Thma Edth",
+"nameKm": "ថ្មឥដ្ឋ",
+"code": "40510",
+"slug": "thma-edth"
+}
+]
+},
+{
+"name": "Rolea B'ier",
+"nameKm": "រលាប្អៀរ",
+"code": "406",
+"slug": "rolea-b-ier",
+"communes": [
+{
+"name": "Andoung Snay",
+"nameKm": "អណ្ដូងស្នាយ",
+"code": "40601",
+"slug": "andoung-snay"
+},
+{
+"name": "Banteay Preal",
+"nameKm": "បន្ទាយព្រាល",
+"code": "40602",
+"slug": "banteay-preal"
+},
+{
+"name": "Cheung Kreav",
+"nameKm": "ជើងគ្រាវ",
+"code": "40603",
+"slug": "cheung-kreav"
+},
+{
+"name": "Chrey Bak",
+"nameKm": "ជ្រៃបាក់",
+"code": "40604",
+"slug": "chrey-bak"
+},
+{
+"name": "Kouk Banteay",
+"nameKm": "គោកបន្ទាយ",
+"code": "40605",
+"slug": "kouk-banteay"
+},
+{
+"name": "Krang Leav",
+"nameKm": "ក្រាំងលាវ",
+"code": "40606",
+"slug": "krang-leav"
+},
+{
+"name": "Pongro",
+"nameKm": "ពង្រ",
+"code": "40607",
+"slug": "pongro"
+},
+{
+"name": "Prasnoeb",
+"nameKm": "ប្រស្នឹប",
+"code": "40608",
+"slug": "prasnoeb"
+},
+{
+"name": "Prey Mul",
+"nameKm": "ព្រៃមូល",
+"code": "40609",
+"slug": "prey-mul"
+},
+{
+"name": "Rolea B'ier",
+"nameKm": "រលាប្អៀរ",
+"code": "40610",
+"slug": "rolea-b-ier"
+},
+{
+"name": "Srae Thmei",
+"nameKm": "ស្រែថ្មី",
+"code": "40611",
+"slug": "srae-thmei"
+},
+{
+"name": "Svay Chrum",
+"nameKm": "ស្វាយជ្រុំ",
+"code": "40612",
+"slug": "svay-chrum"
+},
+{
+"name": "Tuek Hout",
+"nameKm": "ទឹកហូត",
+"code": "40613",
+"slug": "tuek-hout"
+},
+{
+"name": "Phnom Kraing Dey Meas",
+"nameKm": "ភ្នំក្រាំងដីមាស",
+"code": "40614",
+"slug": "phnom-kraing-dey-meas"
+}
+]
+},
+{
+"name": "Sameakki Mean Chey",
+"nameKm": "សាមគ្គីមានជ័យ",
+"code": "407",
+"slug": "sameakki-mean-chey",
+"communes": [
+{
+"name": "Chhean Laeung",
+"nameKm": "ឈានឡើង",
+"code": "40701",
+"slug": "chhean-laeung"
+},
+{
+"name": "Khnar Chhmar",
+"nameKm": "ខ្នារឆ្មារ",
+"code": "40702",
+"slug": "khnar-chhmar"
+},
+{
+"name": "Krang Lvea",
+"nameKm": "ក្រាំងល្វា",
+"code": "40703",
+"slug": "krang-lvea"
+},
+{
+"name": "Peam",
+"nameKm": "ពាម",
+"code": "40704",
+"slug": "peam"
+},
+{
+"name": "Sedthei",
+"nameKm": "សេដ្ឋី",
+"code": "40705",
+"slug": "sedthei"
+},
+{
+"name": "Svay",
+"nameKm": "ស្វាយ",
+"code": "40706",
+"slug": "svay"
+},
+{
+"name": "Svay Chuk",
+"nameKm": "ស្វាយជុក",
+"code": "40707",
+"slug": "svay-chuk"
+},
+{
+"name": "Tbaeng Khpos",
+"nameKm": "ត្បែងខ្ពស់",
+"code": "40708",
+"slug": "tbaeng-khpos"
+},
+{
+"name": "Thlok Vien",
+"nameKm": "ធ្លកវៀន",
+"code": "40709",
+"slug": "thlok-vien"
+}
+]
+},
+{
+"name": "Tuek Phos",
+"nameKm": "ទឹកផុស",
+"code": "408",
+"slug": "tuek-phos",
+"communes": [
+{
+"name": "Akphivoadth",
+"nameKm": "អភិវឌ្ឍន៍",
+"code": "40801",
+"slug": "akphivoadth"
+},
+{
+"name": "Chieb",
+"nameKm": "ជៀប",
+"code": "40802",
+"slug": "chieb"
+},
+{
+"name": "Chaong Maong",
+"nameKm": "ចោងម៉ោង",
+"code": "40803",
+"slug": "chaong-maong"
+},
+{
+"name": "Kbal Tuek",
+"nameKm": "ក្បាលទឹក",
+"code": "40804",
+"slug": "kbal-tuek"
+},
+{
+"name": "Khlong Popok",
+"nameKm": "ខ្លុងពពក",
+"code": "40805",
+"slug": "khlong-popok"
+},
+{
+"name": "Krang Skear",
+"nameKm": "ក្រាំងស្គារ",
+"code": "40806",
+"slug": "krang-skear"
+},
+{
+"name": "Tang Krasang",
+"nameKm": "តាំងក្រសាំង",
+"code": "40807",
+"slug": "tang-krasang"
+},
+{
+"name": "Tuol Khpos",
+"nameKm": "ទួលខ្ពស់",
+"code": "40808",
+"slug": "tuol-khpos"
+},
+{
+"name": "Kdol Saen Chey",
+"nameKm": "ក្តុលសែនជ័យ",
+"code": "40809",
+"slug": "kdol-saen-chey"
+}
+]
+}
+]
+},
+{
+"key": "kampong_speu",
+"slug": "kampong-speu",
+"name": "Kampong Speu",
+"nameKm": "កំពង់ស្ពឺ",
+"code": "05",
+"districts": [
+{
+"name": "Basedth",
+"nameKm": "បរសេដ្ឋ",
+"code": "501",
+"slug": "basedth",
+"communes": [
+{
+"name": "Basedth",
+"nameKm": "បរសេដ្ឋ",
+"code": "50101",
+"slug": "basedth"
+},
+{
+"name": "Kat Phluk",
+"nameKm": "កាត់ភ្លុក",
+"code": "50102",
+"slug": "kat-phluk"
+},
+{
+"name": "Nitean",
+"nameKm": "និទាន",
+"code": "50103",
+"slug": "nitean"
+},
+{
+"name": "Pheakdei",
+"nameKm": "ភក្ដី",
+"code": "50104",
+"slug": "pheakdei"
+},
+{
+"name": "Pheari Mean Chey",
+"nameKm": "ភារីមានជ័យ",
+"code": "50105",
+"slug": "pheari-mean-chey"
+},
+{
+"name": "Phong",
+"nameKm": "ផុង",
+"code": "50106",
+"slug": "phong"
+},
+{
+"name": "Pou Angkrang",
+"nameKm": "ពោធិអង្ក្រង",
+"code": "50107",
+"slug": "pou-angkrang"
+},
+{
+"name": "Pou Chamraeun",
+"nameKm": "ពោធិ៍ចំរើន",
+"code": "50108",
+"slug": "pou-chamraeun"
+},
+{
+"name": "Pou Mreal",
+"nameKm": "ពោធិ៍ម្រាល",
+"code": "50109",
+"slug": "pou-mreal"
+},
+{
+"name": "Svay Chacheb",
+"nameKm": "ស្វាយចចិប",
+"code": "50110",
+"slug": "svay-chacheb"
+},
+{
+"name": "Tuol Ampil",
+"nameKm": "ទួលអំពិល",
+"code": "50111",
+"slug": "tuol-ampil"
+},
+{
+"name": "Tuol Sala",
+"nameKm": "ទួលសាលា",
+"code": "50112",
+"slug": "tuol-sala"
+},
+{
+"name": "Kak",
+"nameKm": "កក់",
+"code": "50113",
+"slug": "kak"
+},
+{
+"name": "Svay Rumpear",
+"nameKm": "ស្វាយរំពារ",
+"code": "50114",
+"slug": "svay-rumpear"
+},
+{
+"name": "Preah Khae",
+"nameKm": "ព្រះខែ",
+"code": "50115",
+"slug": "preah-khae"
+}
+]
+},
+{
+"name": "Chbar Mon",
+"nameKm": "ច្បារមន",
+"code": "502",
+"slug": "chbar-mon",
+"communes": [
+{
+"name": "Chbar Mon",
+"nameKm": "ច្បារមន",
+"code": "50201",
+"slug": "chbar-mon"
+},
+{
+"name": "Kandaol Dom",
+"nameKm": "កណ្ដោលដុំ",
+"code": "50202",
+"slug": "kandaol-dom"
+},
+{
+"name": "Rokar Thum",
+"nameKm": "រការធំ",
+"code": "50203",
+"slug": "rokar-thum"
+},
+{
+"name": "Sopoar Tep",
+"nameKm": "សុព័រទេព",
+"code": "50204",
+"slug": "sopoar-tep"
+},
+{
+"name": "Svay Kravan",
+"nameKm": "ស្វាយក្រវ៉ាន់",
+"code": "50205",
+"slug": "svay-kravan"
+}
+]
+},
+{
+"name": "Kong Pisei",
+"nameKm": "គងពិសី",
+"code": "503",
+"slug": "kong-pisei",
+"communes": [
+{
+"name": "Angk Popel",
+"nameKm": "អង្គពពេល",
+"code": "50301",
+"slug": "angk-popel"
+},
+{
+"name": "Chongruk",
+"nameKm": "ជង្រុក",
+"code": "50302",
+"slug": "chongruk"
+},
+{
+"name": "Moha Ruessei",
+"nameKm": "មហាឫស្សី",
+"code": "50303",
+"slug": "moha-ruessei"
+},
+{
+"name": "Pechr Muni",
+"nameKm": "ពេជ្រមុនី",
+"code": "50304",
+"slug": "pechr-muni"
+},
+{
+"name": "Preah Nipean",
+"nameKm": "ព្រះនិព្វាន",
+"code": "50305",
+"slug": "preah-nipean"
+},
+{
+"name": "Prey Nheat",
+"nameKm": "ព្រៃញាតិ",
+"code": "50306",
+"slug": "prey-nheat"
+},
+{
+"name": "Prey Vihear",
+"nameKm": "ព្រៃវិហារ",
+"code": "50307",
+"slug": "prey-vihear"
+},
+{
+"name": "Roka Kaoh",
+"nameKm": "រកាកោះ",
+"code": "50308",
+"slug": "roka-kaoh"
+},
+{
+"name": "Sdok",
+"nameKm": "ស្ដុក",
+"code": "50309",
+"slug": "sdok"
+},
+{
+"name": "Snam Krapeu",
+"nameKm": "ស្នំក្រពើ",
+"code": "50310",
+"slug": "snam-krapeu"
+},
+{
+"name": "Srang",
+"nameKm": "ស្រង់",
+"code": "50311",
+"slug": "srang"
+},
+{
+"name": "Tuek L'ak",
+"nameKm": "ទឹកល្អក់",
+"code": "50312",
+"slug": "tuek-l-ak"
+},
+{
+"name": "Veal",
+"nameKm": "វាល",
+"code": "50313",
+"slug": "veal"
+}
+]
+},
+{
+"name": "Aoral",
+"nameKm": "ឱរ៉ាល់",
+"code": "504",
+"slug": "aoral",
+"communes": [
+{
+"name": "Haong Samnam",
+"nameKm": "ហោងសំណំ",
+"code": "50401",
+"slug": "haong-samnam"
+},
+{
+"name": "Reaksmei Sameakki",
+"nameKm": "រស្មីសាមគ្គី",
+"code": "50402",
+"slug": "reaksmei-sameakki"
+},
+{
+"name": "Trapeang Chour",
+"nameKm": "ត្រពាំងជោ",
+"code": "50403",
+"slug": "trapeang-chour"
+},
+{
+"name": "Sangkae Satob",
+"nameKm": "សង្កែសាទប",
+"code": "50404",
+"slug": "sangkae-satob"
+},
+{
+"name": "Ta Sal",
+"nameKm": "តាសាល",
+"code": "50405",
+"slug": "ta-sal"
+}
+]
+},
+{
+"name": "Phnum Sruoch",
+"nameKm": "ភ្នំស្រួច",
+"code": "506",
+"slug": "phnum-sruoch",
+"communes": [
+{
+"name": "Chambak",
+"nameKm": "ចំបក់",
+"code": "50601",
+"slug": "chambak"
+},
+{
+"name": "Choam Sangkae",
+"nameKm": "ជាំសង្កែ",
+"code": "50602",
+"slug": "choam-sangkae"
+},
+{
+"name": "Dambouk Rung",
+"nameKm": "ដំបូករូង",
+"code": "50603",
+"slug": "dambouk-rung"
+},
+{
+"name": "Kiri Voan",
+"nameKm": "គិរីវន្ដ",
+"code": "50604",
+"slug": "kiri-voan"
+},
+{
+"name": "Krang Dei Vay",
+"nameKm": "ក្រាំងដីវ៉ាយ",
+"code": "50605",
+"slug": "krang-dei-vay"
+},
+{
+"name": "Moha Sang",
+"nameKm": "មហាសាំង",
+"code": "50606",
+"slug": "moha-sang"
+},
+{
+"name": "Ou",
+"nameKm": "អូរ",
+"code": "50607",
+"slug": "ou"
+},
+{
+"name": "Prey Rumduol",
+"nameKm": "ព្រៃរំដួល",
+"code": "50608",
+"slug": "prey-rumduol"
+},
+{
+"name": "Prey Kmeng",
+"nameKm": "ព្រៃក្មេង",
+"code": "50609",
+"slug": "prey-kmeng"
+},
+{
+"name": "Tang Samraong",
+"nameKm": "តាំងសំរោង",
+"code": "50610",
+"slug": "tang-samraong"
+},
+{
+"name": "Tang Sya",
+"nameKm": "តាំងស្យា",
+"code": "50611",
+"slug": "tang-sya"
+},
+{
+"name": "Traeng Trayueng",
+"nameKm": "ត្រែងត្រយឹង",
+"code": "50613",
+"slug": "traeng-trayueng"
+},
+{
+"name": "Yeay Mao Pichnil",
+"nameKm": "យាយម៉ៅពេជ្យនិល",
+"code": "50614",
+"slug": "yeay-mao-pichnil"
+}
+]
+},
+{
+"name": "Samraong Tong",
+"nameKm": "សំរោងទង",
+"code": "507",
+"slug": "samraong-tong",
+"communes": [
+{
+"name": "Roleang Chak",
+"nameKm": "រលាំងចក",
+"code": "50701",
+"slug": "roleang-chak"
+},
+{
+"name": "Kahaeng",
+"nameKm": "កាហែង",
+"code": "50702",
+"slug": "kahaeng"
+},
+{
+"name": "Khtum Krang",
+"nameKm": "ខ្ទុំក្រាំង",
+"code": "50703",
+"slug": "khtum-krang"
+},
+{
+"name": "Krang Ampil",
+"nameKm": "ក្រាំងអំពិល",
+"code": "50704",
+"slug": "krang-ampil"
+},
+{
+"name": "Pneay",
+"nameKm": "ព្នាយ",
+"code": "50705",
+"slug": "pneay"
+},
+{
+"name": "Roleang Kreul",
+"nameKm": "រលាំងគ្រើល",
+"code": "50706",
+"slug": "roleang-kreul"
+},
+{
+"name": "Samrong Tong",
+"nameKm": "សំរោងទង",
+"code": "50707",
+"slug": "samrong-tong"
+},
+{
+"name": "Sambour",
+"nameKm": "សំបូរ",
+"code": "50708",
+"slug": "sambour"
+},
+{
+"name": "Saen Dei",
+"nameKm": "សែនដី",
+"code": "50709",
+"slug": "saen-dei"
+},
+{
+"name": "Skuh",
+"nameKm": "ស្គុះ",
+"code": "50710",
+"slug": "skuh"
+},
+{
+"name": "Tang Krouch",
+"nameKm": "តាំងក្រូច",
+"code": "50711",
+"slug": "tang-krouch"
+},
+{
+"name": "Thummoda Ar",
+"nameKm": "ធម្មតាអរ",
+"code": "50712",
+"slug": "thummoda-ar"
+},
+{
+"name": "Trapeang Kong",
+"nameKm": "ត្រពាំងគង",
+"code": "50713",
+"slug": "trapeang-kong"
+},
+{
+"name": "Tumpoar Meas",
+"nameKm": "ទំព័រមាស",
+"code": "50714",
+"slug": "tumpoar-meas"
+},
+{
+"name": "Voa Sar",
+"nameKm": "វល្លិសរ",
+"code": "50715",
+"slug": "voa-sar"
+}
+]
+},
+{
+"name": "Thpong",
+"nameKm": "ថ្ពង",
+"code": "508",
+"slug": "thpong",
+"communes": [
+{
+"name": "Amleang",
+"nameKm": "អមលាំង",
+"code": "50801",
+"slug": "amleang"
+},
+{
+"name": "Monourom",
+"nameKm": "មនោរម្យ",
+"code": "50802",
+"slug": "monourom"
+},
+{
+"name": "Prambei Mum",
+"nameKm": "ប្រាំបីមុម",
+"code": "50804",
+"slug": "prambei-mum"
+},
+{
+"name": "Rung Roeang",
+"nameKm": "រុងរឿង",
+"code": "50805",
+"slug": "rung-roeang"
+},
+{
+"name": "Toap Mean",
+"nameKm": "ទ័ពមាន",
+"code": "50806",
+"slug": "toap-mean"
+},
+{
+"name": "Veal Pon",
+"nameKm": "វាលពន់",
+"code": "50807",
+"slug": "veal-pon"
+},
+{
+"name": "Yea Angk",
+"nameKm": "យាអង្គ",
+"code": "50808",
+"slug": "yea-angk"
+}
+]
+},
+{
+"name": "Odongk Maechay",
+"nameKm": "ឧដុង្គម៉ែជ័យ",
+"code": "509",
+"slug": "odongk-maechay",
+"communes": [
+{
+"name": "Veang Chas",
+"nameKm": "វាំងចាស់",
+"code": "50901",
+"slug": "veang-chas"
+},
+{
+"name": "Veal Pong",
+"nameKm": "វាលពង់",
+"code": "50902",
+"slug": "veal-pong"
+},
+{
+"name": "Trach Tong",
+"nameKm": "ត្រាចទង",
+"code": "50903",
+"slug": "trach-tong"
+},
+{
+"name": "Preah Srae",
+"nameKm": "ព្រះស្រែ",
+"code": "50904",
+"slug": "preah-srae"
+},
+{
+"name": "Khsem Khsant",
+"nameKm": "ក្សេមក្សាន្ដ",
+"code": "50905",
+"slug": "khsem-khsant"
+}
+]
+},
+{
+"name": "Samkkei Munichay",
+"nameKm": "សាមគ្គីមុនីជ័យ",
+"code": "510",
+"slug": "samkkei-munichay",
+"communes": [
+{
+"name": "Chan Saen",
+"nameKm": "ចាន់សែន",
+"code": "51001",
+"slug": "chan-saen"
+},
+{
+"name": "Cheung Roas",
+"nameKm": "ជើងរាស់",
+"code": "51002",
+"slug": "cheung-roas"
+},
+{
+"name": "Chumpu Proeks",
+"nameKm": "ជំពូព្រឹក្ស",
+"code": "51003",
+"slug": "chumpu-proeks"
+},
+{
+"name": "Krang Chek",
+"nameKm": "ក្រាំងចេក",
+"code": "51004",
+"slug": "krang-chek"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "51005",
+"slug": "mean-chey"
+},
+{
+"name": "Prey Krasang",
+"nameKm": "ព្រៃក្រសាំង",
+"code": "51006",
+"slug": "prey-krasang"
+},
+{
+"name": "Yutth Sameakki",
+"nameKm": "យុទ្ធសាមគ្គី",
+"code": "51007",
+"slug": "yutth-sameakki"
+},
+{
+"name": "Damnak Reang",
+"nameKm": "ដំណាក់រាំង",
+"code": "51008",
+"slug": "damnak-reang"
+},
+{
+"name": "Peang Lvea",
+"nameKm": "ពាំងល្វា",
+"code": "51009",
+"slug": "peang-lvea"
+},
+{
+"name": "Phnom Touch",
+"nameKm": "ភ្នំតូច",
+"code": "51010",
+"slug": "phnom-touch"
+}
+]
+}
+]
+},
+{
+"key": "kampong_thom",
+"slug": "kampong-thom",
+"name": "Kampong Thom",
+"nameKm": "កំពង់ធំ",
+"code": "06",
+"districts": [
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "601",
+"slug": "baray",
+"communes": [
+{
+"name": "Bak Sna",
+"nameKm": "បាក់ស្នា",
+"code": "60101",
+"slug": "bak-sna"
+},
+{
+"name": "Ballangk",
+"nameKm": "បល្ល័ង្គ",
+"code": "60102",
+"slug": "ballangk"
+},
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "60103",
+"slug": "baray"
+},
+{
+"name": "Boeng",
+"nameKm": "បឹង",
+"code": "60104",
+"slug": "boeng"
+},
+{
+"name": "Chaeung Daeung",
+"nameKm": "ចើងដើង",
+"code": "60105",
+"slug": "chaeung-daeung"
+},
+{
+"name": "Chhuk Khsach",
+"nameKm": "ឈូកខ្សាច់",
+"code": "60107",
+"slug": "chhuk-khsach"
+},
+{
+"name": "Chong Doung",
+"nameKm": "ចុងដូង",
+"code": "60108",
+"slug": "chong-doung"
+},
+{
+"name": "Kokir Thum",
+"nameKm": "គគីធំ",
+"code": "60110",
+"slug": "kokir-thum"
+},
+{
+"name": "Krava",
+"nameKm": "ក្រវ៉ា",
+"code": "60111",
+"slug": "krava"
+},
+{
+"name": "Tnaot Chum",
+"nameKm": "ត្នោតជុំ",
+"code": "60117",
+"slug": "tnaot-chum"
+}
+]
+},
+{
+"name": "Kampong Svay",
+"nameKm": "កំពង់ស្វាយ",
+"code": "602",
+"slug": "kampong-svay",
+"communes": [
+{
+"name": "Chey",
+"nameKm": "ជ័យ",
+"code": "60201",
+"slug": "chey"
+},
+{
+"name": "Damrei Slab",
+"nameKm": "ដំរីស្លាប់",
+"code": "60202",
+"slug": "damrei-slab"
+},
+{
+"name": "Kampong Kou",
+"nameKm": "កំពង់គោ",
+"code": "60203",
+"slug": "kampong-kou"
+},
+{
+"name": "Kampong Svay",
+"nameKm": "កំពង់ស្វាយ",
+"code": "60204",
+"slug": "kampong-svay"
+},
+{
+"name": "Nipech",
+"nameKm": "នីពេជ",
+"code": "60205",
+"slug": "nipech"
+},
+{
+"name": "Phat Sanday",
+"nameKm": "ផាត់សណ្ដាយ",
+"code": "60206",
+"slug": "phat-sanday"
+},
+{
+"name": "San Kor",
+"nameKm": "សាន់គ",
+"code": "60207",
+"slug": "san-kor"
+},
+{
+"name": "Tbaeng",
+"nameKm": "ត្បែង",
+"code": "60208",
+"slug": "tbaeng"
+},
+{
+"name": "Trapeang Ruessei",
+"nameKm": "ត្រពាំងឫស្សី",
+"code": "60209",
+"slug": "trapeang-ruessei"
+},
+{
+"name": "Kdei Doung",
+"nameKm": "ក្ដីដូង",
+"code": "60210",
+"slug": "kdei-doung"
+},
+{
+"name": "Prey Kuy",
+"nameKm": "ព្រៃគុយ",
+"code": "60211",
+"slug": "prey-kuy"
+}
+]
+},
+{
+"name": "Stueng Saen",
+"nameKm": "ស្ទឹងសែន",
+"code": "603",
+"slug": "stueng-saen",
+"communes": [
+{
+"name": "Damrei Choan Khla",
+"nameKm": "ដំរីជាន់ខ្លា",
+"code": "60301",
+"slug": "damrei-choan-khla"
+},
+{
+"name": "Kampong Thum",
+"nameKm": "កំពង់ធំ",
+"code": "60302",
+"slug": "kampong-thum"
+},
+{
+"name": "Kampong Roteh",
+"nameKm": "កំពង់រទេះ",
+"code": "60303",
+"slug": "kampong-roteh"
+},
+{
+"name": "Ou Kanthor",
+"nameKm": "អូរកន្ធរ",
+"code": "60304",
+"slug": "ou-kanthor"
+},
+{
+"name": "Kampong Krabau",
+"nameKm": "កំពង់ក្របៅ",
+"code": "60306",
+"slug": "kampong-krabau"
+},
+{
+"name": "Prey Ta Hu",
+"nameKm": "ព្រៃតាហ៊ូ",
+"code": "60308",
+"slug": "prey-ta-hu"
+},
+{
+"name": "Achar Leak",
+"nameKm": "អាចារ្យលាក់",
+"code": "60309",
+"slug": "achar-leak"
+},
+{
+"name": "Srayov",
+"nameKm": "ស្រយ៉ូវ",
+"code": "60310",
+"slug": "srayov"
+}
+]
+},
+{
+"name": "Prasat Ballangk",
+"nameKm": "ប្រាសាទបល្ល័ង្គ",
+"code": "604",
+"slug": "prasat-ballangk",
+"communes": [
+{
+"name": "Doung",
+"nameKm": "ដូង",
+"code": "60401",
+"slug": "doung"
+},
+{
+"name": "Kraya",
+"nameKm": "ក្រយា",
+"code": "60402",
+"slug": "kraya"
+},
+{
+"name": "Phan Nheum",
+"nameKm": "ផាន់ញើម",
+"code": "60403",
+"slug": "phan-nheum"
+},
+{
+"name": "Sakream",
+"nameKm": "សាគ្រាម",
+"code": "60404",
+"slug": "sakream"
+},
+{
+"name": "Sala Visai",
+"nameKm": "សាលាវិស័យ",
+"code": "60405",
+"slug": "sala-visai"
+},
+{
+"name": "Sameakki",
+"nameKm": "សាមគ្គី",
+"code": "60406",
+"slug": "sameakki"
+},
+{
+"name": "Tuol Kreul",
+"nameKm": "ទួលគ្រើល",
+"code": "60407",
+"slug": "tuol-kreul"
+}
+]
+},
+{
+"name": "Prasat Sambour",
+"nameKm": "ប្រាសាទសំបូរ",
+"code": "605",
+"slug": "prasat-sambour",
+"communes": [
+{
+"name": "Chhuk",
+"nameKm": "ឈូក",
+"code": "60501",
+"slug": "chhuk"
+},
+{
+"name": "Koul",
+"nameKm": "គោល",
+"code": "60502",
+"slug": "koul"
+},
+{
+"name": "Sambour",
+"nameKm": "សំបូរណ៍",
+"code": "60503",
+"slug": "sambour"
+},
+{
+"name": "Sraeung",
+"nameKm": "ស្រើង",
+"code": "60504",
+"slug": "sraeung"
+},
+{
+"name": "Tang Krasau",
+"nameKm": "តាំងក្រសៅ",
+"code": "60505",
+"slug": "tang-krasau"
+}
+]
+},
+{
+"name": "Sandan",
+"nameKm": "សណ្ដាន់",
+"code": "606",
+"slug": "sandan",
+"communes": [
+{
+"name": "Chheu Teal",
+"nameKm": "ឈើទាល",
+"code": "60601",
+"slug": "chheu-teal"
+},
+{
+"name": "Dang Kambet",
+"nameKm": "ដងកាំបិត",
+"code": "60602",
+"slug": "dang-kambet"
+},
+{
+"name": "Klaeng",
+"nameKm": "ក្លែង",
+"code": "60603",
+"slug": "klaeng"
+},
+{
+"name": "Mean Rith",
+"nameKm": "មានរិទ្ធ",
+"code": "60604",
+"slug": "mean-rith"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "60605",
+"slug": "mean-chey"
+},
+{
+"name": "Ngan",
+"nameKm": "ងន",
+"code": "60606",
+"slug": "ngan"
+},
+{
+"name": "Sandan",
+"nameKm": "សណ្ដាន់",
+"code": "60607",
+"slug": "sandan"
+},
+{
+"name": "Sochet",
+"nameKm": "សុចិត្រ",
+"code": "60608",
+"slug": "sochet"
+},
+{
+"name": "Tum Ring",
+"nameKm": "ទំរីង",
+"code": "60609",
+"slug": "tum-ring"
+}
+]
+},
+{
+"name": "Santuk",
+"nameKm": "សន្ទុក",
+"code": "607",
+"slug": "santuk",
+"communes": [
+{
+"name": "Boeng Lvea",
+"nameKm": "បឹងល្វា",
+"code": "60701",
+"slug": "boeng-lvea"
+},
+{
+"name": "Chroab",
+"nameKm": "ជ្រាប់",
+"code": "60702",
+"slug": "chroab"
+},
+{
+"name": "Kampong Thma",
+"nameKm": "កំពង់ថ្ម",
+"code": "60703",
+"slug": "kampong-thma"
+},
+{
+"name": "Kakaoh",
+"nameKm": "កកោះ",
+"code": "60704",
+"slug": "kakaoh"
+},
+{
+"name": "Kraya",
+"nameKm": "ក្រយា",
+"code": "60705",
+"slug": "kraya"
+},
+{
+"name": "Pnov",
+"nameKm": "ព្នៅ",
+"code": "60706",
+"slug": "pnov"
+},
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "60707",
+"slug": "prasat"
+},
+{
+"name": "Tang Krasang",
+"nameKm": "តាំងក្រសាំង",
+"code": "60708",
+"slug": "tang-krasang"
+},
+{
+"name": "Ti Pou",
+"nameKm": "ទីពោ",
+"code": "60709",
+"slug": "ti-pou"
+},
+{
+"name": "Tboung Krapeu",
+"nameKm": "ត្បូងក្រពើ",
+"code": "60710",
+"slug": "tboung-krapeu"
+}
+]
+},
+{
+"name": "Stoung",
+"nameKm": "ស្ទោង",
+"code": "608",
+"slug": "stoung",
+"communes": [
+{
+"name": "Banteay Stoung",
+"nameKm": "បន្ទាយស្ទោង",
+"code": "60801",
+"slug": "banteay-stoung"
+},
+{
+"name": "Chamna Kraom",
+"nameKm": "ចំណាក្រោម",
+"code": "60802",
+"slug": "chamna-kraom"
+},
+{
+"name": "Chamna Leu",
+"nameKm": "ចំណាលើ",
+"code": "60803",
+"slug": "chamna-leu"
+},
+{
+"name": "Kampong Chen Cheung",
+"nameKm": "កំពង់ចិនជើង",
+"code": "60804",
+"slug": "kampong-chen-cheung"
+},
+{
+"name": "Kampong Chen Tboung",
+"nameKm": "កំពង់ចិនត្បូង",
+"code": "60805",
+"slug": "kampong-chen-tboung"
+},
+{
+"name": "Msa Krang",
+"nameKm": "ម្សាក្រង",
+"code": "60806",
+"slug": "msa-krang"
+},
+{
+"name": "Peam Bang",
+"nameKm": "ពាមបាង",
+"code": "60807",
+"slug": "peam-bang"
+},
+{
+"name": "Popok",
+"nameKm": "ពពក",
+"code": "60808",
+"slug": "popok"
+},
+{
+"name": "Pralay",
+"nameKm": "ប្រឡាយ",
+"code": "60809",
+"slug": "pralay"
+},
+{
+"name": "Preah Damrei",
+"nameKm": "ព្រះដំរី",
+"code": "60810",
+"slug": "preah-damrei"
+},
+{
+"name": "Rung Roeang",
+"nameKm": "រុងរឿង",
+"code": "60811",
+"slug": "rung-roeang"
+},
+{
+"name": "Samprouch",
+"nameKm": "សំព្រោជ",
+"code": "60812",
+"slug": "samprouch"
+},
+{
+"name": "Trea",
+"nameKm": "ទ្រា",
+"code": "60813",
+"slug": "trea"
+}
+]
+},
+{
+"name": "Taing Kouk",
+"nameKm": "តាំងគោក",
+"code": "609",
+"slug": "taing-kouk",
+"communes": [
+{
+"name": "Pongro",
+"nameKm": "ពង្រ",
+"code": "60901",
+"slug": "pongro"
+},
+{
+"name": "Chraneang",
+"nameKm": "ច្រនាង",
+"code": "60902",
+"slug": "chraneang"
+},
+{
+"name": "Chrolong",
+"nameKm": "ជ្រលង",
+"code": "60903",
+"slug": "chrolong"
+},
+{
+"name": "Triel",
+"nameKm": "ទ្រៀល",
+"code": "60904",
+"slug": "triel"
+},
+{
+"name": "Sou Young",
+"nameKm": "សូយោង",
+"code": "60905",
+"slug": "sou-young"
+},
+{
+"name": "Sralau",
+"nameKm": "ស្រឡៅ",
+"code": "60906",
+"slug": "sralau"
+},
+{
+"name": "Svay Phleung",
+"nameKm": "ស្វាយភ្លើង",
+"code": "60907",
+"slug": "svay-phleung"
+},
+{
+"name": "Andoung Pou",
+"nameKm": "អណ្ដូងពោធិ៍",
+"code": "60908",
+"slug": "andoung-pou"
+}
+]
+}
+]
+},
+{
+"key": "kampot",
+"slug": "kampot",
+"name": "Kampot",
+"nameKm": "កំពត",
+"code": "07",
+"districts": [
+{
+"name": "Angkor Chey",
+"nameKm": "អង្គរជ័យ",
+"code": "701",
+"slug": "angkor-chey",
+"communes": [
+{
+"name": "Angk Phnum Touch",
+"nameKm": "អង្គភ្នំតូច",
+"code": "70101",
+"slug": "angk-phnum-touch"
+},
+{
+"name": "Ankor Chey",
+"nameKm": "អង្គរជ័យ",
+"code": "70102",
+"slug": "ankor-chey"
+},
+{
+"name": "Champei",
+"nameKm": "ចំប៉ី",
+"code": "70103",
+"slug": "champei"
+},
+{
+"name": "Dambouk Khpos",
+"nameKm": "ដំបូកខ្ពស់",
+"code": "70104",
+"slug": "dambouk-khpos"
+},
+{
+"name": "Dan Koum",
+"nameKm": "ដានគោម",
+"code": "70105",
+"slug": "dan-koum"
+},
+{
+"name": "Daeum Doung",
+"nameKm": "ដើមដូង",
+"code": "70106",
+"slug": "daeum-doung"
+},
+{
+"name": "Mroum",
+"nameKm": "ម្រោម",
+"code": "70107",
+"slug": "mroum"
+},
+{
+"name": "Phnum Kong",
+"nameKm": "ភ្នំកុង",
+"code": "70108",
+"slug": "phnum-kong"
+},
+{
+"name": "Praphnum",
+"nameKm": "ប្រភ្នំ",
+"code": "70109",
+"slug": "praphnum"
+},
+{
+"name": "Samlanh",
+"nameKm": "សំឡាញ",
+"code": "70110",
+"slug": "samlanh"
+},
+{
+"name": "Tani",
+"nameKm": "តានី",
+"code": "70111",
+"slug": "tani"
+}
+]
+},
+{
+"name": "Banteay Meas",
+"nameKm": "បន្ទាយមាស",
+"code": "702",
+"slug": "banteay-meas",
+"communes": [
+{
+"name": "Banteay Meas Khang Kaeut",
+"nameKm": "បន្ទាយមាសខាងកើត",
+"code": "70201",
+"slug": "banteay-meas-khang-kaeut"
+},
+{
+"name": "Banteay Meas Khang lech",
+"nameKm": "បន្ទាយមាសខាងលិច",
+"code": "70202",
+"slug": "banteay-meas-khang-lech"
+},
+{
+"name": "Prey Tonle",
+"nameKm": "ព្រៃទន្លេ",
+"code": "70203",
+"slug": "prey-tonle"
+},
+{
+"name": "Samraong Kraom",
+"nameKm": "សំរោងក្រោម",
+"code": "70204",
+"slug": "samraong-kraom"
+},
+{
+"name": "Samraong Leu",
+"nameKm": "សំរោងលើ",
+"code": "70205",
+"slug": "samraong-leu"
+},
+{
+"name": "Sdach Kong Khang Cheung",
+"nameKm": "ស្ដេចគង់ខាងជើង",
+"code": "70206",
+"slug": "sdach-kong-khang-cheung"
+},
+{
+"name": "Sdach Kong Khang lech",
+"nameKm": "ស្ដេចគង់ខាងលិច",
+"code": "70207",
+"slug": "sdach-kong-khang-lech"
+},
+{
+"name": "Sdach Kong Khang Tboung",
+"nameKm": "ស្ដេចគង់ខាងត្បូង",
+"code": "70208",
+"slug": "sdach-kong-khang-tboung"
+},
+{
+"name": "Tnoat Chong Srang",
+"nameKm": "ត្នោតចុងស្រង់",
+"code": "70209",
+"slug": "tnoat-chong-srang"
+},
+{
+"name": "Trapeang Sala Khang Kaeut",
+"nameKm": "ត្រពាំងសាលាខាងកើត",
+"code": "70210",
+"slug": "trapeang-sala-khang-kaeut"
+},
+{
+"name": "Trapeang Sala Khang Lech",
+"nameKm": "ត្រពាំងសាលាខាងលិច",
+"code": "70211",
+"slug": "trapeang-sala-khang-lech"
+},
+{
+"name": "Tuk Meas Khang Kaeut",
+"nameKm": "ទូកមាសខាងកើត",
+"code": "70212",
+"slug": "tuk-meas-khang-kaeut"
+},
+{
+"name": "Tuk Meas Khang Lech",
+"nameKm": "ទូកមាសខាងលិច",
+"code": "70213",
+"slug": "tuk-meas-khang-lech"
+},
+{
+"name": "Voat Angk Khang Cheung",
+"nameKm": "វត្ដអង្គខាងជើង",
+"code": "70214",
+"slug": "voat-angk-khang-cheung"
+},
+{
+"name": "Voat Angk Khang Tboung",
+"nameKm": "វត្ដអង្គខាងត្បូង",
+"code": "70215",
+"slug": "voat-angk-khang-tboung"
+}
+]
+},
+{
+"name": "Chhuk",
+"nameKm": "ឈូក",
+"code": "703",
+"slug": "chhuk",
+"communes": [
+{
+"name": "Baniev",
+"nameKm": "បានៀវ",
+"code": "70301",
+"slug": "baniev"
+},
+{
+"name": "Takaen",
+"nameKm": "តាកែន",
+"code": "70302",
+"slug": "takaen"
+},
+{
+"name": "Boeng Nimol",
+"nameKm": "បឹងនិមល",
+"code": "70303",
+"slug": "boeng-nimol"
+},
+{
+"name": "Chhuk",
+"nameKm": "ឈូក",
+"code": "70304",
+"slug": "chhuk"
+},
+{
+"name": "Doun Yay",
+"nameKm": "ដូនយ៉យ",
+"code": "70305",
+"slug": "doun-yay"
+},
+{
+"name": "Krang Sbov",
+"nameKm": "ក្រាំងស្បូវ",
+"code": "70306",
+"slug": "krang-sbov"
+},
+{
+"name": "Krang Snay",
+"nameKm": "ក្រាំងស្នាយ",
+"code": "70307",
+"slug": "krang-snay"
+},
+{
+"name": "Lbaeuk",
+"nameKm": "ល្បើក",
+"code": "70308",
+"slug": "lbaeuk"
+},
+{
+"name": "Trapeang Phleang",
+"nameKm": "ត្រពាំងភ្លាំង",
+"code": "70309",
+"slug": "trapeang-phleang"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "70310",
+"slug": "mean-chey"
+},
+{
+"name": "Neareay",
+"nameKm": "នារាយណ៍",
+"code": "70311",
+"slug": "neareay"
+},
+{
+"name": "Satv Pong",
+"nameKm": "សត្វពង",
+"code": "70312",
+"slug": "satv-pong"
+},
+{
+"name": "Trapeang Bei",
+"nameKm": "ត្រពាំងបី",
+"code": "70313",
+"slug": "trapeang-bei"
+},
+{
+"name": "Tramaeng",
+"nameKm": "ត្រមែង",
+"code": "70314",
+"slug": "tramaeng"
+},
+{
+"name": "Dechou Akphivoadth",
+"nameKm": "តេជោអភិវឌ្ឍន៍",
+"code": "70315",
+"slug": "dechou-akphivoadth"
+}
+]
+},
+{
+"name": "Chum Kiri",
+"nameKm": "ជុំគិរី",
+"code": "704",
+"slug": "chum-kiri",
+"communes": [
+{
+"name": "Chres",
+"nameKm": "ច្រេស",
+"code": "70401",
+"slug": "chres"
+},
+{
+"name": "Chumpu Voan",
+"nameKm": "ជំពូវន្ដ",
+"code": "70402",
+"slug": "chumpu-voan"
+},
+{
+"name": "Snay Anhchit",
+"nameKm": "ស្នាយអញ្ជិត",
+"code": "70403",
+"slug": "snay-anhchit"
+},
+{
+"name": "Srae Chaeng",
+"nameKm": "ស្រែចែង",
+"code": "70404",
+"slug": "srae-chaeng"
+},
+{
+"name": "Srae Knong",
+"nameKm": "ស្រែក្នុង",
+"code": "70405",
+"slug": "srae-knong"
+},
+{
+"name": "Srae Samraong",
+"nameKm": "ស្រែសំរោង",
+"code": "70406",
+"slug": "srae-samraong"
+},
+{
+"name": "Trapeang Reang",
+"nameKm": "ត្រពាំងរាំង",
+"code": "70407",
+"slug": "trapeang-reang"
+}
+]
+},
+{
+"name": "Dang Tong",
+"nameKm": "ដងទង់",
+"code": "705",
+"slug": "dang-tong",
+"communes": [
+{
+"name": "Damnak Sokram",
+"nameKm": "ដំណាក់សុក្រំ",
+"code": "70501",
+"slug": "damnak-sokram"
+},
+{
+"name": "Dang Tong",
+"nameKm": "ដងទង់",
+"code": "70502",
+"slug": "dang-tong"
+},
+{
+"name": "Khcheay Khang Cheung",
+"nameKm": "ឃ្ជាយខាងជើង",
+"code": "70503",
+"slug": "khcheay-khang-cheung"
+},
+{
+"name": "Khcheay Khang Tboung",
+"nameKm": "ខ្ជាយខាងត្បូង",
+"code": "70504",
+"slug": "khcheay-khang-tboung"
+},
+{
+"name": "Mean Ritth",
+"nameKm": "មានរិទ្ធិ",
+"code": "70505",
+"slug": "mean-ritth"
+},
+{
+"name": "Srae Chea Khang Cheung",
+"nameKm": "ស្រែជាខាងជើង",
+"code": "70506",
+"slug": "srae-chea-khang-cheung"
+},
+{
+"name": "Srae Chea Khang Tboung",
+"nameKm": "ស្រែជាខាងត្បូង",
+"code": "70507",
+"slug": "srae-chea-khang-tboung"
+},
+{
+"name": "Totung",
+"nameKm": "ទទុង",
+"code": "70508",
+"slug": "totung"
+},
+{
+"name": "Angk  Romeas",
+"nameKm": "អង្គ រមាស",
+"code": "70509",
+"slug": "angk-romeas"
+},
+{
+"name": "L'ang",
+"nameKm": "ល្អាង",
+"code": "70510",
+"slug": "l-ang"
+}
+]
+},
+{
+"name": "Kampong Trach",
+"nameKm": "កំពង់ត្រាច",
+"code": "706",
+"slug": "kampong-trach",
+"communes": [
+{
+"name": "Boeng Sala Khang Cheung",
+"nameKm": "បឹងសាលាខាងជើង",
+"code": "70601",
+"slug": "boeng-sala-khang-cheung"
+},
+{
+"name": "Boeng Sala Khang Tboung",
+"nameKm": "បឹងសាលាខាងត្បូង",
+"code": "70602",
+"slug": "boeng-sala-khang-tboung"
+},
+{
+"name": "Damnak Kantuot Khang Cheung",
+"nameKm": "ដំណាក់កន្ទួតខាងជើង",
+"code": "70603",
+"slug": "damnak-kantuot-khang-cheung"
+},
+{
+"name": "Damnak Kantuot Khang Tboung",
+"nameKm": "ដំណាក់កន្ទួតខាងត្បូង",
+"code": "70604",
+"slug": "damnak-kantuot-khang-tboung"
+},
+{
+"name": "Kampong Trach Khang Kaeut",
+"nameKm": "កំពង់ត្រាចខាងកើត",
+"code": "70605",
+"slug": "kampong-trach-khang-kaeut"
+},
+{
+"name": "Kampong Trach Khang Lech",
+"nameKm": "កំពង់ត្រាចខាងលិច",
+"code": "70606",
+"slug": "kampong-trach-khang-lech"
+},
+{
+"name": "Prasat Phnom Khyang",
+"nameKm": "ប្រាសាទភ្នំខ្យង",
+"code": "70607",
+"slug": "prasat-phnom-khyang"
+},
+{
+"name": "Phnom Prasat",
+"nameKm": "ភ្នំប្រាសាទ",
+"code": "70608",
+"slug": "phnom-prasat"
+},
+{
+"name": "Ang Sophy",
+"nameKm": "អង្គសុរភី",
+"code": "70609",
+"slug": "ang-sophy"
+},
+{
+"name": "Preaek Kroes",
+"nameKm": "ព្រែកក្រឹស",
+"code": "70612",
+"slug": "preaek-kroes"
+},
+{
+"name": "Ruessei Srok Khang Kaeut",
+"nameKm": "ឫស្សីស្រុកខាងកើត",
+"code": "70613",
+"slug": "ruessei-srok-khang-kaeut"
+},
+{
+"name": "Ruessei Srok Khang Lech",
+"nameKm": "ឫស្សីស្រុកខាងលិច",
+"code": "70614",
+"slug": "ruessei-srok-khang-lech"
+},
+{
+"name": "Svay Tong Khang Cheung",
+"nameKm": "ស្វាយទងខាងជើង",
+"code": "70615",
+"slug": "svay-tong-khang-cheung"
+},
+{
+"name": "Svay Tong Khang Tboung",
+"nameKm": "ស្វាយទងខាងត្បូង",
+"code": "70616",
+"slug": "svay-tong-khang-tboung"
+}
+]
+},
+{
+"name": "Tuek Chhou",
+"nameKm": "ទឹកឈូ",
+"code": "707",
+"slug": "tuek-chhou",
+"communes": [
+{
+"name": "Chum Kriel",
+"nameKm": "ជុំគ្រៀល",
+"code": "70702",
+"slug": "chum-kriel"
+},
+{
+"name": "Kampong Kraeng",
+"nameKm": "កំពង់ក្រែង",
+"code": "70703",
+"slug": "kampong-kraeng"
+},
+{
+"name": "Kampong Samraong",
+"nameKm": "កំពង់សំរោង",
+"code": "70704",
+"slug": "kampong-samraong"
+},
+{
+"name": "Kandaol",
+"nameKm": "កណ្ដោល",
+"code": "70705",
+"slug": "kandaol"
+},
+{
+"name": "Koun Satv",
+"nameKm": "កូនសត្វ",
+"code": "70708",
+"slug": "koun-satv"
+},
+{
+"name": "Makprang",
+"nameKm": "ម៉ាក់ប្រាង្គ",
+"code": "70709",
+"slug": "makprang"
+},
+{
+"name": "Prey Khmum",
+"nameKm": "ព្រៃឃ្មុំ",
+"code": "70712",
+"slug": "prey-khmum"
+},
+{
+"name": "Prey Thnang",
+"nameKm": "ព្រៃថ្នង",
+"code": "70713",
+"slug": "prey-thnang"
+},
+{
+"name": "Stueng Kaev",
+"nameKm": "ស្ទឹងកែវ",
+"code": "70715",
+"slug": "stueng-kaev"
+},
+{
+"name": "Thmei",
+"nameKm": "ថ្មី",
+"code": "70716",
+"slug": "thmei"
+},
+{
+"name": "Trapeang Pring",
+"nameKm": "ត្រពាំងព្រីង",
+"code": "70717",
+"slug": "trapeang-pring"
+},
+{
+"name": "Trapeang Sangkae",
+"nameKm": "ត្រពាំងសង្កែ",
+"code": "70718",
+"slug": "trapeang-sangkae"
+},
+{
+"name": "Trapeang Thum",
+"nameKm": "ត្រពាំងធំ",
+"code": "70719",
+"slug": "trapeang-thum"
+}
+]
+},
+{
+"name": "Kampot",
+"nameKm": "កំពត",
+"code": "708",
+"slug": "kampot",
+"communes": [
+{
+"name": "Kampong Kandal",
+"nameKm": "កំពង់កណ្ដាល",
+"code": "70801",
+"slug": "kampong-kandal"
+},
+{
+"name": "Krang Ampil",
+"nameKm": "ក្រាំងអំពិល",
+"code": "70802",
+"slug": "krang-ampil"
+},
+{
+"name": "Kampong Bay",
+"nameKm": "កំពង់បាយ",
+"code": "70803",
+"slug": "kampong-bay"
+},
+{
+"name": "Andoung Khmer",
+"nameKm": "អណ្ដូងខ្មែរ",
+"code": "70804",
+"slug": "andoung-khmer"
+},
+{
+"name": "Traeuy Kaoh",
+"nameKm": "ត្រើយកោះ",
+"code": "70805",
+"slug": "traeuy-kaoh"
+}
+]
+},
+{
+"name": "Bokor",
+"nameKm": "បូកគោ",
+"code": "709",
+"slug": "bokor",
+"communes": [
+{
+"name": "Boeng Tuk",
+"nameKm": "បឹងទូក",
+"code": "70901",
+"slug": "boeng-tuk"
+},
+{
+"name": "Kaoh Touch",
+"nameKm": "កោះតូច",
+"code": "70902",
+"slug": "kaoh-touch"
+},
+{
+"name": "Preaek Tnoat",
+"nameKm": "ព្រែកត្នោត",
+"code": "70903",
+"slug": "preaek-tnoat"
+}
+]
+}
+]
+},
+{
+"key": "kandal",
+"slug": "kandal",
+"name": "Kandal",
+"nameKm": "កណ្ដាល",
+"code": "08",
+"districts": [
+{
+"name": "Kandal Stueng",
+"nameKm": "កណ្ដាលស្ទឹង",
+"code": "801",
+"slug": "kandal-stueng",
+"communes": [
+{
+"name": "Ampov Prey",
+"nameKm": "អំពៅព្រៃ",
+"code": "80101",
+"slug": "ampov-prey"
+},
+{
+"name": "Anlong Romiet",
+"nameKm": "អន្លង់រមៀត",
+"code": "80102",
+"slug": "anlong-romiet"
+},
+{
+"name": "Barku",
+"nameKm": "បារគូ",
+"code": "80103",
+"slug": "barku"
+},
+{
+"name": "Boeng Khyang",
+"nameKm": "បឹងខ្យាង",
+"code": "80104",
+"slug": "boeng-khyang"
+},
+{
+"name": "Cheung Kaeub",
+"nameKm": "ជើងកើប",
+"code": "80105",
+"slug": "cheung-kaeub"
+},
+{
+"name": "Daeum Rues",
+"nameKm": "ដើមឫស",
+"code": "80106",
+"slug": "daeum-rues"
+},
+{
+"name": "Kandaok",
+"nameKm": "កណ្ដោក",
+"code": "80107",
+"slug": "kandaok"
+},
+{
+"name": "Thmei",
+"nameKm": "ថ្មី",
+"code": "80108",
+"slug": "thmei"
+},
+{
+"name": "Kouk Trab",
+"nameKm": "គោកត្រប់",
+"code": "80109",
+"slug": "kouk-trab"
+},
+{
+"name": "Preah Putth",
+"nameKm": "ព្រះពុទ្ធ",
+"code": "80113",
+"slug": "preah-putth"
+},
+{
+"name": "Preaek Roka",
+"nameKm": "ព្រែករកា",
+"code": "80115",
+"slug": "preaek-roka"
+},
+{
+"name": "Preaek Slaeng",
+"nameKm": "ព្រែកស្លែង",
+"code": "80116",
+"slug": "preaek-slaeng"
+},
+{
+"name": "Roka",
+"nameKm": "រកា",
+"code": "80117",
+"slug": "roka"
+},
+{
+"name": "Roleang Kaen",
+"nameKm": "រលាំងកែន",
+"code": "80118",
+"slug": "roleang-kaen"
+},
+{
+"name": "Siem Reab",
+"nameKm": "សៀមរាប",
+"code": "80122",
+"slug": "siem-reab"
+},
+{
+"name": "Tbaeng",
+"nameKm": "ត្បែង",
+"code": "80125",
+"slug": "tbaeng"
+},
+{
+"name": "Trapeang Veaeng",
+"nameKm": "ត្រពាំងវែង",
+"code": "80127",
+"slug": "trapeang-veaeng"
+},
+{
+"name": "Trea",
+"nameKm": "ទ្រា",
+"code": "80128",
+"slug": "trea"
+}
+]
+},
+{
+"name": "Kien Svay",
+"nameKm": "កៀនស្វាយ",
+"code": "802",
+"slug": "kien-svay",
+"communes": [
+{
+"name": "Banteay Daek",
+"nameKm": "បន្ទាយដែក",
+"code": "80201",
+"slug": "banteay-daek"
+},
+{
+"name": "Chheu Teal",
+"nameKm": "ឈើទាល",
+"code": "80202",
+"slug": "chheu-teal"
+},
+{
+"name": "Dei Edth",
+"nameKm": "ដីឥដ្ឋ",
+"code": "80203",
+"slug": "dei-edth"
+},
+{
+"name": "Kampong Svay",
+"nameKm": "កំពង់ស្វាយ",
+"code": "80204",
+"slug": "kampong-svay"
+},
+{
+"name": "Kokir",
+"nameKm": "គគីរ",
+"code": "80206",
+"slug": "kokir"
+},
+{
+"name": "Kokir Thum",
+"nameKm": "គគីរធំ",
+"code": "80207",
+"slug": "kokir-thum"
+},
+{
+"name": "Phum Thum",
+"nameKm": "ភូមិធំ",
+"code": "80208",
+"slug": "phum-thum"
+},
+{
+"name": "Samraong Thum",
+"nameKm": "សំរោងធំ",
+"code": "80211",
+"slug": "samraong-thum"
+}
+]
+},
+{
+"name": "Khsach Kandal",
+"nameKm": "ខ្សាច់កណ្ដាល",
+"code": "803",
+"slug": "khsach-kandal",
+"communes": [
+{
+"name": "Chey Thum",
+"nameKm": "ជ័យធំ",
+"code": "80302",
+"slug": "chey-thum"
+},
+{
+"name": "Kampong Chamlang",
+"nameKm": "កំពង់ចំលង",
+"code": "80303",
+"slug": "kampong-chamlang"
+},
+{
+"name": "Kaoh Chouram",
+"nameKm": "កោះចូរ៉ាម",
+"code": "80304",
+"slug": "kaoh-chouram"
+},
+{
+"name": "Preah Prasab",
+"nameKm": "ព្រះប្រសប់",
+"code": "80306",
+"slug": "preah-prasab"
+},
+{
+"name": "Preaek Ta Meak",
+"nameKm": "ព្រែកតាមាក់",
+"code": "80310",
+"slug": "preaek-ta-meak"
+},
+{
+"name": "Puk Ruessei",
+"nameKm": "ពុកឫស្សី",
+"code": "80311",
+"slug": "puk-ruessei"
+},
+{
+"name": "Roka Chonlueng",
+"nameKm": "រកាជន្លឹង",
+"code": "80312",
+"slug": "roka-chonlueng"
+},
+{
+"name": "Sanlung",
+"nameKm": "សន្លុង",
+"code": "80313",
+"slug": "sanlung"
+},
+{
+"name": "Sithor",
+"nameKm": "ស៊ីធរ",
+"code": "80314",
+"slug": "sithor"
+},
+{
+"name": "Svay Romiet",
+"nameKm": "ស្វាយរមៀត",
+"code": "80316",
+"slug": "svay-romiet"
+},
+{
+"name": "Ta Aek",
+"nameKm": "តាឯក",
+"code": "80317",
+"slug": "ta-aek"
+},
+{
+"name": "Vihear Suork",
+"nameKm": "វិហារសួគ៌",
+"code": "80318",
+"slug": "vihear-suork"
+}
+]
+},
+{
+"name": "Kaoh Thum",
+"nameKm": "កោះធំ",
+"code": "804",
+"slug": "kaoh-thum",
+"communes": [
+{
+"name": "Kampong Kong",
+"nameKm": "កំពង់កុង",
+"code": "80403",
+"slug": "kampong-kong"
+},
+{
+"name": "Kaoh Thum Ka",
+"nameKm": "កោះធំ ‹ក›",
+"code": "80404",
+"slug": "kaoh-thum-ka"
+},
+{
+"name": "Kaoh Thum Kha",
+"nameKm": "កោះធំ ‹ខ›",
+"code": "80405",
+"slug": "kaoh-thum-kha"
+},
+{
+"name": "Leuk Daek",
+"nameKm": "លើកដែក",
+"code": "80407",
+"slug": "leuk-daek"
+},
+{
+"name": "Pouthi Ban",
+"nameKm": "ពោធិ៍បាន",
+"code": "80408",
+"slug": "pouthi-ban"
+},
+{
+"name": "Preaek Thmei",
+"nameKm": "ព្រែកថ្មី",
+"code": "80411",
+"slug": "preaek-thmei"
+}
+]
+},
+{
+"name": "Leuk Daek",
+"nameKm": "លើកដែក",
+"code": "805",
+"slug": "leuk-daek",
+"communes": [
+{
+"name": "Kampong Phnum",
+"nameKm": "កំពង់ភ្នំ",
+"code": "80501",
+"slug": "kampong-phnum"
+},
+{
+"name": "K'am Samnar",
+"nameKm": "ក្អមសំណរ",
+"code": "80502",
+"slug": "k-am-samnar"
+},
+{
+"name": "Khpob Ateav",
+"nameKm": "ខ្ពបអាទាវ",
+"code": "80503",
+"slug": "khpob-ateav"
+},
+{
+"name": "Peam Reang",
+"nameKm": "ពាមរាំង",
+"code": "80504",
+"slug": "peam-reang"
+},
+{
+"name": "Preaek Dach",
+"nameKm": "ព្រែកដាច់",
+"code": "80505",
+"slug": "preaek-dach"
+},
+{
+"name": "Preaek Tonloab",
+"nameKm": "ព្រែកទន្លាប់",
+"code": "80506",
+"slug": "preaek-tonloab"
+},
+{
+"name": "Sandar",
+"nameKm": "សណ្ដារ",
+"code": "80507",
+"slug": "sandar"
+}
+]
+},
+{
+"name": "Lvea Aem",
+"nameKm": "ល្វាឯម",
+"code": "806",
+"slug": "lvea-aem",
+"communes": [
+{
+"name": "Boeng Krum",
+"nameKm": "បឹងគ្រំ",
+"code": "80603",
+"slug": "boeng-krum"
+},
+{
+"name": "Kaoh Kaev",
+"nameKm": "កោះកែវ",
+"code": "80604",
+"slug": "kaoh-kaev"
+},
+{
+"name": "Kaoh Reah",
+"nameKm": "កោះរះ",
+"code": "80605",
+"slug": "kaoh-reah"
+},
+{
+"name": "Lvea Sar",
+"nameKm": "ល្វាសរ",
+"code": "80606",
+"slug": "lvea-sar"
+},
+{
+"name": "Phum Thum",
+"nameKm": "ភូមិធំ",
+"code": "80608",
+"slug": "phum-thum"
+},
+{
+"name": "Preaek Rey",
+"nameKm": "ព្រែករៃ",
+"code": "80610",
+"slug": "preaek-rey"
+},
+{
+"name": "Preaek Ruessei",
+"nameKm": "ព្រែកឫស្សី",
+"code": "80611",
+"slug": "preaek-ruessei"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "80612",
+"slug": "sambuor"
+},
+{
+"name": "Thma Kor",
+"nameKm": "ថ្មគរ",
+"code": "80614",
+"slug": "thma-kor"
+},
+{
+"name": "Tuek Khleang",
+"nameKm": "ទឹកឃ្លាំង",
+"code": "80615",
+"slug": "tuek-khleang"
+}
+]
+},
+{
+"name": "Mukh Kampul",
+"nameKm": "មុខកំពូល",
+"code": "807",
+"slug": "mukh-kampul",
+"communes": [
+{
+"name": "Preaek Anhchanh",
+"nameKm": "ព្រែកអញ្ចាញ",
+"code": "80703",
+"slug": "preaek-anhchanh"
+},
+{
+"name": "Preaek Dambang",
+"nameKm": "ព្រែកដំបង",
+"code": "80704",
+"slug": "preaek-dambang"
+},
+{
+"name": "Roka Kong Ti Muoy",
+"nameKm": "រកាកោង ទី ១",
+"code": "80707",
+"slug": "roka-kong-ti-muoy"
+},
+{
+"name": "Roka Kong Ti Pir",
+"nameKm": "រកាកោង ទី ២",
+"code": "80708",
+"slug": "roka-kong-ti-pir"
+},
+{
+"name": "Ruessei Chrouy",
+"nameKm": "ឫស្សីជ្រោយ",
+"code": "80709",
+"slug": "ruessei-chrouy"
+},
+{
+"name": "Sambuor Meas",
+"nameKm": "សំបួរមាស",
+"code": "80710",
+"slug": "sambuor-meas"
+},
+{
+"name": "Svay Ampear",
+"nameKm": "ស្វាយអំពារ",
+"code": "80711",
+"slug": "svay-ampear"
+}
+]
+},
+{
+"name": "Angk Snuol",
+"nameKm": "អង្គស្នួល",
+"code": "808",
+"slug": "angk-snuol",
+"communes": [
+{
+"name": "Baek Chan",
+"nameKm": "បែកចាន",
+"code": "80801",
+"slug": "baek-chan"
+},
+{
+"name": "Chhak Chheu Neang",
+"nameKm": "ឆក់ឈើនាង",
+"code": "80803",
+"slug": "chhak-chheu-neang"
+},
+{
+"name": "Damnak Ampil",
+"nameKm": "ដំណាក់អំពិល",
+"code": "80804",
+"slug": "damnak-ampil"
+},
+{
+"name": "Krang Mkak",
+"nameKm": "ក្រាំងម្កាក់",
+"code": "80807",
+"slug": "krang-mkak"
+},
+{
+"name": "Lumhach",
+"nameKm": "លំហាច",
+"code": "80808",
+"slug": "lumhach"
+},
+{
+"name": "Mkak",
+"nameKm": "ម្កាក់",
+"code": "80809",
+"slug": "mkak"
+},
+{
+"name": "Peuk",
+"nameKm": "ពើក",
+"code": "80811",
+"slug": "peuk"
+},
+{
+"name": "Prey Puoch",
+"nameKm": "ព្រៃពួច",
+"code": "80813",
+"slug": "prey-puoch"
+},
+{
+"name": "Samraong Leu",
+"nameKm": "សំរោងលើ",
+"code": "80814",
+"slug": "samraong-leu"
+},
+{
+"name": "Tuol Prech",
+"nameKm": "ទួលព្រេជ",
+"code": "80816",
+"slug": "tuol-prech"
+}
+]
+},
+{
+"name": "Ponhea Lueu",
+"nameKm": "ពញាឮ",
+"code": "809",
+"slug": "ponhea-lueu",
+"communes": [
+{
+"name": "Chhveang",
+"nameKm": "ឈ្វាំង",
+"code": "80901",
+"slug": "chhveang"
+},
+{
+"name": "Chrey Loas",
+"nameKm": "ជ្រៃលាស់",
+"code": "80902",
+"slug": "chrey-loas"
+},
+{
+"name": "Kampong Luong",
+"nameKm": "កំពង់ហ្លួង",
+"code": "80903",
+"slug": "kampong-luong"
+},
+{
+"name": "Kampong Os",
+"nameKm": "កំពង់អុស",
+"code": "80904",
+"slug": "kampong-os"
+},
+{
+"name": "Kaoh Chen",
+"nameKm": "កោះចិន",
+"code": "80905",
+"slug": "kaoh-chen"
+},
+{
+"name": "Phnum Bat",
+"nameKm": "ភ្នំបាត",
+"code": "80906",
+"slug": "phnum-bat"
+},
+{
+"name": "Ponhea Lueu",
+"nameKm": "ពញាឮ",
+"code": "80907",
+"slug": "ponhea-lueu"
+},
+{
+"name": "Preaek Ta Teaen",
+"nameKm": "ព្រែកតាទែន",
+"code": "80910",
+"slug": "preaek-ta-teaen"
+},
+{
+"name": "Phsar Daek",
+"nameKm": "ផ្សារដែក",
+"code": "80911",
+"slug": "phsar-daek"
+},
+{
+"name": "Tumnob Thum",
+"nameKm": "ទំនប់ធំ",
+"code": "80913",
+"slug": "tumnob-thum"
+},
+{
+"name": "Vihear Luong",
+"nameKm": "វិហារហ្លួង",
+"code": "80914",
+"slug": "vihear-luong"
+}
+]
+},
+{
+"name": "S'ang",
+"nameKm": "ស្អាង",
+"code": "810",
+"slug": "s-ang",
+"communes": [
+{
+"name": "Khpob",
+"nameKm": "ខ្ពប",
+"code": "81001",
+"slug": "khpob"
+},
+{
+"name": "Kaoh Khael",
+"nameKm": "កោះខែល",
+"code": "81003",
+"slug": "kaoh-khael"
+},
+{
+"name": "Kaoh Khsach Tonlea",
+"nameKm": "កោះខ្សាច់ទន្លា",
+"code": "81004",
+"slug": "kaoh-khsach-tonlea"
+},
+{
+"name": "Krang Yov",
+"nameKm": "ក្រាំងយ៉ូវ",
+"code": "81005",
+"slug": "krang-yov"
+},
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "81006",
+"slug": "prasat"
+},
+{
+"name": "Preaek Ambel",
+"nameKm": "ព្រែកអំបិល",
+"code": "81007",
+"slug": "preaek-ambel"
+},
+{
+"name": "Preaek Koy",
+"nameKm": "ព្រែកគយ",
+"code": "81008",
+"slug": "preaek-koy"
+},
+{
+"name": "S'ang Phnum",
+"nameKm": "ស្អាងភ្នំ",
+"code": "81010",
+"slug": "s-ang-phnum"
+},
+{
+"name": "Svay Prateal",
+"nameKm": "ស្វាយប្រទាល",
+"code": "81012",
+"slug": "svay-prateal"
+},
+{
+"name": "Ta Lon",
+"nameKm": "តាលន់",
+"code": "81014",
+"slug": "ta-lon"
+},
+{
+"name": "Traeuy Sla",
+"nameKm": "ត្រើយស្លា",
+"code": "81015",
+"slug": "traeuy-sla"
+},
+{
+"name": "Tuek Vil",
+"nameKm": "ទឹកវិល",
+"code": "81016",
+"slug": "tuek-vil"
+}
+]
+},
+{
+"name": "Ta Khmau",
+"nameKm": "តាខ្មៅ",
+"code": "811",
+"slug": "ta-khmau",
+"communes": [
+{
+"name": "Ta Kdol",
+"nameKm": "តាក្ដុល",
+"code": "81101",
+"slug": "ta-kdol"
+},
+{
+"name": "Prek Ruessey",
+"nameKm": "ព្រែកឫស្សី",
+"code": "81102",
+"slug": "prek-ruessey"
+},
+{
+"name": "Doeum Mien",
+"nameKm": "ដើមមៀន",
+"code": "81103",
+"slug": "doeum-mien"
+},
+{
+"name": "Ta Khmao",
+"nameKm": "តាខ្មៅ",
+"code": "81104",
+"slug": "ta-khmao"
+},
+{
+"name": "Prek Ho",
+"nameKm": "ព្រែកហូរ",
+"code": "81105",
+"slug": "prek-ho"
+},
+{
+"name": "Kampong Samnanh",
+"nameKm": "កំពង់សំណាញ់",
+"code": "81106",
+"slug": "kampong-samnanh"
+},
+{
+"name": "Svay Rolum",
+"nameKm": "ស្វាយរលំ",
+"code": "81107",
+"slug": "svay-rolum"
+},
+{
+"name": "Kaoh Anlong Chen",
+"nameKm": "កោះអន្លង់ចិន",
+"code": "81108",
+"slug": "kaoh-anlong-chen"
+},
+{
+"name": "Setbou",
+"nameKm": "សិត្បូ",
+"code": "81109",
+"slug": "setbou"
+},
+{
+"name": "Roka Khpos",
+"nameKm": "រកាខ្ពស់",
+"code": "81110",
+"slug": "roka-khpos"
+}
+]
+},
+{
+"name": "Sampeou Poun",
+"nameKm": "សំពៅពូន",
+"code": "812",
+"slug": "sampeou-poun",
+"communes": [
+{
+"name": "Chheu Kmau",
+"nameKm": "ឈើខ្មៅ",
+"code": "81201",
+"slug": "chheu-kmau"
+},
+{
+"name": "Prea​ek Chrey",
+"nameKm": "ព្រែកជ្រៃ",
+"code": "81202",
+"slug": "preaek-chrey"
+},
+{
+"name": "Preaek Sdei",
+"nameKm": "ព្រែកស្ដី",
+"code": "81203",
+"slug": "preaek-sdei"
+},
+{
+"name": "Chrouy Ta Kaev",
+"nameKm": "ជ្រោយតាកែវ",
+"code": "81204",
+"slug": "chrouy-ta-kaev"
+},
+{
+"name": "Sampeou Poun",
+"nameKm": "សំពៅពូន",
+"code": "81205",
+"slug": "sampeou-poun"
+}
+]
+},
+{
+"name": "Akreiy Ksatr",
+"nameKm": "អរិយក្សត្រ",
+"code": "813",
+"slug": "akreiy-ksatr",
+"communes": [
+{
+"name": "Bak Dav",
+"nameKm": "បាក់ដាវ",
+"code": "81301",
+"slug": "bak-dav"
+},
+{
+"name": "Kaoh Oknha Tei",
+"nameKm": "កោះឧកញ៉ាតី",
+"code": "81302",
+"slug": "kaoh-oknha-tei"
+},
+{
+"name": "Preaek Ampil",
+"nameKm": "ព្រែកអំពិល",
+"code": "81303",
+"slug": "preaek-ampil"
+},
+{
+"name": "Preaek Luong",
+"nameKm": "ព្រែកលួង",
+"code": "81304",
+"slug": "preaek-luong"
+},
+{
+"name": "Preaek Ta kov",
+"nameKm": "ព្រែកតាកូវ",
+"code": "81305",
+"slug": "preaek-ta-kov"
+},
+{
+"name": "Svay Chrum",
+"nameKm": "ស្វាយជ្រំ",
+"code": "81306",
+"slug": "svay-chrum"
+},
+{
+"name": "Akreiy Ksatr",
+"nameKm": "អរិយក្សត្រ",
+"code": "81307",
+"slug": "akreiy-ksatr"
+},
+{
+"name": "Sarikakaev",
+"nameKm": "សារិកាកែវ",
+"code": "81308",
+"slug": "sarikakaev"
+},
+{
+"name": "Peam Oknha Ong",
+"nameKm": "ពាមឧកញ៉ាអុង",
+"code": "81309",
+"slug": "peam-oknha-ong"
+},
+{
+"name": "Preaek Kmeng",
+"nameKm": "ព្រែកក្មេង",
+"code": "81310",
+"slug": "preaek-kmeng"
+},
+{
+"name": "Barong",
+"nameKm": "បារុង",
+"code": "81311",
+"slug": "barong"
+}
+]
+}
+]
+},
+{
+"key": "kep",
+"slug": "kep",
+"name": "Kep",
+"nameKm": "កែប",
+"code": "23",
+"districts": [
+{
+"name": "Damnak Chang'aeur",
+"nameKm": "ដំណាក់ចង្អើរ",
+"code": "2301",
+"slug": "damnak-chang-aeur",
+"communes": [
+{
+"name": "Angkaol",
+"nameKm": "អង្កោល",
+"code": "230101",
+"slug": "angkaol"
+},
+{
+"name": "Pong Tuek",
+"nameKm": "ពងទឹក",
+"code": "230103",
+"slug": "pong-tuek"
+}
+]
+},
+{
+"name": "Kaeb",
+"nameKm": "កែប",
+"code": "2302",
+"slug": "kep",
+"communes": [
+{
+"name": "Kaeb",
+"nameKm": "កែប",
+"code": "230201",
+"slug": "kaeb"
+},
+{
+"name": "Prey Thum",
+"nameKm": "ព្រៃធំ",
+"code": "230202",
+"slug": "prey-thum"
+},
+{
+"name": "Ou Krasar",
+"nameKm": "អូរក្រសារ",
+"code": "230203",
+"slug": "ou-krasar"
+}
+],
+"legacySlug": true
+}
+]
+},
+{
+"key": "koh_kong",
+"slug": "koh-kong",
+"name": "Koh Kong",
+"nameKm": "កោះកុង",
+"code": "09",
+"districts": [
+{
+"name": "Botum Sakor",
+"nameKm": "បុទុមសាគរ",
+"code": "901",
+"slug": "botum-sakor",
+"communes": [
+{
+"name": "Andoung Tuek",
+"nameKm": "អណ្ដូងទឹក",
+"code": "90101",
+"slug": "andoung-tuek"
+},
+{
+"name": "Kandaol",
+"nameKm": "កណ្ដោល",
+"code": "90102",
+"slug": "kandaol"
+},
+{
+"name": "Ta Noun",
+"nameKm": "តានូន",
+"code": "90103",
+"slug": "ta-noun"
+},
+{
+"name": "Thma Sa",
+"nameKm": "ថ្មស",
+"code": "90104",
+"slug": "thma-sa"
+}
+]
+},
+{
+"name": "Kiri Sakor",
+"nameKm": "គិរីសាគរ",
+"code": "902",
+"slug": "kiri-sakor",
+"communes": [
+{
+"name": "Kaoh Sdach",
+"nameKm": "កោះស្ដេច",
+"code": "90201",
+"slug": "kaoh-sdach"
+},
+{
+"name": "Phnhi Meas",
+"nameKm": "ភ្ញីមាស",
+"code": "90202",
+"slug": "phnhi-meas"
+},
+{
+"name": "Preaek Khsach",
+"nameKm": "ព្រែកខ្សាច់",
+"code": "90203",
+"slug": "preaek-khsach"
+}
+]
+},
+{
+"name": "Kaoh Kong",
+"nameKm": "កោះកុង",
+"code": "903",
+"slug": "kaoh-kong",
+"communes": [
+{
+"name": "Chrouy Pras",
+"nameKm": "ជ្រោយប្រស់",
+"code": "90301",
+"slug": "chrouy-pras"
+},
+{
+"name": "Kaoh Kapi",
+"nameKm": "កោះកាពិ",
+"code": "90302",
+"slug": "kaoh-kapi"
+},
+{
+"name": "Ta Tai Kraom",
+"nameKm": "តាតៃក្រោម",
+"code": "90303",
+"slug": "ta-tai-kraom"
+},
+{
+"name": "Trapeang Rung",
+"nameKm": "ត្រពាំងរូង",
+"code": "90304",
+"slug": "trapeang-rung"
+}
+]
+},
+{
+"name": "Khemara Phoumin",
+"nameKm": "ខេមរភូមិន្ទ",
+"code": "904",
+"slug": "khemarak-phoumin",
+"communes": [
+{
+"name": "Smach Mean Chey",
+"nameKm": "ស្មាច់មានជ័យ",
+"code": "90401",
+"slug": "smach-mean-chey"
+},
+{
+"name": "Dang Tong",
+"nameKm": "ដងទង់",
+"code": "90402",
+"slug": "dang-tong"
+},
+{
+"name": "Stueng Veaeng",
+"nameKm": "ស្ទឹងវែង",
+"code": "90403",
+"slug": "stueng-veaeng"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Mondol Seima",
+"nameKm": "មណ្ឌលសីមា",
+"code": "905",
+"slug": "mondol-seima",
+"communes": [
+{
+"name": "Pak Khlang",
+"nameKm": "ប៉ាក់ខ្លង",
+"code": "90501",
+"slug": "pak-khlang"
+},
+{
+"name": "Peam Krasaob",
+"nameKm": "ពាមក្រសោប",
+"code": "90502",
+"slug": "peam-krasaob"
+},
+{
+"name": "Tuol Kokir",
+"nameKm": "ទួលគគីរ",
+"code": "90503",
+"slug": "tuol-kokir"
+}
+]
+},
+{
+"name": "Srae Ambel",
+"nameKm": "ស្រែ អំបិល",
+"code": "906",
+"slug": "srae-ambel",
+"communes": [
+{
+"name": "Boeng Preav",
+"nameKm": "បឹងព្រាវ",
+"code": "90601",
+"slug": "boeng-preav"
+},
+{
+"name": "Chi Kha Kraom",
+"nameKm": "ជី ខ ក្រោម",
+"code": "90602",
+"slug": "chi-kha-kraom"
+},
+{
+"name": "Chi kha Leu",
+"nameKm": "ជី ខ លើ",
+"code": "90603",
+"slug": "chi-kha-leu"
+},
+{
+"name": "Chrouy Svay",
+"nameKm": "ជ្រោយស្វាយ",
+"code": "90604",
+"slug": "chrouy-svay"
+},
+{
+"name": "Dang Peaeng",
+"nameKm": "ដងពែង",
+"code": "90605",
+"slug": "dang-peaeng"
+},
+{
+"name": "Srae Ambel",
+"nameKm": "ស្រែអំបិល",
+"code": "90606",
+"slug": "srae-ambel"
+}
+]
+},
+{
+"name": "Thma Bang",
+"nameKm": "ថ្មបាំង",
+"code": "907",
+"slug": "thma-bang",
+"communes": [
+{
+"name": "Ta Tey Leu",
+"nameKm": "តាទៃលើ",
+"code": "90701",
+"slug": "ta-tey-leu"
+},
+{
+"name": "Pralay",
+"nameKm": "ប្រឡាយ",
+"code": "90702",
+"slug": "pralay"
+},
+{
+"name": "Chumnoab",
+"nameKm": "ជំនាប់",
+"code": "90703",
+"slug": "chumnoab"
+},
+{
+"name": "Ruessei Chrum",
+"nameKm": "ឫស្សីជ្រុំ",
+"code": "90704",
+"slug": "ruessei-chrum"
+},
+{
+"name": "Chi Phat",
+"nameKm": "ជីផាត",
+"code": "90705",
+"slug": "chi-phat"
+},
+{
+"name": "Thma Doun Pov",
+"nameKm": "ថ្មដូនពៅ",
+"code": "90706",
+"slug": "thma-doun-pov"
+}
+]
+}
+]
+},
+{
+"key": "kratie",
+"slug": "kratie",
+"name": "Kratie",
+"nameKm": "ក្រចេះ",
+"code": "10",
+"districts": [
+{
+"name": "Chhloung",
+"nameKm": "ឆ្លូង",
+"code": "1001",
+"slug": "chhloung",
+"communes": [
+{
+"name": "Chhloung",
+"nameKm": "ឆ្លូង",
+"code": "100101",
+"slug": "chhloung"
+},
+{
+"name": "Damrei Phong",
+"nameKm": "ដំរីផុង",
+"code": "100102",
+"slug": "damrei-phong"
+},
+{
+"name": "Han Chey",
+"nameKm": "ហាន់ជ័យ",
+"code": "100103",
+"slug": "han-chey"
+},
+{
+"name": "Kampong Damrei",
+"nameKm": "កំពង់ដំរី",
+"code": "100104",
+"slug": "kampong-damrei"
+},
+{
+"name": "Kanhchor",
+"nameKm": "កញ្ជរ",
+"code": "100105",
+"slug": "kanhchor"
+},
+{
+"name": "Khsach Andeth",
+"nameKm": "ខ្សាច់អណ្ដែត",
+"code": "100106",
+"slug": "khsach-andeth"
+},
+{
+"name": "Pongro",
+"nameKm": "ពង្រ",
+"code": "100107",
+"slug": "pongro"
+},
+{
+"name": "Preaek Saman",
+"nameKm": "ព្រែកសាម៉ាន់",
+"code": "100108",
+"slug": "preaek-saman"
+}
+]
+},
+{
+"name": "Kracheh",
+"nameKm": "ក្រចេះ",
+"code": "1002",
+"slug": "kratie",
+"communes": [
+{
+"name": "Kaoh Trong",
+"nameKm": "កោះទ្រង់",
+"code": "100207",
+"slug": "kaoh-trong"
+},
+{
+"name": "Krakor",
+"nameKm": "ក្រគរ",
+"code": "100208",
+"slug": "krakor"
+},
+{
+"name": "Kracheh",
+"nameKm": "ក្រចេះ",
+"code": "100209",
+"slug": "kracheh"
+},
+{
+"name": "Ou Ruessei",
+"nameKm": "អូរឫស្សី",
+"code": "100210",
+"slug": "ou-ruessei"
+},
+{
+"name": "Roka Kandal",
+"nameKm": "រកាកណ្ដាល",
+"code": "100211",
+"slug": "roka-kandal"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Prek Prasab",
+"nameKm": "ព្រែកប្រសព្វ",
+"code": "1003",
+"slug": "prek-prasab",
+"communes": [
+{
+"name": "Chambâk",
+"nameKm": "ចំបក់",
+"code": "100301",
+"slug": "chambak"
+},
+{
+"name": "Chrouy Banteay",
+"nameKm": "ជ្រោយបន្ទាយ",
+"code": "100302",
+"slug": "chrouy-banteay"
+},
+{
+"name": "Kampong Kor",
+"nameKm": "កំពង់គរ",
+"code": "100303",
+"slug": "kampong-kor"
+},
+{
+"name": "Koh Ta Suy",
+"nameKm": "កោះតាស៊ុយ",
+"code": "100304",
+"slug": "koh-ta-suy"
+},
+{
+"name": "Preaek Prasab",
+"nameKm": "ព្រែកប្រសព្វ",
+"code": "100305",
+"slug": "preaek-prasab"
+},
+{
+"name": "Russey Keo",
+"nameKm": "ឫស្សីកែវ",
+"code": "100306",
+"slug": "russey-keo"
+},
+{
+"name": "Saob",
+"nameKm": "សោប",
+"code": "100307",
+"slug": "saob"
+},
+{
+"name": "Ta Mao",
+"nameKm": "តាម៉ៅ",
+"code": "100308",
+"slug": "ta-mao"
+}
+]
+},
+{
+"name": "Sambour",
+"nameKm": "សំបូរ",
+"code": "1004",
+"slug": "sambour",
+"communes": [
+{
+"name": "Boeng Char",
+"nameKm": "បឹងចារ",
+"code": "100401",
+"slug": "boeng-char"
+},
+{
+"name": "Kampong Cham",
+"nameKm": "កំពង់ចាម",
+"code": "100402",
+"slug": "kampong-cham"
+},
+{
+"name": "Kaoh Khnhaer",
+"nameKm": "កោះខ្ញែរ",
+"code": "100404",
+"slug": "kaoh-khnhaer"
+},
+{
+"name": "Sambour",
+"nameKm": "សំបូរ",
+"code": "100407",
+"slug": "sambour"
+},
+{
+"name": "Sandan",
+"nameKm": "សណ្ដាន់",
+"code": "100408",
+"slug": "sandan"
+},
+{
+"name": "Voadthonak",
+"nameKm": "វឌ្ឍនៈ",
+"code": "100410",
+"slug": "voadthonak"
+}
+]
+},
+{
+"name": "Snuol",
+"nameKm": "ស្នួល",
+"code": "1005",
+"slug": "snuol",
+"communes": [
+{
+"name": "Khsuem",
+"nameKm": "ឃ្សឹម",
+"code": "100501",
+"slug": "khsuem"
+},
+{
+"name": "Pir Thnu",
+"nameKm": "ពីរធ្នូ",
+"code": "100502",
+"slug": "pir-thnu"
+},
+{
+"name": "Snuol",
+"nameKm": "ស្នួល",
+"code": "100503",
+"slug": "snuol"
+},
+{
+"name": "Srae Char",
+"nameKm": "ស្រែចារ",
+"code": "100504",
+"slug": "srae-char"
+},
+{
+"name": "Svay Chreah",
+"nameKm": "ស្វាយជ្រះ",
+"code": "100505",
+"slug": "svay-chreah"
+},
+{
+"name": "Kronhoung Saen Chey",
+"nameKm": "គ្រញូងសែនជ័យ",
+"code": "100506",
+"slug": "kronhoung-saen-chey"
+}
+]
+},
+{
+"name": "Chetr Borei",
+"nameKm": "ចិត្របុរី",
+"code": "1006",
+"slug": "chetr-borei",
+"communes": [
+{
+"name": "Bos Leav",
+"nameKm": "បុសលាវ",
+"code": "100601",
+"slug": "bos-leav"
+},
+{
+"name": "Changkrang",
+"nameKm": "ចង្ក្រង់",
+"code": "100602",
+"slug": "changkrang"
+},
+{
+"name": "Dar",
+"nameKm": "ដារ",
+"code": "100603",
+"slug": "dar"
+},
+{
+"name": "Kantuot",
+"nameKm": "កន្ទួត",
+"code": "100604",
+"slug": "kantuot"
+},
+{
+"name": "Kou Loab",
+"nameKm": "គោលាប់",
+"code": "100605",
+"slug": "kou-loab"
+},
+{
+"name": "Kaoh Chraeng",
+"nameKm": "កោះច្រែង",
+"code": "100606",
+"slug": "kaoh-chraeng"
+},
+{
+"name": "Sambok",
+"nameKm": "សំបុក",
+"code": "100607",
+"slug": "sambok"
+},
+{
+"name": "Thma Andaeuk",
+"nameKm": "ថ្មអណ្ដើក",
+"code": "100608",
+"slug": "thma-andaeuk"
+},
+{
+"name": "Thma Kreae",
+"nameKm": "ថ្មគ្រែ",
+"code": "100609",
+"slug": "thma-kreae"
+},
+{
+"name": "Thmei",
+"nameKm": "ថ្មី",
+"code": "100610",
+"slug": "thmei"
+}
+]
+},
+{
+"name": "Or Krieng Saenchay",
+"nameKm": "អូរគ្រៀងសែនជ័យ",
+"code": "1007",
+"slug": "or-krieng-saenchay",
+"communes": [
+{
+"name": "Kbal Damrei",
+"nameKm": "ក្បាលដំរី",
+"code": "100701",
+"slug": "kbal-damrei"
+},
+{
+"name": "Ou Krieng",
+"nameKm": "អូរគ្រៀង",
+"code": "100702",
+"slug": "ou-krieng"
+},
+{
+"name": "Oukondear Senchey",
+"nameKm": "អូរកណ្តៀរសែនជ័យ",
+"code": "100703",
+"slug": "oukondear-senchey"
+},
+{
+"name": "Roluos Mean Chey",
+"nameKm": "រលួសមានជ័យ",
+"code": "100704",
+"slug": "roluos-mean-chey"
+},
+{
+"name": "Srae Chis",
+"nameKm": "ស្រែជិះ",
+"code": "100705",
+"slug": "srae-chis"
+}
+]
+}
+]
+},
+{
+"key": "mondul_kiri",
+"slug": "mondulkiri",
+"name": "Mondulkiri",
+"nameKm": "មណ្ឌលគិរី",
+"code": "11",
+"districts": [
+{
+"name": "Kaev Seima",
+"nameKm": "កែវសីមា",
+"code": "1101",
+"slug": "kaev-seima",
+"communes": [
+{
+"name": "Chong Phlah",
+"nameKm": "ចុងផ្លាស់",
+"code": "110101",
+"slug": "chong-phlah"
+},
+{
+"name": "Memang",
+"nameKm": "មេម៉ង់",
+"code": "110102",
+"slug": "memang"
+},
+{
+"name": "Srae Chhuk",
+"nameKm": "ស្រែឈូក",
+"code": "110103",
+"slug": "srae-chhuk"
+},
+{
+"name": "Srae Khtum",
+"nameKm": "ស្រែខ្ទុម",
+"code": "110104",
+"slug": "srae-khtum"
+},
+{
+"name": "Srae Preah",
+"nameKm": "ស្រែព្រះ",
+"code": "110105",
+"slug": "srae-preah"
+}
+]
+},
+{
+"name": "Kaoh Nheaek",
+"nameKm": "កោះញែក",
+"code": "1102",
+"slug": "kaoh-nheaek",
+"communes": [
+{
+"name": "Nang Khi Lik",
+"nameKm": "ណងឃីលិក",
+"code": "110201",
+"slug": "nang-khi-lik"
+},
+{
+"name": "A Buon Leu",
+"nameKm": "អ បួនលើ",
+"code": "110202",
+"slug": "a-buon-leu"
+},
+{
+"name": "Roya",
+"nameKm": "រយ៉",
+"code": "110203",
+"slug": "roya"
+},
+{
+"name": "Sokh Sant",
+"nameKm": "សុខសាន្ដ",
+"code": "110204",
+"slug": "sokh-sant"
+},
+{
+"name": "Srae Huy",
+"nameKm": "ស្រែហ៊ុយ",
+"code": "110205",
+"slug": "srae-huy"
+},
+{
+"name": "Srae Sangkum",
+"nameKm": "ស្រែសង្គម",
+"code": "110206",
+"slug": "srae-sangkum"
+}
+]
+},
+{
+"name": "Ou Reang",
+"nameKm": "អូររាំង",
+"code": "1103",
+"slug": "ou-reang",
+"communes": [
+{
+"name": "Dak Dam",
+"nameKm": "ដាក់ដាំ",
+"code": "110301",
+"slug": "dak-dam"
+},
+{
+"name": "Saen Monourom",
+"nameKm": "សែនមនោរម្យ",
+"code": "110302",
+"slug": "saen-monourom"
+}
+]
+},
+{
+"name": "Pech Chreada",
+"nameKm": "ពេជ្រាដា",
+"code": "1104",
+"slug": "pech-chreada",
+"communes": [
+{
+"name": "Krang Teh",
+"nameKm": "ក្រង់តេះ",
+"code": "110401",
+"slug": "krang-teh"
+},
+{
+"name": "Pu Chrey",
+"nameKm": "ពូជ្រៃ",
+"code": "110402",
+"slug": "pu-chrey"
+},
+{
+"name": "Srae Ampum",
+"nameKm": "ស្រែអំពូម",
+"code": "110403",
+"slug": "srae-ampum"
+},
+{
+"name": "Bu Sra",
+"nameKm": "ប៊ូស្រា",
+"code": "110404",
+"slug": "bu-sra"
+}
+]
+},
+{
+"name": "Saen Monourom",
+"nameKm": "សែនមនោរម្យ",
+"code": "1105",
+"slug": "saen-monourom",
+"communes": [
+{
+"name": "Monourom",
+"nameKm": "មនោរម្យ",
+"code": "110501",
+"slug": "monourom"
+},
+{
+"name": "Sokh Dom",
+"nameKm": "សុខដុម",
+"code": "110502",
+"slug": "sokh-dom"
+},
+{
+"name": "Spean Mean Chey",
+"nameKm": "ស្ពានមានជ័យ",
+"code": "110503",
+"slug": "spean-mean-chey"
+},
+{
+"name": "Romonea",
+"nameKm": "រមនា",
+"code": "110504",
+"slug": "romonea"
+}
+]
+}
+]
+},
+{
+"key": "oddar_meanchey",
+"slug": "oddar-meanchey",
+"name": "Oddar Meanchey",
+"nameKm": "ឧត្ដរមានជ័យ",
+"code": "22",
+"districts": [
+{
+"name": "Anlong Veaeng",
+"nameKm": "អន្លង់វែង",
+"code": "2201",
+"slug": "anlong-veaeng",
+"communes": [
+{
+"name": "Anlong Veaeng",
+"nameKm": "អន្លង់វែង",
+"code": "220101",
+"slug": "anlong-veaeng"
+},
+{
+"name": "Trapeang Tav",
+"nameKm": "ត្រពាំងតាវ",
+"code": "220103",
+"slug": "trapeang-tav"
+},
+{
+"name": "Trapeang Prei",
+"nameKm": "ត្រពាំងប្រីយ៍",
+"code": "220104",
+"slug": "trapeang-prei"
+},
+{
+"name": "Thlat",
+"nameKm": "ថ្លាត",
+"code": "220105",
+"slug": "thlat"
+},
+{
+"name": "Lumtong",
+"nameKm": "លំទង",
+"code": "220106",
+"slug": "lumtong"
+}
+]
+},
+{
+"name": "Banteay Ampil",
+"nameKm": "បន្ទាយអំពិល",
+"code": "2202",
+"slug": "banteay-ampil",
+"communes": [
+{
+"name": "Ampil",
+"nameKm": "អំពិល",
+"code": "220201",
+"slug": "ampil"
+},
+{
+"name": "Beng",
+"nameKm": "បេង",
+"code": "220202",
+"slug": "beng"
+},
+{
+"name": "Kouk Khpos",
+"nameKm": "គោកខ្ពស់",
+"code": "220203",
+"slug": "kouk-khpos"
+},
+{
+"name": "Kouk Mon",
+"nameKm": "គោកមន",
+"code": "220204",
+"slug": "kouk-mon"
+}
+]
+},
+{
+"name": "Chong Kal",
+"nameKm": "ចុងកាល់",
+"code": "2203",
+"slug": "chong-kal",
+"communes": [
+{
+"name": "Cheung Tien",
+"nameKm": "ជើងទៀន",
+"code": "220301",
+"slug": "cheung-tien"
+},
+{
+"name": "Chong Kal",
+"nameKm": "ចុងកាល់",
+"code": "220302",
+"slug": "chong-kal"
+},
+{
+"name": "Krasang",
+"nameKm": "ក្រសាំង",
+"code": "220303",
+"slug": "krasang"
+},
+{
+"name": "Pongro",
+"nameKm": "ពង្រ",
+"code": "220304",
+"slug": "pongro"
+}
+]
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "2204",
+"slug": "samraong",
+"communes": [
+{
+"name": "Bansay Reak",
+"nameKm": "បន្សាយរាក់",
+"code": "220401",
+"slug": "bansay-reak"
+},
+{
+"name": "Bos Sbov",
+"nameKm": "បុស្បូវ",
+"code": "220402",
+"slug": "bos-sbov"
+},
+{
+"name": "Koun Kriel",
+"nameKm": "កូនក្រៀល",
+"code": "220403",
+"slug": "koun-kriel"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "220404",
+"slug": "samraong"
+},
+{
+"name": "Ou Smach",
+"nameKm": "អូរស្មាច់",
+"code": "220405",
+"slug": "ou-smach"
+}
+]
+},
+{
+"name": "Trapeang Prasat",
+"nameKm": "ត្រពាំងប្រាសាទ",
+"code": "2205",
+"slug": "trapeang-prasat",
+"communes": [
+{
+"name": "Bak Anloung",
+"nameKm": "បាក់អន្លូង",
+"code": "220501",
+"slug": "bak-anloung"
+},
+{
+"name": "Ph'av",
+"nameKm": "ផ្អាវ",
+"code": "220502",
+"slug": "ph-av"
+},
+{
+"name": "Ou Svay",
+"nameKm": "អូរស្វាយ",
+"code": "220503",
+"slug": "ou-svay"
+},
+{
+"name": "Preah Pralay",
+"nameKm": "ព្រះប្រឡាយ",
+"code": "220504",
+"slug": "preah-pralay"
+},
+{
+"name": "Tumnob Dach",
+"nameKm": "ទំនប់ដាច់",
+"code": "220505",
+"slug": "tumnob-dach"
+},
+{
+"name": "Trapeang Prasat",
+"nameKm": "ត្រពាំងប្រាសាទ",
+"code": "220506",
+"slug": "trapeang-prasat"
+}
+]
+}
+]
+},
+{
+"key": "pailin",
+"slug": "pailin",
+"name": "Pailin",
+"nameKm": "ប៉ៃលិន",
+"code": "24",
+"districts": [
+{
+"name": "Pailin",
+"nameKm": "ប៉ៃលិន",
+"code": "2401",
+"slug": "pailin",
+"communes": [
+{
+"name": "Pailin",
+"nameKm": "ប៉ៃលិន",
+"code": "240101",
+"slug": "pailin"
+},
+{
+"name": "Ou Ta Vau",
+"nameKm": "អូរតាវ៉ៅ",
+"code": "240102",
+"slug": "ou-ta-vau"
+},
+{
+"name": "Tuol Lvea",
+"nameKm": "ទួលល្វា",
+"code": "240103",
+"slug": "tuol-lvea"
+},
+{
+"name": "Bar Yakha",
+"nameKm": "បរយ៉ាខា",
+"code": "240104",
+"slug": "bar-yakha"
+}
+]
+},
+{
+"name": "Sala Krau",
+"nameKm": "សាលាក្រៅ",
+"code": "2402",
+"slug": "sala-krau",
+"communes": [
+{
+"name": "Sala Krau",
+"nameKm": "សាលាក្រៅ",
+"code": "240201",
+"slug": "sala-krau"
+},
+{
+"name": "Stueng Trang",
+"nameKm": "ស្ទឹងត្រង់",
+"code": "240202",
+"slug": "stueng-trang"
+},
+{
+"name": "Stueng Kach",
+"nameKm": "ស្ទឹងកាច់",
+"code": "240203",
+"slug": "stueng-kach"
+},
+{
+"name": "Ou Andoung",
+"nameKm": "អូរអណ្ដូង",
+"code": "240204",
+"slug": "ou-andoung"
+}
+]
+}
+]
+},
+{
+"key": "phnom_penh",
+"slug": "phnom-penh",
+"name": "Phnom Penh",
+"nameKm": "ភ្នំពេញ",
+"code": "12",
+"districts": [
+{
+"name": "Chamkar Mon",
+"nameKm": "ចំការមន",
+"code": "1201",
+"slug": "chamkar-mon",
+"communes": [
+{
+"name": "Tonle Basak",
+"nameKm": "ទន្លេបាសាក់",
+"code": "120101",
+"slug": "tonle-basak"
+},
+{
+"name": "Tuol Tumpung Ti Pir",
+"nameKm": "ទួលទំពូងទី ២",
+"code": "120109",
+"slug": "tuol-tumpung-ti-pir"
+},
+{
+"name": "Tuol Tumpung Ti Muoy",
+"nameKm": "ទួលទំពូងទី ១",
+"code": "120110",
+"slug": "tuol-tumpung-ti-muoy"
+},
+{
+"name": "Boeng Trabaek",
+"nameKm": "បឹងត្របែក",
+"code": "120111",
+"slug": "boeng-trabaek"
+},
+{
+"name": "Phsar Daeum Thkov",
+"nameKm": "ផ្សារដើមថ្កូវ",
+"code": "120112",
+"slug": "phsar-daeum-thkov"
+}
+]
+},
+{
+"name": "Doun Penh",
+"nameKm": "ដូនពេញ",
+"code": "1202",
+"slug": "doun-penh",
+"communes": [
+{
+"name": "Phsar Thmei Ti Muoy",
+"nameKm": "ផ្សារថ្មីទី ១",
+"code": "120201",
+"slug": "phsar-thmei-ti-muoy"
+},
+{
+"name": "Phsar Thmei Ti Pir",
+"nameKm": "ផ្សារថ្មីទី ២",
+"code": "120202",
+"slug": "phsar-thmei-ti-pir"
+},
+{
+"name": "Phsar Thmei Ti Bei",
+"nameKm": "ផ្សារថ្មីទី ៣",
+"code": "120203",
+"slug": "phsar-thmei-ti-bei"
+},
+{
+"name": "Boeng Reang",
+"nameKm": "បឹងរាំង",
+"code": "120204",
+"slug": "boeng-reang"
+},
+{
+"name": "Phsar Kandal Ti Muoy",
+"nameKm": "ផ្សារកណ្ដាលទី១",
+"code": "120205",
+"slug": "phsar-kandal-ti-muoy"
+},
+{
+"name": "Phsar Kandal Ti Pir",
+"nameKm": "ផ្សារកណ្ដាលទី២",
+"code": "120206",
+"slug": "phsar-kandal-ti-pir"
+},
+{
+"name": "Chakto Mukh",
+"nameKm": "ចតុមុខ",
+"code": "120207",
+"slug": "chakto-mukh"
+},
+{
+"name": "Chey Chummeah",
+"nameKm": "ជ័យជំនះ",
+"code": "120208",
+"slug": "chey-chummeah"
+},
+{
+"name": "Phsar Chas",
+"nameKm": "ផ្សារចាស់",
+"code": "120209",
+"slug": "phsar-chas"
+},
+{
+"name": "Srah Chak",
+"nameKm": "ស្រះចក",
+"code": "120210",
+"slug": "srah-chak"
+},
+{
+"name": "Voat Phnum",
+"nameKm": "វត្ដភ្នំ",
+"code": "120211",
+"slug": "voat-phnum"
+}
+]
+},
+{
+"name": "Prampir Meakkakra",
+"nameKm": "៧មករា",
+"code": "1203",
+"slug": "prampir-meakkakra",
+"communes": [
+{
+"name": "Ou Ruessei Ti Muoy",
+"nameKm": "អូរឫស្សីទី ១",
+"code": "120301",
+"slug": "ou-ruessei-ti-muoy"
+},
+{
+"name": "Ou Ruessei Ti Pir",
+"nameKm": "អូរឫស្សីទី ២",
+"code": "120302",
+"slug": "ou-ruessei-ti-pir"
+},
+{
+"name": "Ou Ruessei Ti Bei",
+"nameKm": "អូរឫស្សីទី ៣",
+"code": "120303",
+"slug": "ou-ruessei-ti-bei"
+},
+{
+"name": "Ou Ruessei Ti Buon",
+"nameKm": "អូរឫស្សីទី ៤",
+"code": "120304",
+"slug": "ou-ruessei-ti-buon"
+},
+{
+"name": "Monourom",
+"nameKm": "មនោរម្យ",
+"code": "120305",
+"slug": "monourom"
+},
+{
+"name": "Mittapheap",
+"nameKm": "មិត្ដភាព",
+"code": "120306",
+"slug": "mittapheap"
+},
+{
+"name": "Veal Vong",
+"nameKm": "វាលវង់",
+"code": "120307",
+"slug": "veal-vong"
+},
+{
+"name": "Boeng Proluet",
+"nameKm": "បឹងព្រលឹត",
+"code": "120308",
+"slug": "boeng-proluet"
+}
+]
+},
+{
+"name": "Tuol Kouk",
+"nameKm": "ទួលគោក",
+"code": "1204",
+"slug": "tuol-kouk",
+"communes": [
+{
+"name": "Phsar Depou Ti Muoy",
+"nameKm": "ផ្សារដេប៉ូទី ១",
+"code": "120401",
+"slug": "phsar-depou-ti-muoy"
+},
+{
+"name": "Phsar Depou Ti Pir",
+"nameKm": "ផ្សារដេប៉ូទី ២",
+"code": "120402",
+"slug": "phsar-depou-ti-pir"
+},
+{
+"name": "Phsar Depou Ti Bei",
+"nameKm": "ផ្សារដេប៉ូទី ៣",
+"code": "120403",
+"slug": "phsar-depou-ti-bei"
+},
+{
+"name": "Tuek L'ak Ti Muoy",
+"nameKm": "ទឹកល្អក់ទី ១",
+"code": "120404",
+"slug": "tuek-l-ak-ti-muoy"
+},
+{
+"name": "Tuek L'ak Ti Pir",
+"nameKm": "ទឹកល្អក់ទី ២",
+"code": "120405",
+"slug": "tuek-l-ak-ti-pir"
+},
+{
+"name": "Tuek L'ak Ti Bei",
+"nameKm": "ទឹកល្អក់ទី ៣",
+"code": "120406",
+"slug": "tuek-l-ak-ti-bei"
+},
+{
+"name": "Boeng Kak Ti Muoy",
+"nameKm": "បឹងកក់ទី ១",
+"code": "120407",
+"slug": "boeng-kak-ti-muoy"
+},
+{
+"name": "Boeng Kak Ti Pir",
+"nameKm": "បឹងកក់ទី ២",
+"code": "120408",
+"slug": "boeng-kak-ti-pir"
+},
+{
+"name": "Phsar Daeum Kor",
+"nameKm": "ផ្សារដើមគរ",
+"code": "120409",
+"slug": "phsar-daeum-kor"
+},
+{
+"name": "Boeng Salang",
+"nameKm": "បឹងសាឡាង",
+"code": "120410",
+"slug": "boeng-salang"
+}
+]
+},
+{
+"name": "Dangkao",
+"nameKm": "ដង្កោ",
+"code": "1205",
+"slug": "dangkao",
+"communes": [
+{
+"name": "Dangkao",
+"nameKm": "ដង្កោ",
+"code": "120501",
+"slug": "dangkao"
+},
+{
+"name": "Pong Tuek",
+"nameKm": "ពងទឹក",
+"code": "120507",
+"slug": "pong-tuek"
+},
+{
+"name": "Prey Veaeng",
+"nameKm": "ព្រៃវែង",
+"code": "120508",
+"slug": "prey-veaeng"
+},
+{
+"name": "Prey Sa",
+"nameKm": "ព្រៃស",
+"code": "120510",
+"slug": "prey-sa"
+},
+{
+"name": "Krang Pongro",
+"nameKm": "ក្រាំងពង្រ",
+"code": "120512",
+"slug": "krang-pongro"
+},
+{
+"name": "Sak Sampov",
+"nameKm": "សាក់សំពៅ",
+"code": "120514",
+"slug": "sak-sampov"
+},
+{
+"name": "Cheung Aek",
+"nameKm": "ជើងឯក",
+"code": "120515",
+"slug": "cheung-aek"
+},
+{
+"name": "Kong Noy",
+"nameKm": "គងនយ",
+"code": "120516",
+"slug": "kong-noy"
+},
+{
+"name": "Preaek Kampues",
+"nameKm": "ព្រែកកំពឹស",
+"code": "120517",
+"slug": "preaek-kampues"
+},
+{
+"name": "Roluos",
+"nameKm": "រលួស",
+"code": "120518",
+"slug": "roluos"
+},
+{
+"name": "Spean Thma",
+"nameKm": "ស្ពានថ្ម",
+"code": "120519",
+"slug": "spean-thma"
+},
+{
+"name": "Tien",
+"nameKm": "ទៀន",
+"code": "120520",
+"slug": "tien"
+}
+]
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "1206",
+"slug": "mean-chey",
+"communes": [
+{
+"name": "Chak Angrae Leu",
+"nameKm": "ចាក់អង្រែលើ",
+"code": "120606",
+"slug": "chak-angrae-leu"
+},
+{
+"name": "Chak Angrae Kraom",
+"nameKm": "ចាក់អង្រែក្រោម",
+"code": "120607",
+"slug": "chak-angrae-kraom"
+},
+{
+"name": "Stueng Mean chey 1",
+"nameKm": "ស្ទឹងមានជ័យទី១",
+"code": "120608",
+"slug": "stueng-mean-chey-1"
+},
+{
+"name": "Stueng Mean chey 2",
+"nameKm": "ស្ទឹងមានជ័យទី២",
+"code": "120609",
+"slug": "stueng-mean-chey-2"
+},
+{
+"name": "Stueng Mean chey 3",
+"nameKm": "ស្ទឹងមានជ័យទី៣",
+"code": "120610",
+"slug": "stueng-mean-chey-3"
+},
+{
+"name": "Boeng Tumpun 1",
+"nameKm": "បឹងទំពុនទី១",
+"code": "120611",
+"slug": "boeng-tumpun-1"
+},
+{
+"name": "Boeng Tumpun 2",
+"nameKm": "បឹងទំពុនទី២",
+"code": "120612",
+"slug": "boeng-tumpun-2"
+}
+]
+},
+{
+"name": "Russey Keo",
+"nameKm": "ឫស្សីកែវ",
+"code": "1207",
+"slug": "russey-keo",
+"communes": [
+{
+"name": "Svay Pak",
+"nameKm": "ស្វាយប៉ាក",
+"code": "120703",
+"slug": "svay-pak"
+},
+{
+"name": "Kilomaetr Lekh Prammuoy",
+"nameKm": "គីឡូម៉ែត្រលេខ៦",
+"code": "120704",
+"slug": "kilomaetr-lekh-prammuoy"
+},
+{
+"name": "Ruessei Kaev",
+"nameKm": "ឫស្សីកែវ",
+"code": "120706",
+"slug": "ruessei-kaev"
+},
+{
+"name": "Chrang Chamreh Ti Muoy",
+"nameKm": "ច្រាំងចំរេះទី ១",
+"code": "120711",
+"slug": "chrang-chamreh-ti-muoy"
+},
+{
+"name": "Chrang Chamreh Ti Pir",
+"nameKm": "ច្រាំងចំរេះទី ២",
+"code": "120712",
+"slug": "chrang-chamreh-ti-pir"
+},
+{
+"name": "Tuol Sangkae 1",
+"nameKm": "ទួលសង្កែទី១",
+"code": "120713",
+"slug": "tuol-sangkae-1"
+},
+{
+"name": "Tuol Sangkae 2",
+"nameKm": "ទួលសង្កែទី២",
+"code": "120714",
+"slug": "tuol-sangkae-2"
+}
+]
+},
+{
+"name": "Saensokh",
+"nameKm": "សែនសុខ",
+"code": "1208",
+"slug": "saensokh",
+"communes": [
+{
+"name": "Phnom Penh Thmei",
+"nameKm": "ភ្នំពេញថ្មី",
+"code": "120801",
+"slug": "phnom-penh-thmei"
+},
+{
+"name": "Tuek Thla",
+"nameKm": "ទឹកថ្លា",
+"code": "120802",
+"slug": "tuek-thla"
+},
+{
+"name": "Khmuonh",
+"nameKm": "ឃ្មួញ",
+"code": "120803",
+"slug": "khmuonh"
+},
+{
+"name": "Krang Thnong",
+"nameKm": "ក្រាំងធ្នង់",
+"code": "120807",
+"slug": "krang-thnong"
+},
+{
+"name": "Ou Baek K'am",
+"nameKm": "អូរបែកក្អម",
+"code": "120808",
+"slug": "ou-baek-k-am"
+},
+{
+"name": "Kouk Khleang",
+"nameKm": "គោកឃ្លាង",
+"code": "120809",
+"slug": "kouk-khleang"
+}
+]
+},
+{
+"name": "Pur SenChey",
+"nameKm": "ពោធិ៍សែនជ័យ",
+"code": "1209",
+"slug": "pur-senchey",
+"communes": [
+{
+"name": "Trapeang Krasang",
+"nameKm": "ត្រពាំងក្រសាំង",
+"code": "120901",
+"slug": "trapeang-krasang"
+},
+{
+"name": "Samraong Kraom",
+"nameKm": "សំរោងក្រោម",
+"code": "120906",
+"slug": "samraong-kraom"
+},
+{
+"name": "Chaom Chau 1",
+"nameKm": "ចោមចៅទី១",
+"code": "120914",
+"slug": "chaom-chau-1"
+},
+{
+"name": "Chaom Chau 2",
+"nameKm": "ចោមចៅទី២",
+"code": "120915",
+"slug": "chaom-chau-2"
+},
+{
+"name": "Chaom Chau 3",
+"nameKm": "ចោមចៅទី៣",
+"code": "120916",
+"slug": "chaom-chau-3"
+},
+{
+"name": "Kakab 1",
+"nameKm": "កាកាបទី១",
+"code": "120917",
+"slug": "kakab-1"
+},
+{
+"name": "Kakab 2",
+"nameKm": "កាកាបទី២",
+"code": "120918",
+"slug": "kakab-2"
+}
+]
+},
+{
+"name": "Chraoy Chongvar",
+"nameKm": "ជ្រោយចង្វារ",
+"code": "1210",
+"slug": "chraoy-chongvar",
+"communes": [
+{
+"name": "Chrouy Changvar",
+"nameKm": "ជ្រោយចង្វារ",
+"code": "121001",
+"slug": "chrouy-changvar"
+},
+{
+"name": "Preaek Lieb",
+"nameKm": "ព្រែកលៀប",
+"code": "121002",
+"slug": "preaek-lieb"
+},
+{
+"name": "Preaek Ta Sek",
+"nameKm": "ព្រែកតាសេក",
+"code": "121003",
+"slug": "preaek-ta-sek"
+},
+{
+"name": "Kaoh Dach",
+"nameKm": "កោះដាច់",
+"code": "121004",
+"slug": "kaoh-dach"
+},
+{
+"name": "Bak Kaeng",
+"nameKm": "បាក់ខែង",
+"code": "121005",
+"slug": "bak-kaeng"
+}
+]
+},
+{
+"name": "Praek Pnov",
+"nameKm": "ព្រែកព្នៅ",
+"code": "1211",
+"slug": "praek-pnov",
+"communes": [
+{
+"name": "Preaek Phnov",
+"nameKm": "ព្រែកព្នៅ",
+"code": "121101",
+"slug": "preaek-phnov"
+},
+{
+"name": "Ponhea Pon",
+"nameKm": "ពញាពន់",
+"code": "121102",
+"slug": "ponhea-pon"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "121103",
+"slug": "samraong"
+},
+{
+"name": "Kouk Roka",
+"nameKm": "គោករកា",
+"code": "121104",
+"slug": "kouk-roka"
+},
+{
+"name": "Ponsang",
+"nameKm": "ពន្សាំង",
+"code": "121105",
+"slug": "ponsang"
+}
+]
+},
+{
+"name": "Chbar Ampov",
+"nameKm": "ច្បារអំពៅ",
+"code": "1212",
+"slug": "chbar-ampov",
+"communes": [
+{
+"name": "Chhbar Ampov Ti Muoy",
+"nameKm": "ច្បារអំពៅទី ១",
+"code": "121201",
+"slug": "chhbar-ampov-ti-muoy"
+},
+{
+"name": "Chbar Ampov Ti Pir",
+"nameKm": "ច្បារអំពៅទី ២",
+"code": "121202",
+"slug": "chbar-ampov-ti-pir"
+},
+{
+"name": "Nirouth",
+"nameKm": "និរោធ",
+"code": "121203",
+"slug": "nirouth"
+},
+{
+"name": "Preaek Pra",
+"nameKm": "ព្រែកប្រា",
+"code": "121204",
+"slug": "preaek-pra"
+},
+{
+"name": "Veal Sbov",
+"nameKm": "វាលស្បូវ",
+"code": "121205",
+"slug": "veal-sbov"
+},
+{
+"name": "Preaek Aeng",
+"nameKm": "ព្រែកឯង",
+"code": "121206",
+"slug": "preaek-aeng"
+},
+{
+"name": "Kbal Kaoh",
+"nameKm": "ក្បាលកោះ",
+"code": "121207",
+"slug": "kbal-kaoh"
+},
+{
+"name": "Preaek Thmei",
+"nameKm": "ព្រែកថ្មី",
+"code": "121208",
+"slug": "preaek-thmei"
+}
+]
+},
+{
+"name": "Boeng Keng Kang",
+"nameKm": "បឹងកេងកង",
+"code": "1213",
+"slug": "boeng-keng-kang",
+"communes": [
+{
+"name": "Boeng Keng Kang Ti Muoy",
+"nameKm": "បឹងកេងកងទី ១",
+"code": "121301",
+"slug": "boeng-keng-kang-ti-muoy"
+},
+{
+"name": "Boeng Keng Kang Ti Pir",
+"nameKm": "បឹងកេងកងទី ២",
+"code": "121302",
+"slug": "boeng-keng-kang-ti-pir"
+},
+{
+"name": "Boeng Keng Kang Ti Bei",
+"nameKm": "បឹងកេងកងទី ៣",
+"code": "121303",
+"slug": "boeng-keng-kang-ti-bei"
+},
+{
+"name": "Olympic",
+"nameKm": "អូឡាំពិក",
+"code": "121304",
+"slug": "olympic"
+},
+{
+"name": "Tumnob Tuek",
+"nameKm": "ទំនប់ទឹក",
+"code": "121305",
+"slug": "tumnob-tuek"
+},
+{
+"name": "Tuol Svay Prey Ti Muoy",
+"nameKm": "ទួលស្វាយព្រៃទី ១",
+"code": "121306",
+"slug": "tuol-svay-prey-ti-muoy"
+},
+{
+"name": "Tuol Svay Prey Ti Pir",
+"nameKm": "ទួលស្វាយព្រៃទី ២",
+"code": "121307",
+"slug": "tuol-svay-prey-ti-pir"
+}
+]
+},
+{
+"name": "Kamboul",
+"nameKm": "កំបូល",
+"code": "1214",
+"slug": "kamboul",
+"communes": [
+{
+"name": "Kamboul",
+"nameKm": "កំបូល",
+"code": "121401",
+"slug": "kamboul"
+},
+{
+"name": "Kantaok",
+"nameKm": "កន្ទោក",
+"code": "121402",
+"slug": "kantaok"
+},
+{
+"name": "Ovlaok",
+"nameKm": "ឪឡោក",
+"code": "121403",
+"slug": "ovlaok"
+},
+{
+"name": "Snaor",
+"nameKm": "ស្នោរ",
+"code": "121404",
+"slug": "snaor"
+},
+{
+"name": "Phleung Chheh Roteh",
+"nameKm": "ភ្លើងឆេះរទេះ",
+"code": "121405",
+"slug": "phleung-chheh-roteh"
+},
+{
+"name": "Boeng Thum",
+"nameKm": "បឹងធំ",
+"code": "121406",
+"slug": "boeng-thum"
+},
+{
+"name": "Prateah Lang",
+"nameKm": "ប្រទះឡាង",
+"code": "121407",
+"slug": "prateah-lang"
+}
+]
+}
+]
+},
+{
+"key": "preah_sihanouk",
+"slug": "preah-sihanouk",
+"name": "Preah Sihanouk",
+"nameKm": "ព្រះសីហនុ",
+"code": "18",
+"districts": [
+{
+"name": "Preah Sihanouk",
+"nameKm": "ព្រះសីហនុ",
+"code": "1801",
+"slug": "sihanoukville",
+"communes": [
+{
+"name": "lek Muoy",
+"nameKm": "លេខ១",
+"code": "180101",
+"slug": "lek-muoy"
+},
+{
+"name": "Pir",
+"nameKm": "២",
+"code": "180102",
+"slug": "pir"
+},
+{
+"name": "Bei",
+"nameKm": "៣",
+"code": "180103",
+"slug": "bei"
+},
+{
+"name": "Buon",
+"nameKm": "៤",
+"code": "180104",
+"slug": "buon"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Prey Nob",
+"nameKm": "ព្រៃនប់",
+"code": "1802",
+"slug": "prey-nob",
+"communes": [
+{
+"name": "Andoung Thma",
+"nameKm": "អណ្ដូងថ្ម",
+"code": "180201",
+"slug": "andoung-thma"
+},
+{
+"name": "Boeng Ta Prum",
+"nameKm": "បឹងតាព្រហ្ម",
+"code": "180202",
+"slug": "boeng-ta-prum"
+},
+{
+"name": "Bet Trang",
+"nameKm": "បិតត្រាង",
+"code": "180203",
+"slug": "bet-trang"
+},
+{
+"name": "Cheung Kou",
+"nameKm": "ជើងគោ",
+"code": "180204",
+"slug": "cheung-kou"
+},
+{
+"name": "Ou Chrov",
+"nameKm": "អូរជ្រៅ",
+"code": "180205",
+"slug": "ou-chrov"
+},
+{
+"name": "Ou Oknha Heng",
+"nameKm": "អូរឧកញ៉ាហេង",
+"code": "180206",
+"slug": "ou-oknha-heng"
+},
+{
+"name": "Prey Nob",
+"nameKm": "ព្រៃនប់",
+"code": "180207",
+"slug": "prey-nob"
+},
+{
+"name": "Ream",
+"nameKm": "រាម",
+"code": "180208",
+"slug": "ream"
+},
+{
+"name": "Sameakki",
+"nameKm": "សាមគ្គី",
+"code": "180209",
+"slug": "sameakki"
+},
+{
+"name": "Samrong",
+"nameKm": "សំរុង",
+"code": "180210",
+"slug": "samrong"
+},
+{
+"name": "Tuek L'ak",
+"nameKm": "ទឹកល្អក់",
+"code": "180211",
+"slug": "tuek-l-ak"
+},
+{
+"name": "Tuek Thla",
+"nameKm": "ទឹកថ្លា",
+"code": "180212",
+"slug": "tuek-thla"
+},
+{
+"name": "Tuol Totueng",
+"nameKm": "ទួលទទឹង",
+"code": "180213",
+"slug": "tuol-totueng"
+},
+{
+"name": "Veal Renh",
+"nameKm": "វាលរេញ",
+"code": "180214",
+"slug": "veal-renh"
+},
+{
+"name": "Ta Ney",
+"nameKm": "តានៃ",
+"code": "180215",
+"slug": "ta-ney"
+}
+]
+},
+{
+"name": "Stueng Hav",
+"nameKm": "ស្ទឹងហាវ",
+"code": "1803",
+"slug": "stueng-hav",
+"communes": [
+{
+"name": "Kampenh",
+"nameKm": "កំពេញ",
+"code": "180301",
+"slug": "kampenh"
+},
+{
+"name": "Ou Treh",
+"nameKm": "អូរត្រេះ",
+"code": "180302",
+"slug": "ou-treh"
+},
+{
+"name": "Tumnob Rolok",
+"nameKm": "ទំនប់រលក",
+"code": "180303",
+"slug": "tumnob-rolok"
+},
+{
+"name": "Kaev Phos",
+"nameKm": "កែវផុស",
+"code": "180304",
+"slug": "kaev-phos"
+}
+]
+},
+{
+"name": "Kampong Seila",
+"nameKm": "កំពង់សីលា",
+"code": "1804",
+"slug": "kampong-seila",
+"communes": [
+{
+"name": "Chamkar Luong",
+"nameKm": "ចំការហ្លួង",
+"code": "180401",
+"slug": "chamkar-luong"
+},
+{
+"name": "Kampong Seila",
+"nameKm": "កំពង់សីលា",
+"code": "180402",
+"slug": "kampong-seila"
+},
+{
+"name": "Ou Bak Roteh",
+"nameKm": "អូរបាក់រទេះ",
+"code": "180403",
+"slug": "ou-bak-roteh"
+},
+{
+"name": "Stueng Chhay",
+"nameKm": "ស្ទឹងឆាយ",
+"code": "180404",
+"slug": "stueng-chhay"
+}
+]
+},
+{
+"name": "Kaoh Rung",
+"nameKm": "កោះរ៉ុង",
+"code": "1805",
+"slug": "kaoh-rung",
+"communes": [
+{
+"name": "Kaoh Rung",
+"nameKm": "កោះរ៉ុង",
+"code": "180501",
+"slug": "kaoh-rung"
+},
+{
+"name": "Koah Rung Sonlem",
+"nameKm": "កោះរ៉ុងសន្លឹម",
+"code": "180502",
+"slug": "koah-rung-sonlem"
+}
+]
+}
+]
+},
+{
+"key": "preah_vihear",
+"slug": "preah-vihear",
+"name": "Preah Vihear",
+"nameKm": "ព្រះវិហារ",
+"code": "13",
+"districts": [
+{
+"name": "Chey Saen",
+"nameKm": "ជ័យសែន",
+"code": "1301",
+"slug": "chey-saen",
+"communes": [
+{
+"name": "S'ang",
+"nameKm": "ស្អាង",
+"code": "130101",
+"slug": "s-ang"
+},
+{
+"name": "Tasu",
+"nameKm": "តស៊ូ",
+"code": "130102",
+"slug": "tasu"
+},
+{
+"name": "Khyang",
+"nameKm": "ខ្យង",
+"code": "130103",
+"slug": "khyang"
+},
+{
+"name": "Chrach",
+"nameKm": "ច្រាច់",
+"code": "130104",
+"slug": "chrach"
+},
+{
+"name": "Thmea",
+"nameKm": "ធ្មា",
+"code": "130105",
+"slug": "thmea"
+},
+{
+"name": "Putrea",
+"nameKm": "ពុទ្រា",
+"code": "130106",
+"slug": "putrea"
+}
+]
+},
+{
+"name": "Chhaeb",
+"nameKm": "ឆែប",
+"code": "1302",
+"slug": "chhaeb",
+"communes": [
+{
+"name": "Chhaeb Muoy",
+"nameKm": "ឆែបមួយ",
+"code": "130201",
+"slug": "chhaeb-muoy"
+},
+{
+"name": "Chhaeb Pir",
+"nameKm": "ឆែបពីរ",
+"code": "130202",
+"slug": "chhaeb-pir"
+},
+{
+"name": "Sangkae Muoy",
+"nameKm": "សង្កែមួយ",
+"code": "130203",
+"slug": "sangkae-muoy"
+},
+{
+"name": "Sangkae Pir",
+"nameKm": "សង្កែពីរ",
+"code": "130204",
+"slug": "sangkae-pir"
+},
+{
+"name": "Mlu Prey Muoy",
+"nameKm": "ម្លូព្រៃមួយ",
+"code": "130205",
+"slug": "mlu-prey-muoy"
+},
+{
+"name": "Mlu Prey Pir",
+"nameKm": "ម្លូព្រៃពីរ",
+"code": "130206",
+"slug": "mlu-prey-pir"
+},
+{
+"name": "Kampong Sralau Muoy",
+"nameKm": "កំពង់ស្រឡៅមួយ",
+"code": "130207",
+"slug": "kampong-sralau-muoy"
+},
+{
+"name": "Kampong Sralau Pir",
+"nameKm": "កំពង់ស្រឡៅពីរ",
+"code": "130208",
+"slug": "kampong-sralau-pir"
+}
+]
+},
+{
+"name": "Choam Ksant",
+"nameKm": "ជាំក្សាន្ដ",
+"code": "1303",
+"slug": "choam-ksant",
+"communes": [
+{
+"name": "Choam Ksant",
+"nameKm": "ជាំក្សាន្ដ",
+"code": "130301",
+"slug": "choam-ksant"
+},
+{
+"name": "Tuek Kraham",
+"nameKm": "ទឹកក្រហម",
+"code": "130302",
+"slug": "tuek-kraham"
+},
+{
+"name": "Pring Thum",
+"nameKm": "ព្រីងធំ",
+"code": "130303",
+"slug": "pring-thum"
+},
+{
+"name": "Rumdaoh Srae",
+"nameKm": "រំដោះស្រែ",
+"code": "130304",
+"slug": "rumdaoh-srae"
+},
+{
+"name": "Yeang",
+"nameKm": "យាង",
+"code": "130305",
+"slug": "yeang"
+},
+{
+"name": "Kantuot",
+"nameKm": "កន្ទួត",
+"code": "130306",
+"slug": "kantuot"
+},
+{
+"name": "Sror Aem",
+"nameKm": "ស្រអែម",
+"code": "130307",
+"slug": "sror-aem"
+},
+{
+"name": "Morokot",
+"nameKm": "មរកត",
+"code": "130308",
+"slug": "morokot"
+}
+]
+},
+{
+"name": "Kuleaen",
+"nameKm": "គូលែន",
+"code": "1304",
+"slug": "kuleaen",
+"communes": [
+{
+"name": "Kuleaen Tboung",
+"nameKm": "គូលែនត្បូង",
+"code": "130401",
+"slug": "kuleaen-tboung"
+},
+{
+"name": "Kuleaen Cheung",
+"nameKm": "គូលែនជើង",
+"code": "130402",
+"slug": "kuleaen-cheung"
+},
+{
+"name": "Thmei",
+"nameKm": "ថ្មី",
+"code": "130403",
+"slug": "thmei"
+},
+{
+"name": "Phnum Penh",
+"nameKm": "ភ្នំពេញ",
+"code": "130404",
+"slug": "phnum-penh"
+},
+{
+"name": "Phnum Tbaeng Pir",
+"nameKm": "ភ្នំត្បែងពីរ",
+"code": "130405",
+"slug": "phnum-tbaeng-pir"
+},
+{
+"name": "Srayang",
+"nameKm": "ស្រយង់",
+"code": "130406",
+"slug": "srayang"
+}
+]
+},
+{
+"name": "Rovieng",
+"nameKm": "រវៀង",
+"code": "1305",
+"slug": "rovieng",
+"communes": [
+{
+"name": "Robieb",
+"nameKm": "របៀប",
+"code": "130501",
+"slug": "robieb"
+},
+{
+"name": "Reaksmei",
+"nameKm": "រស្មី",
+"code": "130502",
+"slug": "reaksmei"
+},
+{
+"name": "Rohas",
+"nameKm": "រហ័ស",
+"code": "130503",
+"slug": "rohas"
+},
+{
+"name": "Rung Roeang",
+"nameKm": "រុងរឿង",
+"code": "130504",
+"slug": "rung-roeang"
+},
+{
+"name": "Rik Reay",
+"nameKm": "រីករាយ",
+"code": "130505",
+"slug": "rik-reay"
+},
+{
+"name": "Ruos Roan",
+"nameKm": "រួសរាន់",
+"code": "130506",
+"slug": "ruos-roan"
+},
+{
+"name": "Rotanak",
+"nameKm": "រតនៈ",
+"code": "130507",
+"slug": "rotanak"
+},
+{
+"name": "Rieb Roy",
+"nameKm": "រៀបរយ",
+"code": "130508",
+"slug": "rieb-roy"
+},
+{
+"name": "Reaksa",
+"nameKm": "រក្សា",
+"code": "130509",
+"slug": "reaksa"
+},
+{
+"name": "Rumdaoh",
+"nameKm": "រំដោះ",
+"code": "130510",
+"slug": "rumdaoh"
+},
+{
+"name": "Romtum",
+"nameKm": "រមទម",
+"code": "130511",
+"slug": "romtum"
+},
+{
+"name": "Romoneiy",
+"nameKm": "រមណីយ",
+"code": "130512",
+"slug": "romoneiy"
+}
+]
+},
+{
+"name": "Sangkum Thmei",
+"nameKm": "សង្គមថ្មី",
+"code": "1306",
+"slug": "sangkum-thmei",
+"communes": [
+{
+"name": "Chamraeun",
+"nameKm": "ចំរើន",
+"code": "130601",
+"slug": "chamraeun"
+},
+{
+"name": "Ro'ang",
+"nameKm": "រអាង",
+"code": "130602",
+"slug": "ro-ang"
+},
+{
+"name": "Phnum Tbaeng Muoy",
+"nameKm": "ភ្នំត្បែងមួយ",
+"code": "130603",
+"slug": "phnum-tbaeng-muoy"
+},
+{
+"name": "Sdau",
+"nameKm": "ស្ដៅ",
+"code": "130604",
+"slug": "sdau"
+},
+{
+"name": "Ronak Ser",
+"nameKm": "រណសិរ្ស",
+"code": "130605",
+"slug": "ronak-ser"
+}
+]
+},
+{
+"name": "Tbaeng Mean Chey",
+"nameKm": "ត្បែងមានជ័យ",
+"code": "1307",
+"slug": "tbeng-meanchey",
+"communes": [
+{
+"name": "Chhean Mukh",
+"nameKm": "ឈានមុខ",
+"code": "130703",
+"slug": "chhean-mukh"
+},
+{
+"name": "Pou",
+"nameKm": "ពោធិ៍",
+"code": "130704",
+"slug": "pou"
+},
+{
+"name": "Prame",
+"nameKm": "ប្រមេរុ",
+"code": "130705",
+"slug": "prame"
+},
+{
+"name": "Preah Khleang",
+"nameKm": "ព្រះឃ្លាំង",
+"code": "130706",
+"slug": "preah-khleang"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Preah Vihear",
+"nameKm": "ព្រះវិហារ",
+"code": "1308",
+"slug": "preah-vihear",
+"communes": [
+{
+"name": "Kampong Pranak",
+"nameKm": "កំពង់ប្រណាក",
+"code": "130801",
+"slug": "kampong-pranak"
+},
+{
+"name": "Pal Hal",
+"nameKm": "ប៉ាលហាល",
+"code": "130802",
+"slug": "pal-hal"
+}
+]
+}
+]
+},
+{
+"key": "prey_veng",
+"slug": "prey-veng",
+"name": "Prey Veng",
+"nameKm": "ព្រៃវែង",
+"code": "14",
+"districts": [
+{
+"name": "Ba Phnum",
+"nameKm": "បាភ្នំ",
+"code": "1401",
+"slug": "ba-phnum",
+"communes": [
+{
+"name": "Boeng Preah",
+"nameKm": "បឹងព្រះ",
+"code": "140101",
+"slug": "boeng-preah"
+},
+{
+"name": "Cheung Phnum",
+"nameKm": "ជើងភ្នំ",
+"code": "140102",
+"slug": "cheung-phnum"
+},
+{
+"name": "Chheu Kach",
+"nameKm": "ឈើកាច់",
+"code": "140103",
+"slug": "chheu-kach"
+},
+{
+"name": "Reaks Chey",
+"nameKm": "រក្សជ័យ",
+"code": "140104",
+"slug": "reaks-chey"
+},
+{
+"name": "Roung Damrei",
+"nameKm": "រោងដំរី",
+"code": "140105",
+"slug": "roung-damrei"
+},
+{
+"name": "Sdau Kaong",
+"nameKm": "ស្ដៅកោង",
+"code": "140106",
+"slug": "sdau-kaong"
+},
+{
+"name": "Spueu Ka",
+"nameKm": "ស្ពឺ  ក",
+"code": "140107",
+"slug": "spueu-ka"
+},
+{
+"name": "Spueu Kha",
+"nameKm": "ស្ពឺ  ខ",
+"code": "140108",
+"slug": "spueu-kha"
+},
+{
+"name": "Theay",
+"nameKm": "ធាយ",
+"code": "140109",
+"slug": "theay"
+}
+]
+},
+{
+"name": "Kamchay Mear",
+"nameKm": "កំចាយមារ",
+"code": "1402",
+"slug": "kamchay-mear",
+"communes": [
+{
+"name": "Cheach",
+"nameKm": "ជាច",
+"code": "140201",
+"slug": "cheach"
+},
+{
+"name": "Doun Koeng",
+"nameKm": "ដូនកឹង",
+"code": "140202",
+"slug": "doun-koeng"
+},
+{
+"name": "Kranhung",
+"nameKm": "ក្រញូង",
+"code": "140203",
+"slug": "kranhung"
+},
+{
+"name": "Krabau",
+"nameKm": "ក្របៅ",
+"code": "140204",
+"slug": "krabau"
+},
+{
+"name": "Seang Khveang",
+"nameKm": "ស៊ាងឃ្វាង",
+"code": "140205",
+"slug": "seang-khveang"
+},
+{
+"name": "Smaong Khang Cheung",
+"nameKm": "ស្មោងខាងជើង",
+"code": "140206",
+"slug": "smaong-khang-cheung"
+},
+{
+"name": "Smaong Khang Tboung",
+"nameKm": "ស្មោងខាងត្បូង",
+"code": "140207",
+"slug": "smaong-khang-tboung"
+},
+{
+"name": "Trabaek",
+"nameKm": "ត្របែក",
+"code": "140208",
+"slug": "trabaek"
+}
+]
+},
+{
+"name": "Kampong Trabaek",
+"nameKm": "កំពង់ត្របែក",
+"code": "1403",
+"slug": "kampong-trabaek",
+"communes": [
+{
+"name": "Ansaong",
+"nameKm": "អន្សោង",
+"code": "140301",
+"slug": "ansaong"
+},
+{
+"name": "Cham",
+"nameKm": "ចាម",
+"code": "140302",
+"slug": "cham"
+},
+{
+"name": "Cheang Daek",
+"nameKm": "ជាងដែក",
+"code": "140303",
+"slug": "cheang-daek"
+},
+{
+"name": "Chrey",
+"nameKm": "ជ្រៃ",
+"code": "140304",
+"slug": "chrey"
+},
+{
+"name": "Kansoam Ak",
+"nameKm": "កន្សោមអក",
+"code": "140305",
+"slug": "kansoam-ak"
+},
+{
+"name": "Kou Khchak",
+"nameKm": "គោខ្ចក",
+"code": "140306",
+"slug": "kou-khchak"
+},
+{
+"name": "Kampong Trabaek",
+"nameKm": "កំពង់ត្របែក",
+"code": "140307",
+"slug": "kampong-trabaek"
+},
+{
+"name": "Peam Montear",
+"nameKm": "ពាមមន្ទារ",
+"code": "140308",
+"slug": "peam-montear"
+},
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "140309",
+"slug": "prasat"
+},
+{
+"name": "Pratheat",
+"nameKm": "ប្រធាតុ",
+"code": "140310",
+"slug": "pratheat"
+},
+{
+"name": "Prey Chhor",
+"nameKm": "ព្រៃឈរ",
+"code": "140311",
+"slug": "prey-chhor"
+},
+{
+"name": "Prey Poun",
+"nameKm": "ព្រៃពោន",
+"code": "140312",
+"slug": "prey-poun"
+},
+{
+"name": "Thkov",
+"nameKm": "ថ្កូវ",
+"code": "140313",
+"slug": "thkov"
+}
+]
+},
+{
+"name": "Kanhchriech",
+"nameKm": "កញ្ជ្រៀច",
+"code": "1404",
+"slug": "kanhchriech",
+"communes": [
+{
+"name": "Chong Ampil",
+"nameKm": "ចុងអំពិល",
+"code": "140401",
+"slug": "chong-ampil"
+},
+{
+"name": "Kanhchriech",
+"nameKm": "កញ្ជ្រៀច",
+"code": "140402",
+"slug": "kanhchriech"
+},
+{
+"name": "Kdoeang Reay",
+"nameKm": "ក្ដឿងរាយ",
+"code": "140403",
+"slug": "kdoeang-reay"
+},
+{
+"name": "Kouk Kong Kaeut",
+"nameKm": "គោកគង់កើត",
+"code": "140404",
+"slug": "kouk-kong-kaeut"
+},
+{
+"name": "Kouk Kong Lech",
+"nameKm": "គោកគង់លិច",
+"code": "140405",
+"slug": "kouk-kong-lech"
+},
+{
+"name": "Preal",
+"nameKm": "ព្រាល",
+"code": "140406",
+"slug": "preal"
+},
+{
+"name": "Thma Pun",
+"nameKm": "ថ្មពូន",
+"code": "140407",
+"slug": "thma-pun"
+},
+{
+"name": "Tnaot",
+"nameKm": "ត្នោត",
+"code": "140408",
+"slug": "tnaot"
+}
+]
+},
+{
+"name": "Me Sang",
+"nameKm": "មេសាង",
+"code": "1405",
+"slug": "me-sang",
+"communes": [
+{
+"name": "Angkor Sar",
+"nameKm": "អង្គរសរ",
+"code": "140501",
+"slug": "angkor-sar"
+},
+{
+"name": "Chres",
+"nameKm": "ច្រេស",
+"code": "140502",
+"slug": "chres"
+},
+{
+"name": "Chi Phoch",
+"nameKm": "ជីផុច",
+"code": "140503",
+"slug": "chi-phoch"
+},
+{
+"name": "Prey Khnes",
+"nameKm": "ព្រៃឃ្នេស",
+"code": "140504",
+"slug": "prey-khnes"
+},
+{
+"name": "Prey Rumdeng",
+"nameKm": "ព្រៃរំដេង",
+"code": "140505",
+"slug": "prey-rumdeng"
+},
+{
+"name": "Prey Totueng",
+"nameKm": "ព្រៃទទឹង",
+"code": "140506",
+"slug": "prey-totueng"
+},
+{
+"name": "Svay Chrum",
+"nameKm": "ស្វាយជ្រុំ",
+"code": "140507",
+"slug": "svay-chrum"
+},
+{
+"name": "Trapeang Srae",
+"nameKm": "ត្រពាំងស្រែ",
+"code": "140508",
+"slug": "trapeang-srae"
+}
+]
+},
+{
+"name": "Peam Chor",
+"nameKm": "ពាមជរ",
+"code": "1406",
+"slug": "peam-chor",
+"communes": [
+{
+"name": "Angkor Angk",
+"nameKm": "អង្គរអង្គ",
+"code": "140601",
+"slug": "angkor-angk"
+},
+{
+"name": "Kampong Prasat",
+"nameKm": "កំពង់ប្រាសាទ",
+"code": "140602",
+"slug": "kampong-prasat"
+},
+{
+"name": "Kaoh Chek",
+"nameKm": "កោះចេក",
+"code": "140603",
+"slug": "kaoh-chek"
+},
+{
+"name": "Kaoh Roka",
+"nameKm": "កោះរកា",
+"code": "140604",
+"slug": "kaoh-roka"
+},
+{
+"name": "Kaoh Sampov",
+"nameKm": "កោះសំពៅ",
+"code": "140605",
+"slug": "kaoh-sampov"
+},
+{
+"name": "Krang Ta Yang",
+"nameKm": "ក្រាំងតាយ៉ង",
+"code": "140606",
+"slug": "krang-ta-yang"
+},
+{
+"name": "Preaek Krabau",
+"nameKm": "ព្រែកក្របៅ",
+"code": "140607",
+"slug": "preaek-krabau"
+},
+{
+"name": "Preaek Sambuor",
+"nameKm": "ព្រែកសំបួរ",
+"code": "140608",
+"slug": "preaek-sambuor"
+},
+{
+"name": "Ruessei Srok",
+"nameKm": "ឫស្សីស្រុក",
+"code": "140609",
+"slug": "ruessei-srok"
+},
+{
+"name": "Svay Phluoh",
+"nameKm": "ស្វាយភ្លោះ",
+"code": "140610",
+"slug": "svay-phluoh"
+}
+]
+},
+{
+"name": "Peam Ro",
+"nameKm": "ពាមរក៍",
+"code": "1407",
+"slug": "peam-ro",
+"communes": [
+{
+"name": "Ba Baong",
+"nameKm": "បាបោង",
+"code": "140701",
+"slug": "ba-baong"
+},
+{
+"name": "Banlich Prasat",
+"nameKm": "បន្លិចប្រាសាទ",
+"code": "140702",
+"slug": "banlich-prasat"
+},
+{
+"name": "Neak Loeang",
+"nameKm": "អ្នកលឿង",
+"code": "140703",
+"slug": "neak-loeang"
+},
+{
+"name": "Peam Mean Chey",
+"nameKm": "ពាមមានជ័យ",
+"code": "140704",
+"slug": "peam-mean-chey"
+},
+{
+"name": "Peam Ro",
+"nameKm": "ពាមរក៍",
+"code": "140705",
+"slug": "peam-ro"
+},
+{
+"name": "Preaek Khsay Ka",
+"nameKm": "ព្រែកខ្សាយ ក",
+"code": "140706",
+"slug": "preaek-khsay-ka"
+},
+{
+"name": "Preaek Khsay Kha",
+"nameKm": "ព្រែកខ្សាយ ខ",
+"code": "140707",
+"slug": "preaek-khsay-kha"
+},
+{
+"name": "Prey Kandieng",
+"nameKm": "ព្រៃកណ្ដៀង",
+"code": "140708",
+"slug": "prey-kandieng"
+}
+]
+},
+{
+"name": "Pea Reang",
+"nameKm": "ពារាំង",
+"code": "1408",
+"slug": "pea-reang",
+"communes": [
+{
+"name": "Kampong Popil",
+"nameKm": "កំពង់ពពិល",
+"code": "140801",
+"slug": "kampong-popil"
+},
+{
+"name": "Kanhcham",
+"nameKm": "កញ្ចំ",
+"code": "140802",
+"slug": "kanhcham"
+},
+{
+"name": "Kampong Prang",
+"nameKm": "កំពង់ប្រាំង",
+"code": "140803",
+"slug": "kampong-prang"
+},
+{
+"name": "Mesar Prachan",
+"nameKm": "មេសរប្រចាន់",
+"code": "140805",
+"slug": "mesar-prachan"
+},
+{
+"name": "Prey Pnov",
+"nameKm": "ព្រៃព្នៅ",
+"code": "140807",
+"slug": "prey-pnov"
+},
+{
+"name": "Prey Sniet",
+"nameKm": "ព្រៃស្នៀត",
+"code": "140808",
+"slug": "prey-sniet"
+},
+{
+"name": "Prey Sralet",
+"nameKm": "ព្រៃស្រឡិត",
+"code": "140809",
+"slug": "prey-sralet"
+},
+{
+"name": "Reab",
+"nameKm": "រាប",
+"code": "140810",
+"slug": "reab"
+},
+{
+"name": "Roka",
+"nameKm": "រកា",
+"code": "140811",
+"slug": "roka"
+}
+]
+},
+{
+"name": "Preah Sdach",
+"nameKm": "ព្រះស្ដេច",
+"code": "1409",
+"slug": "preah-sdach",
+"communes": [
+{
+"name": "Angkor Reach",
+"nameKm": "អង្គររាជ្យ",
+"code": "140901",
+"slug": "angkor-reach"
+},
+{
+"name": "Banteay Chakrei",
+"nameKm": "បន្ទាយចក្រី",
+"code": "140902",
+"slug": "banteay-chakrei"
+},
+{
+"name": "Boeng Daol",
+"nameKm": "បឹងដោល",
+"code": "140903",
+"slug": "boeng-daol"
+},
+{
+"name": "Chey Kampok",
+"nameKm": "ជៃកំពក",
+"code": "140904",
+"slug": "chey-kampok"
+},
+{
+"name": "Kampong Soeng",
+"nameKm": "កំពង់សឹង",
+"code": "140905",
+"slug": "kampong-soeng"
+},
+{
+"name": "Krang Svay",
+"nameKm": "ក្រាំងស្វាយ",
+"code": "140906",
+"slug": "krang-svay"
+},
+{
+"name": "Lvea",
+"nameKm": "ល្វា",
+"code": "140907",
+"slug": "lvea"
+},
+{
+"name": "Preah Sdach",
+"nameKm": "ព្រះស្ដេច",
+"code": "140908",
+"slug": "preah-sdach"
+},
+{
+"name": "Reathor",
+"nameKm": "រាធរ",
+"code": "140909",
+"slug": "reathor"
+},
+{
+"name": "Rumchek",
+"nameKm": "រំចេក",
+"code": "140910",
+"slug": "rumchek"
+},
+{
+"name": "Sena Reach Otdam",
+"nameKm": "សេនារាជឧត្ដម",
+"code": "140911",
+"slug": "sena-reach-otdam"
+}
+]
+},
+{
+"name": "Prey Veng",
+"nameKm": "ព្រៃវែង",
+"code": "1410",
+"slug": "prey-veng",
+"communes": [
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "141001",
+"slug": "baray"
+},
+{
+"name": "Cheung Tuek",
+"nameKm": "ជើងទឹក",
+"code": "141002",
+"slug": "cheung-tuek"
+},
+{
+"name": "Kampong Leav",
+"nameKm": "កំពង់លាវ",
+"code": "141003",
+"slug": "kampong-leav"
+},
+{
+"name": "Ta Kao",
+"nameKm": "តាកោ",
+"code": "141004",
+"slug": "ta-kao"
+}
+]
+},
+{
+"name": "Pur Rieng",
+"nameKm": "ពោធិ៍រៀង",
+"code": "1411",
+"slug": "pur-rieng",
+"communes": [
+{
+"name": "Pou Rieng",
+"nameKm": "ពោធិ៍រៀង",
+"code": "141101",
+"slug": "pou-rieng"
+},
+{
+"name": "Preaek Anteah",
+"nameKm": "ព្រែកអន្ទះ",
+"code": "141102",
+"slug": "preaek-anteah"
+},
+{
+"name": "Preaek Chrey",
+"nameKm": "ព្រែកជ្រៃ",
+"code": "141103",
+"slug": "preaek-chrey"
+},
+{
+"name": "Prey Kanlaong",
+"nameKm": "ព្រៃកន្លោង",
+"code": "141104",
+"slug": "prey-kanlaong"
+},
+{
+"name": "Kampong Ruessei",
+"nameKm": "កំពង់ឫស្សី",
+"code": "141106",
+"slug": "kampong-ruessei"
+},
+{
+"name": "Preaek Ta Sar",
+"nameKm": "ព្រែកតាសរ",
+"code": "141107",
+"slug": "preaek-ta-sar"
+}
+]
+},
+{
+"name": "Sithor Kandal",
+"nameKm": "ស៊ីធរកណ្ដាល",
+"code": "1412",
+"slug": "sithor-kandal",
+"communes": [
+{
+"name": "Ampil Krau",
+"nameKm": "អំពិលក្រៅ",
+"code": "141201",
+"slug": "ampil-krau"
+},
+{
+"name": "Chrey Khmum",
+"nameKm": "ជ្រៃឃ្មុំ",
+"code": "141202",
+"slug": "chrey-khmum"
+},
+{
+"name": "Lve",
+"nameKm": "ល្វេ",
+"code": "141203",
+"slug": "lve"
+},
+{
+"name": "Pnov Ti Muoy",
+"nameKm": "ព្នៅទី ១",
+"code": "141204",
+"slug": "pnov-ti-muoy"
+},
+{
+"name": "Pnov Ti Pir",
+"nameKm": "ព្នៅទី ២",
+"code": "141205",
+"slug": "pnov-ti-pir"
+},
+{
+"name": "Pou Ti",
+"nameKm": "ពោធិ៍ទី",
+"code": "141206",
+"slug": "pou-ti"
+},
+{
+"name": "Preaek Changkran",
+"nameKm": "ព្រែកចង្ក្រាន",
+"code": "141207",
+"slug": "preaek-changkran"
+},
+{
+"name": "Prey Daeum Thnoeng",
+"nameKm": "ព្រៃដើមថ្នឹង",
+"code": "141208",
+"slug": "prey-daeum-thnoeng"
+},
+{
+"name": "Prey Tueng",
+"nameKm": "ព្រៃទឹង",
+"code": "141209",
+"slug": "prey-tueng"
+},
+{
+"name": "Rumlech",
+"nameKm": "រំលេច",
+"code": "141210",
+"slug": "rumlech"
+},
+{
+"name": "Ruessei Sanh",
+"nameKm": "ឫស្សីសាញ់",
+"code": "141211",
+"slug": "ruessei-sanh"
+}
+]
+},
+{
+"name": "Svay Antor",
+"nameKm": "ស្វាយអន្ទរ",
+"code": "1413",
+"slug": "svay-antor",
+"communes": [
+{
+"name": "Angkor Tret",
+"nameKm": "អង្គរទ្រេត",
+"code": "141301",
+"slug": "angkor-tret"
+},
+{
+"name": "Chea Khlang",
+"nameKm": "ជាខ្លាង",
+"code": "141302",
+"slug": "chea-khlang"
+},
+{
+"name": "Chrey",
+"nameKm": "ជ្រៃ",
+"code": "141303",
+"slug": "chrey"
+},
+{
+"name": "Damrei Puon",
+"nameKm": "ដំរីពួន",
+"code": "141304",
+"slug": "damrei-puon"
+},
+{
+"name": "Me Bon",
+"nameKm": "មេបុណ្យ",
+"code": "141305",
+"slug": "me-bon"
+},
+{
+"name": "Pean Roung",
+"nameKm": "ពានរោង",
+"code": "141306",
+"slug": "pean-roung"
+},
+{
+"name": "Popueus",
+"nameKm": "ពពឺស",
+"code": "141307",
+"slug": "popueus"
+},
+{
+"name": "Prey Khla",
+"nameKm": "ព្រៃខ្លា",
+"code": "141308",
+"slug": "prey-khla"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "141309",
+"slug": "samraong"
+},
+{
+"name": "Svay Antor",
+"nameKm": "ស្វាយអន្ទរ",
+"code": "141310",
+"slug": "svay-antor"
+},
+{
+"name": "Tuek Thla",
+"nameKm": "ទឹកថ្លា",
+"code": "141311",
+"slug": "tuek-thla"
+}
+]
+}
+]
+},
+{
+"key": "pursat",
+"slug": "pursat",
+"name": "Pursat",
+"nameKm": "ពោធិ៍សាត់",
+"code": "15",
+"districts": [
+{
+"name": "Bakan",
+"nameKm": "បាកាន",
+"code": "1501",
+"slug": "bakan",
+"communes": [
+{
+"name": "Boeng Bat Kandaol",
+"nameKm": "បឹងបត់កណ្ដាល",
+"code": "150101",
+"slug": "boeng-bat-kandaol"
+},
+{
+"name": "Boeng Khnar",
+"nameKm": "បឹងខ្នារ",
+"code": "150102",
+"slug": "boeng-khnar"
+},
+{
+"name": "Khnar Totueng",
+"nameKm": "ខ្នារទទឹង",
+"code": "150103",
+"slug": "khnar-totueng"
+},
+{
+"name": "Me Tuek",
+"nameKm": "មេទឹក",
+"code": "150104",
+"slug": "me-tuek"
+},
+{
+"name": "Ou Ta Paong",
+"nameKm": "អូរតាប៉ោង",
+"code": "150105",
+"slug": "ou-ta-paong"
+},
+{
+"name": "Rumlech",
+"nameKm": "រំលេច",
+"code": "150106",
+"slug": "rumlech"
+},
+{
+"name": "Snam Preah",
+"nameKm": "ស្នាមព្រះ",
+"code": "150107",
+"slug": "snam-preah"
+},
+{
+"name": "Svay Doun Kaev",
+"nameKm": "ស្វាយដូនកែវ",
+"code": "150108",
+"slug": "svay-doun-kaev"
+},
+{
+"name": "Trapeang chorng",
+"nameKm": "ត្រពាំងជង",
+"code": "150110",
+"slug": "trapeang-chorng"
+}
+]
+},
+{
+"name": "Kandieng",
+"nameKm": "កណ្ដៀង",
+"code": "1502",
+"slug": "kandieng",
+"communes": [
+{
+"name": "Anlong Vil",
+"nameKm": "អន្លង់វិល",
+"code": "150201",
+"slug": "anlong-vil"
+},
+{
+"name": "Kandieng",
+"nameKm": "កណ្ដៀង",
+"code": "150203",
+"slug": "kandieng"
+},
+{
+"name": "Kanhchor",
+"nameKm": "កញ្ជរ",
+"code": "150204",
+"slug": "kanhchor"
+},
+{
+"name": "Reang Til",
+"nameKm": "រាំងទិល",
+"code": "150205",
+"slug": "reang-til"
+},
+{
+"name": "Srae Sdok",
+"nameKm": "ស្រែស្ដុក",
+"code": "150206",
+"slug": "srae-sdok"
+},
+{
+"name": "Svay Luong",
+"nameKm": "ស្វាយលួង",
+"code": "150207",
+"slug": "svay-luong"
+},
+{
+"name": "Sya",
+"nameKm": "ស្យា",
+"code": "150208",
+"slug": "sya"
+},
+{
+"name": "Veal",
+"nameKm": "វាល",
+"code": "150209",
+"slug": "veal"
+},
+{
+"name": "Kaoh Chum",
+"nameKm": "កោះជុំ",
+"code": "150210",
+"slug": "kaoh-chum"
+}
+]
+},
+{
+"name": "Krakor",
+"nameKm": "ក្រគរ",
+"code": "1503",
+"slug": "krakor",
+"communes": [
+{
+"name": "Anlong Tnaot",
+"nameKm": "អន្លង់ត្នោត",
+"code": "150301",
+"slug": "anlong-tnaot"
+},
+{
+"name": "Ansa Chambak",
+"nameKm": "អន្សាចំបក់",
+"code": "150302",
+"slug": "ansa-chambak"
+},
+{
+"name": "Boeng Kantuot",
+"nameKm": "បឹងកន្ទួត",
+"code": "150303",
+"slug": "boeng-kantuot"
+},
+{
+"name": "Chheu Tom",
+"nameKm": "ឈើតុំ",
+"code": "150304",
+"slug": "chheu-tom"
+},
+{
+"name": "Kampong Luong",
+"nameKm": "កំពង់លួង",
+"code": "150305",
+"slug": "kampong-luong"
+},
+{
+"name": "Kampong Pou",
+"nameKm": "កំពង់ពោធិ៍",
+"code": "150306",
+"slug": "kampong-pou"
+},
+{
+"name": "Kbal Trach",
+"nameKm": "ក្បាលត្រាច",
+"code": "150307",
+"slug": "kbal-trach"
+},
+{
+"name": "Ou Sandan",
+"nameKm": "អូរសណ្ដាន់",
+"code": "150308",
+"slug": "ou-sandan"
+},
+{
+"name": "Sna Ansa",
+"nameKm": "ស្នាអន្សា",
+"code": "150309",
+"slug": "sna-ansa"
+},
+{
+"name": "Svay Sa",
+"nameKm": "ស្វាយស",
+"code": "150310",
+"slug": "svay-sa"
+},
+{
+"name": "Tnaot Chum",
+"nameKm": "ត្នោតជុំ",
+"code": "150311",
+"slug": "tnaot-chum"
+}
+]
+},
+{
+"name": "Phnum Kravanh",
+"nameKm": "ភ្នំក្រវ៉ាញ",
+"code": "1504",
+"slug": "phnum-kravanh",
+"communes": [
+{
+"name": "Bak Chenhchien",
+"nameKm": "បាក់ចិញ្ចៀន",
+"code": "150401",
+"slug": "bak-chenhchien"
+},
+{
+"name": "Leach",
+"nameKm": "លាច",
+"code": "150402",
+"slug": "leach"
+},
+{
+"name": "Prongil",
+"nameKm": "ព្រងិល",
+"code": "150404",
+"slug": "prongil"
+},
+{
+"name": "Rokat",
+"nameKm": "រកាត",
+"code": "150405",
+"slug": "rokat"
+},
+{
+"name": "Santreae",
+"nameKm": "សន្ទ្រែ",
+"code": "150406",
+"slug": "santreae"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "150407",
+"slug": "samraong"
+}
+]
+},
+{
+"name": "Pursat",
+"nameKm": "ពោធិ៍សាត់",
+"code": "1505",
+"slug": "pursat",
+"communes": [
+{
+"name": "Chamraeun Phal",
+"nameKm": "ចំរើនផល",
+"code": "150501",
+"slug": "chamraeun-phal"
+},
+{
+"name": "Lolok Sa",
+"nameKm": "លលកស",
+"code": "150503",
+"slug": "lolok-sa"
+},
+{
+"name": "Phteah Prey",
+"nameKm": "ផ្ទះព្រៃ",
+"code": "150504",
+"slug": "phteah-prey"
+},
+{
+"name": "Prey Nhi",
+"nameKm": "ព្រៃញី",
+"code": "150505",
+"slug": "prey-nhi"
+},
+{
+"name": "Roleab",
+"nameKm": "រលាប",
+"code": "150506",
+"slug": "roleab"
+},
+{
+"name": "Svay At",
+"nameKm": "ស្វាយអាត់",
+"code": "150507",
+"slug": "svay-at"
+},
+{
+"name": "Banteay Dei",
+"nameKm": "បន្ទាយដី",
+"code": "150508",
+"slug": "banteay-dei"
+}
+]
+},
+{
+"name": "Veal Veaeng",
+"nameKm": "វាលវែង",
+"code": "1506",
+"slug": "veal-veaeng",
+"communes": [
+{
+"name": "Ou Saom",
+"nameKm": "អូរសោម",
+"code": "150601",
+"slug": "ou-saom"
+},
+{
+"name": "Krapeu Pir",
+"nameKm": "ក្រពើពីរ",
+"code": "150602",
+"slug": "krapeu-pir"
+},
+{
+"name": "Anlong Reab",
+"nameKm": "អន្លង់រាប",
+"code": "150603",
+"slug": "anlong-reab"
+},
+{
+"name": "Pramaoy",
+"nameKm": "ប្រម៉ោយ",
+"code": "150604",
+"slug": "pramaoy"
+},
+{
+"name": "Thma Da",
+"nameKm": "ថ្មដា",
+"code": "150605",
+"slug": "thma-da"
+}
+]
+},
+{
+"name": "Ta Lou Senchey",
+"nameKm": "តាលោសែនជ័យ",
+"code": "1507",
+"slug": "ta-lou-senchey",
+"communes": [
+{
+"name": "Ta Lou",
+"nameKm": "តាលោ",
+"code": "150701",
+"slug": "ta-lou"
+},
+{
+"name": "Phteah Rung",
+"nameKm": "ផ្ទះរុង",
+"code": "150702",
+"slug": "phteah-rung"
+}
+]
+}
+]
+},
+{
+"key": "ratanak_kiri",
+"slug": "ratanakiri",
+"name": "Ratanakiri",
+"nameKm": "រតនគិរី",
+"code": "16",
+"districts": [
+{
+"name": "Andoung Meas",
+"nameKm": "អណ្ដូងមាស",
+"code": "1601",
+"slug": "andoung-meas",
+"communes": [
+{
+"name": "Malik",
+"nameKm": "ម៉ាលិក",
+"code": "160101",
+"slug": "malik"
+},
+{
+"name": "Nhang",
+"nameKm": "ញ៉ាង",
+"code": "160103",
+"slug": "nhang"
+},
+{
+"name": "Ta Lav",
+"nameKm": "តាឡាវ",
+"code": "160104",
+"slug": "ta-lav"
+}
+]
+},
+{
+"name": "Ban Lung",
+"nameKm": "បានលុង",
+"code": "1602",
+"slug": "banlung",
+"communes": [
+{
+"name": "Kachanh",
+"nameKm": "កាចាញ",
+"code": "160201",
+"slug": "kachanh"
+},
+{
+"name": "Labansiek",
+"nameKm": "ឡាបានសៀក",
+"code": "160202",
+"slug": "labansiek"
+},
+{
+"name": "Yeak Laom",
+"nameKm": "យក្ខឡោម",
+"code": "160203",
+"slug": "yeak-laom"
+},
+{
+"name": "Boeng Kansaeng",
+"nameKm": "បឹងកន្សែង",
+"code": "160204",
+"slug": "boeng-kansaeng"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Bar Kaev",
+"nameKm": "បរកែវ",
+"code": "1603",
+"slug": "bar-kaev",
+"communes": [
+{
+"name": "Kak",
+"nameKm": "កក់",
+"code": "160301",
+"slug": "kak"
+},
+{
+"name": "Keh Chong",
+"nameKm": "កិះចុង",
+"code": "160302",
+"slug": "keh-chong"
+},
+{
+"name": "La Minh",
+"nameKm": "ឡាមីញ",
+"code": "160303",
+"slug": "la-minh"
+},
+{
+"name": "Lung Khung",
+"nameKm": "លុងឃុង",
+"code": "160304",
+"slug": "lung-khung"
+},
+{
+"name": "Saeung",
+"nameKm": "ស៊ើង",
+"code": "160305",
+"slug": "saeung"
+},
+{
+"name": "Ting Chak",
+"nameKm": "ទីងចាក់",
+"code": "160306",
+"slug": "ting-chak"
+}
+]
+},
+{
+"name": "Koun Mom",
+"nameKm": "កូនមុំ",
+"code": "1604",
+"slug": "koun-mom",
+"communes": [
+{
+"name": "Serei Mongkol",
+"nameKm": "សិរីមង្គល",
+"code": "160401",
+"slug": "serei-mongkol"
+},
+{
+"name": "Srae Angkrorng",
+"nameKm": "ស្រែអង្គ្រង",
+"code": "160402",
+"slug": "srae-angkrorng"
+},
+{
+"name": "Ta Ang",
+"nameKm": "តាអង",
+"code": "160403",
+"slug": "ta-ang"
+},
+{
+"name": "Teun",
+"nameKm": "តឺន",
+"code": "160404",
+"slug": "teun"
+},
+{
+"name": "Trapeang Chres",
+"nameKm": "ត្រពាំងច្រេស",
+"code": "160405",
+"slug": "trapeang-chres"
+},
+{
+"name": "Trapeang Kraham",
+"nameKm": "ត្រពាំងក្រហម",
+"code": "160406",
+"slug": "trapeang-kraham"
+}
+]
+},
+{
+"name": "Lumphat",
+"nameKm": "លំផាត់",
+"code": "1605",
+"slug": "lumphat",
+"communes": [
+{
+"name": "Chey Otdam",
+"nameKm": "ជ័យឧត្ដម",
+"code": "160501",
+"slug": "chey-otdam"
+},
+{
+"name": "Ka Laeng",
+"nameKm": "កាឡែង",
+"code": "160502",
+"slug": "ka-laeng"
+},
+{
+"name": "Lbang Muoy",
+"nameKm": "ល្បាំង១",
+"code": "160503",
+"slug": "lbang-muoy"
+},
+{
+"name": "Lbang Pir",
+"nameKm": "ល្បាំង២",
+"code": "160504",
+"slug": "lbang-pir"
+},
+{
+"name": "Ba Tang",
+"nameKm": "បាតាង",
+"code": "160505",
+"slug": "ba-tang"
+},
+{
+"name": "Seda",
+"nameKm": "សេដា",
+"code": "160506",
+"slug": "seda"
+}
+]
+},
+{
+"name": "Ou Chum",
+"nameKm": "អូរជុំ",
+"code": "1606",
+"slug": "ou-chum",
+"communes": [
+{
+"name": "Cha Ung",
+"nameKm": "ចាអ៊ុង",
+"code": "160601",
+"slug": "cha-ung"
+},
+{
+"name": "Pouy",
+"nameKm": "ប៉ូយ",
+"code": "160602",
+"slug": "pouy"
+},
+{
+"name": "Aekakpheap",
+"nameKm": "ឯកភាព",
+"code": "160603",
+"slug": "aekakpheap"
+},
+{
+"name": "Kalai",
+"nameKm": "កាឡៃ",
+"code": "160604",
+"slug": "kalai"
+},
+{
+"name": "Ou Chum",
+"nameKm": "អូរជុំ",
+"code": "160605",
+"slug": "ou-chum"
+},
+{
+"name": "Sameakki",
+"nameKm": "សាមគ្គី",
+"code": "160606",
+"slug": "sameakki"
+},
+{
+"name": "L'ak",
+"nameKm": "ល្អក់",
+"code": "160607",
+"slug": "l-ak"
+}
+]
+},
+{
+"name": "Ou Ya Dav",
+"nameKm": "អូរយ៉ាដាវ",
+"code": "1607",
+"slug": "ou-ya-dav",
+"communes": [
+{
+"name": "Bar Kham",
+"nameKm": "បរខាំ",
+"code": "160701",
+"slug": "bar-kham"
+},
+{
+"name": "Lum Choar",
+"nameKm": "លំជ័រ",
+"code": "160702",
+"slug": "lum-choar"
+},
+{
+"name": "Pak Nhai",
+"nameKm": "ប៉ក់ញ៉ៃ",
+"code": "160703",
+"slug": "pak-nhai"
+},
+{
+"name": "Pa Te",
+"nameKm": "ប៉ាតេ",
+"code": "160704",
+"slug": "pa-te"
+},
+{
+"name": "Sesan",
+"nameKm": "សេសាន",
+"code": "160705",
+"slug": "sesan"
+},
+{
+"name": "Saom Thum",
+"nameKm": "សោមធំ",
+"code": "160706",
+"slug": "saom-thum"
+},
+{
+"name": "Ya Tung",
+"nameKm": "យ៉ាទុង",
+"code": "160707",
+"slug": "ya-tung"
+}
+]
+},
+{
+"name": "Ta Veaeng",
+"nameKm": "តាវែង",
+"code": "1608",
+"slug": "ta-veaeng",
+"communes": [
+{
+"name": "Ta Veaeng Leu",
+"nameKm": "តាវែងលើ",
+"code": "160801",
+"slug": "ta-veaeng-leu"
+},
+{
+"name": "Ta Veaeng Kraom",
+"nameKm": "តាវែងក្រោម",
+"code": "160802",
+"slug": "ta-veaeng-kraom"
+}
+]
+},
+{
+"name": "Veun Sai",
+"nameKm": "វើនសៃ",
+"code": "1609",
+"slug": "veun-sai",
+"communes": [
+{
+"name": "Pong",
+"nameKm": "ប៉ុង",
+"code": "160901",
+"slug": "pong"
+},
+{
+"name": "Hat Pak",
+"nameKm": "ហាត់ប៉ក់",
+"code": "160903",
+"slug": "hat-pak"
+},
+{
+"name": "Ka Choun",
+"nameKm": "កាចូន",
+"code": "160904",
+"slug": "ka-choun"
+},
+{
+"name": "Kaoh Pang",
+"nameKm": "កោះប៉ង់",
+"code": "160905",
+"slug": "kaoh-pang"
+},
+{
+"name": "Kaoh Peak",
+"nameKm": "កោះពាក្យ",
+"code": "160906",
+"slug": "kaoh-peak"
+},
+{
+"name": "Kok Lak",
+"nameKm": "កុកឡាក់",
+"code": "160907",
+"slug": "kok-lak"
+},
+{
+"name": "Pa Kalan",
+"nameKm": "ប៉ាកាឡាន់",
+"code": "160908",
+"slug": "pa-kalan"
+},
+{
+"name": "Phnum Kok",
+"nameKm": "ភ្នំកុក",
+"code": "160909",
+"slug": "phnum-kok"
+},
+{
+"name": "Veun Sai",
+"nameKm": "វើនសៃ",
+"code": "160910",
+"slug": "veun-sai"
+}
+]
+}
+]
+},
+{
+"key": "siemreap",
+"slug": "siem-reap",
+"name": "Siem Reap",
+"nameKm": "សៀមរាប",
+"code": "17",
+"districts": [
+{
+"name": "Angkor Chum",
+"nameKm": "អង្គរជុំ",
+"code": "1701",
+"slug": "angkor-chum",
+"communes": [
+{
+"name": "Char Chhuk",
+"nameKm": "ចារឈូក",
+"code": "170101",
+"slug": "char-chhuk"
+},
+{
+"name": "Doun Peng",
+"nameKm": "ដូនពេង",
+"code": "170102",
+"slug": "doun-peng"
+},
+{
+"name": "Kouk Doung",
+"nameKm": "គោកដូង",
+"code": "170103",
+"slug": "kouk-doung"
+},
+{
+"name": "Koul",
+"nameKm": "គោល",
+"code": "170104",
+"slug": "koul"
+},
+{
+"name": "Nokor Pheas",
+"nameKm": "នគរភាស",
+"code": "170105",
+"slug": "nokor-pheas"
+},
+{
+"name": "Srae Khvav",
+"nameKm": "ស្រែខ្វាវ",
+"code": "170106",
+"slug": "srae-khvav"
+},
+{
+"name": "Ta Saom",
+"nameKm": "តាសោម",
+"code": "170107",
+"slug": "ta-saom"
+}
+]
+},
+{
+"name": "Angkor Thum",
+"nameKm": "អង្គរធំ",
+"code": "1702",
+"slug": "angkor-thum",
+"communes": [
+{
+"name": "Chob Ta Trav",
+"nameKm": "ជប់តាត្រាវ",
+"code": "170201",
+"slug": "chob-ta-trav"
+},
+{
+"name": "Leang Dai",
+"nameKm": "លាងដៃ",
+"code": "170202",
+"slug": "leang-dai"
+},
+{
+"name": "Peak Snaeng",
+"nameKm": "ពាក់ស្នែង",
+"code": "170203",
+"slug": "peak-snaeng"
+},
+{
+"name": "Svay Chek",
+"nameKm": "ស្វាយចេក",
+"code": "170204",
+"slug": "svay-chek"
+}
+]
+},
+{
+"name": "Banteay Srei",
+"nameKm": "បន្ទាយស្រី",
+"code": "1703",
+"slug": "banteay-srei",
+"communes": [
+{
+"name": "Khnar Sanday",
+"nameKm": "ខ្នារសណ្ដាយ",
+"code": "170301",
+"slug": "khnar-sanday"
+},
+{
+"name": "Khun Ream",
+"nameKm": "ឃុនរាម",
+"code": "170302",
+"slug": "khun-ream"
+},
+{
+"name": "Preah Dak",
+"nameKm": "ព្រះដាក់",
+"code": "170303",
+"slug": "preah-dak"
+},
+{
+"name": "Rumchek",
+"nameKm": "រំចេក",
+"code": "170304",
+"slug": "rumchek"
+},
+{
+"name": "Run Ta Aek",
+"nameKm": "រុនតាឯក",
+"code": "170305",
+"slug": "run-ta-aek"
+},
+{
+"name": "Tbaeng",
+"nameKm": "ត្បែង",
+"code": "170306",
+"slug": "tbaeng"
+}
+]
+},
+{
+"name": "Chi Kraeng",
+"nameKm": "ជីក្រែង",
+"code": "1704",
+"slug": "chi-kraeng",
+"communes": [
+{
+"name": "Anlong Samnar",
+"nameKm": "អន្លង់សំណរ",
+"code": "170401",
+"slug": "anlong-samnar"
+},
+{
+"name": "Chi Kraeng",
+"nameKm": "ជីក្រែង",
+"code": "170402",
+"slug": "chi-kraeng"
+},
+{
+"name": "Kampong Kdei",
+"nameKm": "កំពង់ក្ដី",
+"code": "170403",
+"slug": "kampong-kdei"
+},
+{
+"name": "Khvav",
+"nameKm": "ខ្វាវ",
+"code": "170404",
+"slug": "khvav"
+},
+{
+"name": "Kouk Thlok Kraom",
+"nameKm": "គោកធ្លកក្រោម",
+"code": "170405",
+"slug": "kouk-thlok-kraom"
+},
+{
+"name": "Kouk Thlok Leu",
+"nameKm": "គោកធ្លកលើ",
+"code": "170406",
+"slug": "kouk-thlok-leu"
+},
+{
+"name": "Lveaeng Ruessei",
+"nameKm": "ល្វែងឫស្សី",
+"code": "170407",
+"slug": "lveaeng-ruessei"
+},
+{
+"name": "Pongro Kraom",
+"nameKm": "ពង្រក្រោម",
+"code": "170408",
+"slug": "pongro-kraom"
+},
+{
+"name": "Pongro Leu",
+"nameKm": "ពង្រលើ",
+"code": "170409",
+"slug": "pongro-leu"
+},
+{
+"name": "Ruessei Lok",
+"nameKm": "ឫស្សីលក",
+"code": "170410",
+"slug": "ruessei-lok"
+},
+{
+"name": "Sangvaeuy",
+"nameKm": "សង្វើយ",
+"code": "170411",
+"slug": "sangvaeuy"
+},
+{
+"name": "Spean Tnaot",
+"nameKm": "ស្ពានត្នោត",
+"code": "170412",
+"slug": "spean-tnaot"
+}
+]
+},
+{
+"name": "Kralanh",
+"nameKm": "ក្រឡាញ់",
+"code": "1706",
+"slug": "kralanh",
+"communes": [
+{
+"name": "Chanleas Dai",
+"nameKm": "ចន្លាសដៃ",
+"code": "170601",
+"slug": "chanleas-dai"
+},
+{
+"name": "Kampong Thkov",
+"nameKm": "កំពង់ថ្កូវ",
+"code": "170602",
+"slug": "kampong-thkov"
+},
+{
+"name": "Kralanh",
+"nameKm": "ក្រឡាញ់",
+"code": "170603",
+"slug": "kralanh"
+},
+{
+"name": "Krouch Kor",
+"nameKm": "ក្រូចគរ",
+"code": "170604",
+"slug": "krouch-kor"
+},
+{
+"name": "Roung Kou",
+"nameKm": "រោងគោ",
+"code": "170605",
+"slug": "roung-kou"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "170606",
+"slug": "sambuor"
+},
+{
+"name": "Saen Sokh",
+"nameKm": "សែនសុខ",
+"code": "170607",
+"slug": "saen-sokh"
+},
+{
+"name": "Snuol",
+"nameKm": "ស្នួល",
+"code": "170608",
+"slug": "snuol"
+},
+{
+"name": "Sranal",
+"nameKm": "ស្រណាល",
+"code": "170609",
+"slug": "sranal"
+},
+{
+"name": "Ta An",
+"nameKm": "តាអាន",
+"code": "170610",
+"slug": "ta-an"
+}
+]
+},
+{
+"name": "Puok",
+"nameKm": "ពួក",
+"code": "1707",
+"slug": "puok",
+"communes": [
+{
+"name": "Sasar Sdam",
+"nameKm": "សសរស្ដម្ភ",
+"code": "170701",
+"slug": "sasar-sdam"
+},
+{
+"name": "Doun Kaev",
+"nameKm": "ដូនកែវ",
+"code": "170702",
+"slug": "doun-kaev"
+},
+{
+"name": "Kdei Run",
+"nameKm": "ក្ដីរុន",
+"code": "170703",
+"slug": "kdei-run"
+},
+{
+"name": "Kaev Poar",
+"nameKm": "កែវពណ៌",
+"code": "170704",
+"slug": "kaev-poar"
+},
+{
+"name": "Khnat",
+"nameKm": "ខ្នាត",
+"code": "170705",
+"slug": "khnat"
+},
+{
+"name": "Lvea",
+"nameKm": "ល្វា",
+"code": "170707",
+"slug": "lvea"
+},
+{
+"name": "Mukh Paen",
+"nameKm": "មុខប៉ែន",
+"code": "170708",
+"slug": "mukh-paen"
+},
+{
+"name": "Pou Treay",
+"nameKm": "ពោធិ៍ទ្រាយ",
+"code": "170709",
+"slug": "pou-treay"
+},
+{
+"name": "Puok",
+"nameKm": "ពួក",
+"code": "170710",
+"slug": "puok"
+},
+{
+"name": "Prey Chruk",
+"nameKm": "ព្រៃជ្រូក",
+"code": "170711",
+"slug": "prey-chruk"
+},
+{
+"name": "Reul",
+"nameKm": "រើល",
+"code": "170712",
+"slug": "reul"
+},
+{
+"name": "Samraong Yea",
+"nameKm": "សំរោងយា",
+"code": "170713",
+"slug": "samraong-yea"
+},
+{
+"name": "Trei Nhoar",
+"nameKm": "ត្រីញ័រ",
+"code": "170715",
+"slug": "trei-nhoar"
+},
+{
+"name": "Yeang",
+"nameKm": "យាង",
+"code": "170716",
+"slug": "yeang"
+}
+]
+},
+{
+"name": "Prasat Bakong",
+"nameKm": "ប្រាសាទបាគង",
+"code": "1709",
+"slug": "prasat-bakong",
+"communes": [
+{
+"name": "Bakong",
+"nameKm": "បាគង",
+"code": "170902",
+"slug": "bakong"
+},
+{
+"name": "Ballangk",
+"nameKm": "បល្ល័ង្ក",
+"code": "170903",
+"slug": "ballangk"
+},
+{
+"name": "Kampong Phluk",
+"nameKm": "កំពង់ភ្លុក",
+"code": "170904",
+"slug": "kampong-phluk"
+},
+{
+"name": "Kantreang",
+"nameKm": "កន្ទ្រាំង",
+"code": "170905",
+"slug": "kantreang"
+},
+{
+"name": "Kandaek",
+"nameKm": "កណ្ដែក",
+"code": "170906",
+"slug": "kandaek"
+},
+{
+"name": "Mean Chey",
+"nameKm": "មានជ័យ",
+"code": "170907",
+"slug": "mean-chey"
+},
+{
+"name": "Roluos",
+"nameKm": "រលួស",
+"code": "170908",
+"slug": "roluos"
+},
+{
+"name": "Trapeang Thum",
+"nameKm": "ត្រពាំងធំ",
+"code": "170909",
+"slug": "trapeang-thum"
+},
+{
+"name": "Ampil",
+"nameKm": "អំពិល",
+"code": "170910",
+"slug": "ampil"
+}
+]
+},
+{
+"name": "Siem Reap",
+"nameKm": "សៀមរាប",
+"code": "1710",
+"slug": "siem-reap",
+"communes": [
+{
+"name": "Sla Kram",
+"nameKm": "ស្លក្រាម",
+"code": "171001",
+"slug": "sla-kram"
+},
+{
+"name": "Svay Dankum",
+"nameKm": "ស្វាយដង្គំ",
+"code": "171002",
+"slug": "svay-dankum"
+},
+{
+"name": "Kok Chak",
+"nameKm": "គោកចក",
+"code": "171003",
+"slug": "kok-chak"
+},
+{
+"name": "Sala Kamreuk",
+"nameKm": "សាលាកំរើក",
+"code": "171004",
+"slug": "sala-kamreuk"
+},
+{
+"name": "Nokor Thum",
+"nameKm": "នគរធំ",
+"code": "171005",
+"slug": "nokor-thum"
+},
+{
+"name": "Chreav",
+"nameKm": "ជ្រាវ",
+"code": "171006",
+"slug": "chreav"
+},
+{
+"name": "Chong Khnies",
+"nameKm": "ចុងឃ្នៀស",
+"code": "171007",
+"slug": "chong-khnies"
+},
+{
+"name": "Sngkat Sambuor",
+"nameKm": "សំបួរ",
+"code": "171008",
+"slug": "sngkat-sambuor"
+},
+{
+"name": "Siem Reab",
+"nameKm": "សៀមរាប",
+"code": "171009",
+"slug": "siem-reab"
+},
+{
+"name": "Srangae",
+"nameKm": "ស្រង៉ែ",
+"code": "171010",
+"slug": "srangae"
+},
+{
+"name": "Krabei Riel",
+"nameKm": "ក្របីរៀល",
+"code": "171012",
+"slug": "krabei-riel"
+},
+{
+"name": "Tuek Vil",
+"nameKm": "ទឹកវិល",
+"code": "171013",
+"slug": "tuek-vil"
+}
+]
+},
+{
+"name": "Soutr Nikom",
+"nameKm": "សូទ្រនិគម",
+"code": "1711",
+"slug": "soutr-nikom",
+"communes": [
+{
+"name": "Chan Sa",
+"nameKm": "ចាន់ស",
+"code": "171101",
+"slug": "chan-sa"
+},
+{
+"name": "Dam Daek",
+"nameKm": "ដំដែក",
+"code": "171102",
+"slug": "dam-daek"
+},
+{
+"name": "Dan Run",
+"nameKm": "ដានរុន",
+"code": "171103",
+"slug": "dan-run"
+},
+{
+"name": "Kampong Khleang",
+"nameKm": "កំពង់ឃ្លាំង",
+"code": "171104",
+"slug": "kampong-khleang"
+},
+{
+"name": "Kien Sangkae",
+"nameKm": "កៀនសង្កែ",
+"code": "171105",
+"slug": "kien-sangkae"
+},
+{
+"name": "Khchas",
+"nameKm": "ខ្ចាស់",
+"code": "171106",
+"slug": "khchas"
+},
+{
+"name": "Khnar Pou",
+"nameKm": "ខ្នារពោធិ៍",
+"code": "171107",
+"slug": "khnar-pou"
+},
+{
+"name": "Popel",
+"nameKm": "ពពេល",
+"code": "171108",
+"slug": "popel"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "171109",
+"slug": "samraong"
+},
+{
+"name": "Ta Yaek",
+"nameKm": "តាយ៉ែក",
+"code": "171110",
+"slug": "ta-yaek"
+}
+]
+},
+{
+"name": "Srei Snam",
+"nameKm": "ស្រីស្នំ",
+"code": "1712",
+"slug": "srei-snam",
+"communes": [
+{
+"name": "Chrouy Neang Nguon",
+"nameKm": "ជ្រោយនាងងួន",
+"code": "171201",
+"slug": "chrouy-neang-nguon"
+},
+{
+"name": "Klang Hay",
+"nameKm": "ក្លាំងហាយ",
+"code": "171202",
+"slug": "klang-hay"
+},
+{
+"name": "Tram Sasar",
+"nameKm": "ត្រាំសសរ",
+"code": "171203",
+"slug": "tram-sasar"
+},
+{
+"name": "Moung",
+"nameKm": "មោង",
+"code": "171204",
+"slug": "moung"
+},
+{
+"name": "Prei",
+"nameKm": "ប្រីយ៍",
+"code": "171205",
+"slug": "prei"
+},
+{
+"name": "Slaeng Spean",
+"nameKm": "ស្លែងស្ពាន",
+"code": "171206",
+"slug": "slaeng-spean"
+}
+]
+},
+{
+"name": "Svay Leu",
+"nameKm": "ស្វាយលើ",
+"code": "1713",
+"slug": "svay-leu",
+"communes": [
+{
+"name": "Boeng Mealea",
+"nameKm": "បឹងមាលា",
+"code": "171301",
+"slug": "boeng-mealea"
+},
+{
+"name": "Kantuot",
+"nameKm": "កន្ទួត",
+"code": "171302",
+"slug": "kantuot"
+},
+{
+"name": "Khnang Phnum",
+"nameKm": "ខ្នងភ្នំ",
+"code": "171303",
+"slug": "khnang-phnum"
+},
+{
+"name": "Svay Leu",
+"nameKm": "ស្វាយលើ",
+"code": "171304",
+"slug": "svay-leu"
+},
+{
+"name": "Ta Siem",
+"nameKm": "តាសៀម",
+"code": "171305",
+"slug": "ta-siem"
+}
+]
+},
+{
+"name": "Varin",
+"nameKm": "វ៉ារិន",
+"code": "1714",
+"slug": "varin",
+"communes": [
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "171401",
+"slug": "prasat"
+},
+{
+"name": "Lvea Krang",
+"nameKm": "ល្វាក្រាំង",
+"code": "171402",
+"slug": "lvea-krang"
+},
+{
+"name": "Srae Nouy",
+"nameKm": "ស្រែណូយ",
+"code": "171403",
+"slug": "srae-nouy"
+},
+{
+"name": "Svay Sa",
+"nameKm": "ស្វាយ ស",
+"code": "171404",
+"slug": "svay-sa"
+},
+{
+"name": "Varin",
+"nameKm": "វ៉ារិន",
+"code": "171405",
+"slug": "varin"
+}
+]
+}
+]
+},
+{
+"key": "stung_treng",
+"slug": "stung-treng",
+"name": "Stung Treng",
+"nameKm": "ស្ទឹងត្រែង",
+"code": "19",
+"districts": [
+{
+"name": "Sesan",
+"nameKm": "សេសាន",
+"code": "1901",
+"slug": "sesan",
+"communes": [
+{
+"name": "Kamphun",
+"nameKm": "កំភុន",
+"code": "190101",
+"slug": "kamphun"
+},
+{
+"name": "Kbal Romeas",
+"nameKm": "ក្បាលរមាស",
+"code": "190102",
+"slug": "kbal-romeas"
+},
+{
+"name": "Phluk",
+"nameKm": "ភ្លុក",
+"code": "190103",
+"slug": "phluk"
+},
+{
+"name": "Samkhuoy",
+"nameKm": "សាមឃួយ",
+"code": "190104",
+"slug": "samkhuoy"
+},
+{
+"name": "Sdau",
+"nameKm": "ស្ដៅ",
+"code": "190105",
+"slug": "sdau"
+},
+{
+"name": "Srae Kor",
+"nameKm": "ស្រែគរ",
+"code": "190106",
+"slug": "srae-kor"
+},
+{
+"name": "Ta Lat",
+"nameKm": "តាឡាត",
+"code": "190107",
+"slug": "ta-lat"
+}
+]
+},
+{
+"name": "Siem Bouk",
+"nameKm": "សៀមបូក",
+"code": "1902",
+"slug": "siem-bouk",
+"communes": [
+{
+"name": "Kaoh Preah",
+"nameKm": "កោះព្រះ",
+"code": "190201",
+"slug": "kaoh-preah"
+},
+{
+"name": "Kaoh Sampeay",
+"nameKm": "កោះសំពាយ",
+"code": "190202",
+"slug": "kaoh-sampeay"
+},
+{
+"name": "Kaoh Sralay",
+"nameKm": "កោះស្រឡាយ",
+"code": "190203",
+"slug": "kaoh-sralay"
+},
+{
+"name": "Ou Mreah",
+"nameKm": "អូរម្រះ",
+"code": "190204",
+"slug": "ou-mreah"
+},
+{
+"name": "Ou Ruessei Kandal",
+"nameKm": "អូរឫស្សីកណ្ដាល",
+"code": "190205",
+"slug": "ou-ruessei-kandal"
+},
+{
+"name": "Siem Bouk",
+"nameKm": "សៀមបូក",
+"code": "190206",
+"slug": "siem-bouk"
+},
+{
+"name": "Srae Krasang",
+"nameKm": "ស្រែក្រសាំង",
+"code": "190207",
+"slug": "srae-krasang"
+}
+]
+},
+{
+"name": "Siem Pang",
+"nameKm": "សៀមប៉ាង",
+"code": "1903",
+"slug": "siem-pang",
+"communes": [
+{
+"name": "Preaek Meas",
+"nameKm": "ព្រែកមាស",
+"code": "190301",
+"slug": "preaek-meas"
+},
+{
+"name": "Sekong",
+"nameKm": "សេកុង",
+"code": "190302",
+"slug": "sekong"
+},
+{
+"name": "Santepheap",
+"nameKm": "សន្ដិភាព",
+"code": "190303",
+"slug": "santepheap"
+},
+{
+"name": "Srae Sambour",
+"nameKm": "ស្រែសំបូរ",
+"code": "190304",
+"slug": "srae-sambour"
+},
+{
+"name": "Tma Kaev",
+"nameKm": "ថ្មកែវ",
+"code": "190305",
+"slug": "tma-kaev"
+}
+]
+},
+{
+"name": "Stueng Traeng",
+"nameKm": "ស្ទឹងត្រែង",
+"code": "1904",
+"slug": "stung-treng",
+"communes": [
+{
+"name": "Stueng Traeng",
+"nameKm": "ស្ទឹងត្រែង",
+"code": "190401",
+"slug": "stueng-traeng"
+},
+{
+"name": "Srah Ruessei",
+"nameKm": "ស្រះឫស្សី",
+"code": "190402",
+"slug": "srah-ruessei"
+},
+{
+"name": "Preah Bat",
+"nameKm": "ព្រះបាទ",
+"code": "190403",
+"slug": "preah-bat"
+},
+{
+"name": "Sameakki",
+"nameKm": "សាមគ្គី",
+"code": "190404",
+"slug": "sameakki"
+}
+],
+"legacySlug": true
+},
+{
+"name": "Thala Barivat",
+"nameKm": "ថាឡាបរិវ៉ាត់",
+"code": "1905",
+"slug": "thala-barivat",
+"communes": [
+{
+"name": "Anlong Phe",
+"nameKm": "អន្លង់ភេ",
+"code": "190501",
+"slug": "anlong-phe"
+},
+{
+"name": "Chamkar Leu",
+"nameKm": "ចំការលើ",
+"code": "190502",
+"slug": "chamkar-leu"
+},
+{
+"name": "Kang Cham",
+"nameKm": "កាំងចាម",
+"code": "190503",
+"slug": "kang-cham"
+},
+{
+"name": "Anlong Chrey",
+"nameKm": "អន្លង់ជ្រៃ",
+"code": "190505",
+"slug": "anlong-chrey"
+},
+{
+"name": "Ou Rai",
+"nameKm": "អូររ៉ៃ",
+"code": "190506",
+"slug": "ou-rai"
+},
+{
+"name": "Sam Ang",
+"nameKm": "សំអាង",
+"code": "190509",
+"slug": "sam-ang"
+},
+{
+"name": "Srae Ruessei",
+"nameKm": "ស្រែឫស្សី",
+"code": "190510",
+"slug": "srae-ruessei"
+},
+{
+"name": "Thala Barivat",
+"nameKm": "ថាឡាបរិវ៉ាត់",
+"code": "190511",
+"slug": "thala-barivat"
+}
+]
+},
+{
+"name": "Borei Ou Svay Senchey",
+"nameKm": "បុរីអូរស្វាយសែនជ័យ",
+"code": "1906",
+"slug": "borei-ou-svay-senchey",
+"communes": [
+{
+"name": "Ou Svay",
+"nameKm": "អូរស្វាយ",
+"code": "190601",
+"slug": "ou-svay"
+},
+{
+"name": "Kaoh Snaeng",
+"nameKm": "កោះស្នែង",
+"code": "190602",
+"slug": "kaoh-snaeng"
+},
+{
+"name": "Preah Rumkel",
+"nameKm": "ព្រះរំកិល",
+"code": "190603",
+"slug": "preah-rumkel"
+}
+]
+}
+]
+},
+{
+"key": "svay_rieng",
+"slug": "svay-rieng",
+"name": "Svay Rieng",
+"nameKm": "ស្វាយរៀង",
+"code": "20",
+"districts": [
+{
+"name": "Chantrea",
+"nameKm": "ចន្ទ្រា",
+"code": "2001",
+"slug": "chantrea",
+"communes": [
+{
+"name": "Chantrea",
+"nameKm": "ចន្ទ្រា",
+"code": "200103",
+"slug": "chantrea"
+},
+{
+"name": "Chres",
+"nameKm": "ច្រេស",
+"code": "200104",
+"slug": "chres"
+},
+{
+"name": "Me Sar Thngak",
+"nameKm": "មេ សរថ្ងក",
+"code": "200105",
+"slug": "me-sar-thngak"
+},
+{
+"name": "Prey Kokir",
+"nameKm": "ព្រៃគគីរ",
+"code": "200108",
+"slug": "prey-kokir"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "200109",
+"slug": "samraong"
+},
+{
+"name": "Tuol Sdei",
+"nameKm": "ទួលស្ដី",
+"code": "200110",
+"slug": "tuol-sdei"
+}
+]
+},
+{
+"name": "Kampong Rou",
+"nameKm": "កំពង់រោទិ៍",
+"code": "2002",
+"slug": "kampong-rou",
+"communes": [
+{
+"name": "Banteay Krang",
+"nameKm": "បន្ទាយក្រាំង",
+"code": "200201",
+"slug": "banteay-krang"
+},
+{
+"name": "Nhor",
+"nameKm": "ញរ",
+"code": "200202",
+"slug": "nhor"
+},
+{
+"name": "Khsaetr",
+"nameKm": "ខ្សែត្រ",
+"code": "200203",
+"slug": "khsaetr"
+},
+{
+"name": "Preah Ponlea",
+"nameKm": "ព្រះពន្លា",
+"code": "200204",
+"slug": "preah-ponlea"
+},
+{
+"name": "Prey Thum",
+"nameKm": "ព្រៃធំ",
+"code": "200205",
+"slug": "prey-thum"
+},
+{
+"name": "Reach Montir",
+"nameKm": "រាជមន្ទីរ",
+"code": "200206",
+"slug": "reach-montir"
+},
+{
+"name": "Samlei",
+"nameKm": "សំឡី",
+"code": "200207",
+"slug": "samlei"
+},
+{
+"name": "Samyaong",
+"nameKm": "សំយ៉ោង",
+"code": "200208",
+"slug": "samyaong"
+},
+{
+"name": "Svay Ta Yean",
+"nameKm": "ស្វាយតាយាន",
+"code": "200209",
+"slug": "svay-ta-yean"
+},
+{
+"name": "Thmei",
+"nameKm": "ថ្មី",
+"code": "200211",
+"slug": "thmei"
+},
+{
+"name": "Tnaot",
+"nameKm": "ត្នោត",
+"code": "200212",
+"slug": "tnaot"
+}
+]
+},
+{
+"name": "Rumduol",
+"nameKm": "រំដួល",
+"code": "2003",
+"slug": "rumduol",
+"communes": [
+{
+"name": "Bos Mon",
+"nameKm": "បុសមន",
+"code": "200301",
+"slug": "bos-mon"
+},
+{
+"name": "Thmea",
+"nameKm": "ធ្មា",
+"code": "200302",
+"slug": "thmea"
+},
+{
+"name": "Kampong Chak",
+"nameKm": "កំពង់ចក",
+"code": "200303",
+"slug": "kampong-chak"
+},
+{
+"name": "Chrung Popel",
+"nameKm": "ជ្រុងពពេល",
+"code": "200304",
+"slug": "chrung-popel"
+},
+{
+"name": "Kampong Ampil",
+"nameKm": "កំពង់អំពិល",
+"code": "200305",
+"slug": "kampong-ampil"
+},
+{
+"name": "Meun Chey",
+"nameKm": "ម៉ឺនជ័យ",
+"code": "200306",
+"slug": "meun-chey"
+},
+{
+"name": "Pong Tuek",
+"nameKm": "ពងទឹក",
+"code": "200307",
+"slug": "pong-tuek"
+},
+{
+"name": "Sangkae",
+"nameKm": "សង្កែ",
+"code": "200308",
+"slug": "sangkae"
+},
+{
+"name": "Svay Chek",
+"nameKm": "ស្វាយចេក",
+"code": "200309",
+"slug": "svay-chek"
+},
+{
+"name": "Thna Thnong",
+"nameKm": "ថ្នាធ្នង់",
+"code": "200310",
+"slug": "thna-thnong"
+}
+]
+},
+{
+"name": "Romeas Haek",
+"nameKm": "រមាសហែក",
+"code": "2004",
+"slug": "romeas-haek",
+"communes": [
+{
+"name": "Ampil",
+"nameKm": "អំពិល",
+"code": "200401",
+"slug": "ampil"
+},
+{
+"name": "Andoung Pou",
+"nameKm": "អណ្ដូងពោធិ៍",
+"code": "200402",
+"slug": "andoung-pou"
+},
+{
+"name": "Andoung Trabaek",
+"nameKm": "អណ្ដូងត្របែក",
+"code": "200403",
+"slug": "andoung-trabaek"
+},
+{
+"name": "Angk Prasrae",
+"nameKm": "អង្គប្រស្រែ",
+"code": "200404",
+"slug": "angk-prasrae"
+},
+{
+"name": "Chantrei",
+"nameKm": "ចន្ដ្រី",
+"code": "200405",
+"slug": "chantrei"
+},
+{
+"name": "Chrey Thum",
+"nameKm": "ជ្រៃធំ",
+"code": "200406",
+"slug": "chrey-thum"
+},
+{
+"name": "Doung",
+"nameKm": "ដូង",
+"code": "200407",
+"slug": "doung"
+},
+{
+"name": "Kampong Trach",
+"nameKm": "កំពង់ត្រាច",
+"code": "200408",
+"slug": "kampong-trach"
+},
+{
+"name": "Kokir",
+"nameKm": "គគីរ",
+"code": "200409",
+"slug": "kokir"
+},
+{
+"name": "Krasang",
+"nameKm": "ក្រសាំង",
+"code": "200410",
+"slug": "krasang"
+},
+{
+"name": "Mukh Da",
+"nameKm": "មុខដា",
+"code": "200411",
+"slug": "mukh-da"
+},
+{
+"name": "Mream",
+"nameKm": "ម្រាម",
+"code": "200412",
+"slug": "mream"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "200413",
+"slug": "sambuor"
+},
+{
+"name": "Sambatt Mean Chey",
+"nameKm": "សម្បត្ដិមានជ័យ",
+"code": "200414",
+"slug": "sambatt-mean-chey"
+},
+{
+"name": "Trapeang Sdau",
+"nameKm": "ត្រពាំងស្ដៅ",
+"code": "200415",
+"slug": "trapeang-sdau"
+},
+{
+"name": "Tras",
+"nameKm": "ត្រស់",
+"code": "200416",
+"slug": "tras"
+}
+]
+},
+{
+"name": "Svay Chrum",
+"nameKm": "ស្វាយជ្រំ",
+"code": "2005",
+"slug": "svay-chrum",
+"communes": [
+{
+"name": "Angk Ta Sou",
+"nameKm": "អង្គតាសូ",
+"code": "200501",
+"slug": "angk-ta-sou"
+},
+{
+"name": "Basak",
+"nameKm": "បាសាក់",
+"code": "200502",
+"slug": "basak"
+},
+{
+"name": "Chambak",
+"nameKm": "ចំបក់",
+"code": "200503",
+"slug": "chambak"
+},
+{
+"name": "Kampong Chamlang",
+"nameKm": "កំពង់ចំឡង",
+"code": "200504",
+"slug": "kampong-chamlang"
+},
+{
+"name": "Ta Suos",
+"nameKm": "តាសួស",
+"code": "200505",
+"slug": "ta-suos"
+},
+{
+"name": "Chheu Teal",
+"nameKm": "ឈើទាល",
+"code": "200507",
+"slug": "chheu-teal"
+},
+{
+"name": "Doun Sa",
+"nameKm": "ដូនស",
+"code": "200508",
+"slug": "doun-sa"
+},
+{
+"name": "Kouk Pring",
+"nameKm": "គោកព្រីង",
+"code": "200509",
+"slug": "kouk-pring"
+},
+{
+"name": "Kraol Kou",
+"nameKm": "ក្រោលគោ",
+"code": "200510",
+"slug": "kraol-kou"
+},
+{
+"name": "Kruos",
+"nameKm": "គ្រួស",
+"code": "200511",
+"slug": "kruos"
+},
+{
+"name": "Pouthi Reach",
+"nameKm": "ពោធិរាជ",
+"code": "200512",
+"slug": "pouthi-reach"
+},
+{
+"name": "Svay Angk",
+"nameKm": "ស្វាយអង្គ",
+"code": "200513",
+"slug": "svay-angk"
+},
+{
+"name": "Svay Chrum",
+"nameKm": "ស្វាយជ្រំ",
+"code": "200514",
+"slug": "svay-chrum"
+},
+{
+"name": "Svay Thum",
+"nameKm": "ស្វាយធំ",
+"code": "200515",
+"slug": "svay-thum"
+},
+{
+"name": "Svay Yea",
+"nameKm": "ស្វាយយា",
+"code": "200516",
+"slug": "svay-yea"
+},
+{
+"name": "Thlok",
+"nameKm": "ធ្លក",
+"code": "200517",
+"slug": "thlok"
+}
+]
+},
+{
+"name": "Svay Rieng",
+"nameKm": "ស្វាយរៀង",
+"code": "2006",
+"slug": "svay-rieng",
+"communes": [
+{
+"name": "Svay Rieng",
+"nameKm": "ស្វាយរៀង",
+"code": "200601",
+"slug": "svay-rieng"
+},
+{
+"name": "Prey Chhlak",
+"nameKm": "ព្រៃឆ្លាក់",
+"code": "200602",
+"slug": "prey-chhlak"
+},
+{
+"name": "Koy Trabaek",
+"nameKm": "គយត្របែក",
+"code": "200603",
+"slug": "koy-trabaek"
+},
+{
+"name": "Pou Ta Hao",
+"nameKm": "ពោធិ៍តាហោ",
+"code": "200604",
+"slug": "pou-ta-hao"
+},
+{
+"name": "Chek",
+"nameKm": "ចេក",
+"code": "200605",
+"slug": "chek"
+},
+{
+"name": "Svay Toea",
+"nameKm": "ស្វាយតឿ",
+"code": "200606",
+"slug": "svay-toea"
+},
+{
+"name": "Sangkhoar",
+"nameKm": "សង្ឃរ័",
+"code": "200607",
+"slug": "sangkhoar"
+}
+]
+},
+{
+"name": "Svay Teab",
+"nameKm": "ស្វាយទាប",
+"code": "2007",
+"slug": "svay-teab",
+"communes": [
+{
+"name": "Koki Saom",
+"nameKm": "គគីសោម",
+"code": "200702",
+"slug": "koki-saom"
+},
+{
+"name": "Kandieng Reay",
+"nameKm": "កណ្ដៀងរាយ",
+"code": "200703",
+"slug": "kandieng-reay"
+},
+{
+"name": "Monourom",
+"nameKm": "មនោរម្យ",
+"code": "200704",
+"slug": "monourom"
+},
+{
+"name": "Popeaet",
+"nameKm": "ពពែត",
+"code": "200705",
+"slug": "popeaet"
+},
+{
+"name": "Prey Ta Ei",
+"nameKm": "ព្រៃតាអី",
+"code": "200706",
+"slug": "prey-ta-ei"
+},
+{
+"name": "Prasoutr",
+"nameKm": "ប្រសូត្រ",
+"code": "200707",
+"slug": "prasoutr"
+},
+{
+"name": "Romeang Thkaol",
+"nameKm": "រមាំងថ្កោល",
+"code": "200708",
+"slug": "romeang-thkaol"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "200709",
+"slug": "sambuor"
+},
+{
+"name": "Svay Rumpear",
+"nameKm": "ស្វាយរំពារ",
+"code": "200711",
+"slug": "svay-rumpear"
+}
+]
+},
+{
+"name": "Bavet",
+"nameKm": "បាវិត",
+"code": "2008",
+"slug": "bavet",
+"communes": [
+{
+"name": "Bati",
+"nameKm": "បាទី",
+"code": "200801",
+"slug": "bati"
+},
+{
+"name": "Bavet",
+"nameKm": "បាវិត",
+"code": "200802",
+"slug": "bavet"
+},
+{
+"name": "Chrak Mtes",
+"nameKm": "ច្រកម្ទេស",
+"code": "200803",
+"slug": "chrak-mtes"
+},
+{
+"name": "Prasat",
+"nameKm": "ប្រាសាទ",
+"code": "200804",
+"slug": "prasat"
+},
+{
+"name": "Prey Angkunh",
+"nameKm": "ព្រៃអង្គុញ",
+"code": "200805",
+"slug": "prey-angkunh"
+}
+]
+}
+]
+},
+{
+"key": "takeo",
+"slug": "takeo",
+"name": "Takeo",
+"nameKm": "តាកែវ",
+"code": "21",
+"districts": [
+{
+"name": "Angkor Borei",
+"nameKm": "អង្គរបូរី",
+"code": "2101",
+"slug": "angkor-borei",
+"communes": [
+{
+"name": "Angkor Borei",
+"nameKm": "អង្គរបូរី",
+"code": "210101",
+"slug": "angkor-borei"
+},
+{
+"name": "Ba Srae",
+"nameKm": "បាស្រែ",
+"code": "210102",
+"slug": "ba-srae"
+},
+{
+"name": "Kouk Thlok",
+"nameKm": "គោកធ្លក",
+"code": "210103",
+"slug": "kouk-thlok"
+},
+{
+"name": "Ponley",
+"nameKm": "ពន្លៃ",
+"code": "210104",
+"slug": "ponley"
+},
+{
+"name": "Preaek Phtoul",
+"nameKm": "ព្រែកផ្ទោល",
+"code": "210105",
+"slug": "preaek-phtoul"
+},
+{
+"name": "Prey Phkoam",
+"nameKm": "ព្រៃផ្គាំ",
+"code": "210106",
+"slug": "prey-phkoam"
+}
+]
+},
+{
+"name": "Bati",
+"nameKm": "បាទី",
+"code": "2102",
+"slug": "bati",
+"communes": [
+{
+"name": "Chambak",
+"nameKm": "ចំបក់",
+"code": "210201",
+"slug": "chambak"
+},
+{
+"name": "Champei",
+"nameKm": "ចំប៉ី",
+"code": "210202",
+"slug": "champei"
+},
+{
+"name": "Doung",
+"nameKm": "ដូង",
+"code": "210203",
+"slug": "doung"
+},
+{
+"name": "Kandoeng",
+"nameKm": "កណ្ដឹង",
+"code": "210204",
+"slug": "kandoeng"
+},
+{
+"name": "Komar Reachea",
+"nameKm": "កុមាររាជា",
+"code": "210205",
+"slug": "komar-reachea"
+},
+{
+"name": "Krang Leav",
+"nameKm": "ក្រាំងលាវ",
+"code": "210206",
+"slug": "krang-leav"
+},
+{
+"name": "Krang Thnong",
+"nameKm": "ក្រាំងធ្នង់",
+"code": "210207",
+"slug": "krang-thnong"
+},
+{
+"name": "Lumpong",
+"nameKm": "លំពង់",
+"code": "210208",
+"slug": "lumpong"
+},
+{
+"name": "Pea Ream",
+"nameKm": "ពារាម",
+"code": "210209",
+"slug": "pea-ream"
+},
+{
+"name": "Pot Sar",
+"nameKm": "ពត់សរ",
+"code": "210210",
+"slug": "pot-sar"
+},
+{
+"name": "Sour Phi",
+"nameKm": "សូរភី",
+"code": "210211",
+"slug": "sour-phi"
+},
+{
+"name": "Tang Doung",
+"nameKm": "តាំងដូង",
+"code": "210212",
+"slug": "tang-doung"
+},
+{
+"name": "Tnaot",
+"nameKm": "ត្នោត",
+"code": "210213",
+"slug": "tnaot"
+},
+{
+"name": "Trapeang Krasang",
+"nameKm": "ត្រពាំងក្រសាំង",
+"code": "210214",
+"slug": "trapeang-krasang"
+},
+{
+"name": "Trapeang Sab",
+"nameKm": "ត្រពាំងសាប",
+"code": "210215",
+"slug": "trapeang-sab"
+}
+]
+},
+{
+"name": "Borei Cholsar",
+"nameKm": "បូរីជលសារ",
+"code": "2103",
+"slug": "borei-cholsar",
+"communes": [
+{
+"name": "Borei Cholsar",
+"nameKm": "បូរីជលសារ",
+"code": "210301",
+"slug": "borei-cholsar"
+},
+{
+"name": "Chey Chouk",
+"nameKm": "ជ័យជោគ",
+"code": "210302",
+"slug": "chey-chouk"
+},
+{
+"name": "Doung Khpos",
+"nameKm": "ដូងខ្ពស់",
+"code": "210303",
+"slug": "doung-khpos"
+},
+{
+"name": "Kampong Krasang",
+"nameKm": "កំពង់ក្រសាំង",
+"code": "210304",
+"slug": "kampong-krasang"
+},
+{
+"name": "Kouk Pou",
+"nameKm": "គោកពោធិ៍",
+"code": "210305",
+"slug": "kouk-pou"
+}
+]
+},
+{
+"name": "Kiri Vong",
+"nameKm": "គីរីវង់",
+"code": "2104",
+"slug": "kiri-vong",
+"communes": [
+{
+"name": "Angk Prasat",
+"nameKm": "អង្គប្រាសាទ",
+"code": "210401",
+"slug": "angk-prasat"
+},
+{
+"name": "Preah Bat Choan Chum",
+"nameKm": "ព្រះបាទជាន់ជុំ",
+"code": "210402",
+"slug": "preah-bat-choan-chum"
+},
+{
+"name": "Kamnab",
+"nameKm": "កំណប់",
+"code": "210403",
+"slug": "kamnab"
+},
+{
+"name": "Kampeaeng",
+"nameKm": "កំពែង",
+"code": "210404",
+"slug": "kampeaeng"
+},
+{
+"name": "Kiri Chong Kaoh",
+"nameKm": "គីរីចុងកោះ",
+"code": "210405",
+"slug": "kiri-chong-kaoh"
+},
+{
+"name": "Kouk Prech",
+"nameKm": "គោកព្រេច",
+"code": "210406",
+"slug": "kouk-prech"
+},
+{
+"name": "Phnum Den",
+"nameKm": "ភ្នំដិន",
+"code": "210407",
+"slug": "phnum-den"
+},
+{
+"name": "Prey Ampok",
+"nameKm": "ព្រៃអំពក",
+"code": "210408",
+"slug": "prey-ampok"
+},
+{
+"name": "Prey Rumdeng",
+"nameKm": "ព្រៃរំដេង",
+"code": "210409",
+"slug": "prey-rumdeng"
+},
+{
+"name": "Ream Andaeuk",
+"nameKm": "រាមអណ្ដើក",
+"code": "210410",
+"slug": "ream-andaeuk"
+},
+{
+"name": "Saom",
+"nameKm": "សោម",
+"code": "210411",
+"slug": "saom"
+},
+{
+"name": "Ta Ou",
+"nameKm": "តាអូរ",
+"code": "210412",
+"slug": "ta-ou"
+}
+]
+},
+{
+"name": "Kaoh Andaet",
+"nameKm": "កោះអណ្ដែត",
+"code": "2105",
+"slug": "kaoh-andaet",
+"communes": [
+{
+"name": "Krapum Chhuk",
+"nameKm": "ក្រពុំឈូក",
+"code": "210501",
+"slug": "krapum-chhuk"
+},
+{
+"name": "Pech Sar",
+"nameKm": "ពេជសារ",
+"code": "210502",
+"slug": "pech-sar"
+},
+{
+"name": "Prey Khla",
+"nameKm": "ព្រៃខ្លា",
+"code": "210503",
+"slug": "prey-khla"
+},
+{
+"name": "Prey Yuthka",
+"nameKm": "ព្រៃយុថ្កា",
+"code": "210504",
+"slug": "prey-yuthka"
+},
+{
+"name": "Romenh",
+"nameKm": "រមេញ",
+"code": "210505",
+"slug": "romenh"
+},
+{
+"name": "Thlea Prachum",
+"nameKm": "ធ្លាប្រជុំ",
+"code": "210506",
+"slug": "thlea-prachum"
+}
+]
+},
+{
+"name": "Prey Kabbas",
+"nameKm": "ព្រៃកប្បាស",
+"code": "2106",
+"slug": "prey-kabbas",
+"communes": [
+{
+"name": "Angkanh",
+"nameKm": "អង្កាញ់",
+"code": "210601",
+"slug": "angkanh"
+},
+{
+"name": "Ban Kam",
+"nameKm": "បានកាម",
+"code": "210602",
+"slug": "ban-kam"
+},
+{
+"name": "Champa",
+"nameKm": "ចំប៉ា",
+"code": "210603",
+"slug": "champa"
+},
+{
+"name": "Char",
+"nameKm": "ចារ",
+"code": "210604",
+"slug": "char"
+},
+{
+"name": "Kampeaeng",
+"nameKm": "កំពែង",
+"code": "210605",
+"slug": "kampeaeng"
+},
+{
+"name": "Kampong Reab",
+"nameKm": "កំពង់រាប",
+"code": "210606",
+"slug": "kampong-reab"
+},
+{
+"name": "Kdanh",
+"nameKm": "ក្ដាញ់",
+"code": "210607",
+"slug": "kdanh"
+},
+{
+"name": "Pou Rumchak",
+"nameKm": "ពោធិ៍រំចាក",
+"code": "210608",
+"slug": "pou-rumchak"
+},
+{
+"name": "Prey Kabbas",
+"nameKm": "ព្រៃកប្បាស",
+"code": "210609",
+"slug": "prey-kabbas"
+},
+{
+"name": "Prey Lvea",
+"nameKm": "ព្រៃល្វា",
+"code": "210610",
+"slug": "prey-lvea"
+},
+{
+"name": "Prey Phdau",
+"nameKm": "ព្រៃផ្ដៅ",
+"code": "210611",
+"slug": "prey-phdau"
+},
+{
+"name": "Snao",
+"nameKm": "ស្នោ",
+"code": "210612",
+"slug": "snao"
+},
+{
+"name": "Tang Yab",
+"nameKm": "តាំងយ៉ាប",
+"code": "210613",
+"slug": "tang-yab"
+}
+]
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "2107",
+"slug": "samraong",
+"communes": [
+{
+"name": "Boeng Tranh Khang Cheung",
+"nameKm": "បឹងត្រាញ់ខាងជើង",
+"code": "210701",
+"slug": "boeng-tranh-khang-cheung"
+},
+{
+"name": "Boeng Tranh Khang Tboung",
+"nameKm": "បឹងត្រាញ់ខាងត្បូង",
+"code": "210702",
+"slug": "boeng-tranh-khang-tboung"
+},
+{
+"name": "Cheung Kuon",
+"nameKm": "ជើងគួន",
+"code": "210703",
+"slug": "cheung-kuon"
+},
+{
+"name": "Chumreah Pen",
+"nameKm": "ជំរះពេន",
+"code": "210704",
+"slug": "chumreah-pen"
+},
+{
+"name": "Khvav",
+"nameKm": "ខ្វាវ",
+"code": "210705",
+"slug": "khvav"
+},
+{
+"name": "Lumchang",
+"nameKm": "លំចង់",
+"code": "210706",
+"slug": "lumchang"
+},
+{
+"name": "Rovieng",
+"nameKm": "រវៀង",
+"code": "210707",
+"slug": "rovieng"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "210708",
+"slug": "samraong"
+},
+{
+"name": "Soengh",
+"nameKm": "សឹង្ហ",
+"code": "210709",
+"slug": "soengh"
+},
+{
+"name": "Sla",
+"nameKm": "ស្លា",
+"code": "210710",
+"slug": "sla"
+},
+{
+"name": "Trea",
+"nameKm": "ទ្រា",
+"code": "210711",
+"slug": "trea"
+}
+]
+},
+{
+"name": "Doun Kaev",
+"nameKm": "ដូនកែវ",
+"code": "2108",
+"slug": "doun-kaev",
+"communes": [
+{
+"name": "Baray",
+"nameKm": "បារាយណ៍",
+"code": "210801",
+"slug": "baray"
+},
+{
+"name": "Roka Knong",
+"nameKm": "រកាក្នុង",
+"code": "210802",
+"slug": "roka-knong"
+},
+{
+"name": "Roka Krau",
+"nameKm": "រកាក្រៅ",
+"code": "210803",
+"slug": "roka-krau"
+}
+]
+},
+{
+"name": "Tram Kak",
+"nameKm": "ត្រាំកក់",
+"code": "2109",
+"slug": "tram-kak",
+"communes": [
+{
+"name": "Angk Ta Saom",
+"nameKm": "អង្គតាសោម",
+"code": "210901",
+"slug": "angk-ta-saom"
+},
+{
+"name": "Cheang Tong",
+"nameKm": "ជាងទង",
+"code": "210902",
+"slug": "cheang-tong"
+},
+{
+"name": "Kus",
+"nameKm": "គុស",
+"code": "210903",
+"slug": "kus"
+},
+{
+"name": "Leay Bour",
+"nameKm": "លាយបូរ",
+"code": "210904",
+"slug": "leay-bour"
+},
+{
+"name": "Nhaeng Nhang",
+"nameKm": "ញ៉ែងញ៉ង",
+"code": "210905",
+"slug": "nhaeng-nhang"
+},
+{
+"name": "Ou Saray",
+"nameKm": "អូរសារាយ",
+"code": "210906",
+"slug": "ou-saray"
+},
+{
+"name": "Trapeang Kranhoung",
+"nameKm": "ត្រពាំងក្រញូង",
+"code": "210907",
+"slug": "trapeang-kranhoung"
+},
+{
+"name": "Otdam Soriya",
+"nameKm": "ឧត្ដមសុរិយា",
+"code": "210908",
+"slug": "otdam-soriya"
+},
+{
+"name": "Popel",
+"nameKm": "ពពេល",
+"code": "210909",
+"slug": "popel"
+},
+{
+"name": "Samraong",
+"nameKm": "សំរោង",
+"code": "210910",
+"slug": "samraong"
+},
+{
+"name": "Srae Ronoung",
+"nameKm": "ស្រែរនោង",
+"code": "210911",
+"slug": "srae-ronoung"
+},
+{
+"name": "Ta Phem",
+"nameKm": "តាភេម",
+"code": "210912",
+"slug": "ta-phem"
+},
+{
+"name": "Tram Kak",
+"nameKm": "ត្រាំកក់",
+"code": "210913",
+"slug": "tram-kak"
+},
+{
+"name": "Trapeang Thum Khang Cheung",
+"nameKm": "ត្រពាំងធំខាងជើង",
+"code": "210914",
+"slug": "trapeang-thum-khang-cheung"
+},
+{
+"name": "Trapeang Thum Khang Tboung",
+"nameKm": "ត្រពាំងធំខាងត្បូង",
+"code": "210915",
+"slug": "trapeang-thum-khang-tboung"
+}
+]
+},
+{
+"name": "Treang",
+"nameKm": "ទ្រាំង",
+"code": "2110",
+"slug": "treang",
+"communes": [
+{
+"name": "Angkanh",
+"nameKm": "អង្កាញ់",
+"code": "211001",
+"slug": "angkanh"
+},
+{
+"name": "Angk Khnor",
+"nameKm": "អង្គខ្នុរ",
+"code": "211002",
+"slug": "angk-khnor"
+},
+{
+"name": "Chi Khma",
+"nameKm": "ជីខ្មា",
+"code": "211003",
+"slug": "chi-khma"
+},
+{
+"name": "Khvav",
+"nameKm": "ខ្វាវ",
+"code": "211004",
+"slug": "khvav"
+},
+{
+"name": "Prambei Mum",
+"nameKm": "ប្រាំបីមុំ",
+"code": "211005",
+"slug": "prambei-mum"
+},
+{
+"name": "Angk Kaev",
+"nameKm": "អង្គកែវ",
+"code": "211006",
+"slug": "angk-kaev"
+},
+{
+"name": "Prey Sloek",
+"nameKm": "ព្រៃស្លឹក",
+"code": "211007",
+"slug": "prey-sloek"
+},
+{
+"name": "Roneam",
+"nameKm": "រនាម",
+"code": "211008",
+"slug": "roneam"
+},
+{
+"name": "Sambuor",
+"nameKm": "សំបួរ",
+"code": "211009",
+"slug": "sambuor"
+},
+{
+"name": "Sanlung",
+"nameKm": "សន្លុង",
+"code": "211010",
+"slug": "sanlung"
+},
+{
+"name": "Smaong",
+"nameKm": "ស្មោង",
+"code": "211011",
+"slug": "smaong"
+},
+{
+"name": "Srangae",
+"nameKm": "ស្រង៉ែ",
+"code": "211012",
+"slug": "srangae"
+},
+{
+"name": "Thlok",
+"nameKm": "ធ្លក",
+"code": "211013",
+"slug": "thlok"
+},
+{
+"name": "Tralach",
+"nameKm": "ត្រឡាច",
+"code": "211014",
+"slug": "tralach"
+}
+]
+}
+]
+},
+{
+"key": "tboung_khmum",
+"slug": "tbong-khmum",
+"name": "Tbong Khmum",
+"nameKm": "ត្បូងឃ្មុំ",
+"code": "25",
+"districts": [
+{
+"name": "Dambae",
+"nameKm": "តំបែរ",
+"code": "2501",
+"slug": "dambae",
+"communes": [
+{
+"name": "Chong Cheach",
+"nameKm": "ចុងជាច",
+"code": "250101",
+"slug": "chong-cheach"
+},
+{
+"name": "Dambae",
+"nameKm": "តំបែរ",
+"code": "250102",
+"slug": "dambae"
+},
+{
+"name": "Kouk Srok",
+"nameKm": "គោកស្រុក",
+"code": "250103",
+"slug": "kouk-srok"
+},
+{
+"name": "Neang Teut",
+"nameKm": "នាងទើត",
+"code": "250104",
+"slug": "neang-teut"
+},
+{
+"name": "Seda",
+"nameKm": "សេដា",
+"code": "250105",
+"slug": "seda"
+},
+{
+"name": "Trapeang Pring",
+"nameKm": "ត្រពាំងព្រីង",
+"code": "250106",
+"slug": "trapeang-pring"
+},
+{
+"name": "Tuek Chrov",
+"nameKm": "ទឹកជ្រៅ",
+"code": "250107",
+"slug": "tuek-chrov"
+}
+]
+},
+{
+"name": "Krouch Chhmar",
+"nameKm": "ក្រូចឆ្មារ",
+"code": "2502",
+"slug": "krouch-chhmar",
+"communes": [
+{
+"name": "Chhuk",
+"nameKm": "ឈូក",
+"code": "250201",
+"slug": "chhuk"
+},
+{
+"name": "Chumnik",
+"nameKm": "ជំនីក",
+"code": "250202",
+"slug": "chumnik"
+},
+{
+"name": "Kampong Treas",
+"nameKm": "កំពង់ទ្រាស",
+"code": "250203",
+"slug": "kampong-treas"
+},
+{
+"name": "Kaoh Pir",
+"nameKm": "កោះពីរ",
+"code": "250204",
+"slug": "kaoh-pir"
+},
+{
+"name": "Krouch Chhmar",
+"nameKm": "ក្រូចឆ្មារ",
+"code": "250205",
+"slug": "krouch-chhmar"
+},
+{
+"name": "Peus Muoy",
+"nameKm": "ប៉ឺស១",
+"code": "250206",
+"slug": "peus-muoy"
+},
+{
+"name": "Peus Pir",
+"nameKm": "ប៉ឺស២",
+"code": "250207",
+"slug": "peus-pir"
+},
+{
+"name": "Preaek A chi",
+"nameKm": "ព្រែកអាជី",
+"code": "250208",
+"slug": "preaek-a-chi"
+},
+{
+"name": "Roka Khnor",
+"nameKm": "រការខ្នុរ",
+"code": "250209",
+"slug": "roka-khnor"
+},
+{
+"name": "Svay Khleang",
+"nameKm": "ស្វាយឃ្លាំង",
+"code": "250210",
+"slug": "svay-khleang"
+},
+{
+"name": "Trea",
+"nameKm": "ទ្រា",
+"code": "250211",
+"slug": "trea"
+},
+{
+"name": "Tuol Snuol",
+"nameKm": "ទួលស្នួល",
+"code": "250212",
+"slug": "tuol-snuol"
+}
+]
+},
+{
+"name": "Memot",
+"nameKm": "មេមត់",
+"code": "2503",
+"slug": "memot",
+"communes": [
+{
+"name": "Chan Mul",
+"nameKm": "ចាន់មូល",
+"code": "250301",
+"slug": "chan-mul"
+},
+{
+"name": "Choam",
+"nameKm": "ជាំ",
+"code": "250302",
+"slug": "choam"
+},
+{
+"name": "Choam Kravien",
+"nameKm": "ជាំក្រវៀន",
+"code": "250303",
+"slug": "choam-kravien"
+},
+{
+"name": "Choam Ta Mau",
+"nameKm": "ជាំតាម៉ៅ",
+"code": "250304",
+"slug": "choam-ta-mau"
+},
+{
+"name": "Dar",
+"nameKm": "ដារ",
+"code": "250305",
+"slug": "dar"
+},
+{
+"name": "Kampoan",
+"nameKm": "កំពាន់",
+"code": "250306",
+"slug": "kampoan"
+},
+{
+"name": "Kokir",
+"nameKm": "គគីរ",
+"code": "250307",
+"slug": "kokir"
+},
+{
+"name": "Memong",
+"nameKm": "មេមង",
+"code": "250308",
+"slug": "memong"
+},
+{
+"name": "Memot",
+"nameKm": "មេមត់",
+"code": "250309",
+"slug": "memot"
+},
+{
+"name": "Rumchek",
+"nameKm": "រំចេក",
+"code": "250310",
+"slug": "rumchek"
+},
+{
+"name": "Rung",
+"nameKm": "រូង",
+"code": "250311",
+"slug": "rung"
+},
+{
+"name": "Tonlung",
+"nameKm": "ទន្លូង",
+"code": "250312",
+"slug": "tonlung"
+},
+{
+"name": "Tramung",
+"nameKm": "ត្រមូង",
+"code": "250313",
+"slug": "tramung"
+},
+{
+"name": "Triek",
+"nameKm": "ទ្រៀក",
+"code": "250314",
+"slug": "triek"
+}
+]
+},
+{
+"name": "Ou Reang Ov",
+"nameKm": "អូររាំងឪ",
+"code": "2504",
+"slug": "ou-reang-ov",
+"communes": [
+{
+"name": "Ampil Ta Pok",
+"nameKm": "អំពិលតាពក",
+"code": "250401",
+"slug": "ampil-ta-pok"
+},
+{
+"name": "Chak",
+"nameKm": "ចក",
+"code": "250402",
+"slug": "chak"
+},
+{
+"name": "Damril",
+"nameKm": "ដំរិល",
+"code": "250403",
+"slug": "damril"
+},
+{
+"name": "Kong Chey",
+"nameKm": "គងជ័យ",
+"code": "250404",
+"slug": "kong-chey"
+},
+{
+"name": "Mien",
+"nameKm": "មៀន",
+"code": "250405",
+"slug": "mien"
+},
+{
+"name": "Preah Theat",
+"nameKm": "ព្រះធាតុ",
+"code": "250406",
+"slug": "preah-theat"
+},
+{
+"name": "Tuol Souphi",
+"nameKm": "ទួលសូភី",
+"code": "250407",
+"slug": "tuol-souphi"
+}
+]
+},
+{
+"name": "Ponhea Kraek",
+"nameKm": "ពញាក្រែក",
+"code": "2505",
+"slug": "ponhea-kraek",
+"communes": [
+{
+"name": "Dountei",
+"nameKm": "ដូនតី",
+"code": "250501",
+"slug": "dountei"
+},
+{
+"name": "Kak",
+"nameKm": "កក់",
+"code": "250502",
+"slug": "kak"
+},
+{
+"name": "Kandaol Chrum",
+"nameKm": "កណ្ដោលជ្រុំ",
+"code": "250503",
+"slug": "kandaol-chrum"
+},
+{
+"name": "Kaong Kang",
+"nameKm": "កោងកាង",
+"code": "250504",
+"slug": "kaong-kang"
+},
+{
+"name": "Kraek",
+"nameKm": "ក្រែក",
+"code": "250505",
+"slug": "kraek"
+},
+{
+"name": "Popel",
+"nameKm": "ពពេល",
+"code": "250506",
+"slug": "popel"
+},
+{
+"name": "Trapeang Phlong",
+"nameKm": "ត្រពាំងផ្លុង",
+"code": "250507",
+"slug": "trapeang-phlong"
+},
+{
+"name": "Veal Mlu",
+"nameKm": "វាលម្លូរ",
+"code": "250508",
+"slug": "veal-mlu"
+}
+]
+},
+{
+"name": "Suong",
+"nameKm": "សួង",
+"code": "2506",
+"slug": "suong",
+"communes": [
+{
+"name": "Suong",
+"nameKm": "សួង",
+"code": "250601",
+"slug": "suong"
+},
+{
+"name": "Vihear Luong",
+"nameKm": "វិហារលួង",
+"code": "250602",
+"slug": "vihear-luong"
+}
+]
+},
+{
+"name": "Tboung Khmum",
+"nameKm": "ត្បូងឃ្មុំ",
+"code": "2507",
+"slug": "tboung-khmum",
+"communes": [
+{
+"name": "Anhchaeum",
+"nameKm": "អញ្ចើម",
+"code": "250701",
+"slug": "anhchaeum"
+},
+{
+"name": "Boeng Pruol",
+"nameKm": "បឹងព្រួល",
+"code": "250702",
+"slug": "boeng-pruol"
+},
+{
+"name": "Chikor",
+"nameKm": "ជីគរ",
+"code": "250703",
+"slug": "chikor"
+},
+{
+"name": "Chirou Ti Muoy",
+"nameKm": "ជីរោទ៍ ទី១",
+"code": "250704",
+"slug": "chirou-ti-muoy"
+},
+{
+"name": "Chirou Ti Pir",
+"nameKm": "ជីរោទ៍ ទី២",
+"code": "250705",
+"slug": "chirou-ti-pir"
+},
+{
+"name": "Chob",
+"nameKm": "ជប់",
+"code": "250706",
+"slug": "chob"
+},
+{
+"name": "Kor",
+"nameKm": "គរ",
+"code": "250707",
+"slug": "kor"
+},
+{
+"name": "Lngieng",
+"nameKm": "ល្ងៀង",
+"code": "250708",
+"slug": "lngieng"
+},
+{
+"name": "Mong Riev",
+"nameKm": "មង់រៀវ",
+"code": "250709",
+"slug": "mong-riev"
+},
+{
+"name": "Peam Chileang",
+"nameKm": "ពាមជីលាំង",
+"code": "250710",
+"slug": "peam-chileang"
+},
+{
+"name": "Roka Po Pram",
+"nameKm": "រកាពប្រាំ",
+"code": "250711",
+"slug": "roka-po-pram"
+},
+{
+"name": "Sralab",
+"nameKm": "ស្រឡប់",
+"code": "250712",
+"slug": "sralab"
+},
+{
+"name": "Thma Pech",
+"nameKm": "ថ្មពេជ្រ",
+"code": "250713",
+"slug": "thma-pech"
+},
+{
+"name": "Tonle Bet",
+"nameKm": "ទន្លេបិទ",
+"code": "250714",
+"slug": "tonle-bet"
+}
+]
+}
+]
+}
+]
+}

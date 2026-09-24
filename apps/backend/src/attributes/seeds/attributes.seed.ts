@@ -574,14 +574,19 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     subcategories: ['computers-parts-and-accessories'],
     sortOrder: i,
   })),
+  // The electronics names are spec-detail-four.md's own wording. They used to
+  // echo the slug (and, before that, the asset filename), which is what the
+  // Type picker displays and what the form stores in `attributes.type` — so
+  // 'Lens-filters' would have been buyer-visible. No listing held any of these
+  // values when they were renamed (2026-09-22), so nothing is reinterpreted.
   ...[
-    ['Digital-cameras', 'digital-cameras'],
+    ['Digital Cameras', 'digital-cameras'],
     ['Camcorders', 'camcorders'],
-    ['Lens-filters', 'lens-filters'],
-    ['Flashes-flash-acc', 'flashes-flash-acc'],
-    ['Lighting-studio', 'lighting-studio'],
-    ['Cases-bags', 'cases-bags'],
-    ['Batteries-chargers', 'batteries-chargers'],
+    ['Lens & Filters', 'lens-filters'],
+    ['Flashes & Flash Acc.', 'flashes-flash-acc'],
+    ['Lighting & Studio', 'lighting-studio'],
+    ['Cases & Bags', 'cases-bags'],
+    ['Batteries & Chargers', 'batteries-chargers'],
   ].map(([name, slug], i) => ({
     type: 'types',
     slug,
@@ -590,9 +595,19 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     subcategories: ['cameras-and-camcorders'],
     sortOrder: 100 + i,
   })),
+  // `speakers` and `microphones` are deliberately re-declared rather than
+  // created again: `dedupe()` merges same-(type, slug) rows by UNIONING their
+  // subcategories, so these two lines add the tvs link onto the rows that
+  // already serve computers-parts-and-accessories and musical-instruments.
+  // That is the same mechanism `cases-bags` uses two blocks up. The first
+  // declaration wins for name/category/sortOrder, so the picker orders them by
+  // the global sortOrder (Speakers sorts at the computers block's position,
+  // i.e. first) — a shared row cannot hold two orderings at once.
   ...[
     ['Televisions', 'televisions'],
-    ['Audio-interfaces', 'audio-interfaces'],
+    ['Speakers', 'speakers'],
+    ['Audio Interfaces', 'audio-interfaces'],
+    ['Microphones', 'microphones'],
     ['Remotes', 'remotes'],
   ].map(([name, slug], i) => ({
     type: 'types',

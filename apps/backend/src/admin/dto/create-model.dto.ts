@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -35,4 +36,12 @@ export class CreateModelDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Which subcategories this model belongs to. Optional, but a model left
+   *  with none is treated as unclassified and shows under every subcategory
+   *  its brand is linked to. */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  subcategoryIds?: string[];
 }

@@ -39,13 +39,22 @@ const ATTR_KEYS: [key: string, label: string][] = [
   ["color", "Color"],
   ["jobType", "Job Type"],
   ["experience", "Experience"],
-  ["type", "Type"],
-  ["bedrooms", "Bedroom"],
-  ["bathrooms", "Bathroom"],
+  // Home & Land sit before `type`: the property form reads Bedroom → Bathroom
+  // → Facing → Size → Type, so the published grid has to as well. The keys are
+  // the schema's own **singular** `bedroom`/`bathroom` — this list carried the
+  // plural forms from before the family had a form, and a key that is not here
+  // is invisible on the detail page even though the listing stores it.
+  ["bedroom", "Bedroom"],
+  ["bathroom", "Bathroom"],
   ["facing", "Facing"],
+  ["size", "Size"],
+  ["type", "Type"],
+  ["accessory", "Accessory"],
+  ["screenSize", "Screen Size"],
   ["storage", "Storage"],
   ["ram", "RAM"],
   ["cpu", "CPU"],
+  ["vga", "VGA"],
   ["network", "Network"],
 ];
 
@@ -72,7 +81,10 @@ const CONDITION_SUBCATEGORIES = new Set([
   "fridges-and-freezers",
   "air-conditioning-and-heating",
   "tools",
+  "machinery",
   "consumer-electronics",
+  "security-cameras",
+  "lighting",
   "cameras-and-camcorders",
   "tvs-videos-and-audio",
   "home-appliances",
@@ -85,6 +97,38 @@ const CONDITION_SUBCATEGORIES = new Set([
 const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   "parts-and-accessories": { vehicleType: "Type" },
 };
+
+/**
+ * Units appended to a value on the PUBLISHED grid (captain, 2026-09-23:
+ * "size: m²", reference showing `Size | 220m²`).
+ *
+ * The unit belongs to the display, not to the seller's input: the post form's
+ * Size field is a bare number with no suffix, which is what the captain's form
+ * mock shows. So it is added here rather than in the input or in the stored
+ * attribute — the JSONB keeps `"220"` and only this grid renders `220m²`.
+ * `size` is Home & Land's only such key (areas throughout: land, rooms, condos,
+ * houses, commercial).
+ */
+const VALUE_SUFFIX: Record<string, string> = { size: "m²" };
+
+/**
+ * Subcategories whose reference lists Storage before Condition, so Condition
+ * moves to after the spec block. Phones and Tablets only (captain, 2026-09-22);
+ * the computers family declares `storage` too but keeps Condition where it is
+ * until its own reference is checked.
+ */
+const STORAGE_BEFORE_CONDITION = new Set(["phones", "tablets"]);
+
+/**
+ * Mirrors `CONDITION_SLOT`'s `afterScreenSize` in the post form: All-in-One and
+ * Monitors read Screen Size first and Condition directly under it, so their
+ * published grid has to as well — otherwise the same listing says
+ * `Screen Size | Condition` while it is being posted and `Condition | Screen
+ * Size` once it is live. Scoped rather than added to the shared list: Laptops
+ * and Desktops declare `screenSize` too but use the `lead` slot (Condition
+ * first), so a blanket rule would invert those instead of fixing these.
+ */
+const CONDITION_AFTER_SCREEN_SIZE = new Set(["all-in-one", "monitors"]);
 
 export default function ListingSpecs({
   cate,
@@ -166,14 +210,28 @@ export default function ListingSpecs({
   }
 
   // Condition sits directly after the fields the design places before it:
-  // Year/Tax Type (cars/motorcycles) — plus the Type picker for parts
-  // (reference shows "Type" then "Condition"). When none of those are
-  // present it falls back to just after Brand/Model (or Category).
+  // Year/Tax Type (cars/motorcycles), the Type picker — both the cars parts
+  // form, which keys it `vehicleType`, and the computers one, which keys it
+  // `type`; the reference shows "Type" then "Condition" on each — and the
+  // Accessory picker, which holds the same "what kind of thing is this" slot on
+  // Phone Accessories. When none of those are present it falls back to just
+  // after Brand/Model (or Category).
   const conditionPreKeys = new Set(
     subcate?.slug === "parts-and-accessories"
-      ? ["year", "taxType", "vehicleType"]
-      : ["year", "taxType"],
+      ? ["year", "taxType", "vehicleType", "type", "accessory"]
+      : ["year", "taxType", "type", "accessory"],
   );
+  // Phones and Tablets show Storage BEFORE Condition (captain's reference), so
+  // Condition follows the spec block instead of leading it. Scoped rather than
+  // added to the shared list: the computers family also declares `storage`, and
+  // its own reference has not been reviewed — same per-subcategory shape as
+  // `CONDITION_SLOT` in the post form.
+  if (subcate && STORAGE_BEFORE_CONDITION.has(subcate.slug)) {
+    conditionPreKeys.add("storage");
+  }
+  if (subcate && CONDITION_AFTER_SCREEN_SIZE.has(subcate.slug)) {
+    conditionPreKeys.add("screenSize");
+  }
   const showCondition =
     conditionCarrier && (condition === "used" || condition === "new");
   let conditionInserted = false;
@@ -193,7 +251,7 @@ export default function ListingSpecs({
     if (!conditionPreKeys.has(key)) pushCondition();
     rows.push({
       label: labelOverrides?.[key] ?? label,
-      value,
+      value: `${value}${VALUE_SUFFIX[key] ?? ""}`,
       href: browseHref,
     });
   }

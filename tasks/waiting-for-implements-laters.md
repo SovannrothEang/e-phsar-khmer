@@ -45,3 +45,14 @@ string, so pressing Save re-persists it (`icon: parsed.data.image || null` in
 `actions/brand.ts` and siblings). Option: drop non-Storage values on save so the
 stale bundled `/sub-img` paths clear themselves as admins edit. Captain's earlier
 call was to leave the data alone, so this one needs an explicit go-ahead.
+
+## 4. Centre the map on the typed Location / Address text
+
+The post form's location picker (`components/post/LocationMapPicker.tsx`) opens on
+Phnom Penh until the seller drops a pin; it ignores the text they typed in the
+Location/Address fields above it (the old Google-embed preview followed that text,
+the Leaflet picker cannot without a geocoder). Fixing it means a geocoding lookup
+— e.g. Nominatim `https://nominatim.openstreetmap.org/search?format=json&q=…`,
+which requires a real Referer/User-Agent and is rate-limited, so it wants a
+server-side call (a route handler or backend endpoint) with caching, not a
+per-keystroke browser fetch.

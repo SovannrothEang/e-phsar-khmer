@@ -1,130 +1,188 @@
-import { and, eq } from 'drizzle-orm';
 import type { DbClient } from '../drizzle.provider';
-import { provinces, districts } from '../schema/users.schema';
+import { communes, districts, provinces } from '../schema/users.schema';
+import dataset from './data/cambodia-geography.json';
 
-export const PROVINCES: { name: string; slug: string }[] = [
-  { name: 'Banteay Meanchey', slug: 'banteay-meanchey' },
-  { name: 'Battambang', slug: 'battambang' },
-  { name: 'Kampong Cham', slug: 'kampong-cham' },
-  { name: 'Kampong Chhnang', slug: 'kampong-chhnang' },
-  { name: 'Kampong Speu', slug: 'kampong-speu' },
-  { name: 'Kampong Thom', slug: 'kampong-thom' },
-  { name: 'Kampot', slug: 'kampot' },
-  { name: 'Kandal', slug: 'kandal' },
-  { name: 'Kep', slug: 'kep' },
-  { name: 'Koh Kong', slug: 'koh-kong' },
-  { name: 'Kratié', slug: 'kratie' },
-  { name: 'Mondulkiri', slug: 'mondulkiri' },
-  { name: 'Oddar Meanchey', slug: 'oddar-meanchey' },
-  { name: 'Pailin', slug: 'pailin' },
-  { name: 'Phnom Penh', slug: 'phnom-penh' },
-  { name: 'Preah Vihear', slug: 'preah-vihear' },
-  { name: 'Prey Veng', slug: 'prey-veng' },
-  { name: 'Pursat', slug: 'pursat' },
-  { name: 'Ratanakiri', slug: 'ratanakiri' },
-  { name: 'Siem Reap', slug: 'siem-reap' },
-  { name: 'Preah Sihanouk', slug: 'preah-sihanouk' },
-  { name: 'Stung Treng', slug: 'stung-treng' },
-  { name: 'Svay Rieng', slug: 'svay-rieng' },
-  { name: 'Takéo', slug: 'takeo' },
-  { name: 'Tbong Khmum', slug: 'tbong-khmum' },
-];
+/**
+ * Cambodian administrative geography — provinces → districts → communes.
+ *
+ * Source of truth: `data/cambodia-geography.json`, generated from the
+ * NCDD-derived gazetteer (https://github.com/NorakGithub/cambodia-gazetteer,
+ * MIT — itself derived from db.ncdd.gov.kh), cross-checked against the MEF open
+ * data "Cambodia District List 2025" (data.mef.gov.kh). Villages are not
+ * included; the file carries official administrative codes for provenance only
+ * (the tables store name + name_km + slug).
+ *
+ * Conventions (see the file's own `slug`/`name` fields — they are pre-computed):
+ *  - province slugs follow the DB's existing scheme (`tbong-khmum`, not
+ *    `tboung-khmum`; `siem-reap`; `mondulkiri`), because live listings reference
+ *    them;
+ *  - district slugs are bare names (`battambang`, not `krong-battambang`),
+ *    matching the rows that were seeded before this change;
+ *  - commune slugs are unique within their district.
+ *
+ * Idempotent: every level upserts on its natural key (province slug;
+ * (province_id, slug) for districts — (district_id, slug) for communes), so
+ * re-running updates names in place and never duplicates. Rows that cannot be
+ * mapped are logged as warnings, never dropped silently.
+ */
 
-export const DISTRICTS: { provinceSlug: string; name: string; slug: string }[] =
-  [
-    {
-      provinceSlug: 'banteay-meanchey',
-      name: 'Serei Saophoan',
-      slug: 'serei-saophoan',
-    },
-    { provinceSlug: 'battambang', name: 'Battambang', slug: 'battambang' },
-    {
-      provinceSlug: 'kampong-cham',
-      name: 'Kampong Cham',
-      slug: 'kampong-cham',
-    },
-    {
-      provinceSlug: 'kampong-chhnang',
-      name: 'Kampong Chhnang',
-      slug: 'kampong-chhnang',
-    },
-    { provinceSlug: 'kampong-speu', name: 'Chbar Mon', slug: 'chbar-mon' },
-    {
-      provinceSlug: 'kampong-thom',
-      name: 'Stueng Saen',
-      slug: 'stueng-saen',
-    },
-    { provinceSlug: 'kampot', name: 'Kampot', slug: 'kampot' },
-    { provinceSlug: 'kandal', name: 'Ta Khmau', slug: 'ta-khmau' },
-    { provinceSlug: 'kep', name: 'Kep', slug: 'kep' },
-    {
-      provinceSlug: 'koh-kong',
-      name: 'Khemarak Phoumin',
-      slug: 'khemarak-phoumin',
-    },
-    { provinceSlug: 'kratie', name: 'Kratié', slug: 'kratie' },
-    {
-      provinceSlug: 'mondulkiri',
-      name: 'Saen Monourom',
-      slug: 'saen-monourom',
-    },
-    { provinceSlug: 'oddar-meanchey', name: 'Samraong', slug: 'samraong' },
-    { provinceSlug: 'pailin', name: 'Pailin', slug: 'pailin' },
-    {
-      provinceSlug: 'phnom-penh',
-      name: 'Chamkar Mon',
-      slug: 'chamkar-mon',
-    },
-    {
-      provinceSlug: 'preah-vihear',
-      name: 'Tbeng Meanchey',
-      slug: 'tbeng-meanchey',
-    },
-    { provinceSlug: 'prey-veng', name: 'Prey Veng', slug: 'prey-veng' },
-    { provinceSlug: 'pursat', name: 'Pursat', slug: 'pursat' },
-    { provinceSlug: 'ratanakiri', name: 'Banlung', slug: 'banlung' },
-    { provinceSlug: 'siem-reap', name: 'Siem Reap', slug: 'siem-reap' },
-    {
-      provinceSlug: 'preah-sihanouk',
-      name: 'Sihanoukville',
-      slug: 'sihanoukville',
-    },
-    {
-      provinceSlug: 'stung-treng',
-      name: 'Stung Treng',
-      slug: 'stung-treng',
-    },
-    { provinceSlug: 'svay-rieng', name: 'Svay Rieng', slug: 'svay-rieng' },
-    { provinceSlug: 'takeo', name: 'Doun Kaev', slug: 'doun-kaev' },
-    { provinceSlug: 'tbong-khmum', name: 'Suong', slug: 'suong' },
-  ];
+interface SeedCommune {
+  name: string;
+  nameKm: string;
+  code: string;
+  slug: string;
+}
 
-export const COMMUNES: { districtSlug: string; name: string; slug: string }[] =
-  [];
+interface SeedDistrict {
+  name: string;
+  nameKm: string;
+  code: string;
+  slug: string;
+  communes: SeedCommune[];
+}
+
+interface SeedProvince {
+  key: string;
+  slug: string;
+  name: string;
+  nameKm: string;
+  code: string;
+  districts: SeedDistrict[];
+}
+
+const DATA = dataset as {
+  meta: { source: string; retrieved: string };
+  provinces: SeedProvince[];
+};
 
 export async function seedGeography(db: DbClient): Promise<void> {
-  const slugToId = new Map<string, string>();
-  for (const p of PROVINCES) {
-    const [row] = await db
+  const warnings: string[] = [];
+
+  const expected = {
+    provinces: DATA.provinces.length,
+    districts: DATA.provinces.reduce((n, p) => n + p.districts.length, 0),
+    communes: DATA.provinces.reduce(
+      (n, p) => n + p.districts.reduce((m, d) => m + d.communes.length, 0),
+      0,
+    ),
+  };
+
+  for (const province of DATA.provinces) {
+    if (!province.slug || !province.name) {
+      warnings.push(
+        `province "${province.key}": missing slug or name — skipped`,
+      );
+      continue;
+    }
+
+    const [provinceRow] = await db
       .insert(provinces)
-      .values({ name: p.name, slug: p.slug })
-      .onConflictDoUpdate({ target: provinces.slug, set: { name: p.name } })
-      .returning({ id: provinces.id, slug: provinces.slug });
-    slugToId.set(row.slug, row.id);
+      .values({
+        name: province.name,
+        nameKm: province.nameKm || null,
+        slug: province.slug,
+      })
+      .onConflictDoUpdate({
+        target: provinces.slug,
+        set: { name: province.name, nameKm: province.nameKm || null },
+      })
+      .returning({ id: provinces.id });
+
+    if (!provinceRow) {
+      warnings.push(`province "${province.slug}": upsert returned no row`);
+      continue;
+    }
+
+    for (const district of province.districts) {
+      if (!district.slug || !district.name) {
+        warnings.push(
+          `district "${district.code}" in ${province.slug}: missing slug or name — skipped`,
+        );
+        continue;
+      }
+
+      const [districtRow] = await db
+        .insert(districts)
+        .values({
+          provinceId: provinceRow.id,
+          name: district.name,
+          nameKm: district.nameKm || null,
+          slug: district.slug,
+        })
+        .onConflictDoUpdate({
+          target: [districts.provinceId, districts.slug],
+          set: { name: district.name, nameKm: district.nameKm || null },
+        })
+        .returning({ id: districts.id });
+
+      if (!districtRow) {
+        warnings.push(
+          `district "${district.slug}" (${province.slug}): upsert returned no row`,
+        );
+        continue;
+      }
+
+      for (const commune of district.communes) {
+        if (!commune.slug || !commune.name) {
+          warnings.push(
+            `commune "${commune.code}" in ${province.slug}/${district.slug}: missing slug or name — skipped`,
+          );
+          continue;
+        }
+
+        await db
+          .insert(communes)
+          .values({
+            districtId: districtRow.id,
+            name: commune.name,
+            nameKm: commune.nameKm || null,
+            slug: commune.slug,
+          })
+          .onConflictDoUpdate({
+            target: [communes.districtId, communes.slug],
+            set: { name: commune.name, nameKm: commune.nameKm || null },
+          });
+      }
+    }
   }
-  for (const d of DISTRICTS) {
-    const provinceId = slugToId.get(d.provinceSlug);
-    if (!provinceId) continue;
-    const [existing] = await db
-      .select({ id: districts.id })
-      .from(districts)
-      .where(
-        and(eq(districts.provinceId, provinceId), eq(districts.slug, d.slug)),
-      )
-      .limit(1);
-    if (existing) continue;
-    await db
-      .insert(districts)
-      .values({ provinceId, name: d.name, slug: d.slug });
+
+  // Verify against the source tallies rather than trusting the loop.
+  const [provinceRows, districtRows, communeRows] = await Promise.all([
+    db.select({ id: provinces.id }).from(provinces),
+    db.select({ id: districts.id }).from(districts),
+    db.select({ id: communes.id }).from(communes),
+  ]);
+
+  const actual = {
+    provinces: provinceRows.length,
+    districts: districtRows.length,
+    communes: communeRows.length,
+  };
+
+  console.log(
+    `  ✓ geography: ${actual.provinces} provinces (source ${expected.provinces}), ` +
+      `${actual.districts} districts (source ${expected.districts}), ` +
+      `${actual.communes} communes (source ${expected.communes})`,
+  );
+
+  const mismatches = (
+    Object.keys(expected) as (keyof typeof expected)[]
+  ).filter((level) => actual[level] !== expected[level]);
+  if (mismatches.length > 0) {
+    console.warn(
+      `  ⚠ geography count mismatch in: ${mismatches.join(', ')} — ` +
+        'the DB has rows the source file does not (left in place, nothing deleted)',
+    );
+  }
+
+  if (warnings.length > 0) {
+    console.warn(`  ⚠ ${warnings.length} geography row(s) not mapped:`);
+    for (const warning of warnings.slice(0, 20))
+      console.warn(`      ${warning}`);
+    if (warnings.length > 20) {
+      console.warn(`      … and ${warnings.length - 20} more`);
+    }
+  } else {
+    console.log('  ✓ geography: every source row mapped, no warnings');
   }
 }

@@ -44,7 +44,12 @@ export interface RealDetailData {
 
 /** Adapt a backend listing into the template's local `Post` shape. */
 function toPostView(l: BackendListing): Post {
-  const price = l.price !== null ? Number(l.price) : 0;
+  // Null is a real state — see `toCardPost`. A no-price listing must not be
+  // shown as $0; the template prints "Negotiable" for it.
+  const price =
+    l.price !== null && Number.isFinite(Number(l.price))
+      ? Number(l.price)
+      : null;
   const discount =
     l.discountValue !== null && l.discountType !== null
       ? `${Number(l.discountValue)}${l.discountType === "percent" ? "%" : " $"}`.trim()
@@ -57,21 +62,16 @@ function toPostView(l: BackendListing): Post {
     imageCount: l.photos.length,
     // The listing price is the ORIGINAL; the discount applies on top — the
     // bold price is the final, the strikethrough is the original.
-    price: applyDiscount(
-      Number.isFinite(price) ? price : 0,
-      l.discountValue,
-      l.discountType,
-    ),
+    price:
+      price === null
+        ? null
+        : applyDiscount(price, l.discountValue, l.discountType),
     cateId: "",
     subId: "",
     brandId: undefined,
     modelId: undefined,
     oldPrice:
-      l.discountValue && l.discountType
-        ? Number.isFinite(price)
-          ? price
-          : 0
-        : undefined,
+      price !== null && l.discountValue && l.discountType ? price : undefined,
     discount,
     description: l.description ?? "",
     createdat: new Date(l.createdAt),
@@ -109,6 +109,18 @@ export default function PostDetail({
   const locationLine = isReal
     ? [real.listing.location, real.listing.address].filter(Boolean).join(", ")
     : [district?.name, province?.name].filter(Boolean).join(", ");
+
+  // The pin the seller dropped when posting (numeric columns arrive as strings).
+  const lat =
+    isReal && real.listing.latitude != null
+      ? Number(real.listing.latitude)
+      : NaN;
+  const lng =
+    isReal && real.listing.longitude != null
+      ? Number(real.listing.longitude)
+      : NaN;
+  const coords =
+    Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 
   return (
     <main className="min-h-screen flex flex-col bg-muted block pt-6">
@@ -231,7 +243,7 @@ export default function PostDetail({
                 )}
                 <div className="flex items-end gap-2.5 mt-3 pb-4">
                   <span className="text-xl md:text-2xl font-medium text-[#e3281b] leading-none">
-                    ${post.price}
+                    {post.price === null ? "Negotiable" : `$${post.price}`}
                   </span>
                   {post.oldPrice && (
                     <span className="text-sm text-gray-400 line-through mb-0.5">
@@ -266,8 +278,10 @@ export default function PostDetail({
                 </p>
                 <ContactUser
                   user={user}
-                  district={isReal ? { name: locationLine } : district}
+                  district={district}
                   province={province}
+                  coords={coords}
+                  locationLine={isReal ? locationLine : undefined}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
                 <ThreeButton post={post} />
@@ -301,7 +315,11 @@ export default function PostDetail({
           {/* Sidebar */}
           <aside className="w-full md:w-[400px] shrink-0">
             <div className="sticky top-20 space-y-2">
-              <ProfileSidebar userId={post.userId} user={user} listingId={String(post.postId)} />
+              <ProfileSidebar
+                userId={post.userId}
+                user={user}
+                listingId={String(post.postId)}
+              />
             </div>
           </aside>
         </div>

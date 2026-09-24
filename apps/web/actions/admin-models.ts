@@ -9,6 +9,8 @@ interface BackendModel {
   slug: string;
   name: string;
   image: string | null;
+  /** The model's OWN subcategory links (added 2026-09-22). */
+  subcategoryIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -25,19 +27,30 @@ export async function getAdminModels(): Promise<Model[]> {
     serverFetch<BackendBrand[]>("/admin/brands"),
   ]);
 
-  // Models carry only brandId; derive category/subcategories from the brand
-  // so the table columns render meaningfully.
-  const brandMap = new Map(brands.map((b) => [b.id, b]));
+  // The model's own links drive the Sub Category column. Until 2026-09-22 this
+  // fell back to the BRAND's links, which is why every Apple row (iPhone
+  // included) showed all eight of Apple's subcategories — the display was
+  // reporting a relationship the schema could not express.
+  const subToCategory = new Map<string, string>();
+  for (const b of brands) {
+    if (!b.categoryId) continue;
+    for (const sub of b.subcategoryIds) subToCategory.set(sub, b.categoryId);
+  }
 
   return models.map((m) => {
-    const b = brandMap.get(m.brandId);
+    const subs = m.subcategoryIds ?? [];
     return {
       modelId: m.id,
       name: m.name,
       slug: m.slug,
       brandId: m.brandId,
-      categoryId: b?.categoryId ?? "",
-      subcategories: b?.subcategoryIds ?? [],
+      // A model's subcategories all sit in one category by construction; fall
+      // back to the brand's when it has none.
+      categoryId:
+        subToCategory.get(subs[0] ?? "") ??
+        brands.find((b) => b.id === m.brandId)?.categoryId ??
+        "",
+      subcategories: subs,
       createdAt: m.createdAt.slice(0, 10),
       updatedAt: m.updatedAt.slice(0, 10),
     };

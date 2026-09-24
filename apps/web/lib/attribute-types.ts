@@ -14,10 +14,16 @@ export type AttributeType = {
  * upload them), networks is Cambodia-market-specific (Cellcard/Metfone/Smart
  * change over time), and years is generated automatically. The plain
  * spec-fixed enumerations (colors, rams, cpus, storages, screensizes, vgas,
- * enginetypes, vehicletypes, bedrooms, bathrooms, facings, experiences) are
- * still seeded backend-side but need no admin management.
+ * enginetypes, bedrooms, bathrooms, facings, experiences) are still seeded
+ * backend-side but need no admin management.
  *
  * Order matters: the dashboard/attributes index hub renders these links in order.
+ *
+ * CAVEAT (2026-09-15): `vehicletypes` is deliberately NOT listed — the captain
+ * decided the second set isn't wanted, and it is being retired in favour of
+ * `bodytypes`. Until that lands, Vehicles For Rent's post form still READS
+ * `vehicletypes` for its Vehicle Type field, so that list remains live but
+ * unmanageable, and ticking/unticking a Body Type row does not affect it.
  */
 export const ATTRIBUTE_TYPES: AttributeType[] = [
   { type: "bodytypes", title: "Body Types", hasImage: true },

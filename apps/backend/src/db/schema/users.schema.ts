@@ -36,6 +36,8 @@ export const authProviderEnum = pgEnum('auth_provider', [
 export const provinces = pgTable('provinces', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
+  /** Khmer script name (the gazetteer's `local`, without its level prefix). */
+  nameKm: varchar('name_km', { length: 100 }),
   slug: varchar('slug', { length: 80 }).unique().notNull(),
 });
 
@@ -47,6 +49,7 @@ export const districts = pgTable(
       .notNull()
       .references(() => provinces.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
+    nameKm: varchar('name_km', { length: 100 }),
     slug: varchar('slug', { length: 80 }).notNull(),
   },
   (t) => [
@@ -63,9 +66,13 @@ export const communes = pgTable(
       .notNull()
       .references(() => districts.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
+    nameKm: varchar('name_km', { length: 100 }),
     slug: varchar('slug', { length: 80 }).notNull(),
   },
-  (t) => [index('communes_district_id_idx').on(t.districtId)],
+  (t) => [
+    uniqueIndex('communes_district_slug_uq').on(t.districtId, t.slug),
+    index('communes_district_id_idx').on(t.districtId),
+  ],
 );
 
 export const users = pgTable(
@@ -83,9 +90,17 @@ export const users = pgTable(
     company: varchar('company', { length: 150 }),
     coverPhotoUrl: text('cover_photo_url'),
     profilePhotoUrl: text('profile_photo_url'),
-    provinceId: uuid('province_id').references(() => provinces.id),
-    districtId: uuid('district_id').references(() => districts.id),
-    communeId: uuid('commune_id').references(() => communes.id),
+    // RESTRICT — see listings.schema.ts: a user's location must never be
+    // silently cleared by a geography re-seed.
+    provinceId: uuid('province_id').references(() => provinces.id, {
+      onDelete: 'restrict',
+    }),
+    districtId: uuid('district_id').references(() => districts.id, {
+      onDelete: 'restrict',
+    }),
+    communeId: uuid('commune_id').references(() => communes.id, {
+      onDelete: 'restrict',
+    }),
     address: text('address'),
     latitude: numeric('latitude', { precision: 10, scale: 7 }),
     longitude: numeric('longitude', { precision: 10, scale: 7 }),

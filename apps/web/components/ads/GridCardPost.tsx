@@ -30,7 +30,10 @@ export function GridCardPost({ post }: { post: Post }) {
   const province = getProvinceById(post.proId);
   const district = getDistrictById(post.proId, post.disId);
 
-  const discountAmount = post.oldPrice ? post.oldPrice - post.price : 0;
+  // `oldPrice` only exists alongside a real price, but a "Negotiable" listing
+  // has none — guard it rather than letting the subtraction see null.
+  const discountAmount =
+    post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
   const discountPercent = post.oldPrice
     ? Math.round((discountAmount / post.oldPrice) * 100)
@@ -119,7 +122,9 @@ export function GridCardPost({ post }: { post: Post }) {
           {/* LEFT: price */}
           <div className="flex items-center gap-3">
             <span className="text-red-600 font-semibold text-lg">
-              ${post.price.toLocaleString()}
+              {post.price === null
+                ? "Negotiable"
+                : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (
               <span className="text-base text-zinc-400 italic line-through">
