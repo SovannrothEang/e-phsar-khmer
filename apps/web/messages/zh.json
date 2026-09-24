@@ -116,7 +116,8 @@
       "blockedError": "无法发送消息。",
       "uploadFailed": "图片上传失败。",
       "imageSizeError": "图片太大。",
-      "imageTypeError": "不支持的图片格式。"
+      "imageTypeError": "不支持的图片格式。",
+      "imageLimitError": "最多只能添加 {max} 张图片。"
     },
     "listing": {
       "noPrice": "价格面议",

@@ -116,7 +116,8 @@
       "blockedError": "មិនអាចផ្ញើសារបានទេ។",
       "uploadFailed": "ការផ្ទុករូបភាពបានបរាជ័យ។",
       "imageSizeError": "រូបភាពធំពេក។",
-      "imageTypeError": "ប្រភេទរូបភាពមិនត្រូវបានគាំទ្រ។"
+      "imageTypeError": "ប្រភេទរូបភាពមិនត្រូវបានគាំទ្រ។",
+      "imageLimitError": "អាចភ្ជាប់រូបភាពបានច្រើនបំផុត {max}។"
     },
     "listing": {
       "noPrice": "សុំតម្លៃ",

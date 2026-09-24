@@ -18,6 +18,7 @@ import { ChatService } from './chat.service';
 import { ChatPubSubService } from './chat-pubsub.service';
 import type { ChatPushEvent } from './chat-pubsub.service';
 import type { SendMessageDto } from './dto/send-message.dto';
+import { WS_TICKET_TYP } from './ws-ticket';
 import type WebSocket from 'ws';
 
 interface ClientEnvelope {
@@ -69,15 +70,20 @@ export class ChatGateway
 
   async handleConnection(socket: WebSocket, req: IncomingMessage) {
     try {
-      // Browser WS API cannot set headers. Three fallbacks:
-      // 1. ?token= query param (explicit)
-      // 2. Authorization header (non-browser clients)
-      // 3. user_access_token httpOnly cookie (same-origin WS upgrades send cookies)
+      // Browser WS API cannot set headers. Four fallbacks:
+      // 1. ?ticket= short-lived WS ticket (POST /chats/ws-ticket) — the only
+      //    one that works when the backend is on a different origin than the
+      //    web app (tunnels, separate API domain): cookies don't cross hosts
+      // 2. ?token= query param (explicit)
+      // 3. Authorization header (non-browser clients)
+      // 4. user_access_token httpOnly cookie (same-host WS upgrades send cookies)
       const url = new URL(
         req.url ?? '/',
         `http://${req.headers.host ?? 'localhost'}`,
       );
+      const ticket = url.searchParams.get('ticket');
       const token =
+        ticket ??
         url.searchParams.get('token') ??
         this.extractBearerToken(req.headers.authorization) ??
         this.extractCookieToken(req.headers.cookie);
@@ -87,7 +93,11 @@ export class ChatGateway
         return;
       }
 
-      const claims = this.auth.verify<{ sub: string }>(token);
+      const claims = this.auth.verify<{ sub: string; typ?: string }>(token);
+      if (ticket && claims.typ !== WS_TICKET_TYP) {
+        socket.close(4001, 'Invalid ticket');
+        return;
+      }
 
       // Parity with the REST JwtStrategy: signature/expiry alone isn't
       // enough — a soft-deleted user must not keep a working socket until
@@ -107,6 +117,12 @@ export class ChatGateway
         userId: claims.sub,
         lastPongAt: Date.now(),
       };
+      // HeartbeatService evicts any socket whose lastPongAt is stale; browsers
+      // answer protocol-level pings automatically, but only this listener
+      // records it. Without it every socket is force-closed ~40s after connect.
+      socket.on('pong', () => {
+        conn.lastPongAt = Date.now();
+      });
       this.conns.set(socket, conn);
       this.registry.add(claims.sub, conn);
     } catch {

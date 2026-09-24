@@ -300,3 +300,21 @@ export async function deleteChatUpload(
     return toFailure(err);
   }
 }
+
+/**
+ * Short-lived ticket for the chat WebSocket handshake. The WS may live on a
+ * different origin than this app (ngrok/cloudflare tunnel, separate API
+ * domain), where the httpOnly `user_access_token` cookie is never sent — so
+ * the socket authenticates with `?ticket=` instead. `null` when signed out.
+ */
+export async function getChatWsTicket(): Promise<string | null> {
+  try {
+    const { data } = await userServerFetch<{ ticket: string }>(
+      "/chats/ws-ticket",
+      { method: "POST" },
+    );
+    return data.ticket;
+  } catch {
+    return null;
+  }
+}

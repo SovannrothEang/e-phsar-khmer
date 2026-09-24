@@ -116,7 +116,8 @@
       "blockedError": "메시지를 보낼 수 없습니다.",
       "uploadFailed": "이미지 업로드에 실패했습니다.",
       "imageSizeError": "이미지가 너무 큽니다.",
-      "imageTypeError": "지원하지 않는 이미지 형식입니다."
+      "imageTypeError": "지원하지 않는 이미지 형식입니다.",
+      "imageLimitError": "이미지는 최대 {max}장까지 첨부할 수 있습니다."
     },
     "listing": {
       "noPrice": "가격 문의",

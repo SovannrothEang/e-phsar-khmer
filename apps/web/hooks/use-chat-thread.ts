@@ -16,7 +16,11 @@ import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { mergeMessages } from "@/lib/chat/format";
 import { useAdaptivePolling } from "@/hooks/use-chat-polling";
 import { useChatWs } from "@/hooks/use-chat-ws";
-import { dataUrlToFile } from "@/lib/chat-draft-images";
+import {
+  getDraftFile,
+  getDraftPreviewUrl,
+  removeDraftImage,
+} from "@/lib/chat-draft-images";
 import { getE2eEngine } from "@/lib/e2e/engine-provider";
 import { sendE2eText } from "@/lib/e2e/send-encrypt";
 import type {
@@ -51,7 +55,7 @@ function advanceWatermark(
 
 export interface SendDraft {
   body?: string;
-  /** localStorage keys for draft images — uploaded to Supabase at send-time. */
+  /** Draft-image registry keys — uploaded to Supabase at send-time. */
   draftKeys?: string[];
   listingId?: string;
 }
@@ -158,13 +162,16 @@ export function useChatThread({
   });
 
   // ── Delta poll ────────────────────────────────────────────────────────────
-  // When the WebSocket is connected it delivers messages in real-time, so
-  // polling is only a safety net. Drop to idle interval to save bandwidth.
+  // While the WebSocket is connected it delivers messages in real-time, so the
+  // interval stops. The query itself stays enabled: pushes published while
+  // the socket was down (reconnect gap, server restart) are never replayed,
+  // so a one-shot delta on every (re)connect and on window focus is what
+  // closes that gap — otherwise the thread silently misses messages the
+  // inbox already shows.
   const wsConnected = ws.isConnected;
   const delta = useQuery({
     queryKey: [...chatKeys.thread(conversationId ?? "none"), "delta"],
-    enabled:
-      enabled && conversationId !== null && history.isSuccess && !wsConnected,
+    enabled: enabled && conversationId !== null && history.isSuccess,
     refetchInterval: wsConnected ? false : refetchInterval,
     refetchIntervalInBackground: false,
     staleTime: 0,
@@ -198,6 +205,11 @@ export function useChatThread({
       };
     },
   });
+
+  const { refetch: refetchDelta } = delta;
+  useEffect(() => {
+    if (wsConnected && history.isSuccess) void refetchDelta();
+  }, [wsConnected, history.isSuccess, refetchDelta]);
 
   const serverMessages = useMemo(() => {
     const historyItems = (history.data?.pages ?? []).flatMap((p) => p.items);
@@ -271,10 +283,10 @@ export function useChatThread({
       for (let i = 0; i < imageCount; i++) {
         const key = draftKeys[i];
         try {
-          const dataUrl = localStorage.getItem(key);
-          if (!dataUrl) continue;
-          const filename = `chat-image-${Date.now()}-${i}.jpg`;
-          const file = dataUrlToFile(dataUrl, filename);
+          const file = getDraftFile(key);
+          if (!file) continue;
+          const ext = file.type.split("/")[1] ?? "jpg";
+          const filename = `chat-image-${Date.now()}-${i}.${ext}`;
           const signed = await signChatUpload(filename);
           if (!signed.ok) throw new Error(signed.message);
           const uploadRes = await fetch(signed.data.signedUrl, {
@@ -304,7 +316,7 @@ export function useChatThread({
           ]);
 
           // Cleanup this key after successful upload+send.
-          localStorage.removeItem(key);
+          removeDraftImage(key);
         } catch {
           // Upload/send failed — mark as failed, keep remaining drafts.
           setIsSending(false);
@@ -398,13 +410,11 @@ export function useChatThread({
       // response / double-tap replays instead of inserting twice.
       const clientMessageId = crypto.randomUUID();
 
-      // Read dataUrls from localStorage for optimistic preview.
+      // Object URLs from the draft registry for the optimistic preview.
       const previewUrls: string[] = [];
-      if (draft.draftKeys && draft.draftKeys.length > 0) {
-        for (const key of draft.draftKeys) {
-          const dataUrl = localStorage.getItem(key);
-          if (dataUrl) previewUrls.push(dataUrl);
-        }
+      for (const key of draft.draftKeys ?? []) {
+        const url = getDraftPreviewUrl(key);
+        if (url) previewUrls.push(url);
       }
 
       // Create optimistic echo — first image shows preview, text shows body.

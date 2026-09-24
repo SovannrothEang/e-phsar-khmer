@@ -7,26 +7,23 @@ import { useTranslations } from "next-intl";
 
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
-import {
-  storeDraftImage,
-  removeDraftImage,
-  clearAllDrafts,
-} from "@/lib/chat-draft-images";
+import { storeDraftImage, removeDraftImage } from "@/lib/chat-draft-images";
 
 export interface ComposerDraft {
   body?: string;
-  /** localStorage keys for draft images — uploaded to Supabase on send. */
+  /** Draft-image registry keys — uploaded to Supabase on send. */
   draftKeys?: string[];
 }
 
 interface StagedImage {
   key: string;
-  dataUrl: string;
+  previewUrl: string;
 }
 
 // Mirrors the backend FilesService image validation (5MB).
 const MAX_SIZE = 5 * 1024 * 1024;
 const MAX_IMAGES = 5;
+const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 export function Composer({
   disabled,
@@ -49,19 +46,20 @@ export function Composer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedImage[]>([]);
-  const [uploading, setUploading] = useState(false);
 
   const maxAllowed = hasListing ? MAX_IMAGES - 1 : MAX_IMAGES;
   const remaining = maxAllowed - staged.length;
 
-  // Cleanup all drafts when tab/window closes.
+  // Release unsent drafts when the composer unmounts (e.g. switching threads).
+  // Sent drafts are no longer in `staged`; the send path cleans those up.
+  const stagedRef = useRef(staged);
   useEffect(() => {
-    function handleBeforeUnload() {
-      clearAllDrafts();
-    }
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
+    stagedRef.current = staged;
+  }, [staged]);
+  useEffect(
+    () => () => stagedRef.current.forEach((s) => removeDraftImage(s.key)),
+    [],
+  );
 
   const canSend =
     !disabled && !sending && (text.trim() !== "" || staged.length > 0);
@@ -76,40 +74,33 @@ export function Composer({
     setStaged([]);
   }, [canSend, text, staged, onSend]);
 
-  async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error(t("composer.imageTypeError"));
-      return;
+  function addFiles(files: File[]) {
+    if (files.length === 0) return;
+    const valid: File[] = [];
+    let badType = false;
+    let tooLarge = false;
+    for (const file of files) {
+      if (!ACCEPTED_TYPES.includes(file.type)) badType = true;
+      else if (file.size > MAX_SIZE) tooLarge = true;
+      else valid.push(file);
     }
-    if (file.size > MAX_SIZE) {
-      toast.error(t("composer.imageSizeError"));
-      return;
+    if (badType) toast.error(t("composer.imageTypeError"));
+    if (tooLarge) toast.error(t("composer.imageSizeError"));
+
+    // Trim to the free slots up front — one toast, and no draft is created
+    // only to be thrown away.
+    const accepted = valid.slice(0, Math.max(0, remaining));
+    if (valid.length > accepted.length) {
+      toast.error(t("composer.imageLimitError", { max: maxAllowed }));
     }
-    setUploading(true);
-    try {
-      // Use random ID to avoid key collisions on rapid picks.
-      const tempId = crypto.randomUUID();
-      const draft = await storeDraftImage(tempId, staged.length, file);
-      let accepted = false;
-      setStaged((prev) => {
-        // Re-check limit inside the updater — concurrent pastes see stale state.
-        if (prev.length >= maxAllowed) return prev;
-        accepted = true;
-        return [...prev, { key: draft.key, dataUrl: draft.dataUrl }];
-      });
-      if (!accepted) {
-        removeDraftImage(draft.key);
-        toast.error(t("composer.imageLimitError", { max: maxAllowed }));
-        return;
-      }
-      onActivity?.();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : t("composer.uploadFailed"),
-      );
-    } finally {
-      setUploading(false);
-    }
+    if (accepted.length === 0) return;
+
+    const added = accepted.map((file) => {
+      const draft = storeDraftImage(file);
+      return { key: draft.key, previewUrl: draft.previewUrl };
+    });
+    setStaged((prev) => [...prev, ...added]);
+    onActivity?.();
   }
 
   function discardStaged(index: number) {
@@ -133,9 +124,12 @@ export function Composer({
       {staged.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
           {staged.map((s, i) => (
-            <div key={s.key} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
+            <div
+              key={s.key}
+              className="relative h-16 w-16 overflow-hidden rounded-lg border border-border"
+            >
               <Image
-                src={s.dataUrl}
+                src={s.previewUrl}
                 alt={t("composer.stagedImageAlt")}
                 fill
                 sizes="64px"
@@ -152,6 +146,14 @@ export function Composer({
               </button>
             </div>
           ))}
+          <span
+            className={cn(
+              "text-xs tabular-nums",
+              remaining <= 0 ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {staged.length}/{maxAllowed}
+          </span>
         </div>
       )}
 
@@ -159,15 +161,11 @@ export function Composer({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || sending || remaining <= 0}
+          disabled={sending || remaining <= 0}
           aria-label={t("composer.attachImage")}
           className="shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
-          {uploading ? (
-            <Loader2 className="size-[18px] animate-spin" />
-          ) : (
-            <ImageIcon className="size-[18px]" />
-          )}
+          <ImageIcon className="size-[18px]" />
         </button>
 
         <textarea
@@ -193,12 +191,7 @@ export function Composer({
             );
             if (files.length === 0) return;
             e.preventDefault();
-            // Sequential so limit/quota checks see prior staged results.
-            void (async () => {
-              for (const f of files) {
-                await handleFile(f);
-              }
-            })();
+            addFiles(files);
           }}
         />
 
@@ -225,19 +218,11 @@ export function Composer({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp"
+        accept={ACCEPTED_TYPES.join(",")}
         multiple
         className="hidden"
         onChange={(e) => {
-          const files = e.target.files;
-          if (files) {
-            // Sequential so limit/quota checks see prior staged results.
-            void (async () => {
-              for (const f of Array.from(files)) {
-                await handleFile(f);
-              }
-            })();
-          }
+          addFiles(Array.from(e.target.files ?? []));
           e.target.value = "";
         }}
       />

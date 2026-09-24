@@ -116,7 +116,8 @@
       "blockedError": "Không thể gửi tin nhắn.",
       "uploadFailed": "Tải ảnh lên thất bại.",
       "imageSizeError": "Ảnh quá lớn.",
-      "imageTypeError": "Định dạng ảnh không được hỗ trợ."
+      "imageTypeError": "Định dạng ảnh không được hỗ trợ.",
+      "imageLimitError": "Tối đa {max} ảnh."
     },
     "listing": {
       "noPrice": "Giá thương lượng",
