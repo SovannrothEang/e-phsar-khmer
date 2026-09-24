@@ -4,12 +4,16 @@ import { signUpload, type UploadSignFn } from "@/actions/files";
 import { toast } from "@/components/ui/sonner";
 
 /**
- * Drag/drop + click photo picker (max 8). Signs a Supabase upload via a
+ * Drag/drop + click photo picker. Signs a Supabase upload via a
  * `/files/sign` server action — admin session by default; pass
  * `signFn={signUploadUser}` for the user session — then uploads the bytes
  * directly to the signed URL. Reports the public URL through `onUploaded`
  * and/or the full `{ url, path }` pair through `onSigned` (the storage path
  * is required when creating a listing).
+ *
+ * The heading and cap come from the subcategory's own `field_schema` via the
+ * post form: the jobs forms declare a single "Logo" slot (`max: 1`) while
+ * every other photo-bearing form declares 8, so neither is a constant here.
  */
 export default function ImageUpload({
   images,
@@ -17,12 +21,18 @@ export default function ImageUpload({
   onUploaded,
   signFn = signUpload,
   onSigned,
+  title = "Photos",
+  max = 8,
 }: {
   images: File[];
   onChange: (files: File[]) => void;
   onUploaded?: (url: string) => void;
   signFn?: UploadSignFn;
   onSigned?: (photo: { url: string; path: string }) => void;
+  /** Bold heading above the dropzone (the schema's `photos` label). */
+  title?: string;
+  /** How many photos this subcategory accepts (the schema's `photos.max`). */
+  max?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -51,17 +61,17 @@ export default function ImageUpload({
     const files = Array.from(e.dataTransfer.files).filter((f) =>
       f.type.startsWith("image/"),
     );
-    const room = Math.max(0, 8 - images.length);
+    const room = Math.max(0, max - images.length);
     const newFiles = files.slice(0, room);
-    onChange([...images, ...newFiles].slice(0, 8));
+    onChange([...images, ...newFiles].slice(0, max));
     void Promise.all(newFiles.map(uploadOne));
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    const room = Math.max(0, 8 - images.length);
+    const room = Math.max(0, max - images.length);
     const newFiles = files.slice(0, room);
-    onChange([...images, ...newFiles].slice(0, 8));
+    onChange([...images, ...newFiles].slice(0, max));
     void Promise.all(newFiles.map(uploadOne));
   };
 
@@ -70,9 +80,9 @@ export default function ImageUpload({
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <label className="text-sm font-semibold text-foregorund">Photos</label>
+        <label className="text-base font-bold text-foreground">{title}</label>
         <span className="text-xs text-muted-foreground">
-          Max: {images.length} / 8
+          Max: {images.length} / {max}
         </span>
       </div>
 
@@ -102,7 +112,7 @@ export default function ImageUpload({
               )}
             </div>
           ))}
-          {images.length < 8 && (
+          {images.length < max && (
             <button
               onClick={() => inputRef.current?.click()}
               className="w-20 h-20 rounded-sm border-2 border-dashed border-muted flex items-center justify-center text-gray-400 hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
@@ -118,7 +128,7 @@ export default function ImageUpload({
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           onClick={() => inputRef.current?.click()}
-          className="border-2 border-dashed border-gray-200 rounded-sm p-14 flex flex-col items-center gap-2 cursor-pointer hover:border-[#00a0e9] hover:bg-[#e1f3fb] transition-all"
+          className="border-2 border-dashed border-gray-200 bg-gray-50 rounded-sm p-12 flex flex-col items-center gap-2 cursor-pointer hover:border-[#00a0e9] hover:bg-[#e1f3fb] transition-all"
         >
           <Upload className="w-10 h-10 text-[#00a0e9]" />
           <p className="text-sm text-gray-500">

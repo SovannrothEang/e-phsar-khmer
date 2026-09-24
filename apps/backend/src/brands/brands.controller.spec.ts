@@ -61,8 +61,21 @@ describe('BrandsController', () => {
       mockService.listModels.mockResolvedValue(result);
 
       const res = await controller.listModels('brand-uuid');
-      expect(mockService.listModels).toHaveBeenCalledWith('brand-uuid');
+      expect(mockService.listModels).toHaveBeenCalledWith(
+        'brand-uuid',
+        undefined,
+      );
       expect(res).toBe(result);
+    });
+
+    it('forwards the subcategory slug so models can be scoped', async () => {
+      mockService.listModels.mockResolvedValue([]);
+
+      await controller.listModels('brand-uuid', 'tablets');
+      expect(mockService.listModels).toHaveBeenCalledWith(
+        'brand-uuid',
+        'tablets',
+      );
     });
 
     it('is marked @Public()', () => {

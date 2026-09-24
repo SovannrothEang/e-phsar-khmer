@@ -143,3 +143,37 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Leaflet's OSM attribution: required by the tile terms, so it stays — just
+   quiet (no "Leaflet |" prefix, no white box, muted 10px). */
+.leaflet-container .leaflet-control-attribution {
+  background: transparent;
+  color: color-mix(in oklab, var(--muted-foreground) 75%, transparent);
+  font-size: 10px;
+}
+.leaflet-container .leaflet-control-attribution a {
+  color: inherit;
+}
+
+/* The picker list scrolls, but Chromium's overlay scrollbars leave no visible
+   affordance — with a 91-brand list only ~6 rows show and nothing says there is
+   more. `::-webkit-scrollbar` opts the element out of overlay scrollbars and
+   gives a slim, always-draggable one; `scrollbar-width` covers Firefox. */
+.command-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent)
+    transparent;
+}
+.command-list::-webkit-scrollbar {
+  width: 8px;
+}
+.command-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.command-list::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--muted-foreground) 35%, transparent);
+}
+.command-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+}

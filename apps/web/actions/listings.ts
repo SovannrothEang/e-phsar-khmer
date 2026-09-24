@@ -3,10 +3,15 @@
 import { ApiError, userServerFetch } from "@/lib/api/client";
 import {
   type BackendAttributeRow,
+  type BackendPlace,
   type BackendBrand,
   type BackendListing,
   type BackendModel,
+  getAttributeOptions,
   getBrandsForSubcategory,
+  getCommunes,
+  getDistricts,
+  getProvinces,
   getBodyTypes,
   getCategoryWithSubcategories,
   getColors,
@@ -23,17 +28,85 @@ interface UserPhoneRow {
 }
 
 /**
+ * The field keys the form renders as a searchable picker, mapped to the
+ * attribute set that may back each one — `null` meaning "no set, the
+ * subcategory's own inline `field_schema.options` is the source".
+ *
+ * The `null` entries are not oversights — they are the spec-fixed plain
+ * dropdowns whose values live only in the subcategory's own `field_schema`.
+ * None of them has an admin-manageable set behind it (see
+ * `lib/attribute-types.ts`), and two are backed by *two* sets at once:
+ * `storage` by `storage_phone`/`storage_computer` (phones read 128GB/256GB/…,
+ * computers "128GB & Under"/"250GB - 256GB"/…) and `screenSize` by
+ * `screensize_laptop`/`screensize_monitor` (10.9" & Under vs 22.9" & Under).
+ * A key→set mapping would be wrong for one of each pair, so the schema's own
+ * list is authoritative. `ram`, `cpu` and `vga` each map to a single set
+ * (`rams`/`cpus`/`vgas`) but are equally unmanageable, so they follow the same
+ * rule rather than growing a second mechanism.
+ *
+ * `type`, `accessory` and `network` DO have admin-managed sets (`types`,
+ * `accessories`, `networks`) linked to their subcategories, so those ticks
+ * drive the form — including computers-parts-and-accessories, whose 17 type
+ * rows are ticked for it.
+ */
+const PICKER_ATTR_TYPES: Record<string, string | null> = {
+  storage: null,
+  screenSize: null,
+  ram: null,
+  cpu: null,
+  vga: null,
+  type: "types",
+  accessory: "accessories",
+  network: "networks",
+  // Home & Land's three property pickers. Each has a seeded set but every one
+  // of its rows is unlinked, so `forSub`'s global rule applies and the resolver
+  // uses the subcategory's own inline options. Mapped rather than `null` so
+  // that linking a row in the admin turns the ticks authoritative, exactly as
+  // `type`/`accessory`/`network` behave.
+  //
+  // The two sources do NOT always agree, which is the whole reason this is a
+  // latent hazard rather than a no-op: `bedrooms` and `facings` match their
+  // inline lists exactly, but **`bathrooms` does not** — the set carries
+  // 1,2,3,4,5,6,More+ while the seed's inline list (and spec-detail-five.md)
+  // carries 1,2,3,4,5,More+, because Bedroom has a "6" and Bathroom
+  // deliberately does not. So the first admin tick on ANY `bathrooms` row
+  // flips the set to managed for every subcategory at once and the picker
+  // silently grows a "6"; tick one for a *different* subcategory only and this
+  // form's Bathroom renders EMPTY, with no inline fallback — by design, and
+  // silent because Bathroom is unstarred. Fixing the set's extra row is a data
+  // decision (a seed change alone cannot delete it: `attributes.seed.ts` is
+  // insert-only), so it is tracked in tasks/todo.md rather than done here.
+  bedroom: "bedrooms",
+  bathroom: "bathrooms",
+  facing: "facings",
+  // The jobs family (2026-09-23). `jobType` is the job-type field's key; the
+  // seed originally declared it as `type`, which maps to the admin-managed
+  // `types` set — and since no `types` row is ticked for any job subcategory,
+  // the resolver returned an EMPTY list for a field the design stars, so the
+  // form could not be submitted at all. `jobtypes` is linked to all 36 job
+  // subcategories, so its ticks are the truth here, and the three consumers
+  // that were already written for it (`SET_FIELD_KEYS.jobtypes`,
+  // `ListingSpecs.ATTR_KEYS`, the `jobtypes` admin page) all say `jobType`.
+  jobType: "jobtypes",
+  // `experiences` is a global picklist — no row of it is linked anywhere, so
+  // `forSub`'s global rule applies and the subcategory's own inline options
+  // are what render. Mapped rather than `null` for the same reason as the
+  // Home & Land keys above: linking a row would turn the ticks authoritative.
+  experience: "experiences",
+};
+
+/**
  * The logged-in user's contact info, prefilled into the form's contact
  * section (name, up to 3 phones in local format, email if the profile has
  * one). Empty when the seller has no profile data.
  */
-export interface CarsContactPrefill {
+export interface ContactPrefill {
   name: string;
   phones: string[];
   email: string | null;
 }
 
-async function getUserContactPrefill(): Promise<CarsContactPrefill> {
+async function getUserContactPrefill(): Promise<ContactPrefill> {
   const user = await getCurrentUser();
   if (!user) return { name: "", phones: [], email: null };
 
@@ -59,58 +132,241 @@ async function getUserContactPrefill(): Promise<CarsContactPrefill> {
 }
 
 /**
- * Data the cars-for-sale form needs to render its selects — category and
- * subcategory UUIDs (the create DTO takes IDs, not slugs) plus the option
- * lists. All of it is public backend data and lives here (not in the client)
- * because `API_URL` is only reachable from server context.
+ * Data the listing form needs to render its selects — category and subcategory
+ * UUIDs (the create DTO takes IDs, not slugs), which fields the subcategory
+ * actually has, plus their option lists. All of it is public backend data and
+ * lives here (not in the client) because `API_URL` is only reachable from
+ * server context.
  */
-export interface CarsForSaleConfig {
+export interface ListingFormConfig {
   categoryId: string;
   subcategoryId: string;
+  /**
+   * The subcategory's own `field_schema` keys — the form renders a block iff
+   * its key is here, so Cars For Sale and Bicycles are the same component with
+   * a different declared field set.
+   */
+  fields: string[];
+  /**
+   * Field labels taken from the subcategory's own `field_schema` (key → label.en).
+   * The design names the same field differently per subcategory: the
+   * `vehicleType` key prints "Vehicle Type" on Vehicles For Rent but "Type" on
+   * Parts & Accessories. Both live in the schema, so the form reads them rather
+   * than hardcoding one and being wrong on the other. (`ListingSpecs` on the
+   * public listing page already carries a hardcoded override map for exactly
+   * this pair — the schema makes that unnecessary.)
+   */
+  labels: Record<string, string>;
   brands: BackendBrand[];
-  bodyTypes: BackendAttributeRow[];
+  /**
+   * Resolved options for whichever "kind of vehicle" field this subcategory
+   * declares — `bodyType` (cars, lorries, motorcycles) or `vehicleType`
+   * (Vehicles For Rent, Parts & Accessories). See the resolver in
+   * `getListingFormConfig` for why three sources feed it.
+   */
+  vehicleKinds: { name: string; image: string | null }[];
   colors: BackendAttributeRow[];
+  /**
+   * Option lists for the plain-dropdown pickers (`storage`, `accessory`,
+   * `network`, …), keyed by the subcategory's own field key. A key is present
+   * only when the subcategory declares it — see `PICKER_ATTR_TYPES` for which
+   * source wins for each.
+   */
+  pickLists: Record<string, { name: string; image: string | null }[]>;
   years: string[];
-  contact: CarsContactPrefill;
+  /**
+   * The subcategory's own photo cap, read from its `photos` field (`max`).
+   * Jobs declare 1 (the design's single "Logo" slot); all 146 other
+   * subcategories declare 8, so the `?? 8` in the resolver is a safety net
+   * rather than a live path. Note this is a UI cap only — the create DTO's
+   * `@ArrayMaxSize(8)` is category-agnostic.
+   */
+  photoMax: number;
+  /** Province rows for the Location cascade (public lookup). */
+  provinces: BackendPlace[];
+  contact: ContactPrefill;
 }
 
-export async function getCarsForSaleConfig(
+export async function getListingFormConfig(
+  categorySlug: string,
+  subcategorySlug: string,
   locale: string,
-): Promise<CarsForSaleConfig | null> {
-  const category = await getCategoryWithSubcategories(
-    "cars-and-vehicles",
-    locale,
-  );
-  const sub = category?.subcategories.find((s) => s.slug === "cars-for-sale");
+): Promise<ListingFormConfig | null> {
+  const category = await getCategoryWithSubcategories(categorySlug, locale);
+  const sub = category?.subcategories.find((s) => s.slug === subcategorySlug);
   if (!category || !sub) return null;
 
-  const [brands, bodyTypes, years, colors, contact] = await Promise.all([
-    getBrandsForSubcategory("cars-for-sale"),
-    getBodyTypes(),
-    getYears(),
-    getColors(),
-    getUserContactPrefill(),
-  ]);
+  const fields = (sub.fieldSchema ?? []).map((f) => f.key);
+  const has = (key: string) => fields.includes(key);
 
-  const forSub = (rows: BackendAttributeRow[]) => {
-    const filtered = rows.filter((r) => r.subcategoryIds.includes(sub.id));
-    return filtered.length > 0 ? filtered : rows; // seed gap fallback
-  };
+  // Option lists are only fetched for the fields this subcategory declares —
+  // a bicycle form never asks the cars endpoints for a year or a body type.
+  // One fetch per attribute set that this subcategory's pickers might read.
+  const pickerTypes = [
+    ...new Set(
+      Object.entries(PICKER_ATTR_TYPES)
+        .filter(([key, type]) => type !== null && has(key))
+        .map(([, type]) => type as string),
+    ),
+  ];
+
+  const [brands, bodyTypes, colors, years, provinces, contact, pickerRows] =
+    await Promise.all([
+      has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
+      has("bodyType") || has("vehicleType") ? getBodyTypes() : [],
+      has("color") ? getColors() : [],
+      has("year") ? getYears() : [],
+      getProvinces(),
+      getUserContactPrefill(),
+      Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
+    ]);
+
+  /**
+   * Scope an option set to this subcategory.
+   *
+   * `attribute_options` holds two kinds of set, and they need opposite rules:
+   *
+   *  - **Managed** — at least one row of the type carries `subcategoryIds`. The
+   *    ticks are then the whole truth: a subcategory that was not ticked for a
+   *    row must NOT see it, so unticking a value really removes it.
+   *  - **Global** — no row of the type is linked anywhere (the colours today).
+   *    These are plain picklists that were never scoped; filtering them would
+   *    empty the field, so the whole list is returned.
+   *
+   * The previous rule — "if nothing is ticked *for this subcategory*, return
+   * everything" — conflated the two and had a nasty edge: unticking the last
+   * row of a managed set resurrected the ENTIRE list, so the field grew exactly
+   * when it should have emptied. Deciding on the *set* rather than on this
+   * subcategory's slice is what makes unticking authoritative.
+   */
+  const forSub = (rows: BackendAttributeRow[]) =>
+    rows.some((r) => r.subcategoryIds.length > 0)
+      ? rows.filter((r) => r.subcategoryIds.includes(sub.id))
+      : rows;
+
+  /**
+   * Resolve each plain-dropdown picker's options. Two sources, in this order:
+   *
+   *  1. the attribute set mapped in `PICKER_ATTR_TYPES`, scoped by `forSub`.
+   *     When that set is *managed*, its ticks are the whole truth — so a
+   *     subcategory with no tick against a managed set correctly renders an
+   *     EMPTY list, which is the point of the 2026-09-16 untick fix. (An
+   *     earlier draft fell back to the inline options here, which would have
+   *     resurrected an unticked set — the exact bug that fix removed.)
+   *  2. otherwise the subcategory's own inline `field_schema.options` — either
+   *     because no set is mapped for the key (`storage`), or because the mapped
+   *     set is a global picklist nobody has linked.
+   */
+  const rowsByType = new Map(
+    pickerTypes.map((type, i) => [type, pickerRows[i] ?? []]),
+  );
+  const pickLists: Record<string, { name: string; image: string | null }[]> =
+    {};
+  for (const key of Object.keys(PICKER_ATTR_TYPES)) {
+    if (!has(key)) continue;
+    const type = PICKER_ATTR_TYPES[key];
+    const rows = type === null ? [] : (rowsByType.get(type) ?? []);
+    // Same managed/global test `forSub` uses — but the *empty* case must not
+    // be conflated with the global one: a managed set that this subcategory
+    // has no tick against renders EMPTY, it does not fall back to the inline
+    // list. Falling back there is precisely the resurrection bug the
+    // 2026-09-16 `forSub` fix removed, so it must not reappear here.
+    const managed = rows.some((r) => r.subcategoryIds.length > 0);
+    const scoped = managed
+      ? rows.filter((r) => r.subcategoryIds.includes(sub.id))
+      : [];
+    const inline =
+      (sub.fieldSchema ?? []).find((f) => f.key === key)?.options ?? [];
+    pickLists[key] = managed
+      ? scoped.map((r) => ({ name: r.name, image: r.image }))
+      : inline.map((name) => ({ name, image: null }));
+  }
+
+  /**
+   * Resolve the "kind of vehicle" list. Three sources, in this order:
+   *
+   *  1. the **linked `bodytypes` rows** — the admin-managed set, and the only
+   *     source that responds to ticks in the Body Types page (cars 9, lorries 8,
+   *     Vehicles For Rent 20);
+   *  2. the subcategory's **own inline `field_schema.options`** when no row is
+   *     linked to it. Parts & Accessories needs this: nothing in `bodytypes`
+   *     points at it, so without the fallback its Type picker would be EMPTY —
+   *     and because that field is required, the form could not be submitted at
+   *     all;
+   *  3. nothing.
+   *
+   * The inline copy is deliberately NOT preferred over the attribute set: on
+   * Vehicles For Rent it is stale (four rows spelled "…Track" instead of
+   * "…Truck") while the attribute rows are correct and admin-editable.
+   */
+  const kindKey = has("bodyType")
+    ? "bodyType"
+    : has("vehicleType")
+      ? "vehicleType"
+      : null;
+  const linkedKinds = bodyTypes.filter((r) =>
+    r.subcategoryIds.includes(sub.id),
+  );
+  const inlineKinds =
+    (sub.fieldSchema ?? []).find((f) => f.key === kindKey)?.options ?? [];
+  const vehicleKinds =
+    linkedKinds.length > 0
+      ? linkedKinds.map((r) => ({ name: r.name, image: r.image }))
+      : inlineKinds.map((name) => ({ name, image: null }));
+
+  const labels: Record<string, string> = {};
+  for (const field of sub.fieldSchema ?? []) {
+    const label = field.label?.en;
+    if (label) labels[field.key] = label;
+  }
+
+  // The photo cap is per-subcategory data, not a constant: the 36 jobs forms
+  // declare `max: 1` (the single "Logo" slot) while every other subcategory
+  // declares 8.
+  const photoMax =
+    (sub.fieldSchema ?? []).find((f) => f.key === "photos")?.max ?? 8;
 
   return {
     categoryId: category.id,
     subcategoryId: sub.id,
+    fields,
+    labels,
     brands,
-    bodyTypes: forSub(bodyTypes),
+    vehicleKinds,
     colors: forSub(colors),
+    pickLists,
     years: years.map((y) => y.name),
+    photoMax,
+    provinces,
     contact,
   };
 }
 
-/** Models for the chosen brand — passthrough for `getModelsForBrand`. */
-export async function getCarModels(brandId: string): Promise<BackendModel[]> {
-  return getModelsForBrand(brandId);
+/** Location cascade: districts of a province (lazy, client-invoked). */
+export async function getLocationDistricts(
+  provinceSlug: string,
+): Promise<BackendPlace[]> {
+  return getDistricts(provinceSlug);
+}
+
+/** Location cascade: communes of a district (lazy, client-invoked). */
+export async function getLocationCommunes(
+  provinceSlug: string,
+  districtSlug: string,
+): Promise<BackendPlace[]> {
+  return getCommunes(provinceSlug, districtSlug);
+}
+
+/**
+ * Models for the chosen brand, scoped to the subcategory being posted in —
+ * a passthrough for `getModelsForBrand`. Without the slug, Tablets under Apple
+ * would offer iPhones.
+ */
+export async function getBrandModels(
+  brandId: string,
+  subcategorySlug: string,
+): Promise<BackendModel[]> {
+  return getModelsForBrand(brandId, subcategorySlug);
 }
 
 /**
@@ -131,6 +387,11 @@ export interface CreateListingPayload {
   attributes?: Record<string, unknown>;
   location?: string;
   address?: string;
+  provinceId?: string;
+  districtId?: string;
+  communeId?: string;
+  latitude?: number;
+  longitude?: number;
   deliveryFree?: boolean;
   contactName?: string;
   contactPhones?: string[];

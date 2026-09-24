@@ -253,6 +253,17 @@ export class ListingsService {
         eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType),
       );
     }
+    // Generic attribute filter for every grid that is NOT a car's Body Type.
+    // The key is bound as a parameter (`->>$n`), never interpolated, and the
+    // DTO additionally constrains it to a plain identifier — so this stays a
+    // read of the JSONB, not a path injection. Half a filter (one param
+    // without the other) applies nothing rather than erroring, matching how
+    // `districtSlug` without `provinceSlug` is already treated.
+    if (query.attrKey && query.attrValue) {
+      conditions.push(
+        eq(sql`${listings.attributes}->>${query.attrKey}`, query.attrValue),
+      );
+    }
 
     if (query.cursor) {
       try {

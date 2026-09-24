@@ -1,8 +1,8 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
 import { useState } from "react";
+import DbImage from "@/components/common/DbImage";
 
 /** Minimal option row (brand/bodyType/model) — local type, web is standalone. */
 interface Option {
@@ -15,9 +15,21 @@ type Props = {
   options: Option[];
   baseHref: string;
   paramKey: "brand" | "body_type" | "model";
+  /** Section heading rendered above the grid (e.g. "Brand", "Body Type"). */
+  title?: string;
+  /** Declared design: true = the icon-circle grid, whether or not a single row
+   *  carries an image yet. Omitted = the bordered text design (models, and any
+   *  set the browse page does not declare). */
+  imageTiles?: boolean;
 };
 
-export default function OptionGrid({ options, baseHref, paramKey }: Props) {
+export default function OptionGrid({
+  options,
+  baseHref,
+  paramKey,
+  title,
+  imageTiles,
+}: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -25,6 +37,20 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
   const [showAll, setShowAll] = useState(false);
   const visibleOptions = showAll ? options : options.slice(0, LIMIT);
   const router = useRouter();
+
+  // The design follows the SET, never the load result: an image-bearing set
+  // (brands, body types, accessories, job types, type pickers, …) uses the
+  // icon-circle design even while an object is missing — a dead image, or a set
+  // whose images no admin has uploaded yet, leaves an EMPTY CIRCLE; it never
+  // re-styles the tile or the grid.
+  //
+  // Nothing here is sniffed from the rows. It used to be: "icon tiles when the
+  // set is majority image-bearing" read the images as a proxy for the set's
+  // design, and since images are never seeded the proxy was wrong nearly
+  // everywhere — Phone Accessories (0 of 16 rows) and every Type grid but
+  // musical instruments (the shared `other` row is their only image, 1 of N)
+  // silently fell to the text design. The caller declares the design instead.
+  const textTiles = paramKey === "model" || !imageTiles;
 
   const handleClick = (e: React.MouseEvent, slug: string) => {
     // Prevent the Link from performing a full navigation
@@ -45,22 +71,25 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
     }
 
     const targetPath = pathname || baseHref;
-    //  stay on the same page, only update query
-    router.replace(`${targetPath}?${params.toString()}`, { scroll: false });
+    // PUSH, not replace: each pick is a navigation step, so Back walks the
+    // drill-down back one choice at a time (replace overwrote the subcategory
+    // entry, which sent Back straight past it to the category page). The view
+    // also resets to the top — a pick changes which grids exist, and keeping
+    // the old offset left the remaining grid's heading under the sticky bar.
+    router.push(`${targetPath}?${params.toString()}`, { scroll: true });
   };
 
   return (
-    <div className="bg-card rounded p-4 mb-4 pl-6">
+    <div className="bg-card rounded p-4 mb-2 pl-6">
+      {title && <h2 className="text-base font-bold mb-4">{title}</h2>}
       <div
         className={
-          paramKey === "model"
+          textTiles
             ? "grid grid-cols-3 md:grid-cols-6 gap-2"
             : "grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-y-6 gap-x-4"
         }
       >
         {visibleOptions.map((opt) => {
-          const imageSrc = "image" in opt ? opt.image : undefined;
-          const isModel = paramKey === "model";
           const targetPath = pathname || baseHref;
 
           const isSelected =
@@ -77,7 +106,7 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
               href={`${targetPath}?${paramKey === "model" ? "ad_model" : paramKey === "body_type" ? "ad_type" : "ad_field"}=${opt.slug}`}
               onClick={(e) => handleClick(e, opt.slug)}
               className={
-                isModel
+                textTiles
                   ? `border py-2 px-1 text-xs text-center transition-colors flex items-center justify-center min-h-[40px] ${
                       isSelected
                         ? "text-blue-500 bg-blue-50 border-blue-100 font-medium"
@@ -86,23 +115,20 @@ export default function OptionGrid({ options, baseHref, paramKey }: Props) {
                   : `flex flex-col items-center text-center group ${isSelected ? "text-blue-500 font-medium" : ""}`
               }
             >
-              {isModel ? (
+              {textTiles ? (
                 <span>{opt.name}</span>
               ) : (
                 <>
                   <div className="w-14 h-14 flex items-center justify-center rounded-full bg-blue-50 group-hover:bg-blue-100">
-                    {imageSrc ? (
-                      <Image
-                        src={imageSrc}
+                    {opt.image ? (
+                      <DbImage
+                        src={opt.image}
                         alt={opt.name}
                         width={56}
                         height={56}
-                        unoptimized
                         className="object-contain"
                       />
-                    ) : (
-                      <span className="text-xs">{opt.name}</span>
-                    )}
+                    ) : null}
                   </div>
                   <span className="text-xs mt-2 block">{opt.name}</span>
                 </>

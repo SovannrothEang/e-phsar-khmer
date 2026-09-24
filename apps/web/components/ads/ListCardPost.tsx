@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import DbImage from "@/components/common/DbImage";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
@@ -34,10 +34,20 @@ import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 
 export function ListCardPost({ post }: { post: Post }) {
-  const discountAmount = post.oldPrice ? post.oldPrice - post.price : 0;
+  // See GridCardPost — a "Negotiable" listing has no price to subtract from.
+  const discountAmount =
+    post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  // No photo at all, or a stored photo missing from storage → empty area (the
+  // DB is the only image source: no static stand-in, no broken <img>).
+  const photo = post.images[0];
+  const emptyPhoto = (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <ImageIcon className="h-8 w-8 text-zinc-400" aria-hidden />
+    </div>
+  );
   const [shareOpen, setShareOpen] = useState(false);
 
   return (
@@ -52,15 +62,20 @@ export function ListCardPost({ post }: { post: Post }) {
 
         {/* ── LEFT: Image ── */}
         <div className="relative shrink-0 w-[200px] h-[180px] ">
-          <Image
-            src={post.images[0] ?? "/placeholder.svg"}
-            alt={post.title}
-            fill
-            className="object-cover rounded-l-sm"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            loading="eager"
-            unoptimized
-          />
+          {photo ? (
+            <DbImage
+              src={photo}
+              alt={post.title}
+              fill
+              className="object-cover rounded-l-sm"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              loading="eager"
+              unoptimized
+              fallback={emptyPhoto}
+            />
+          ) : (
+            emptyPhoto
+          )}
 
           {/* Discount badge — single pill, top-left, orange like khmer24 */}
           {post.oldPrice && (
@@ -201,7 +216,9 @@ export function ListCardPost({ post }: { post: Post }) {
           {/* Price row */}
           <div className="flex items-center gap-2 mt-1">
             <span className="text-red-500 font-bold text-lg leading-none">
-              ${post.price.toLocaleString()}
+              {post.price === null
+                ? "Negotiable"
+                : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (
               <span className="text-sm text-zinc-400 line-through">

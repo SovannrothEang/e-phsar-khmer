@@ -180,7 +180,7 @@ export default function Footer() {
           <div className="flex items-center mt-3 flex-wrap justify-end">
             <span className="text-sm">We Accept:</span>
             {[
-              "icon/ABA.svg",
+              "/icon/ABA.svg",
               "/icon/khqr.svg",
               "/icon/Visa.svg",
               "/icon/Mastercard.svg",

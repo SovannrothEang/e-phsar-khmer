@@ -1,63 +1,186 @@
-import type { ComponentType } from "react";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
-import {
-  LSP_SUBCATEGORIES,
-  LSPC_SUBCATEGORIES,
-  LSPYCE_SUBCATEGORIES,
-  LSPYC_SUBCATEGORIES,
-  LS_SUBCATEGORIES,
-  LSS_SUBCATEGORIES,
-} from "@/lib/subcategoryGroups";
-// ─── Subcategory header components ────────────────────────────────────────────
-import LSPHeader from "@/components/subcategory-layouts/LSPHeader";
-import LSPCHeader from "@/components/subcategory-layouts/LSPCHeader";
-import LSPYCHeader from "@/components/subcategory-layouts/LSPYCHeader";
-import LSPCYEHeader from "@/components/subcategory-layouts/LSPYCEHeader";
-import LSHeader from "@/components/subcategory-layouts/LSHeader";
-import LSSHeader from "@/components/subcategory-layouts/LSSHeader";
-// ─── Content & ads ────────────────────────────────────────────────────────────
+// ─── Header: one component; chip flags come from the maps below ──────────────
+import LSPCYEHeader, {
+  type LSPCYEHeaderProps,
+} from "@/components/subcategory-layouts/LSPYCEHeader";
+// ─── Content & posts ─────────────────────────────────────────────────────────
 import SubcategoryContent from "@/components/subcategory-layouts/SubcategoryContent";
 import type { OptionRow } from "@/components/subcategory-layouts/SubcategoryContent";
-import HighLightAds from "@/components/ads/HighLightAds";
-import NormalAd from "@/components/ads/NormalAd";
-import AdsPhoto from "@/components/ads/AdsPhoto";
+import { GridCardPost } from "@/components/ads/GridCardPost";
+import { GridCardSell } from "@/components/ads/GridCardSell";
+import { ListCardPost } from "@/components/ads/ListCardPost";
+import { ListCardSell } from "@/components/ads/ListCardSell";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
-  getBodyTypes,
   getBrandsForSubcategory,
   getCategoryWithSubcategories,
+  getLinkedAttributeOptions,
   getListingsFeed,
   getModelsForBrand,
   toCardPost,
 } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 
-// ─── Header lookup map (avoids long if-else chain) ───────────────────────────
-type HeaderProps = { title: string };
-const buildMap = (
-  slugs: string[],
-  Component: ComponentType<HeaderProps>,
-): Record<string, ComponentType<HeaderProps>> =>
-  Object.fromEntries(slugs.map((s) => [s, Component]));
-const HEADER_MAP: Record<string, ComponentType<HeaderProps>> = {
-  ...buildMap(LSP_SUBCATEGORIES, LSPHeader),
-  ...buildMap(LS_SUBCATEGORIES, LSHeader),
-  ...buildMap(LSS_SUBCATEGORIES, LSSHeader),
-  ...buildMap(LSPC_SUBCATEGORIES, LSPCHeader),
-  ...buildMap(LSPYCE_SUBCATEGORIES, LSPCYEHeader),
-  ...buildMap(LSPYC_SUBCATEGORIES, LSPYCHeader),
+// ─── Bar chip flags: the design groups chips per main category; the vehicles
+//     family has per-subcategory chip sets. All chips default to true (cars).
+type HeaderFlags = Pick<
+  LSPCYEHeaderProps,
+  "year" | "engine" | "condition" | "price" | "priceLabel"
+>;
+const CATEGORY_HEADER_FLAGS: Record<string, HeaderFlags> = {
+  "phones-and-tablets": { year: false, engine: false },
+  "computers-and-accessories": { year: false, engine: false },
+  "electronics-and-appliances": { year: false, engine: false },
+  "home-and-land": {
+    year: false,
+    engine: false,
+    condition: false,
+    price: false,
+  },
+  services: { year: false, engine: false, condition: false, price: false },
+  jobs: {
+    year: false,
+    engine: false,
+    condition: false,
+    priceLabel: "Salary",
+  },
+  "fashion-and-beauty": { year: false, engine: false, condition: false },
+  "furniture-and-decor": { year: false, engine: false, condition: false },
+  "books-sports-and-hobbies": {
+    year: false,
+    engine: false,
+    condition: false,
+  },
+  pets: { year: false, engine: false, condition: false },
+  foods: { year: false, engine: false, condition: false },
 };
-// ─── Ad block layout (deduped) ────────────────────────────────────────────────
-const AD_BLOCKS: ComponentType[] = [
-  NormalAd,
-  AdsPhoto,
-  HighLightAds,
-  AdsPhoto,
-  HighLightAds,
-];
+const SUBCATEGORY_HEADER_FLAGS: Record<string, HeaderFlags> = {
+  "cars-for-sale": {},
+  "motorcycles-for-sale": { engine: false },
+  bicycles: { year: false, engine: false },
+  "vehicles-for-rent": { year: false, engine: false, condition: false },
+  "maintenance-and-repair": { year: false, engine: false, condition: false },
+  "lorries-vans-and-tractors": {
+    year: false,
+    engine: false,
+    condition: false,
+  },
+  "financing-and-insurance": { year: false, engine: false, condition: false },
+  "tuk-tuk-and-remork": { year: false, engine: false, condition: false },
+  "parts-and-accessories": { year: false, engine: false, condition: false },
+  "vehicles-others": { year: false, engine: false, condition: false },
+};
+const DEFAULT_HEADER_FLAGS: HeaderFlags = {
+  year: false,
+  engine: false,
+  condition: false,
+};
+// ─── Attribute sets rendered as option grids on the browse pages; the rows
+//     carry subcategoryIds (UUIDs) — the page filters by the subcategory id. ──
+const ATTRIBUTE_SET_TITLES: Record<string, string> = {
+  bodytypes: "Body Type",
+  types: "Type",
+  accessories: "Accessories",
+  networks: "Network",
+  jobtypes: "Job Type",
+  enginetypes: "Engine Type",
+  // `vehicletypes` is deliberately absent (2026-09-16): it duplicated
+  // `bodytypes`, and Vehicles For Rent rendered both grids with 5 values
+  // appearing twice. The duplicate set is retired; rent's grid is Body Type.
+  //
+  // `colors` is deliberately absent too (2026-09-16). Colour is a FORM-only
+  // field by design ("the plain dropdown, no image sets are deliberately left
+  // unlinked so they never become browse grids"). That used to be enforced by
+  // leaving the rows unlinked — but they had to be scoped to make unticking
+  // work in the form, and a linked set whose type is listed here renders a
+  // grid. This map is now the control, not the absence of links.
+  bedrooms: "Bedroom",
+  bathrooms: "Bathroom",
+  facings: "Facing",
+  experiences: "Experience",
+  rams: "RAM",
+  cpus: "CPU",
+  storage_phone: "Storage",
+  storage_computer: "Storage",
+  screensize_laptop: "Screen Size",
+  screensize_monitor: "Screen Size",
+  vgas: "VGA",
+};
+const ATTRIBUTE_SET_TYPES = Object.keys(ATTRIBUTE_SET_TITLES);
+
+/**
+ * Which attribute key a grid's value is stored under.
+ *
+ * The option-set type is NOT that key: `types` → `type`, `accessories` →
+ * `accessory`, `bodytypes` → `bodyType` on cars/lorries **but `vehicleType` on
+ * vehicles-for-rent and parts** (the same set, stored under a different key
+ * depending on the subcategory's own schema). So each entry lists its
+ * candidates in preference order and the first one the subcategory's
+ * `field_schema` actually declares wins — the schema is the arbiter, not this
+ * table.
+ *
+ * Getting this wrong is not a no-op: the feed filters a key the listings do
+ * not have and returns NOTHING, which is what made every non-car grid — the
+ * Type grid above all — empty the feed on click (2026-09-23).
+ */
+const SET_FIELD_KEYS: Record<string, string[]> = {
+  bodytypes: ["bodyType", "vehicleType"],
+  types: ["type"],
+  accessories: ["accessory"],
+  networks: ["network"],
+  jobtypes: ["jobType"],
+  enginetypes: ["engineType"],
+  experiences: ["experience"],
+  bedrooms: ["bedroom"],
+  bathrooms: ["bathroom"],
+  facings: ["facing"],
+  rams: ["ram"],
+  cpus: ["cpu"],
+  vgas: ["vga"],
+  storage_phone: ["storage"],
+  storage_computer: ["storage"],
+  screensize_laptop: ["screenSize"],
+  screensize_monitor: ["screenSize"],
+};
+
+/** The first candidate key this subcategory's schema declares, if any. */
+function resolveAttrKey(
+  setType: string,
+  schemaKeys: string[],
+): string | undefined {
+  return (SET_FIELD_KEYS[setType] ?? []).find((k) => schemaKeys.includes(k));
+}
+// ─── Sets whose DESIGN is the icon-circle grid — the mock draws each of them
+//     with icons (Phone Accessories = 10 accessory icons, Fashion Accessories
+//     = 7, Body Types, Job Types, carrier Networks, and every Type picker:
+//     computer parts, cameras, TVs/audio, fashion, musical instruments,
+//     property). The design belongs to the SET, not to the rows: these sets
+//     keep the icon grid while no admin has uploaded their images yet, so they
+//     render empty circles instead of silently falling back to the text design
+//     (captain, 2026-09-10: "if the thing that we have to use image, then use
+//     the image design"). Brands are declared at the call site — every brand
+//     grid in the mock is icon tiles. ─────────────────────────────────────────
+const IMAGE_TILE_SETS = new Set([
+  "accessories",
+  "bodytypes",
+  "jobtypes",
+  "networks",
+  "types",
+]);
+// ─── The exception, by MAIN CATEGORY: Furniture & Decor draws its Type grid as
+//     bordered TEXT tiles. It is the only text-drawn slice of `types` in the
+//     mock — furniture's type rows carry no `image` key at all, while every
+//     other slice does. Keyed by category rather than by subcategory so a new
+//     Type link anywhere under furniture cannot silently re-grow icon circles.
+//     (Property's kind rows — Flat/House/Villa, Factory/Warehouse/… — are drawn
+//     with icons in the mock too, so Home & Land stays on the icon grid.) ─────
+const TEXT_TILE_SETS_BY_CATEGORY: Record<string, Set<string>> = {
+  "furniture-and-decor": new Set(["types"]),
+};
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function SubcategoryPage({
   params,
@@ -86,10 +209,10 @@ export default async function SubcategoryPage({
   }
 
   // Live option grids for every subcategory with linked data: brands + models
-  // (cars, phones/tablets/smart-watches, ...). Body types are car-only — the
-  // subcategoryIds filter (UUIDs) naturally returns [] for other subcategories.
+  // (cars, phones/tablets/smart-watches, ...) plus every linked attribute set
+  // (body types / types / bedrooms / ...) — the subcategoryIds filter (UUIDs)
+  // naturally returns [] for subcategories without links.
   let brands: OptionRow[] | null = null;
-  let bodyTypes: OptionRow[] | null = null;
   let models: OptionRow[] | null = null;
 
   const brandRows = await getBrandsForSubcategory(subcategory.slug);
@@ -102,25 +225,28 @@ export default async function SubcategoryPage({
     }));
   }
 
-  // bodytype rows carry denormalized subcategoryIds (UUIDs) — keep only the
-  // rows relevant to this subcategory
-  const btRows = await getBodyTypes();
-  const filtered = btRows.filter((r) =>
-    r.subcategoryIds?.includes(subcategory.id),
-  );
-  if (filtered.length > 0) {
-    bodyTypes = filtered.map((r) => ({
-      slug: r.slug,
-      name: r.name,
-      image: r.image,
-    }));
-  }
+  // One call returns every attribute row linked to this subcategory (the
+  // denormalized subcategoryIds mirror of the admin UI); rows are grouped
+  // into per-set grids below.
+  const linkedRows = await getLinkedAttributeOptions(subcategory.id);
+  const textTileSets = TEXT_TILE_SETS_BY_CATEGORY[category.slug];
+  const sets = ATTRIBUTE_SET_TYPES.map((type) => ({
+    slug: type,
+    title: ATTRIBUTE_SET_TITLES[type],
+    // Declared design — never sniffed from the rows (see IMAGE_TILE_SETS).
+    imageTiles: IMAGE_TILE_SETS.has(type) && !textTileSets?.has(type),
+    options: linkedRows
+      .filter((r) => r.type === type)
+      .map((r) => ({ slug: r.slug, name: r.name, image: r.image })),
+  })).filter((s) => s.options.length > 0);
 
   // Model grid for the selected brand (per-brand fetch; brands carry no nested models)
   if (sp.ad_field) {
     const selected = brandRows.find((b) => b.slug === sp.ad_field);
     if (selected) {
-      const modelRows = await getModelsForBrand(selected.id);
+      // Scoped to this subcategory — a tablet page must not show iPhone
+      // models in its Model grid.
+      const modelRows = await getModelsForBrand(selected.id, subcategorySlug);
       if (modelRows.length > 0) {
         models = modelRows.map((m) => ({ slug: m.slug, name: m.name }));
       }
@@ -128,39 +254,68 @@ export default async function SubcategoryPage({
   }
 
   const brand = sp.ad_field;
-  const bodyType = sp.ad_type;
-  const isFiltered = !!(brand || bodyType);
+  const adType = sp.ad_type;
+  const isFiltered = !!(brand || adType);
 
   // OptionGrid links carry slugs; the feed filters on the display names the
   // post form stores in `attributes` — map slug → name before fetching.
   const brandName = brand
     ? brandRows.find((b) => b.slug === brand)?.name
     : undefined;
-  const bodyTypeName = bodyType
-    ? bodyTypes?.find((b) => b.slug === bodyType)?.name
-    : undefined;
 
-  // Real active listings for cars-for-sale; any other subcategory keeps the
-  // mock ad blocks untouched.
-  const carFeed: Post[] | null =
-    subcategory.slug === "cars-for-sale"
-      ? (
-          (
-            await getListingsFeed(
-              { subcategorySlug, brand: brandName, bodyType: bodyTypeName },
-              locale,
-            )
-          )?.items ?? []
-        ).map(toCardPost)
-      : null;
+  // A grid click carries only the option's slug, so WHICH attribute it filters
+  // has to be resolved here: the set the option belongs to says which key this
+  // subcategory's schema writes that value under (see SET_FIELD_KEYS).
+  const clickedSet = adType
+    ? sets.find((s) => s.options.some((o) => o.slug === adType))
+    : undefined;
+  const clickedOption = clickedSet?.options.find((o) => o.slug === adType);
+  const attrKey = clickedSet
+    ? resolveAttrKey(
+        clickedSet.slug,
+        (subcategory.fieldSchema ?? []).map((f) => f.key),
+      )
+    : undefined;
+  // Unresolvable set → keep the pre-existing `bodyType` path. The status quo
+  // beats a second way to silently empty the feed.
+  const bodyTypeName =
+    !attrKey && adType
+      ? sets.flatMap((s) => s.options).find((o) => o.slug === adType)?.name
+      : undefined;
+
+  // Real active listings — every subcategory now runs the real feed; the
+  // grid/list toggle drives the two TabsContent views below.
+  const feedItems: Post[] = (
+    (
+      await getListingsFeed(
+        {
+          subcategorySlug,
+          brand: brandName,
+          bodyType: bodyTypeName,
+          attrKey,
+          attrValue: attrKey ? clickedOption?.name : undefined,
+        },
+        locale,
+      )
+    )?.items ?? []
+  ).map(toCardPost);
 
   // ── Header component ────────────────────────────────────────────────────────
-  const HeaderComponent: ComponentType<HeaderProps> =
-    HEADER_MAP[subcategory.slug] ?? LSPHeader;
+  const headerFlags =
+    SUBCATEGORY_HEADER_FLAGS[subcategory.slug] ??
+    CATEGORY_HEADER_FLAGS[category.slug] ??
+    DEFAULT_HEADER_FLAGS;
 
-  // ── Active filter label (pre-existing mock bug, not fixed silently: the
-  //    page reads `body_type` while OptionGrid writes `ad_type`) ──────────────
-  const filterLabel = (brand ?? bodyType)?.replace(/-/g, " ");
+  // ── Active filter label — display names when available (slug-derived
+  //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
+  // `clickedOption.name` is the clicked option's display name — the same value
+  // the old `bodyTypeName` lookup produced, so the resolved-attrKey path keeps
+  // reading "Flat" rather than falling through to the slug-derived "flat".
+  const filterLabel =
+    brandName ??
+    clickedOption?.name ??
+    bodyTypeName ??
+    (brand ?? adType)?.replace(/-/g, " ");
 
   return (
     <main className="min-h-screen flex flex-col bg-gray-100">
@@ -186,7 +341,6 @@ export default async function SubcategoryPage({
       {/* ── Breadcrumb + header ───────────────────────────────────────────── */}
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-1">
-          {/* Breadcrumb */}
           <nav
             className="flex items-center gap-2 text-base"
             aria-label="Breadcrumb"
@@ -239,39 +393,45 @@ export default async function SubcategoryPage({
               </>
             )}
           </nav>
-          {/* Subcategory header */}
-          <div className="mt-2">
-            <HeaderComponent title={subcategory.name} />
-          </div>
-          {/* Main listing content */}
-          <div className="py-2">
-            <SubcategoryContent
-              categorySlug={category.slug}
-              subcategorySlug={subcategory.slug}
-              brands={brands}
-              bodyTypes={bodyTypes}
-              models={models}
-            />
-          </div>
-          {/* ── Ad blocks ───────────────────────────────────────────────────── */}
-          {carFeed === null ? (
-            AD_BLOCKS.map((AdComponent, index) => (
-              <div key={index} className="max-w-7xl mx-auto w-full py-2">
-                <AdComponent />
-              </div>
-            ))
-          ) : carFeed.length > 0 ? (
-            <>
-              <div className="max-w-7xl mx-auto w-full py-2">
-                <HighLightAds posts={carFeed} />
-              </div>
-              <div className="max-w-7xl mx-auto w-full py-2">
-                <NormalAd posts={carFeed} />
-              </div>
-            </>
-          ) : null}
         </div>
       </div>
+
+      {/* The grid/list toggle in the cars-for-sale header drives the two
+          TabsContent views below; the header is NOT wrapped in a short div —
+          the bar inside it is sticky and needs the tall Tabs root as its
+          containing block (same pattern as the category page). */}
+      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
+        {/* Subcategory header */}
+        <LSPCYEHeader title={subcategory.name} {...headerFlags} />
+        {/* Main listing content (visible in both grid/list views — same as
+            SubcategoryGrid on the category page) */}
+        <div>
+          <SubcategoryContent
+            categorySlug={category.slug}
+            subcategorySlug={subcategory.slug}
+            brands={brands}
+            models={models}
+            sets={sets}
+          />
+        </div>
+        {/* ── Post sections: grid/list views driven by the bar's toggle ── */}
+        <TabsContent value="grid" className="mt-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <GridCardSell />
+            {feedItems.map((post) => (
+              <GridCardPost key={post.postId} post={post} />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="list" className="mt-2">
+          <>
+            <ListCardSell />
+            {feedItems.map((post) => (
+              <ListCardPost key={post.postId} post={post} />
+            ))}
+          </>
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

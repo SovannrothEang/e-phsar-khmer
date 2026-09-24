@@ -19,8 +19,14 @@ export class BrandsController {
 
   @Get(':id/models')
   @Public()
-  @ApiOperation({ summary: 'List models for a brand' })
-  listModels(@Param('id') id: string) {
-    return this.brandsService.listModels(id);
+  @ApiOperation({
+    summary:
+      'List models for a brand, optionally narrowed to a subcategory slug',
+  })
+  listModels(
+    @Param('id') id: string,
+    @Query('subcategory') subcategory?: string,
+  ) {
+    return this.brandsService.listModels(id, subcategory);
   }
 }

@@ -12,7 +12,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import Image from "next/image";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -364,19 +364,13 @@ export function AttributeManager({
                       </TableCell>
                       {hasImage && (
                         <TableCell>
-                          <Image
-                            src={
-                              item.image &&
-                              (item.image.startsWith("/") ||
-                                item.image.startsWith("http"))
-                                ? item.image
-                                : "/placeholder.svg"
-                            }
+                          <DbImage
+                            src={item.image ?? ""}
                             alt={item.name}
                             width={40}
                             height={40}
                             className="w-10 h-10 object-contain rounded border bg-muted/30 p-0.5"
-                            unoptimized
+                            fallback={<NoImageCell />}
                           />
                         </TableCell>
                       )}

@@ -35,6 +35,10 @@ export function filterPostsByPrice(
   if (min === undefined && max === undefined) return posts;
 
   return posts.filter((post) => {
+    // A "Negotiable" listing has no price to compare, so it cannot be said to
+    // fall inside a range — exclude it while a range is active. (It would
+    // otherwise coerce to 0 and appear in every "under $X" filter.)
+    if (post.price === null) return false;
     if (min !== undefined && post.price < min) return false;
     if (max !== undefined && post.price > max) return false;
     return true;
@@ -47,16 +51,18 @@ function formatChipValue(value: string) {
   return n.toLocaleString();
 }
 
-function PriceLabel(min: string, max: string) {
+function PriceLabel(min: string, max: string, label = "Price") {
   if (min && max) {
-    return `Price :${formatChipValue(min)}-${formatChipValue(max)}`;
+    return `${label} :${formatChipValue(min)}-${formatChipValue(max)}`;
   }
-  if (min) return `Price :${formatChipValue(min)}+`;
-  if (max) return `Price :up to ${formatChipValue(max)}`;
-  return "Price";
+  if (min) return `${label} :${formatChipValue(min)}+`;
+  if (max) return `${label} :up to ${formatChipValue(max)}`;
+  return label;
 }
 
-export default function PriceFilter() {
+export default function PriceFilter({
+  label = "Price",
+}: { label?: string } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -72,7 +78,7 @@ export default function PriceFilter() {
   const [max, setMax] = useState(maxParam);
 
   const hasActiveFilter = Boolean(minParam || maxParam);
-  const priceLabel = PriceLabel(minParam, maxParam);
+  const priceLabel = PriceLabel(minParam, maxParam, label);
 
   function pushParams(nextMin: string, nextMax: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -142,7 +148,7 @@ export default function PriceFilter() {
       </PopoverTrigger>
       <PopoverContent align="center" className="rounded-sm w-xs p-0 mt-3 pb-3">
         <div className="space-y-4 px-4">
-          <h3 className="text-center text-base mt-3">Price</h3>
+          <h3 className="text-center text-base mt-3">{label}</h3>
           <Separator />
           <div className="flex gap-3">
             <Input

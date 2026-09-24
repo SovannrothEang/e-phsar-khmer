@@ -54,7 +54,7 @@ Main Category:
   - Parts & Accessories
   - Others
     ]
-- Phone & Tablets: Category[
+- Phones & Tablets: Category[
   - Phones
   - Tablets
   - Smart Watches

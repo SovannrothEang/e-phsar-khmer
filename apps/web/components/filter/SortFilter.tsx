@@ -48,10 +48,15 @@ export function sortPosts(posts: Post[], sort: SortValue): Post[] {
       return ads.sort((a, b) => b.createdat.getTime() - a.createdat.getTime());
     case "most-hit":
       return ads.sort((a, b) => Number(b.postId) - Number(a.postId));
+    // "Negotiable" listings have no numeric price to rank, so they sort LAST
+    // in both directions rather than first (a bare `a.price - b.price` would
+    // coerce null to 0 and float them to the top of price-asc).
     case "price-asc":
-      return ads.sort((a, b) => a.price - b.price);
+      return ads.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
     case "price-desc":
-      return ads.sort((a, b) => b.price - a.price);
+      return ads.sort(
+        (a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity),
+      );
     case "latest-ads":
     default:
       return ads;

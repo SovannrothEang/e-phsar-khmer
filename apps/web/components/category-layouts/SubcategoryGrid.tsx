@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Link } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
+import DbImage from "@/components/common/DbImage";
 
 /** Minimal backend subcategory slice this grid renders (local type — web is standalone). */
 export interface SubcategoryTile {
@@ -17,6 +17,15 @@ type Props = {
   subcategories: SubcategoryTile[];
   cols: number;
 };
+
+/** The design follows the row, not the load result: a subcategory with no
+ *  icon value uses this name-in-circle state, while one that has an icon keeps
+ *  the icon design — if its object is missing the circle is simply empty.
+ *  The circle behind it is a fixed light blue in both themes, so the label
+ *  needs a fixed dark colour to stay readable on dark themes. */
+const SubcategoryNameFallback = ({ name }: { name: string }) => (
+  <span className="text-xs text-zinc-700">{name}</span>
+);
 
 export default function SubcategoryGrid({
   categorySlug,
@@ -52,16 +61,15 @@ export default function SubcategoryGrid({
           >
             <div className="mx-auto bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               {sub.icon ? (
-                <Image
+                <DbImage
                   src={sub.icon}
                   alt={sub.name}
                   width={128}
                   height={128}
-                  unoptimized
                   className="object-contain"
                 />
               ) : (
-                <span className="text-xs">{sub.name}</span>
+                <SubcategoryNameFallback name={sub.name} />
               )}
             </div>
             <p className="mt-3 text-[14px] truncate w-full block">{sub.name}</p>

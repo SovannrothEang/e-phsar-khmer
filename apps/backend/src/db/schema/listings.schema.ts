@@ -56,9 +56,20 @@ export const listings = pgTable(
     address: text('address'),
     latitude: numeric('latitude', { precision: 10, scale: 7 }),
     longitude: numeric('longitude', { precision: 10, scale: 7 }),
-    provinceId: uuid('province_id').references(() => provinces.id),
-    districtId: uuid('district_id').references(() => districts.id),
-    communeId: uuid('commune_id').references(() => communes.id),
+    // RESTRICT, not SET NULL/CASCADE: location is a search-critical field, and
+    // silently nulling a listing's geo reference on a geography re-seed would
+    // quietly drop it out of province/district filters. A blocked delete is a
+    // loud, fixable failure; silent data loss is not. (Companion change to the
+    // 0017 geography seed.)
+    provinceId: uuid('province_id').references(() => provinces.id, {
+      onDelete: 'restrict',
+    }),
+    districtId: uuid('district_id').references(() => districts.id, {
+      onDelete: 'restrict',
+    }),
+    communeId: uuid('commune_id').references(() => communes.id, {
+      onDelete: 'restrict',
+    }),
     deliveryFree: boolean('delivery_free').default(false).notNull(),
     contactName: varchar('contact_name', { length: 150 }),
     contactPhones: jsonb('contact_phones')
