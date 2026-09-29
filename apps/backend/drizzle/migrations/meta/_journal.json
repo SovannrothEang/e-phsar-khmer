@@ -183,6 +183,13 @@
       "when": 1790583190771,
       "tag": "0025_flaky_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790656344505,
+      "tag": "0026_flimsy_shadow_king",
+      "breakpoints": true
     }
   ]
 }

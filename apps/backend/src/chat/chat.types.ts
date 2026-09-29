@@ -24,6 +24,12 @@ export interface MessageEnvelopeView {
   wrappedKey: string;
 }
 
+/** Server-side view of an encrypted attachment; everything else is in the E2E body. */
+export interface MessageAttachmentView {
+  id: string;
+  kind: 'image' | 'file';
+}
+
 /**
  * A message row plus, for v2 E2E rows only, every device envelope. All
  * envelopes are returned (not just the caller's): each is ciphertext only
@@ -32,6 +38,8 @@ export interface MessageEnvelopeView {
  */
 export interface MessageWithEnvelopes extends MessageRow {
   envelopes?: MessageEnvelopeView[];
+  /** v2 rows only, and only when the message carries files. */
+  attachments?: MessageAttachmentView[];
 }
 
 export interface MessageWithListing extends MessageWithEnvelopes {

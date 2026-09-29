@@ -12,6 +12,8 @@ import { E2eKeysService } from './e2e/e2e-keys.service';
 import { E2eDevicesController } from './e2e/e2e-devices.controller';
 import { E2eBackupController } from './e2e/e2e-backup.controller';
 import { E2eBackupService } from './e2e/e2e-backup.service';
+import { ChatAttachmentsController } from './chat-attachments.controller';
+import { ChatAttachmentsService } from './chat-attachments.service';
 
 @Module({
   imports: [AuthModule],
@@ -20,6 +22,7 @@ import { E2eBackupService } from './e2e/e2e-backup.service';
     E2eKeysController,
     E2eDevicesController,
     E2eBackupController,
+    ChatAttachmentsController,
   ],
   providers: [
     ChatService,
@@ -30,6 +33,7 @@ import { E2eBackupService } from './e2e/e2e-backup.service';
     ChatGateway,
     E2eKeysService,
     E2eBackupService,
+    ChatAttachmentsService,
   ],
   exports: [ChatService, ChatMetricsService],
 })

@@ -1,6 +1,8 @@
 # Plan: E2E Attachments (encrypted images/files, private bucket, signed URLs)
 
-**Status:** planned 2026-09-29, not started.
+**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2–P4 not started.
+
+**Verified against real storage (2026-09-29):** octet-stream upload 200; `info(path)` returns the real size (1234 → 1234); `text/html` upload refused (415 `invalid_mime_type`); public URL refused (400); signed download 200; `info` on a missing object → `data: null` + error.
 **Depends on:** E2E v2 multi-device (`tasks/plan-e2e-multi-device.md`). Attachments ship on the v2 send path only.
 **Goal:** chat images and files get the same protection as chat text: the server, the storage bucket, and anyone holding a URL see only ciphertext. Delivery must survive retries, reloads and crashes without broken messages or orphaned files. Files must be small.
 **Non-goals (V1):** chunked/streaming encryption, resumable (TUS) upload, compressing arbitrary files, virus scanning, CDN, migrating old public `imageUrl` images.

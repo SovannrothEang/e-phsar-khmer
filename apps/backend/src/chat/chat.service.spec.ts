@@ -31,14 +31,22 @@ function makeService(db: ReturnType<typeof makeDb>) {
   const config = { get: jest.fn(() => 'listings') };
   const pubsub = { publish: jest.fn(() => Promise.resolve()) };
   const metrics = { beginSend: jest.fn(), endSend: jest.fn() };
+  const attachments = {
+    attachToMessage: jest.fn(
+      (_tx: unknown, _sender: string, _msg: string, ids: string[]) =>
+        Promise.resolve(ids.map((id) => ({ id, kind: 'image' }))),
+    ),
+    loadForMessages: jest.fn(() => Promise.resolve(new Map())),
+  };
   const service = new ChatService(
     db as never,
     supabase as never,
     config as never,
     pubsub as never,
     metrics as never,
+    attachments as never,
   );
-  return { service, supabase, pubsub };
+  return { service, supabase, pubsub, attachments };
 }
 
 // .from().where().limit() → rows
@@ -658,6 +666,119 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       .filter((e) => e.type === 'message')
       .map((e) => e.targetUserId);
     expect(targets.sort()).toEqual(['u1', 'u2']);
+  });
+});
+
+describe('ChatService.sendMessage — attachments', () => {
+  let db: ReturnType<typeof makeDb> & { transaction: jest.Mock };
+  let service: ChatService;
+  let attachments: ReturnType<typeof makeService>['attachments'];
+  const header = { v: 1 as const, dh: 'dh', pn: 0, n: 0 };
+  const e2e = {
+    v: 2 as const,
+    senderDeviceId: 'd-me',
+    envelopes: [{ recipientDeviceId: 'd-peer', header, wrappedKey: 'w' }],
+  };
+
+  beforeEach(() => {
+    db = Object.assign(makeDb(), { transaction: jest.fn() });
+    ({ service, attachments } = makeService(db));
+    let calls = 0;
+    db.select.mockImplementation(() => {
+      calls++;
+      if (calls === 1) return limitQuery([{ id: 'u2' }]);
+      if (calls === 2) return limitQuery([]);
+      return whereQuery([
+        { id: 'd-me', userId: 'u1' },
+        { id: 'd-peer', userId: 'u2' },
+      ]);
+    });
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([conversation]),
+        }),
+      }),
+    }));
+  });
+
+  function mockTx() {
+    let n = 0;
+    const tx = {
+      insert: jest.fn(() => ({
+        values: () => ({
+          returning: () =>
+            Promise.resolve(
+              ++n === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : [{ recipientDeviceId: 'd-peer', header, wrappedKey: 'w' }],
+            ),
+        }),
+      })),
+    };
+    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
+      cb(tx),
+    );
+    return tx;
+  }
+
+  it('rejects attachments on a message that is not v2 E2E', async () => {
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'hi',
+        attachmentIds: ['a1'],
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(attachments.attachToMessage).not.toHaveBeenCalled();
+  });
+
+  it('attaches inside the send transaction and returns the attachments', async () => {
+    const tx = mockTx();
+
+    const result = await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'aead',
+      e2e,
+      attachmentIds: ['a1', 'a2'],
+    });
+
+    expect(attachments.attachToMessage).toHaveBeenCalledWith(tx, 'u1', 'm1', [
+      'a1',
+      'a2',
+    ]);
+    expect(result.message.attachments).toEqual([
+      { id: 'a1', kind: 'image' },
+      { id: 'a2', kind: 'image' },
+    ]);
+  });
+
+  it('fails the send when an attachment cannot be attached (tx rolls back)', async () => {
+    mockTx();
+    attachments.attachToMessage.mockRejectedValueOnce(
+      new BadRequestException({ code: 'ATTACHMENT_INVALID' }),
+    );
+
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'aead',
+        e2e,
+        attachmentIds: ['foreign'],
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('omits `attachments` on a v2 send without files', async () => {
+    mockTx();
+
+    const result = await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'aead',
+      e2e,
+    });
+
+    expect(result.message).not.toHaveProperty('attachments');
   });
 });
 

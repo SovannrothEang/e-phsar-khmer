@@ -433,3 +433,56 @@ export const e2eHistoryRequests = chatSchema.table(
 );
 
 export type E2eHistoryRequestRow = typeof e2eHistoryRequests.$inferSelect;
+
+/**
+ * An end-to-end encrypted chat file (image or document). The object in the
+ * private chat-files bucket is ciphertext; its key, MIME type, name, hash
+ * and dimensions travel only inside the E2E message, so none of them are
+ * stored here. Storage integrity is verified by the recipient (ciphertext
+ * hash + GCM tag), not by the server — hence no content-hash column.
+ *
+ * Lifecycle: pending (upload URL issued) → uploaded (object exists, size
+ * checked) → attached (referenced by a message, in the send transaction).
+ * Rows never attached within 24 h are removed with their objects by cleanup.
+ * See tasks/plan-e2e-attachments.md.
+ */
+export const chatAttachments = chatSchema.table(
+  'attachments',
+  {
+    // Client-generated, so a retried create returns the same row.
+    id: uuid('id').primaryKey(),
+    uploaderId: uuid('uploader_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // SET NULL on purpose: the row must outlive a deleted message so cleanup
+    // still knows which storage object to remove. CASCADE would drop the row
+    // and leak the object, since Postgres can't delete from the bucket.
+    messageId: uuid('message_id').references(() => messages.id, {
+      onDelete: 'set null',
+    }),
+    // `{uploaderId}/{id}` in the chat-files bucket — server-generated.
+    objectKey: text('object_key').notNull(),
+    // 'image' | 'file'
+    kind: varchar('kind', { length: 10 }).notNull(),
+    // 'pending' | 'uploaded' | 'attached' | 'expired'
+    status: varchar('status', { length: 20 }).default('pending').notNull(),
+    // Client claim at create time — informational and for the quota only.
+    declaredSize: integer('declared_size').notNull(),
+    // Read from storage metadata on complete; the only size that is trusted.
+    actualSize: integer('actual_size'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }),
+    attachedAt: timestamp('attached_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('attachments_message_idx').on(t.messageId),
+    index('attachments_orphan_idx')
+      .on(t.createdAt)
+      .where(sql`message_id is null`),
+    index('attachments_uploader_created_idx').on(t.uploaderId, t.createdAt),
+  ],
+);
+
+export type ChatAttachmentRow = typeof chatAttachments.$inferSelect;

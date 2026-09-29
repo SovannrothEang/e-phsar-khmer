@@ -42,6 +42,7 @@ import { isUniqueViolation } from './pg-errors.util';
 import { ChatPubSubService } from './chat-pubsub.service';
 import type { ChatPushEvent } from './chat-pubsub.service';
 import { ChatMetricsService } from './chat-metrics.service';
+import { ChatAttachmentsService } from './chat-attachments.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
@@ -52,6 +53,7 @@ import type {
   ConversationWithUser,
   InboxItem,
   ListingContext,
+  MessageAttachmentView,
   MessageEnvelopeView,
   MessageWithEnvelopes,
   MessageWithListing,
@@ -85,6 +87,7 @@ export class ChatService {
     private readonly configService: ConfigService,
     private readonly pubsub: ChatPubSubService,
     private readonly metrics: ChatMetricsService,
+    private readonly attachments: ChatAttachmentsService,
   ) {}
 
   /**
@@ -178,6 +181,10 @@ export class ChatService {
       if (ids.includes(dto.e2e.senderDeviceId))
         throw new BadRequestException('No envelope for the sending device');
     }
+    if (dto.attachmentIds?.length && !dto.e2e)
+      throw new BadRequestException(
+        'Attachments require an encrypted (v2) message',
+      );
     if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
 
     // These three checks are independent reads (none depends on another's
@@ -334,30 +341,43 @@ export class ChatService {
 
     let message: MessageRow;
     let envelopes: MessageEnvelopeView[] | undefined;
+    let attached: MessageAttachmentView[] = [];
     try {
       if (dto.e2e) {
-        // Message + its envelopes land together: a v2 row without envelopes
-        // would be undecryptable on every device.
+        // Message + its envelopes (+ attachments) land together: a v2 row
+        // without envelopes would be undecryptable on every device, and one
+        // referencing a file that failed to attach would render broken.
         const e2e = dto.e2e;
-        [message, envelopes] = await this.db.transaction(async (tx) => {
-          const [row] = await tx.insert(messages).values(values).returning();
-          const rows = await tx
-            .insert(messageEnvelopes)
-            .values(
-              e2e.envelopes.map((e) => ({
-                messageId: row.id,
-                recipientDeviceId: e.recipientDeviceId,
-                header: e.header,
-                wrappedKey: e.wrappedKey,
-              })),
-            )
-            .returning({
-              recipientDeviceId: messageEnvelopes.recipientDeviceId,
-              header: messageEnvelopes.header,
-              wrappedKey: messageEnvelopes.wrappedKey,
-            });
-          return [row, rows] as const;
-        });
+        const attachmentIds = dto.attachmentIds ?? [];
+        [message, envelopes, attached] = await this.db.transaction(
+          async (tx) => {
+            const [row] = await tx.insert(messages).values(values).returning();
+            const rows = await tx
+              .insert(messageEnvelopes)
+              .values(
+                e2e.envelopes.map((e) => ({
+                  messageId: row.id,
+                  recipientDeviceId: e.recipientDeviceId,
+                  header: e.header,
+                  wrappedKey: e.wrappedKey,
+                })),
+              )
+              .returning({
+                recipientDeviceId: messageEnvelopes.recipientDeviceId,
+                header: messageEnvelopes.header,
+                wrappedKey: messageEnvelopes.wrappedKey,
+              });
+            // Throws ATTACHMENT_INVALID (rolling back the message) unless every
+            // id is this sender's, verified-uploaded and not yet attached.
+            const files = await this.attachments.attachToMessage(
+              tx,
+              senderId,
+              row.id,
+              attachmentIds,
+            );
+            return [row, rows, files] as const;
+          },
+        );
       } else {
         [message] = await this.db.insert(messages).values(values).returning();
       }
@@ -403,6 +423,7 @@ export class ChatService {
     const withListing: MessageWithListing = {
       ...message,
       ...(envelopes ? { envelopes } : {}),
+      ...(attached.length > 0 ? { attachments: attached } : {}),
       listing: dto.listingId ? (contexts.get(dto.listingId) ?? null) : null,
     };
 
@@ -978,20 +999,28 @@ export class ChatService {
   }
 
   /**
-   * Adds `envelopes` to v2 E2E rows (one query for the whole batch). v1 and
-   * plaintext rows pass through untouched, and a batch with no v2 rows
-   * issues no query at all.
+   * Adds `envelopes` (and `attachments`, when present) to v2 E2E rows — one
+   * query each for the whole batch, run together. v1 and plaintext rows pass
+   * through untouched, and a batch with no v2 rows issues no query at all.
    */
   private async attachEnvelopes<T extends MessageRow>(
     rows: T[],
-  ): Promise<(T & { envelopes?: MessageEnvelopeView[] })[]> {
+  ): Promise<
+    (T & {
+      envelopes?: MessageEnvelopeView[];
+      attachments?: MessageAttachmentView[];
+    })[]
+  > {
     const v2Ids = rows.filter((m) => m.e2eVersion === 2).map((m) => m.id);
     if (v2Ids.length === 0) return rows;
 
-    const envelopeRows = await this.db
-      .select()
-      .from(messageEnvelopes)
-      .where(inArray(messageEnvelopes.messageId, v2Ids));
+    const [envelopeRows, filesByMessage] = await Promise.all([
+      this.db
+        .select()
+        .from(messageEnvelopes)
+        .where(inArray(messageEnvelopes.messageId, v2Ids)),
+      this.attachments.loadForMessages(v2Ids),
+    ]);
     const byMessage = new Map<string, MessageEnvelopeView[]>();
     for (const e of envelopeRows) {
       const list = byMessage.get(e.messageId) ?? [];
@@ -1002,9 +1031,15 @@ export class ChatService {
       });
       byMessage.set(e.messageId, list);
     }
-    return rows.map((m) =>
-      m.e2eVersion === 2 ? { ...m, envelopes: byMessage.get(m.id) ?? [] } : m,
-    );
+    return rows.map((m) => {
+      if (m.e2eVersion !== 2) return m;
+      const files = filesByMessage.get(m.id);
+      return {
+        ...m,
+        envelopes: byMessage.get(m.id) ?? [],
+        ...(files ? { attachments: files } : {}),
+      };
+    });
   }
 
   private async batchLoadUnreadCounts(
