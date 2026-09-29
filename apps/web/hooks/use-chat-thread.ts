@@ -66,6 +66,20 @@ function advanceWatermark(
   return next ?? current;
 }
 
+/**
+ * Swap an optimistic echo for the server row. Drops any copy of that row
+ * already in `local` too: a v2 send is also pushed over WS to the sender (for
+ * their other devices), and that push can land before the HTTP response —
+ * appending again would render the same id twice.
+ */
+function replaceEcho(
+  prev: ThreadMessage[],
+  tempId: string,
+  row: ThreadMessage,
+): ThreadMessage[] {
+  return [...prev.filter((m) => m.tempId !== tempId && m.id !== row.id), row];
+}
+
 /** Optimistic bubble for an encrypted-attachment send (rendered from `body`). */
 function outboxEcho(
   entry: OutboxEntry,
@@ -168,6 +182,17 @@ export function useChatThread({
       // Merge into local state — deduped against server messages in `messages`.
       setLocal((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
+        // Our own send echoed back over WS (v2 also pushes to the sender's
+        // other devices) before its HTTP response: the response will swap
+        // the echo for this row with the known plaintext. Taking the push
+        // would try to decrypt it here, where no envelope exists for the
+        // sending device, and pin it as "not available on this device".
+        const clientId = msg.clientMessageId;
+        if (
+          clientId &&
+          prev.some((m) => m.tempId && m.clientMessageId === clientId)
+        )
+          return prev;
         return [...prev, { ...msg, pending: false, failed: false }];
       });
       markActivity();
@@ -306,7 +331,13 @@ export function useChatThread({
   const messages = useMemo<ThreadMessage[]>(() => {
     const serverIds = new Set(serverMessages.map((m) => m.id));
     // Drop optimistic echoes the server has already handed back to us.
-    const extras = local.filter((m) => !serverIds.has(m.id));
+    // Keyed by id so a row that reached `local` twice (WS push + HTTP
+    // response) still renders once; the later copy wins.
+    const extras = [
+      ...new Map(
+        local.filter((m) => !serverIds.has(m.id)).map((m) => [m.id, m]),
+      ).values(),
+    ];
     return [...serverMessages, ...extras];
   }, [serverMessages, local]);
 
@@ -363,7 +394,9 @@ export function useChatThread({
   }, []);
 
   const reportE2eFailure = useCallback(
-    (outcome: Exclude<E2eSendOutcome | AttachmentSendOutcome, { ok: true }>) => {
+    (
+      outcome: Exclude<E2eSendOutcome | AttachmentSendOutcome, { ok: true }>,
+    ) => {
       if (outcome.reason === "no-recipient-keys")
         onSendError?.("E2E_NO_KEYS", 404);
       else if (outcome.reason === "send-failed")
@@ -397,15 +430,14 @@ export function useChatThread({
       }
       for (const key of draftKeys) removeDraftImage(key);
       // Same reason as text sends: show the known plaintext, not ciphertext.
-      setLocal((prev) => [
-        ...prev.filter((m) => m.tempId !== tempId),
-        {
+      setLocal((prev) =>
+        replaceEcho(prev, tempId, {
           ...outcome.result.message,
           body: contentFor(entry),
           pending: false,
           failed: false,
-        },
-      ]);
+        }),
+      );
       if (conversationId === null)
         onConversationCreated?.(outcome.result.conversationId);
       onMutated?.();
@@ -498,10 +530,13 @@ export function useChatThread({
           if (!sendRes.ok) throw new Error(sendRes.message);
 
           // Replace optimistic with server message.
-          setLocal((prev) => [
-            ...prev.filter((m) => m.tempId !== tempId),
-            { ...sendRes.data.message, pending: false, failed: false },
-          ]);
+          setLocal((prev) =>
+            replaceEcho(prev, tempId, {
+              ...sendRes.data.message,
+              pending: false,
+              failed: false,
+            }),
+          );
 
           // Cleanup this key after successful upload+send.
           removeDraftImage(key);
@@ -559,15 +594,14 @@ export function useChatThread({
         // and rendering it for one frame before the decrypt hook runs would
         // flash base64 at the user. History refetches re-resolve via the
         // decrypt cache (committed inside sendE2eText).
-        setLocal((prev) => [
-          ...prev.filter((m) => m.tempId !== tempId),
-          {
+        setLocal((prev) =>
+          replaceEcho(prev, tempId, {
             ...outcome.result.message,
             body: draft.body ?? null,
             pending: false,
             failed: false,
-          },
-        ]);
+          }),
+        );
         if (conversationId === null) {
           onConversationCreated?.(outcome.result.conversationId);
         }

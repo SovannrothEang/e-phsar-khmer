@@ -49,6 +49,8 @@ export interface ChatMessage {
   imageUrl: string | null;
   imagePath: string | null;
   groupId: string | null;
+  /** Sender's dedup key for this message, when one was sent. */
+  clientMessageId?: string | null;
   readAt: string | null;
   createdAt: string;
   isE2e: boolean;
@@ -188,7 +190,7 @@ export interface ThreadMessage extends ChatMessage {
   /**
    * Dedup key for this logical send — minted with the optimistic echo and
    * kept across retries so `POST /chats/messages` can replay instead of
-   * duplicating. Client-only; not part of the server message wire type.
+   * duplicating. Also echoed back on server rows (ChatMessage).
    */
-  clientMessageId?: string;
+  clientMessageId?: string | null;
 }
