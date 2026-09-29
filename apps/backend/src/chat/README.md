@@ -21,17 +21,19 @@ is a latency optimization on a system that already works without it.
 
 ### Files
 
-| File                     | Purpose                                                                                                                                                                                                                                                               |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `chat.controller.ts`     | REST surface: send, inbox, unread-count, resolve-with-user, message history/poll, mark-read.                                                                                                                                                                          |
-| `chat.service.ts`        | All persistence + business rules. The single write path for a message, REST or WS. Publishes realtime events after every send / mark-read.                                                                                                                            |
-| `chat.gateway.ts`        | WebSocket gateway (`/ws/chat`). Authenticates the socket (JWT + soft-delete check), rate-limits and validates `send_message`, relays it into `ChatService`, answers each send with one `ack` or `error` frame, and delivers push events to locally-connected sockets. |
-| `chat-pubsub.service.ts` | Redis pub/sub wrapper (reuses the BullMQ Redis connection). Fans a `message` / `inbox_update` / `unread_count` / `read` event out to every backend instance so a recipient connected to a different process still gets realtime delivery.                             |
-| `connection-registry.ts` | In-memory `userId -> sockets` map for this process. Answers "is this user online, and on which socket(s)." — always process-local; cross-instance reach comes from `chat-pubsub.service.ts`.                                                                          |
-| `heartbeat.service.ts`   | Pings every open socket every 30s; closes and evicts any that hasn't ponged in 40s.                                                                                                                                                                                   |
-| `chat.types.ts`          | Response-shape interfaces (`InboxItem`, `MessageWithListing`, poll metadata) shared by the service and controller.                                                                                                                                                    |
-| `e2e/`                   | E2E key relay: `e2e-keys.*` (v1 per-user keys), `e2e-devices.*` (v2 per-device keys + envelopes), `e2e-backup.*` (encrypted history backup, passcode unlock, new-device approval). Server sees only ciphertext.                                                       |
-| `dto/`                   | `SendMessageDto`, `QueryChatsDto`, `QueryMessagesDto` — request validation.                                                                                                                                                                                           |
+| File                            | Purpose                                                                                                                                                                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chat.controller.ts`            | REST surface: send, inbox, unread-count, resolve-with-user, message history/poll, mark-read.                                                                                                                                                                          |
+| `chat.service.ts`               | All persistence + business rules. The single write path for a message, REST or WS. Publishes realtime events after every send / mark-read.                                                                                                                            |
+| `chat.gateway.ts`               | WebSocket gateway (`/ws/chat`). Authenticates the socket (JWT + soft-delete check), rate-limits and validates `send_message`, relays it into `ChatService`, answers each send with one `ack` or `error` frame, and delivers push events to locally-connected sockets. |
+| `chat-pubsub.service.ts`        | Redis pub/sub wrapper (reuses the BullMQ Redis connection). Fans a `message` / `inbox_update` / `unread_count` / `read` event out to every backend instance so a recipient connected to a different process still gets realtime delivery.                             |
+| `connection-registry.ts`        | In-memory `userId -> sockets` map for this process. Answers "is this user online, and on which socket(s)." — always process-local; cross-instance reach comes from `chat-pubsub.service.ts`.                                                                          |
+| `heartbeat.service.ts`          | Pings every open socket every 30s; closes and evicts any that hasn't ponged in 40s.                                                                                                                                                                                   |
+| `chat.types.ts`                 | Response-shape interfaces (`InboxItem`, `MessageWithListing`, poll metadata) shared by the service and controller.                                                                                                                                                    |
+| `chat-attachments.*`            | Encrypted attachments: create (upload URL, quota), complete (real size from storage), attach (inside the send transaction), participant-only signed download URLs, orphan cleanup. Private `chat-files` bucket; the server stores no keys, MIME types or hashes.      |
+| `chat-maintenance.processor.ts` | BullMQ `chat-maintenance` queue: hourly `attachments-cleanup` (storage objects can't be removed by a DB cascade).                                                                                                                                                     |
+| `e2e/`                          | E2E key relay: `e2e-keys.*` (v1 per-user keys), `e2e-devices.*` (v2 per-device keys + envelopes), `e2e-backup.*` (encrypted history backup, passcode unlock, new-device approval). Server sees only ciphertext.                                                       |
+| `dto/`                          | `SendMessageDto`, `QueryChatsDto`, `QueryMessagesDto` — request validation.                                                                                                                                                                                           |
 
 DB schema lives in [`../db/schema/chat.schema.ts`](../db/schema/chat.schema.ts), not in this folder. Both tables live in a dedicated `chat` Postgres schema (`../db/schema/chat.pg-schema.ts`, mirroring `payment/entity/payment.pg-schema.ts`) rather than `public` — moved there in migration `0016_move_chat_tables_to_chat_schema`. The FKs into `public.users`/`public.listings` are unaffected; Postgres and Drizzle both handle cross-schema foreign keys with no special casing.
 
@@ -71,8 +73,11 @@ One `conversations` row per unordered pair, enforced by a CHECK
 
 ### Where this differs from the payment module's approach
 
-Chat doesn't use the transactional outbox or a BullMQ queue at all — every
-write is synchronous, inline, in the request/WS-handler that received it.
+Chat doesn't use the transactional outbox, and uses BullMQ for exactly one
+thing: the hourly `attachments-cleanup` job (`chat-maintenance.processor.ts`),
+because deleting a storage object is something no DB cascade can do. Every
+message write is still synchronous, inline, in the request/WS-handler that
+received it.
 That works because chat has no external system whose failure must be
 retried durably; the closest thing to an async fan-out step is the Redis
 pub/sub publish in `chat-pubsub.service.ts`, and it's deliberately
@@ -170,6 +175,7 @@ Key properties this gives us:
 | WS `ack`/`error` frames + live `read` receipts                    | Done.                                                                                                                                                            |
 | E2E v1 + v2 multi-device                                          | Done (migrations `0017`–`0023`); Phase 3 cutover not started — see `tasks/plan-e2e-multi-device.md`.                                                             |
 | E2E history backup + device approval                              | Done (`0024`, `0025`), unit-tested, not yet browser-verified.                                                                                                    |
+| E2E attachments (images/files)                                    | Done (`0026`): backend, web send/receive, hourly cleanup. Not yet browser-verified end to end. Legacy public images not migrated.                                |
 | Push notifications (FCM/APNs)                                     | Not started.                                                                                                                                                     |
 | Message delete / private chat-image bucket                        | Not started, by design (see the repo's known-gaps notes).                                                                                                        |
 

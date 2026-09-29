@@ -1,6 +1,6 @@
 # Plan: E2E Attachments (encrypted images/files, private bucket, signed URLs)
 
-**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2 (web send) + P3 (web receive) done 2026-09-29, not yet browser-tested end to end. P4 (cleanup schedule, docs) not started.
+**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2 (web send) + P3 (web receive) done 2026-09-29, not yet browser-tested end to end. P4 done: hourly BullMQ `attachments-cleanup` (job scheduler upsert, boot never blocked), CLAUDE.md + chat README updated.
 
 **Deviations:** inbox uses `lastMessage.attachments` (already on every message read) instead of a separate `attachmentCount`. The web crypto round trip was checked with a throwaway Node script (8 checks: size, header, round trip, tampered byte, wrong attachment id, unknown version, forged hash + tampered tag, fresh key/IV), not vitest.
 
