@@ -53,7 +53,8 @@ export function useE2eInboxPreviews(
     }
     if (targets.length === 0) return;
 
-    let cancelled = false;
+    // No cancellation: every result is keyed by message id, so one that
+    // lands after the inbox changed is still correct.
     void (async () => {
       for (const message of targets) {
         let plaintext: string | null = null;
@@ -75,7 +76,13 @@ export function useE2eInboxPreviews(
         } catch {
           // Preview is best-effort — leave unresolved rather than throw.
         }
-        if (cancelled || plaintext === null) continue;
+        // Keyed by message id: still valid after the list changed.
+        if (plaintext === null) {
+          // Unresolved (engine not ready yet, or cancelled mid-batch): let a
+          // later run retry it instead of leaving the preview blank forever.
+          dispatchedRef.current.delete(message.id);
+          continue;
+        }
         setPreviews((prev) => {
           const next = new Map(prev);
           next.set(message.id, plaintext);
@@ -83,10 +90,6 @@ export function useE2eInboxPreviews(
         });
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
     // `items` is intentionally omitted: `key` is the stable fingerprint of
     // the E2E last messages; re-running on every inbox refetch would only
     // re-check the dispatched set.

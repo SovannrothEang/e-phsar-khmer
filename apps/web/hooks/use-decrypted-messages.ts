@@ -43,9 +43,17 @@ export function useDecryptedMessages(
     if (pending.length === 0) return;
     pending.forEach((m) => dispatchedRef.current.add(m.id));
 
+    // Cleanup (the message list changed, or the engine did) stops the loop,
+    // but the ids it never reached were already marked dispatched — hand them
+    // back, or the next run skips them and they sit on "Decrypting…" forever.
     let cancelled = false;
     void (async () => {
-      for (const message of pending) {
+      for (const [i, message] of pending.entries()) {
+        if (cancelled) {
+          for (const rest of pending.slice(i))
+            dispatchedRef.current.delete(rest.id);
+          return;
+        }
         const outcome = await decryptMessage(engine, store, {
           id: message.id,
           conversationId: message.conversationId,
@@ -56,7 +64,8 @@ export function useDecryptedMessages(
           senderDeviceId: message.senderDeviceId,
           envelopes: message.envelopes,
         });
-        if (cancelled) return;
+        // An outcome is keyed by message id, so it stays valid even if the
+        // list changed while we waited — always record it.
         setResults((prev) => {
           const next = new Map(prev);
           next.set(message.id, outcome);
