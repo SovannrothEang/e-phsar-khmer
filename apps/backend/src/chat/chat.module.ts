@@ -9,10 +9,18 @@ import { ConnectionRegistry } from './connection-registry';
 import { HeartbeatService } from './heartbeat.service';
 import { E2eKeysController } from './e2e/e2e-keys.controller';
 import { E2eKeysService } from './e2e/e2e-keys.service';
+import { E2eDevicesController } from './e2e/e2e-devices.controller';
+import { E2eBackupController } from './e2e/e2e-backup.controller';
+import { E2eBackupService } from './e2e/e2e-backup.service';
 
 @Module({
   imports: [AuthModule],
-  controllers: [ChatController, E2eKeysController],
+  controllers: [
+    ChatController,
+    E2eKeysController,
+    E2eDevicesController,
+    E2eBackupController,
+  ],
   providers: [
     ChatService,
     ChatPubSubService,
@@ -21,6 +29,7 @@ import { E2eKeysService } from './e2e/e2e-keys.service';
     HeartbeatService,
     ChatGateway,
     E2eKeysService,
+    E2eBackupService,
   ],
   exports: [ChatService, ChatMetricsService],
 })

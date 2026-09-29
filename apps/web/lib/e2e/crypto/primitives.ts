@@ -45,7 +45,13 @@ export function verify(
 export function kdfX3dh(dhConcat: Uint8Array, info: string): Uint8Array {
   const prefix = new Uint8Array(32).fill(0xff);
   const salt = new Uint8Array(32);
-  return hkdf(sha256, concatBytes(prefix, dhConcat), salt, utf8ToBytes(info), 32);
+  return hkdf(
+    sha256,
+    concatBytes(prefix, dhConcat),
+    salt,
+    utf8ToBytes(info),
+    32,
+  );
 }
 
 /** Double Ratchet's KDF_RK (signal.org/docs/specifications/doubleratchet, §5.2). */
@@ -81,7 +87,11 @@ export function aeadEncrypt(
   return concatBytes(nonce, gcm(key, nonce, aad).encrypt(plaintext));
 }
 
-export function aeadDecrypt(key: Uint8Array, data: Uint8Array, aad: Uint8Array): Uint8Array {
+export function aeadDecrypt(
+  key: Uint8Array,
+  data: Uint8Array,
+  aad: Uint8Array,
+): Uint8Array {
   const nonce = data.slice(0, NONCE_LENGTH);
   const ciphertext = data.slice(NONCE_LENGTH);
   return gcm(key, nonce, aad).decrypt(ciphertext);

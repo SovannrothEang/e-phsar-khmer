@@ -130,7 +130,21 @@ export function useChatThread({
     },
     [conversationId, markActivity],
   );
-  const ws = useChatWs({ enabled: wsEnabled, onMessage: handleWsMessage });
+  // The delta poll is paused while the socket is up, so a `read` push is the
+  // only way the sender's "seen" ticks update live. The delta query is
+  // declared below, hence the ref.
+  const refetchDeltaRef = useRef<(() => void) | null>(null);
+  const handleWsRead = useCallback(
+    (readConversationId: string) => {
+      if (readConversationId === conversationId) refetchDeltaRef.current?.();
+    },
+    [conversationId],
+  );
+  const ws = useChatWs({
+    enabled: wsEnabled,
+    onMessage: handleWsMessage,
+    onRead: handleWsRead,
+  });
 
   // ── History (initial page + upward pagination) ────────────────────────────
   const history = useInfiniteQuery({
@@ -207,6 +221,11 @@ export function useChatThread({
   });
 
   const { refetch: refetchDelta } = delta;
+  useEffect(() => {
+    refetchDeltaRef.current = history.isSuccess
+      ? () => void refetchDelta()
+      : null;
+  }, [history.isSuccess, refetchDelta]);
   useEffect(() => {
     if (wsConnected && history.isSuccess) void refetchDelta();
   }, [wsConnected, history.isSuccess, refetchDelta]);
@@ -339,6 +358,7 @@ export function useChatThread({
         const engine = await getE2eEngine(viewerId).catch(() => null);
         const outcome = await sendE2eText(engine, {
           conversationId,
+          senderId: viewerId,
           recipientId,
           plaintext: draft.body as string,
           listingId: imageCount === 0 ? draft.listingId : undefined,

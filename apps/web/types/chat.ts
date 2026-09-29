@@ -50,8 +50,29 @@ export interface ChatMessage {
   readAt: string | null;
   createdAt: string;
   isE2e: boolean;
+  /** v1 only — v2 rows carry one header per device in `envelopes`. */
   e2eHeader: E2eHeader | null;
+  /** null = plaintext, 1 = single-device E2E, 2 = multi-device E2E. */
+  e2eVersion?: number | null;
+  /** v2 only: the device that encrypted `body` (also its AEAD associated data). */
+  senderDeviceId?: string | null;
+  /** v2 only: the content key wrapped once per recipient device. */
+  envelopes?: E2eEnvelope[];
   listing?: ListingContext | null;
+}
+
+/** v2: the message content key, ratchet-encrypted for one device. */
+export interface E2eEnvelope {
+  recipientDeviceId: string;
+  header: E2eHeader;
+  wrappedKey: string;
+}
+
+/** v2 send payload — see `E2eV2PayloadDto` on the backend. */
+export interface E2eV2Payload {
+  v: 2;
+  senderDeviceId: string;
+  envelopes: E2eEnvelope[];
 }
 
 export interface InboxItem {
@@ -102,6 +123,9 @@ export interface SendMessageInput {
   imagePath?: string;
   groupId?: string;
   e2eHeader?: E2eHeader;
+  /** v1: the identity key the session was built against (server 409s if it changed). */
+  recipientIdentityKey?: string;
+  e2e?: E2eV2Payload;
   /**
    * Stable client-minted dedup key. Mint once per logical send (optimistic
    * echo / draft) and reuse on every retry so a lost response or double-tap
@@ -123,7 +147,14 @@ export interface SendMessageResult {
  */
 export type ChatActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; status: number; code: string; message: string };
+  | {
+      ok: false;
+      status: number;
+      code: string;
+      message: string;
+      /** Structured error payload, e.g. `{ missing, stale }` on E2E_DEVICES_MISMATCH. */
+      details?: unknown;
+    };
 
 /**
  * A message plus the client-only state an optimistic send needs. `pending`

@@ -162,6 +162,27 @@
       "when": 1790136766785,
       "tag": "0022_conscious_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790235946854,
+      "tag": "0023_brave_scarlet_spider",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790304519981,
+      "tag": "0024_hot_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790583190771,
+      "tag": "0025_flaky_starjammers",
+      "breakpoints": true
     }
   ]
 }

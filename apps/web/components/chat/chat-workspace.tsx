@@ -38,6 +38,7 @@ import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
+import { E2eBackupPanel } from "@/components/chat/e2e-backup-panel";
 import type { InboxItem, ListingContext } from "@/types/chat";
 
 const SIDEBAR_COLLAPSED_KEY = "chat_sidebar_collapsed";
@@ -127,7 +128,9 @@ export function ChatWorkspace({
 
   // Warm E2E bootstrap as soon as the viewer is known so key registration
   // races ahead of the first send (fail-closed on send if still pending).
-  useE2eEngine(viewer.isSuccess ? (viewer.data?.id ?? null) : null);
+  const e2eEngine = useE2eEngine(
+    viewer.isSuccess ? (viewer.data?.id ?? null) : null,
+  );
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
   // The nav badge's own socket subscription keeps the shared connection alive
@@ -346,6 +349,7 @@ export function ChatWorkspace({
           threadOpen ? "flex" : "hidden md:flex",
         )}
       >
+        <E2eBackupPanel engine={e2eEngine} />
         {!threadOpen && (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
             <MessagesSquare className="size-8 text-muted-foreground" />

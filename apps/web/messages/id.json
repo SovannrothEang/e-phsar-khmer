@@ -102,7 +102,8 @@
       "sending": "Mengirim…",
       "retry": "Coba lagi",
       "decrypting": "Mendekripsi…",
-      "decryptFailed": "Tidak dapat mendekripsi pesan ini."
+      "decryptFailed": "Tidak dapat mendekripsi pesan ini.",
+      "notOnThisDevice": "Dikirim sebelum perangkat ini disiapkan — buka di perangkat Anda yang lain."
     },
     "composer": {
       "placeholder": "Tulis pesan…",
@@ -142,6 +143,39 @@
       "e2eNoKeys": "Orang ini belum mengaktifkan pesan terenkripsi. Minta mereka membuka Pesan sekali.",
       "e2eUnavailable": "Pesan terenkripsi belum siap. Silakan coba lagi.",
       "deleteFailed": "Tidak dapat menghapus percakapan."
+    },
+    "backup": {
+      "lockedTitle": "Pesan lama terkunci di perangkat ini",
+      "lockedDescription": "Masukkan kode sandi cadangan Anda, atau setujui perangkat ini dari perangkat lain tempat Anda masuk.",
+      "lockedNoPasscode": "Kode sandi cadangan belum diatur. Setujui perangkat ini dari perangkat lain tempat Anda masuk.",
+      "waitingApproval": "Menunggu persetujuan di perangkat Anda yang lain…",
+      "declined": "Permintaan ditolak di perangkat Anda yang lain.",
+      "expired": "Permintaan kedaluwarsa. Minta lagi.",
+      "genericError": "Terjadi kesalahan. Silakan coba lagi.",
+      "enterPasscode": "Masukkan kode sandi cadangan",
+      "askOtherDevice": "Minta ke perangkat saya yang lain",
+      "restored": "{count, plural, =0 {Riwayat chat sudah terbaru} other {# pesan dipulihkan}}",
+      "setNudge": "Atur kode sandi cadangan agar Anda dapat membaca chat di perangkat baru.",
+      "setPasscode": "Atur kode sandi",
+      "notNow": "Nanti",
+      "approveTitle": "Izinkan perangkat baru?",
+      "approveDescription": "{device} meminta untuk membaca riwayat chat Anda. Izinkan hanya jika ini perangkat Anda sendiri.",
+      "unknownDevice": "Perangkat tidak dikenal",
+      "decline": "Tolak",
+      "allow": "Izinkan",
+      "wrongPasscode": "{count, plural, =0 {Kode sandi salah.} other {Kode sandi salah. Sisa # percobaan.}}",
+      "lockedOut": "Terlalu banyak percobaan salah. Coba lagi setelah {time}.",
+      "enterTitle": "Masukkan kode sandi cadangan",
+      "enterDescription": "Kode sandi membuka riwayat chat di perangkat ini. Kode sandi tidak pernah meninggalkan perangkat Anda.",
+      "passcodePlaceholder": "Kode sandi cadangan",
+      "confirmPlaceholder": "Konfirmasi kode sandi",
+      "unlocking": "Membuka… butuh beberapa detik",
+      "unlock": "Buka",
+      "tooShort": "Gunakan minimal {count} karakter.",
+      "mismatch": "Kode sandi tidak cocok.",
+      "setTitle": "Atur kode sandi cadangan",
+      "setDescription": "Minimal {count} karakter. Anda memerlukannya untuk membaca chat di perangkat baru. Kami tidak dapat memulihkannya.",
+      "save": "Simpan kode sandi"
     }
   }
 }

@@ -45,12 +45,24 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? exceptionResponse
           : ((exceptionResponse as { message?: string }).message ??
             exception.message);
+      // A thrower may pass `new XException({ code, message, details })` to
+      // give clients a machine-readable reason (e.g. chat E2E's 409
+      // E2E_DEVICES_MISMATCH carrying which devices to add/drop). Without an
+      // explicit `code`, the HTTP status name is used as before.
+      const custom =
+        typeof exceptionResponse === 'object' && exceptionResponse !== null
+          ? (exceptionResponse as { code?: unknown; details?: unknown })
+          : {};
 
       return response.status(status).json({
         success: false,
         error: {
-          code: HttpStatus[status] ?? 'HTTP_ERROR',
+          code:
+            typeof custom.code === 'string'
+              ? custom.code
+              : (HttpStatus[status] ?? 'HTTP_ERROR'),
           message,
+          ...(custom.details !== undefined ? { details: custom.details } : {}),
         },
       });
     }

@@ -1,0 +1,1 @@
+ALTER TABLE "chat"."e2e_backups" ADD COLUMN "key_proof_hash" text;

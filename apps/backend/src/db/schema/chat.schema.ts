@@ -5,10 +5,13 @@ import {
   index,
   integer,
   jsonb,
+  primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
   uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 import { listings } from './listings.schema';
@@ -97,7 +100,20 @@ export const messages = chatSchema.table(
     groupId: uuid('group_id'),
     readAt: timestamp('read_at', { withTimezone: true }),
     isE2e: boolean('is_e2e').default(false).notNull(),
+    // v1 only: the single-recipient ratchet header. v2 rows keep this null
+    // and carry one header per device in message_envelopes instead.
     e2eHeader: jsonb('e2e_header').$type<E2eHeader | null>(),
+    // null = plaintext, 1 = v1 (one ciphertext for the recipient's single
+    // identity), 2 = v2 multi-device (body encrypted once under a random
+    // content key, wrapped per device in message_envelopes).
+    e2eVersion: smallint('e2e_version'),
+    // v2 only: the device that encrypted this message. Also the AEAD
+    // associated data for `body`, so a body can't be replayed under another
+    // device's name.
+    senderDeviceId: uuid('sender_device_id').references(
+      () => userE2eDevices.id,
+      { onDelete: 'set null' },
+    ),
     // precision 3 (ms): must compare exactly against JS-Date-derived cursors
     // (see conversations.lastMessageAt)
     createdAt: timestamp('created_at', { withTimezone: true, precision: 3 })
@@ -194,3 +210,226 @@ export const userE2eOneTimePrekeys = chatSchema.table(
 
 export type UserE2eOneTimePrekeyRow = typeof userE2eOneTimePrekeys.$inferSelect;
 export type NewUserE2eOneTimePrekey = typeof userE2eOneTimePrekeys.$inferInsert;
+
+/**
+ * One row per (user, browser/device) key set — the multi-device successor
+ * to user_e2e_identities (which stays, read-only for v1 stale clients, until
+ * the Phase 3 cutover in tasks/plan-e2e-multi-device.md). A device is
+ * identified by its identity key: re-registering the same key from the same
+ * browser claims the existing row instead of creating a new device.
+ *
+ * "Active" = revokedAt is null AND lastSeenAt within 30 days (see
+ * activeDeviceCondition in chat/e2e/e2e-devices.util.ts). Senders must
+ * encrypt to exactly the active set or the send is rejected with 409.
+ */
+export const userE2eDevices = chatSchema.table(
+  'user_e2e_devices',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    identityKey: text('identity_key').notNull(), // base64 X25519 (DH)
+    identitySigningKey: text('identity_signing_key').notNull(), // base64 Ed25519
+    registrationId: integer('registration_id').notNull(),
+    signedPrekeyId: integer('signed_prekey_id').notNull(),
+    signedPrekeyPublic: text('signed_prekey_public').notNull(),
+    signedPrekeySignature: text('signed_prekey_signature').notNull(),
+    signedPrekeyCreatedAt: timestamp('signed_prekey_created_at', {
+      withTimezone: true,
+    }).notNull(),
+    // Human-readable "Chrome · Windows" — shown on the other devices when this
+    // one asks to restore chat history, so the user can recognise it.
+    label: varchar('label', { length: 100 }),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('user_e2e_devices_user_identity_uq').on(
+      t.userId,
+      t.identityKey,
+    ),
+    index('user_e2e_devices_user_idx').on(t.userId),
+  ],
+);
+
+export type UserE2eDeviceRow = typeof userE2eDevices.$inferSelect;
+export type NewUserE2eDevice = typeof userE2eDevices.$inferInsert;
+
+/**
+ * Per-device one-time prekey pool. Separate from user_e2e_one_time_prekeys
+ * (v1, keyed per user) because every device numbers its prekeys from its own
+ * counter — a (user_id, prekey_id) unique would collide across devices.
+ */
+export const userE2eDevicePrekeys = chatSchema.table(
+  'user_e2e_device_prekeys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    deviceId: uuid('device_id')
+      .notNull()
+      .references(() => userE2eDevices.id, { onDelete: 'cascade' }),
+    prekeyId: integer('prekey_id').notNull(),
+    publicKey: text('public_key').notNull(), // base64
+    usedAt: timestamp('used_at', { withTimezone: true }), // null = available
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('user_e2e_device_prekeys_device_prekey_uq').on(
+      t.deviceId,
+      t.prekeyId,
+    ),
+    // Serves the SKIP LOCKED claim in E2eKeysService.getDeviceBundle.
+    index('user_e2e_device_prekeys_available_idx')
+      .on(t.deviceId)
+      .where(sql`used_at is null`),
+  ],
+);
+
+export type UserE2eDevicePrekeyRow = typeof userE2eDevicePrekeys.$inferSelect;
+
+/**
+ * v2 fan-out: the message's random content key, ratchet-encrypted once per
+ * recipient device (the peer's devices AND the sender's own other devices).
+ * `messages.body` holds the single AEAD ciphertext all envelopes unlock.
+ */
+export const messageEnvelopes = chatSchema.table(
+  'message_envelopes',
+  {
+    messageId: uuid('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    recipientDeviceId: uuid('recipient_device_id')
+      .notNull()
+      .references(() => userE2eDevices.id, { onDelete: 'cascade' }),
+    header: jsonb('header').$type<E2eHeader>().notNull(),
+    wrappedKey: text('wrapped_key').notNull(), // base64
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.recipientDeviceId] })],
+);
+
+export type MessageEnvelopeRow = typeof messageEnvelopes.$inferSelect;
+
+// ── Encrypted history backup (see tasks/plan-e2e-multi-device.md, Phase 4/5) ──
+//
+// One random backup key (BK) per account, generated in the browser and never
+// seen by the server. Devices holding BK upload their decrypted history as
+// AES-GCM segments under BK. A new device obtains BK either by entering the
+// account's backup passcode (BK wrapped with an argon2id-derived key) or by
+// an existing device approving it (BK wrapped over the device-to-device
+// Double Ratchet session).
+
+export interface BackupKdfParams {
+  alg: 'argon2id';
+  t: number; // iterations
+  m: number; // memory, KiB
+  p: number; // parallelism
+}
+
+export const e2eBackups = chatSchema.table('e2e_backups', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  // base64 HMAC(BK, "npic-backup-check") — lets a device confirm the BK it
+  // holds (or just unwrapped) is this account's current one. Reveals nothing
+  // about BK.
+  keyCheck: text('key_check').notNull(),
+  // hex sha256 of keyProof = base64 HMAC(BK, "npic-backup-proof"). Unlike
+  // keyCheck this is NEVER returned by any endpoint, so presenting the
+  // preimage proves the caller really holds BK — keyCheck alone can't, since
+  // GET /backup hands it to anyone with the account's JWT. Null only on rows
+  // created before the proof existed (first setPasscode adopts one).
+  keyProofHash: text('key_proof_hash'),
+  // Passcode wrapping — all null until the user sets a passcode.
+  passcodeSalt: text('passcode_salt'),
+  passcodeParams: jsonb('passcode_params').$type<BackupKdfParams>(),
+  wrappedKey: text('wrapped_key'), // base64 AES-GCM(passcode key, BK)
+  // bcrypt of a passcode-derived auth key (NOT the passcode, NOT the wrap
+  // key): the server releases wrappedKey only to a caller who knows the
+  // passcode, which is what makes the attempt limit below enforceable.
+  passcodeAuthHash: text('passcode_auth_hash'),
+  failedAttempts: integer('failed_attempts').default(0).notNull(),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export type E2eBackupRow = typeof e2eBackups.$inferSelect;
+
+export const e2eBackupSegments = chatSchema.table(
+  'e2e_backup_segments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: uuid('device_id').references(() => userE2eDevices.id, {
+      onDelete: 'set null',
+    }),
+    ciphertext: text('ciphertext').notNull(), // base64 AES-GCM(BK, JSON)
+    messageCount: integer('message_count').notNull(),
+    // precision 3: cursor-paged by (createdAt, id) through JS Dates.
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index('e2e_backup_segments_user_created_idx').on(
+      t.userId,
+      t.createdAt,
+      t.id,
+    ),
+  ],
+);
+
+export type E2eBackupSegmentRow = typeof e2eBackupSegments.$inferSelect;
+
+export const e2eHistoryRequests = chatSchema.table(
+  'e2e_history_requests',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    requesterDeviceId: uuid('requester_device_id')
+      .notNull()
+      .references(() => userE2eDevices.id, { onDelete: 'cascade' }),
+    // pending → approved | declined | expired; approved → consumed
+    status: varchar('status', { length: 20 }).default('pending').notNull(),
+    approverDeviceId: uuid('approver_device_id').references(
+      () => userE2eDevices.id,
+      { onDelete: 'set null' },
+    ),
+    // Set on approve: BK encrypted for the requester over the approver→
+    // requester Double Ratchet session. Cleared once consumed.
+    header: jsonb('header').$type<E2eHeader>(),
+    wrappedKey: text('wrapped_key'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    index('e2e_history_requests_user_idx').on(t.userId, t.status),
+    // At most one open request per requesting device.
+    uniqueIndex('e2e_history_requests_pending_uq')
+      .on(t.requesterDeviceId)
+      .where(sql`status = 'pending'`),
+  ],
+);
+
+export type E2eHistoryRequestRow = typeof e2eHistoryRequests.$inferSelect;

@@ -39,6 +39,7 @@ function toFailure(err: unknown): ChatActionResult<never> {
       status: err.status,
       code: err.code,
       message: err.message,
+      ...(err.details !== undefined ? { details: err.details } : {}),
     };
   }
   return {

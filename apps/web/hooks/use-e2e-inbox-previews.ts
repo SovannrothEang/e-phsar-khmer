@@ -1,8 +1,9 @@
 "use client";
 
+import { useHistoryRestoredGeneration } from "@/hooks/use-history-restored";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, InboxItem } from "@/types/chat";
-import { decryptMessage } from "@/lib/e2e/decrypt-message";
+import { decryptMessage, isDecryptable } from "@/lib/e2e/decrypt-message";
 import { createIndexedDbStore } from "@/lib/e2e/store";
 import type { E2eStore, RatchetEngine } from "@/lib/e2e/types";
 
@@ -27,6 +28,7 @@ export function useE2eInboxPreviews(
   );
   const storeRef = useRef<E2eStore | null>(null);
   const dispatchedRef = useRef(new Set<string>());
+  const restoreGeneration = useHistoryRestoredGeneration(dispatchedRef);
 
   // Stable identity for the effect: only the E2E last-message ids matter.
   const key = items
@@ -44,12 +46,7 @@ export function useE2eInboxPreviews(
     const targets: ChatMessage[] = [];
     for (const item of items) {
       const m = item.lastMessage;
-      if (
-        m?.isE2e &&
-        m.e2eHeader &&
-        m.body !== null &&
-        !dispatchedRef.current.has(m.id)
-      ) {
+      if (m && isDecryptable(m) && !dispatchedRef.current.has(m.id)) {
         dispatchedRef.current.add(m.id);
         targets.push(m);
       }
@@ -66,8 +63,12 @@ export function useE2eInboxPreviews(
             const outcome = await decryptMessage(engine, store, {
               id: message.id,
               conversationId: message.conversationId,
-              e2eHeader: message.e2eHeader,
+              senderId: message.senderId,
               body: message.body,
+              e2eHeader: message.e2eHeader,
+              e2eVersion: message.e2eVersion,
+              senderDeviceId: message.senderDeviceId,
+              envelopes: message.envelopes,
             });
             if (outcome.status === "ok") plaintext = outcome.plaintext;
           }
@@ -90,7 +91,7 @@ export function useE2eInboxPreviews(
     // the E2E last messages; re-running on every inbox refetch would only
     // re-check the dispatched set.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, engine]);
+  }, [key, engine, restoreGeneration]);
 
   return previews;
 }

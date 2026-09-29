@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
-  allowedDevOrigins: ["*", '192.168.1.42'],
+  allowedDevOrigins: ["*.trycloudflare.com", "*.lhr.life"],
 };
 
 export default withNextIntl(nextConfig);

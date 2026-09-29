@@ -1,8 +1,9 @@
 "use client";
 
+import { useHistoryRestoredGeneration } from "@/hooks/use-history-restored";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/types/chat";
-import { decryptMessage } from "@/lib/e2e/decrypt-message";
+import { decryptMessage, isDecryptable } from "@/lib/e2e/decrypt-message";
 import { createIndexedDbStore } from "@/lib/e2e/store";
 import type { DecryptOutcome, E2eStore, RatchetEngine } from "@/lib/e2e/types";
 
@@ -29,6 +30,7 @@ export function useDecryptedMessages(
   );
   const storeRef = useRef<E2eStore | null>(null);
   const dispatchedRef = useRef(new Set<string>());
+  const restoreGeneration = useHistoryRestoredGeneration(dispatchedRef);
 
   useEffect(() => {
     if (!engine) return;
@@ -36,11 +38,7 @@ export function useDecryptedMessages(
     const store = storeRef.current;
 
     const pending = messages.filter(
-      (m) =>
-        m.isE2e &&
-        m.e2eHeader &&
-        m.body !== null &&
-        !dispatchedRef.current.has(m.id),
+      (m) => isDecryptable(m) && !dispatchedRef.current.has(m.id),
     );
     if (pending.length === 0) return;
     pending.forEach((m) => dispatchedRef.current.add(m.id));
@@ -51,8 +49,12 @@ export function useDecryptedMessages(
         const outcome = await decryptMessage(engine, store, {
           id: message.id,
           conversationId: message.conversationId,
-          e2eHeader: message.e2eHeader,
+          senderId: message.senderId,
           body: message.body,
+          e2eHeader: message.e2eHeader,
+          e2eVersion: message.e2eVersion,
+          senderDeviceId: message.senderDeviceId,
+          envelopes: message.envelopes,
         });
         if (cancelled) return;
         setResults((prev) => {
@@ -66,7 +68,7 @@ export function useDecryptedMessages(
     return () => {
       cancelled = true;
     };
-  }, [messages, engine]);
+  }, [messages, engine, restoreGeneration]);
 
   return results;
 }

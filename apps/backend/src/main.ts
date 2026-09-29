@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -7,7 +8,15 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Express's default JSON limit is 100 KB, which silently 413'd every E2E
+  // history-backup segment above it (AddBackupSegmentDto allows ~900 KB of
+  // ciphertext). 1 MB also matches the Next.js server-action body default —
+  // the hop every web request crosses first — so neither limit is the
+  // tighter surprise. Applies app-wide: every other DTO still caps its own
+  // fields, so this only widens what can be parsed, not what is accepted.
+  app.useBodyParser('json', { limit: '1mb' });
 
   app.setGlobalPrefix('api', { exclude: ['health', '/'] });
 

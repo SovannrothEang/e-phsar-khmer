@@ -32,7 +32,11 @@ import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ImageGroup } from "@/components/chat/image-group";
 import { groupImageMessages } from "@/lib/chat/group-images";
-import type { ChatUserSummary, ListingContext, ThreadMessage } from "@/types/chat";
+import type {
+  ChatUserSummary,
+  ListingContext,
+  ThreadMessage,
+} from "@/types/chat";
 
 export function MessageThread({
   conversationId,
@@ -141,6 +145,8 @@ export function MessageThread({
       if (m.tempId) return m;
       const outcome = decrypted.get(m.id);
       if (outcome?.status === "ok") return { ...m, body: outcome.plaintext };
+      if (outcome?.status === "unavailable")
+        return { ...m, body: t("message.notOnThisDevice") };
       if (outcome?.status === "failed")
         return { ...m, body: t("message.decryptFailed") };
       // Pending decrypt (or engine not ready): hide ciphertext behind a

@@ -44,7 +44,27 @@ function resolveWsOrigin(): string {
 export type ChatWsEvent =
   | { type: "message"; payload: ChatMessage }
   | { type: "inbox_update" }
-  | { type: "unread_count" };
+  | { type: "unread_count" }
+  /** The peer read my messages in this conversation — refetch receipts. */
+  | { type: "read"; payload: { conversationId: string } }
+  /** Reply to our own `send_message` frame. */
+  | {
+      type: "ack";
+      payload: {
+        clientMessageId: string | null;
+        conversationId: string;
+        message: ChatMessage;
+      };
+    }
+  | {
+      type: "error";
+      payload: {
+        clientMessageId: string | null;
+        code: string;
+        message: string;
+        details?: unknown;
+      };
+    };
 
 type Listener = (event: ChatWsEvent) => void;
 type ConnectedListener = (connected: boolean) => void;
@@ -255,20 +275,27 @@ export interface ChatWsState {
 export function useChatWs({
   enabled,
   onMessage,
+  onRead,
 }: {
   enabled: boolean;
   onMessage: (msg: ChatMessage) => void;
+  /** The peer read my messages in `conversationId`. */
+  onRead?: (conversationId: string) => void;
 }): ChatWsState {
   const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
   const onMessageRef = useRef(onMessage);
+  const onReadRef = useRef(onRead);
   useEffect(() => {
     onMessageRef.current = onMessage;
+    onReadRef.current = onRead;
   });
 
   useEffect(() => {
     if (!enabled) return;
     const unsubscribe = chatSocket.subscribe((event) => {
       if (event.type === "message") onMessageRef.current(event.payload);
+      else if (event.type === "read")
+        onReadRef.current?.(event.payload.conversationId);
     });
     const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
     return () => {

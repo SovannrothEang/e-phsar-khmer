@@ -102,7 +102,8 @@
       "sending": "Đang gửi…",
       "retry": "Thử lại",
       "decrypting": "Đang giải mã…",
-      "decryptFailed": "Không thể giải mã tin nhắn này."
+      "decryptFailed": "Không thể giải mã tin nhắn này.",
+      "notOnThisDevice": "Được gửi trước khi thiết bị này được thiết lập — hãy mở trên thiết bị khác của bạn."
     },
     "composer": {
       "placeholder": "Nhập tin nhắn…",
@@ -142,6 +143,39 @@
       "e2eNoKeys": "Người này chưa bật tin nhắn mã hóa. Hãy nhờ họ mở Tin nhắn một lần.",
       "e2eUnavailable": "Tin nhắn mã hóa chưa sẵn sàng. Vui lòng thử lại.",
       "deleteFailed": "Không thể xóa cuộc trò chuyện."
+    },
+    "backup": {
+      "lockedTitle": "Tin nhắn cũ bị khóa trên thiết bị này",
+      "lockedDescription": "Nhập mã khóa sao lưu, hoặc phê duyệt thiết bị này từ một thiết bị khác bạn đã đăng nhập.",
+      "lockedNoPasscode": "Chưa đặt mã khóa sao lưu. Hãy phê duyệt thiết bị này từ một thiết bị khác bạn đã đăng nhập.",
+      "waitingApproval": "Đang chờ phê duyệt trên thiết bị khác của bạn…",
+      "declined": "Yêu cầu đã bị từ chối trên thiết bị khác của bạn.",
+      "expired": "Yêu cầu đã hết hạn. Hãy yêu cầu lại.",
+      "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
+      "enterPasscode": "Nhập mã khóa sao lưu",
+      "askOtherDevice": "Hỏi thiết bị khác của tôi",
+      "restored": "{count, plural, =0 {Lịch sử trò chuyện đã được cập nhật} other {Đã khôi phục # tin nhắn}}",
+      "setNudge": "Đặt mã khóa sao lưu để đọc cuộc trò chuyện trên thiết bị mới.",
+      "setPasscode": "Đặt mã khóa",
+      "notNow": "Để sau",
+      "approveTitle": "Cho phép thiết bị mới?",
+      "approveDescription": "{device} đang yêu cầu đọc lịch sử trò chuyện của bạn. Chỉ cho phép nếu đây là thiết bị của bạn.",
+      "unknownDevice": "Thiết bị không xác định",
+      "decline": "Từ chối",
+      "allow": "Cho phép",
+      "wrongPasscode": "{count, plural, =0 {Sai mã khóa.} other {Sai mã khóa. Còn # lần thử.}}",
+      "lockedOut": "Quá nhiều lần thử sai. Hãy thử lại sau {time}.",
+      "enterTitle": "Nhập mã khóa sao lưu",
+      "enterDescription": "Mã khóa mở lịch sử trò chuyện trên thiết bị này. Mã không bao giờ rời khỏi thiết bị của bạn.",
+      "passcodePlaceholder": "Mã khóa sao lưu",
+      "confirmPlaceholder": "Xác nhận mã khóa",
+      "unlocking": "Đang mở khóa… mất vài giây",
+      "unlock": "Mở khóa",
+      "tooShort": "Dùng ít nhất {count} ký tự.",
+      "mismatch": "Mã khóa không khớp.",
+      "setTitle": "Đặt mã khóa sao lưu",
+      "setDescription": "Ít nhất {count} ký tự. Bạn cần nó để đọc trò chuyện trên thiết bị mới. Chúng tôi không thể khôi phục giúp bạn.",
+      "save": "Lưu mã khóa"
     }
   }
 }
