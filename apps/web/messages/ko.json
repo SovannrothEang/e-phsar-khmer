@@ -81,7 +81,8 @@
       "deleteConfirm": "삭제",
       "deleteSuccess": "대화가 삭제되었습니다.",
       "collapse": "대화 목록 접기",
-      "expand": "대화 목록 펼치기"
+      "expand": "대화 목록 펼치기",
+      "resize": "대화 목록 크기 조절"
     },
     "thread": {
       "back": "뒤로",

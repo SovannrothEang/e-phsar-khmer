@@ -81,7 +81,8 @@
       "deleteConfirm": "Hapus",
       "deleteSuccess": "Percakapan dihapus.",
       "collapse": "Ciutkan daftar percakapan",
-      "expand": "Luaskan daftar percakapan"
+      "expand": "Luaskan daftar percakapan",
+      "resize": "Ubah ukuran daftar percakapan"
     },
     "thread": {
       "back": "Kembali",

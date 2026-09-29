@@ -81,7 +81,8 @@
       "deleteConfirm": "Delete",
       "deleteSuccess": "Conversation deleted.",
       "collapse": "Collapse the conversation list",
-      "expand": "Expand the conversation list"
+      "expand": "Expand the conversation list",
+      "resize": "Resize the conversation list"
     },
     "thread": {
       "back": "Back",

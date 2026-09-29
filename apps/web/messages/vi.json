@@ -81,7 +81,8 @@
       "deleteConfirm": "Xóa",
       "deleteSuccess": "Đã xóa cuộc trò chuyện.",
       "collapse": "Thu gọn danh sách trò chuyện",
-      "expand": "Mở rộng danh sách trò chuyện"
+      "expand": "Mở rộng danh sách trò chuyện",
+      "resize": "Đổi kích thước danh sách trò chuyện"
     },
     "thread": {
       "back": "Quay lại",

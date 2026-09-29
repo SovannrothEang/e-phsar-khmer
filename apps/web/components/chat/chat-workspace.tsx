@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -78,6 +79,43 @@ function setSidebarCollapsed(next: boolean): void {
 function subscribeSidebarCollapsed(listener: () => void): () => void {
   sidebarCollapsedListeners.add(listener);
   return () => sidebarCollapsedListeners.delete(listener);
+}
+
+// Drag-resizable width (desktop only). `null` = never resized, so the default
+// responsive widths (md:300px / lg:340px) apply. Shares the listener set above
+// — both prefs live in the same same-tab-notify store.
+const SIDEBAR_WIDTH_KEY = "chat_sidebar_width";
+const SIDEBAR_MIN_W = 240;
+const SIDEBAR_MAX_W = 560;
+// The thread column must keep at least this much room whatever the drag says.
+const THREAD_MIN_W = 360;
+
+function getSidebarWidth(): number | null {
+  try {
+    const raw = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(raw) && raw >= SIDEBAR_MIN_W ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSidebarWidthServerSnapshot(): number | null {
+  return null;
+}
+
+function setSidebarWidth(next: number | null): void {
+  try {
+    if (next === null) localStorage.removeItem(SIDEBAR_WIDTH_KEY);
+    else localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(next)));
+  } catch {
+    // Private mode / quota — width holds for this session's render only.
+  }
+  sidebarCollapsedListeners.forEach((listener) => listener());
+}
+
+function clampSidebarWidth(width: number, panelWidth: number): number {
+  const max = Math.min(SIDEBAR_MAX_W, panelWidth - THREAD_MIN_W);
+  return Math.max(SIDEBAR_MIN_W, Math.min(width, max));
 }
 
 export interface ChatWorkspaceProps {
@@ -216,6 +254,80 @@ export function ChatWorkspace({
     setSidebarCollapsed(!sidebarCollapsed);
   }, [sidebarCollapsed]);
 
+  // ── Sidebar resize (desktop only) ─────────────────────────────────────────
+  // The live drag width stays in component state and is written to storage
+  // once on release — no localStorage write per pointermove.
+  const storedSidebarWidth = useSyncExternalStore(
+    subscribeSidebarCollapsed,
+    getSidebarWidth,
+    getSidebarWidthServerSnapshot,
+  );
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const sidebarWidth = dragWidth ?? storedSidebarWidth;
+  const asideRef = useRef<HTMLElement>(null);
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const aside = asideRef.current;
+      const panel = aside?.parentElement;
+      if (!aside || !panel || e.button !== 0) return;
+      e.preventDefault();
+      const handle = e.currentTarget;
+      handle.setPointerCapture(e.pointerId);
+      const startX = e.clientX;
+      const startW = aside.getBoundingClientRect().width;
+      const panelW = panel.getBoundingClientRect().width;
+      let latest = startW;
+      // Keep the col-resize cursor and suppress text selection while the
+      // pointer wanders off the 6px handle.
+      const prevCursor = document.body.style.cursor;
+      const prevSelect = document.body.style.userSelect;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onMove = (ev: PointerEvent) => {
+        latest = clampSidebarWidth(startW + ev.clientX - startX, panelW);
+        setDragWidth(latest);
+      };
+      const onUp = () => {
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
+        document.body.style.cursor = prevCursor;
+        document.body.style.userSelect = prevSelect;
+        setSidebarWidth(latest);
+        setDragWidth(null);
+      };
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
+    },
+    [],
+  );
+
+  const handleResizeKey = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const aside = asideRef.current;
+      const panel = aside?.parentElement;
+      if (!aside || !panel) return;
+      const step = e.shiftKey ? 64 : 16;
+      const current = aside.getBoundingClientRect().width;
+      const panelW = panel.getBoundingClientRect().width;
+      let next: number;
+      if (e.key === "ArrowLeft") next = current - step;
+      else if (e.key === "ArrowRight") next = current + step;
+      else if (e.key === "Home") next = SIDEBAR_MIN_W;
+      else if (e.key === "End") next = SIDEBAR_MAX_W;
+      else return;
+      e.preventDefault();
+      setSidebarWidth(clampSidebarWidth(next, panelW));
+    },
+    [],
+  );
+
+  // Double-click the handle to go back to the default responsive width.
+  const handleResizeReset = useCallback(() => setSidebarWidth(null), []);
+
   // ── Delete conversation (per-participant hide, see DELETE /chats/:id) ─────
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const handleDelete = useCallback(
@@ -300,12 +412,37 @@ export function ChatWorkspace({
       {/* Inbox column — full width on mobile until a thread is opened.
           Collapsible to a narrow avatar rail on desktop only (md:). */}
       <aside
+        ref={asideRef}
+        style={
+          sidebarWidth !== null
+            ? ({ "--chat-sidebar-w": `${sidebarWidth}px` } as React.CSSProperties)
+            : undefined
+        }
         className={cn(
-          "flex w-full shrink-0 flex-col border-border bg-card md:w-[300px] md:border-r lg:w-[340px]",
+          "relative flex w-full shrink-0 flex-col border-border bg-card md:border-r",
+          sidebarCollapsed
+            ? "md:w-16"
+            : sidebarWidth !== null
+              ? "md:w-[var(--chat-sidebar-w)]"
+              : "md:w-[300px] lg:w-[340px]",
           threadOpen && "hidden md:flex",
-          sidebarCollapsed && "md:w-16 lg:w-16",
         )}
       >
+        {!sidebarCollapsed && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t("inbox.resize")}
+            aria-valuemin={SIDEBAR_MIN_W}
+            aria-valuemax={SIDEBAR_MAX_W}
+            aria-valuenow={sidebarWidth ?? undefined}
+            tabIndex={0}
+            onPointerDown={handleResizeStart}
+            onKeyDown={handleResizeKey}
+            onDoubleClick={handleResizeReset}
+            className="absolute inset-y-0 -right-[3px] z-10 hidden w-1.5 cursor-col-resize touch-none transition-colors after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 hover:after:bg-primary focus-visible:outline-none focus-visible:after:bg-primary md:block"
+          />
+        )}
         <div
           className={cn(
             "flex shrink-0 items-center border-b border-border px-4 py-3",
