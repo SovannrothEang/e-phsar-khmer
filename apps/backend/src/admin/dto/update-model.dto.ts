@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -38,4 +39,10 @@ export class UpdateModelDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** When provided (even empty), replaces the model's subcategory links. */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  subcategoryIds?: string[];
 }

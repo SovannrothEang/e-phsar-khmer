@@ -99,6 +99,9 @@ export type BaseUser = {
 
   userlink?: string;
 
+  /** Employer on a job listing (the form's `company` field), when given. */
+  company?: string;
+
   email?: string;
   google?: string;
   facebook?: string;

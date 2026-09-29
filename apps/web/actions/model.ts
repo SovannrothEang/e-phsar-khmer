@@ -4,8 +4,10 @@ import { modelSchema, deleteModelSchema } from "@/schemas/model";
 import { serverFetch, ApiError } from "@/lib/api/client";
 import z from "zod";
 
-// The form's categoryId + subcategories are UI-only (they drive the cascade to
-// pick a brand); the backend model only needs brandId + slug + name.
+// The form's categoryId stays UI-only — it only filters the brand dropdown.
+// `subcategories` is NOT: it is the model's own classification, which is what
+// keeps iPhone models out of the Tablets grid (until 2026-09-22 it was dropped
+// on the floor here, so every model was unclassified).
 
 export async function createModel(unsafeData: z.infer<typeof modelSchema>) {
   const parsed = modelSchema.safeParse(unsafeData);
@@ -18,6 +20,7 @@ export async function createModel(unsafeData: z.infer<typeof modelSchema>) {
         brandId: parsed.data.brandId,
         slug: parsed.data.slug,
         name: parsed.data.name,
+        subcategoryIds: parsed.data.subcategories,
       }),
     });
     return { success: true };
@@ -42,6 +45,7 @@ export async function updateModel(
         brandId: parsed.data.brandId,
         slug: parsed.data.slug,
         name: parsed.data.name,
+        subcategoryIds: parsed.data.subcategories,
       }),
     });
     return { success: true };

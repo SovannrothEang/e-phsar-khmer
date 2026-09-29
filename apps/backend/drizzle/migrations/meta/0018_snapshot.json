@@ -1,6 +1,6 @@
 {
-  "id": "d95d7a62-76bf-4181-a820-96a0b4d9e903",
-  "prevId": "d4512f7e-66ec-4b3d-86c5-7b14a5e6fb63",
+  "id": "52eb7518-75cd-4f4e-8ba7-266188225462",
+  "prevId": "b1ef851c-e7fc-4a94-8b39-683349dc2235",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -27,6 +27,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "name_km": {
+          "name": "name_km",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "slug": {
           "name": "slug",
           "type": "varchar(80)",
@@ -35,6 +41,27 @@
         }
       },
       "indexes": {
+        "communes_district_slug_uq": {
+          "name": "communes_district_slug_uq",
+          "columns": [
+            {
+              "expression": "district_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "communes_district_id_idx": {
           "name": "communes_district_id_idx",
           "columns": [
@@ -94,6 +121,12 @@
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
+        },
+        "name_km": {
+          "name": "name_km",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
         },
         "slug": {
           "name": "slug",
@@ -177,6 +210,12 @@
           "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
+        },
+        "name_km": {
+          "name": "name_km",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
         },
         "slug": {
           "name": "slug",
@@ -803,7 +842,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "users_district_id_districts_id_fk": {
@@ -816,7 +855,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "users_commune_id_communes_id_fk": {
@@ -829,7 +868,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -1694,7 +1733,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "listings_district_id_districts_id_fk": {
@@ -1707,7 +1746,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "listings_commune_id_communes_id_fk": {
@@ -1720,7 +1759,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -3485,19 +3524,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "is_e2e": {
-          "name": "is_e2e",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "e2e_header": {
-          "name": "e2e_header",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp (3) with time zone",
@@ -3628,201 +3654,9 @@
         },
         "messages_body_length_max": {
           "name": "messages_body_length_max",
-          "value": "char_length(body) <= 24000"
+          "value": "char_length(body) <= 4000"
         }
       },
-      "isRLSEnabled": false
-    },
-    "chat.user_e2e_identities": {
-      "name": "user_e2e_identities",
-      "schema": "chat",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "identity_key": {
-          "name": "identity_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "identity_signing_key": {
-          "name": "identity_signing_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registration_id": {
-          "name": "registration_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "signed_prekey_id": {
-          "name": "signed_prekey_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "signed_prekey_public": {
-          "name": "signed_prekey_public",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "signed_prekey_signature": {
-          "name": "signed_prekey_signature",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "signed_prekey_created_at": {
-          "name": "signed_prekey_created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "user_e2e_identities_user_id_users_id_fk": {
-          "name": "user_e2e_identities_user_id_users_id_fk",
-          "tableFrom": "user_e2e_identities",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "chat.user_e2e_one_time_prekeys": {
-      "name": "user_e2e_one_time_prekeys",
-      "schema": "chat",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "prekey_id": {
-          "name": "prekey_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "public_key": {
-          "name": "public_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "user_e2e_otp_user_prekey_uq": {
-          "name": "user_e2e_otp_user_prekey_uq",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "prekey_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "user_e2e_otp_available_idx": {
-          "name": "user_e2e_otp_available_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "used_at is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "user_e2e_one_time_prekeys_user_id_users_id_fk": {
-          "name": "user_e2e_one_time_prekeys_user_id_users_id_fk",
-          "tableFrom": "user_e2e_one_time_prekeys",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.outbox_events": {

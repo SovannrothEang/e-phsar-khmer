@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
-import Image from "next/image";
+import DbImage, { isStorageObjectUrl } from "@/components/common/DbImage";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { signUpload, type UploadScope } from "@/actions/files";
@@ -82,19 +82,45 @@ export function ImageUpload({
 
   const open = () => inputRef.current?.click();
 
+  // Same rule as the grids: a Storage object URL is the only image source. A
+  // stored value that is not one — a leftover bundled `/sub-img` path, or an
+  // object that is gone — must not render here either, or the edit dialog
+  // would show an image the table and the storefront refuse to show.
+  const storedImage = value && isStorageObjectUrl(value) ? value : null;
+
+  const emptySlot = (caption: string) => (
+    <button
+      type="button"
+      onClick={open}
+      disabled={uploading}
+      className="flex h-40 w-40 cursor-pointer flex-col items-center justify-center gap-2 rounded border border-dashed border-border text-muted-foreground transition-colors hover:border-sky-500 hover:text-sky-500 disabled:opacity-50"
+    >
+      {uploading ? (
+        <Loader2 className="size-6 animate-spin" />
+      ) : (
+        <ImagePlus className="size-6" />
+      )}
+      <span className="text-xs">{uploading ? "Uploading..." : caption}</span>
+    </button>
+  );
+
   return (
     <div className={className}>
       {value ? (
         <div className="relative inline-block">
-          <Image
-            src={value}
-            alt={label}
-            width={160}
-            height={160}
-            className="h-40 w-40 cursor-pointer rounded border border-border object-cover"
-            unoptimized
-            onClick={open}
-          />
+          {storedImage ? (
+            <DbImage
+              src={storedImage}
+              alt={label}
+              width={160}
+              height={160}
+              className="h-40 w-40 cursor-pointer rounded border border-border object-cover"
+              onClick={open}
+              fallback={emptySlot(`No ${label} stored`)}
+            />
+          ) : (
+            emptySlot(`No ${label} stored`)
+          )}
           <Button
             type="button"
             variant="destructive"
@@ -116,19 +142,7 @@ export function ImageUpload({
           )}
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={open}
-          disabled={uploading}
-          className="flex h-40 w-40 cursor-pointer flex-col items-center justify-center gap-2 rounded border border-dashed border-border text-muted-foreground transition-colors hover:border-sky-500 hover:text-sky-500 disabled:opacity-50"
-        >
-          {uploading ? (
-            <Loader2 className="size-6 animate-spin" />
-          ) : (
-            <ImagePlus className="size-6" />
-          )}
-          <span className="text-xs">{uploading ? "Uploading..." : label}</span>
-        </button>
+        emptySlot(label)
       )}
       <input
         ref={inputRef}

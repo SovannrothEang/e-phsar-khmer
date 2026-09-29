@@ -6,13 +6,19 @@ import { Link } from "@/i18n/routing";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import Image from "next/image";
 
-import { posts } from "@/lib/posts";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
-import { getTranslations } from "next-intl/server";
+import { getTranslations, getLocale } from "next-intl/server";
+import { getListingsFeed, toCardPost } from "@/lib/api/categories";
 
 export default async function HomePage() {
   const t = await getTranslations("HomePage");
+  const locale = await getLocale();
+
+  // Real Latest Ads feed (all active listings); top ads stay untouched.
+  const feedPosts = ((await getListingsFeed({}, locale))?.items ?? []).map(
+    toCardPost,
+  );
 
   return (
     <>
@@ -46,7 +52,7 @@ export default async function HomePage() {
             <h2 className="text-xl">{t("latestads")}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <GridCardSell />
-              {posts.map((post) => (
+              {feedPosts.map((post) => (
                 <GridCardPost key={post.postId} post={post} />
               ))}
             </div>

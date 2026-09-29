@@ -45,7 +45,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useAppForm } from "@/components/form/hooks";
 import { z } from "zod";
 import { toast } from "@/components/ui/sonner";
@@ -56,7 +55,7 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
-import Image from "next/image";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -71,54 +70,9 @@ import { getAdminBrands } from "@/actions/admin-brands";
 import { brandSchema } from "@/schemas/brand";
 import type { Brand } from "@/types/brand";
 import { createBrand, deleteBrand, updateBrand } from "@/actions/brand";
+import { SubcategoryCheckboxes } from "@/components/dashboard/subcategory-checkboxes";
 
 type BrandFormData = z.infer<typeof brandSchema>;
-
-function SubcategoryCheckboxes({
-  categoryId,
-  subcategories,
-  selectedIds,
-  onChange,
-}: {
-  categoryId: string;
-  subcategories: AdminSubcategory[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
-}) {
-  const filteredSubcategories = subcategories.filter(
-    (sub) => sub.categoryId === categoryId,
-  );
-
-  if (filteredSubcategories.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
-        No subcategories available for this category.
-      </p>
-    );
-  }
-  return (
-    <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-2">
-      {filteredSubcategories.map((sub) => (
-        <label
-          key={sub.subId}
-          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
-        >
-          <Checkbox
-            checked={selectedIds.includes(sub.subId)}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                onChange([...selectedIds, sub.subId]);
-              } else {
-                onChange(selectedIds.filter((id) => id !== sub.subId));
-              }
-            }}
-          />
-          <span>{sub.name}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
 
 function AddBrandForm({
   categories,
@@ -603,13 +557,13 @@ export default function BrandsPage() {
                         {brand.slug}
                       </TableCell>
                       <TableCell>
-                        <Image
+                        <DbImage
                           src={brand.image}
                           alt={brand.name}
                           width={40}
                           height={40}
                           className="w-10 h-10 object-contain rounded border bg-muted/30 p-0.5"
-                          unoptimized
+                          fallback={<NoImageCell />}
                         />
                       </TableCell>
                       <TableCell>

@@ -69,27 +69,23 @@ import {
 } from "@/actions/admin-subcategories";
 import { getAdminBrands } from "@/actions/admin-brands";
 import { getAdminModels } from "@/actions/admin-models";
+import { SubcategoryCheckboxes } from "@/components/dashboard/subcategory-checkboxes";
 import type { Brand } from "@/types/brand";
 import z from "zod";
 import { Model } from "@/types/model";
 
 type ModelFormData = z.infer<typeof modelSchema>;
 
-function getSubcategoriesForCategory(
-  subcategories: AdminSubcategory[],
-  categoryId: string,
-) {
-  return subcategories.filter((sub) => sub.categoryId === categoryId);
-}
-
-function getBrandsForCategoryAndSubcategory(
+/** Brands that can carry a model in any of the selected subcategories. */
+function getBrandsForCategoryAndSubcategories(
   brands: Brand[],
   categoryId: string,
-  subcategoryId: string,
+  subcategoryIds: string[],
 ) {
+  if (subcategoryIds.length === 0) return [];
   return brands.filter((brand) => {
     if (brand.categoryId !== categoryId) return false;
-    return brand.subcategories.includes(subcategoryId);
+    return subcategoryIds.some((id) => brand.subcategories.includes(id));
   });
 }
 
@@ -107,18 +103,16 @@ function AddModelForm({
   onCancel: () => void;
 }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState("");
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<
+    string[]
+  >([]);
 
-  const filteredSubcategories = getSubcategoriesForCategory(
-    subcategories,
-    selectedCategoryId,
-  );
   const filteredBrands =
-    selectedCategoryId && selectedSubcategoryId
-      ? getBrandsForCategoryAndSubcategory(
+    selectedCategoryId && selectedSubcategoryIds.length > 0
+      ? getBrandsForCategoryAndSubcategories(
           brands,
           selectedCategoryId,
-          selectedSubcategoryId,
+          selectedSubcategoryIds,
         )
       : [];
 
@@ -168,7 +162,7 @@ function AddModelForm({
               onValueChange={(value) => {
                 setSelectedCategoryId(value);
                 // Reset subcategory and brand when category changes
-                setSelectedSubcategoryId("");
+                setSelectedSubcategoryIds([]);
                 form.setFieldValue("subcategories", []);
                 form.setFieldValue("brandId", "");
               }}
@@ -192,35 +186,23 @@ function AddModelForm({
                     Subcategory <span className="text-red-500">*</span>
                   </FieldLegend>
                   <FieldDescription>
-                    Select the subcategory for this model.
+                    Which subcategories this model belongs to. Pick more than
+                    one when it genuinely spans them (a 2-in-1 is a laptop and a
+                    tablet) — this is what keeps a model out of the
+                    subcategories it does not belong to.
                   </FieldDescription>
                 </FieldContent>
-                {filteredSubcategories.length > 0 ? (
-                  <Select
-                    value={selectedSubcategoryId}
-                    onValueChange={(value) => {
-                      setSelectedSubcategoryId(value);
-                      field.handleChange([value]);
-                      // Reset brand when subcategory changes
-                      form.setFieldValue("brandId", "");
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubcategories.map((sub) => (
-                        <SelectItem key={sub.subId} value={sub.subId}>
-                          {sub.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
-                    No subcategories available for this category.
-                  </p>
-                )}
+                <SubcategoryCheckboxes
+                  categoryId={selectedCategoryId}
+                  subcategories={subcategories}
+                  selectedIds={field.state.value}
+                  onChange={(ids) => {
+                    setSelectedSubcategoryIds(ids);
+                    field.handleChange(ids);
+                    // Reset brand when the subcategory set changes
+                    form.setFieldValue("brandId", "");
+                  }}
+                />
               </FieldSet>
             )}
           </form.AppField>
@@ -237,8 +219,8 @@ function AddModelForm({
           </FieldSet>
         )}
 
-        {/* Step 3: Select Brand (only shows after subcategory is selected) */}
-        {selectedSubcategoryId ? (
+        {/* Step 3: Select Brand (only shows once a subcategory is picked) */}
+        {selectedSubcategoryIds.length > 0 ? (
           <form.AppField name="brandId">
             {(field) => (
               <field.Select label="Brand" required>
@@ -301,20 +283,16 @@ function EditModelForm({
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     model.categoryId,
   );
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState(
-    model.subcategories.length > 0 ? model.subcategories[0] : "",
-  );
+  const [selectedSubcategoryIds, setSelectedSubcategoryIds] = useState<
+    string[]
+  >(model.subcategories);
 
-  const filteredSubcategories = getSubcategoriesForCategory(
-    subcategories,
-    selectedCategoryId,
-  );
   const filteredBrands =
-    selectedCategoryId && selectedSubcategoryId
-      ? getBrandsForCategoryAndSubcategory(
+    selectedCategoryId && selectedSubcategoryIds.length > 0
+      ? getBrandsForCategoryAndSubcategories(
           brands,
           selectedCategoryId,
-          selectedSubcategoryId,
+          selectedSubcategoryIds,
         )
       : [];
 
@@ -364,7 +342,7 @@ function EditModelForm({
               onValueChange={(value) => {
                 setSelectedCategoryId(value);
                 // Reset subcategory and brand when category changes
-                setSelectedSubcategoryId("");
+                setSelectedSubcategoryIds([]);
                 form.setFieldValue("subcategories", []);
                 form.setFieldValue("brandId", "");
               }}
@@ -388,35 +366,23 @@ function EditModelForm({
                     Subcategory <span className="text-red-500">*</span>
                   </FieldLegend>
                   <FieldDescription>
-                    Select the subcategory for this model.
+                    Which subcategories this model belongs to. Pick more than
+                    one when it genuinely spans them (a 2-in-1 is a laptop and a
+                    tablet) — this is what keeps a model out of the
+                    subcategories it does not belong to.
                   </FieldDescription>
                 </FieldContent>
-                {filteredSubcategories.length > 0 ? (
-                  <Select
-                    value={selectedSubcategoryId}
-                    onValueChange={(value) => {
-                      setSelectedSubcategoryId(value);
-                      field.handleChange([value]);
-                      // Reset brand when subcategory changes
-                      form.setFieldValue("brandId", "");
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a subcategory" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filteredSubcategories.map((sub) => (
-                        <SelectItem key={sub.subId} value={sub.subId}>
-                          {sub.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
-                    No subcategories available for this category.
-                  </p>
-                )}
+                <SubcategoryCheckboxes
+                  categoryId={selectedCategoryId}
+                  subcategories={subcategories}
+                  selectedIds={field.state.value}
+                  onChange={(ids) => {
+                    setSelectedSubcategoryIds(ids);
+                    field.handleChange(ids);
+                    // Reset brand when the subcategory set changes
+                    form.setFieldValue("brandId", "");
+                  }}
+                />
               </FieldSet>
             )}
           </form.AppField>
@@ -427,7 +393,7 @@ function EditModelForm({
         )}
 
         {/* Step 3: Select Brand (filtered) */}
-        {selectedSubcategoryId ? (
+        {selectedSubcategoryIds.length > 0 ? (
           <form.AppField name="brandId">
             {(field) => (
               <field.Select label="Brand" required>

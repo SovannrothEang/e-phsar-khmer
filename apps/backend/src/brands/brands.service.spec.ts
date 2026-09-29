@@ -143,4 +143,47 @@ describe('BrandsService', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('listModels (scoped to a subcategory)', () => {
+    it('returns [] for an unknown subcategory slug, without querying models', async () => {
+      db.select.mockReturnValueOnce({
+        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+      });
+
+      const result = await service.listModels('brand-uuid', 'not-a-slug');
+      expect(result).toEqual([]);
+      // The subcategory lookup short-circuits — no second select.
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the scoped models when the slug resolves', async () => {
+      const row = {
+        id: 'm1',
+        slug: 'ipad-pro',
+        name: 'iPad Pro',
+        sortOrder: 0,
+      };
+      const subquery = { from: () => ({ where: () => ({}) }) };
+      db.select
+        // 1. subcategory lookup
+        .mockReturnValueOnce({
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve([{ id: 'sub-1' }]) }),
+          }),
+        })
+        // 2 + 3. the two id subqueries are *built* (never awaited), so their
+        // chains only need to exist.
+        .mockReturnValueOnce(subquery)
+        .mockReturnValueOnce(subquery)
+        // 4. the models query itself
+        .mockReturnValueOnce({
+          from: () => ({
+            where: () => ({ orderBy: () => Promise.resolve([row]) }),
+          }),
+        });
+
+      const result = await service.listModels('brand-uuid', 'tablets');
+      expect(result).toEqual([row]);
+    });
+  });
 });

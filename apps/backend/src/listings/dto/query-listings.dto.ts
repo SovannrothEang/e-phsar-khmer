@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
@@ -69,4 +77,35 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   bodyType?: string;
+
+  /**
+   * Generic sibling of `brand`/`bodyType` for every OTHER attribute grid.
+   *
+   * Those two are only correct for the one family whose listings store those
+   * exact keys. The browse pages render a grid per linked attribute set, and
+   * the key a set's value lands under is the subcategory's own `field_schema`
+   * key — `type` for House For Sale, `vehicleType` for Vehicles For Rent (from
+   * the same `bodytypes` set that cars store as `bodyType`), `accessory`,
+   * `network`, `jobType`, … So the web resolves the key and sends it here
+   * rather than the backend guessing. Additive: both params are optional and
+   * `brand`/`bodyType` behave exactly as before.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Attribute key to filter on, e.g. `type` (listings.attributes->>attrKey). ' +
+      'Requires attrValue; ignored on its own.',
+  })
+  @IsOptional()
+  @Matches(/^[a-zA-Z][a-zA-Z0-9]{0,39}$/, {
+    message: 'attrKey must be a plain attribute key (letters/digits)',
+  })
+  attrKey?: string;
+
+  @ApiPropertyOptional({
+    description: 'Value for attrKey — the display name the post form wrote.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  attrValue?: string;
 }

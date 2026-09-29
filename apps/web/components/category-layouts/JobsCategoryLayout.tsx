@@ -35,7 +35,7 @@ export default function JobsCategoryLayout({
         <div className="flex items-center gap-2 flex-wrap">
           <LocationSelectorFilter />
           <SortFilter />
-          <PriceFilter />
+          <PriceFilter label="Salary" />
           <MoreFilters />
         </div>
         <TabsList className="h-9 shrink-0">

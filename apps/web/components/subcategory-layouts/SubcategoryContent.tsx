@@ -13,53 +13,85 @@ export interface OptionRow {
 type Props = {
   categorySlug: string;
   subcategorySlug: string;
-  /** Brand options (cars) — null when the subcategory has no live brands. */
+  /** Brand options — null when the subcategory has no live brands. */
   brands?: OptionRow[] | null;
-  /** Body-type options (cars) — null when no rows apply. */
-  bodyTypes?: OptionRow[] | null;
   /** Models of the selected brand — null unless a brand is selected. */
   models?: OptionRow[] | null;
+  /** Linked attribute sets (body types, types, bedrooms, …) — each has a
+   *  design title (e.g. "Body Type") and non-empty options. `imageTiles` is the
+   *  set's declared design (icon-circle grid); when it is absent the set draws
+   *  the bordered text tiles. */
+  sets?: {
+    slug: string;
+    title: string;
+    imageTiles?: boolean;
+    options: OptionRow[];
+  }[];
 };
 
 export default function SubcategoryContent({
   categorySlug,
   subcategorySlug,
   brands,
-  bodyTypes,
   models,
+  sets,
 }: Props) {
   const baseHref = `/category/${categorySlug}/${subcategorySlug}`;
   const searchParams = useSearchParams();
 
   const brandSlug = searchParams.get("ad_field");
-  const bodyType = searchParams.get("ad_type");
+  const attrSlug = searchParams.get("ad_type");
 
   // Force lowercase comparison to avoid "Kia" vs "kia" issues
   const selectedBrand = brands?.find(
     (b) => b.slug.toLowerCase() === brandSlug?.toLowerCase(),
   );
 
+  // A set the user has already applied steps aside for the next choice — the
+  // Body Type grid disappears once a body type is picked, leaving Brand (the
+  // applied filter is still shown by the bar, the breadcrumb and the feed).
+  const pendingSets = sets?.filter(
+    (set) => !set.options.some((o) => o.slug === attrSlug),
+  );
+
   return (
     <>
       {/* BRAND GRID: Show when no brand is selected */}
       {!selectedBrand && !!brands?.length && (
-        <OptionGrid options={brands} baseHref={baseHref} paramKey="brand" />
+        <OptionGrid
+          options={brands}
+          baseHref={baseHref}
+          paramKey="brand"
+          title="Brand"
+          /* Every brand grid in the mock is icon tiles, so the design is
+             declared rather than derived from the rows' `icon` values. */
+          imageTiles
+        />
       )}
 
       {/* MODEL GRID: Show when a brand is selected */}
       {selectedBrand && !!models?.length && (
-        <OptionGrid options={models} baseHref={baseHref} paramKey="model" />
+        <OptionGrid
+          options={models}
+          baseHref={baseHref}
+          paramKey="model"
+          title="Model"
+        />
       )}
 
-      {/* TYPE GRID: Show when no type is selected */}
-      {!(categorySlug === "jobs" ? brandSlug : bodyType) &&
-        !!bodyTypes?.length && (
-          <OptionGrid
-            options={bodyTypes}
-            baseHref={baseHref}
-            paramKey={categorySlug === "jobs" ? "brand" : "body_type"}
-          />
-        )}
+      {/* ATTRIBUTE GRIDS (Body Type, Type, Bedroom, Accessories, …): each
+          linked set renders its own card with the design title; an applied set
+          is filtered out above */}
+      {pendingSets?.map((set) => (
+        <OptionGrid
+          key={set.slug}
+          options={set.options}
+          baseHref={baseHref}
+          paramKey="body_type"
+          title={set.title}
+          imageTiles={set.imageTiles}
+        />
+      ))}
     </>
   );
 }

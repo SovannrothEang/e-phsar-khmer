@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-import Image from "next/image";
+import DbImage from "@/components/common/DbImage";
 import { Button } from "../ui/button";
 import { IconHeartPlus, IconShare3 } from "@tabler/icons-react";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
@@ -68,7 +68,7 @@ export default function PostImage({
           className="relative w-full aspect-[15/10] cursor-pointer overflow-hidden rounded-t-xs bg-muted"
           onClick={() => handleImageClick(0)}
         >
-          <Image
+          <DbImage
             src={images[0]}
             alt="post-0"
             fill
@@ -104,7 +104,7 @@ export default function PostImage({
             className="relative flex-1 cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -117,7 +117,7 @@ export default function PostImage({
             className="relative flex-1 cursor-pointer bg-muted"
             onClick={() => handleImageClick(1)}
           >
-            <Image
+            <DbImage
               src={images[1]}
               alt="post-1"
               fill
@@ -135,7 +135,7 @@ export default function PostImage({
             className="relative flex-[2] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -152,7 +152,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -172,7 +172,7 @@ export default function PostImage({
             className="relative flex-[3] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -189,7 +189,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -209,7 +209,7 @@ export default function PostImage({
             className="relative flex-[4] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -226,7 +226,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -246,7 +246,7 @@ export default function PostImage({
             className="relative flex-[5] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -263,7 +263,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -283,7 +283,7 @@ export default function PostImage({
             className="relative flex-[5] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -300,7 +300,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -320,7 +320,7 @@ export default function PostImage({
             className="relative flex-[6] cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
           >
-            <Image
+            <DbImage
               src={images[0]}
               alt="post-0"
               fill
@@ -337,7 +337,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer bg-muted"
                 onClick={() => handleImageClick(i)}
               >
-                <Image
+                <DbImage
                   src={images[i]}
                   alt={`post-${i}`}
                   fill
@@ -360,7 +360,7 @@ export default function PostImage({
           className="relative flex-[6] cursor-pointer bg-muted"
           onClick={() => handleImageClick(0)}
         >
-          <Image
+          <DbImage
             src={images[0]}
             alt="post-0"
             fill
@@ -381,7 +381,7 @@ export default function PostImage({
                 className="relative flex-1 cursor-pointer overflow-hidden bg-muted h-[60px] md:h-[100px]"
                 onClick={() => handleImageClick(idx + 1)}
               >
-                <Image
+                <DbImage
                   src={img}
                   alt={`thumb-${idx}`}
                   fill
