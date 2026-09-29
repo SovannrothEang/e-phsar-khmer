@@ -32,6 +32,9 @@ import type {
 
 const PAGE_SIZE = 30;
 const MARK_READ_DEBOUNCE_MS = 700;
+const HISTORY_GC_MS = 30 * 60 * 1000;
+/** A delta right after a history fetch would return nothing new. */
+const DELTA_FRESH_MS = 5_000;
 
 /** Monotonic max over two ISO timestamps (read receipts). */
 function newerIso(a: string | null, b: string | null): string | null {
@@ -173,6 +176,9 @@ export function useChatThread({
     },
     getNextPageParam: (last) => last.meta.nextCursor,
     staleTime: Infinity,
+    // Switching threads remounts this hook; keep recently opened threads so
+    // switching back costs one small `after=` delta, not a full page.
+    gcTime: HISTORY_GC_MS,
   });
 
   // ── Delta poll ────────────────────────────────────────────────────────────
@@ -188,9 +194,25 @@ export function useChatThread({
     enabled: enabled && conversationId !== null && history.isSuccess,
     refetchInterval: wsConnected ? false : refetchInterval,
     refetchIntervalInBackground: false,
-    staleTime: 0,
+    // Seeded as fresh as the history it follows: a just-fetched history skips
+    // the redundant mount delta, while a thread restored from cache (older
+    // history) is stale and catches up once.
+    initialData: { messages: [], peerLastReadAt: null },
+    initialDataUpdatedAt: history.dataUpdatedAt,
+    staleTime: DELTA_FRESH_MS,
     gcTime: 0,
     queryFn: async () => {
+      // A remount restores history from cache without running its queryFn,
+      // so the refs start empty — seed them from the cached newest page or
+      // this delta would re-download a full page instead of `after=`.
+      const newest = history.data?.pages[0]?.meta;
+      if (watermarkRef.current === null && newest) {
+        watermarkRef.current = newest.latestCursor ?? null;
+        peerReadRef.current = newerIso(
+          peerReadRef.current,
+          newest.peerLastReadAt,
+        );
+      }
       const page = unwrap(
         await fetchMessages(conversationId as string, {
           // No watermark yet (brand-new or empty thread) → fall back to
@@ -226,8 +248,13 @@ export function useChatThread({
       ? () => void refetchDelta()
       : null;
   }, [history.isSuccess, refetchDelta]);
+  // Catch up only on a real (re)connect. The mount case is already covered
+  // by the delta's own staleness, so firing here too doubled every switch.
+  const wasConnectedRef = useRef(wsConnected);
   useEffect(() => {
-    if (wsConnected && history.isSuccess) void refetchDelta();
+    const reconnected = wsConnected && !wasConnectedRef.current;
+    wasConnectedRef.current = wsConnected;
+    if (reconnected && history.isSuccess) void refetchDelta();
   }, [wsConnected, history.isSuccess, refetchDelta]);
 
   const serverMessages = useMemo(() => {

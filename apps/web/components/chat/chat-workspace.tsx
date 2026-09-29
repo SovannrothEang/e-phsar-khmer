@@ -39,7 +39,11 @@ import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import { E2eBackupPanel } from "@/components/chat/e2e-backup-panel";
-import type { InboxItem, ListingContext } from "@/types/chat";
+import type {
+  ConversationWithUser,
+  InboxItem,
+  ListingContext,
+} from "@/types/chat";
 
 const SIDEBAR_COLLAPSED_KEY = "chat_sidebar_collapsed";
 
@@ -171,13 +175,27 @@ export function ChatWorkspace({
     enabled: viewer.isSuccess && selectedPeerId !== null,
     queryFn: async () =>
       unwrap(await fetchConversationWith(selectedPeerId as string)),
-    staleTime: 30 * 1000,
+    // Resolved on every thread switch, so a short staleTime meant one request
+    // per click. Block state rarely changes and a send 403 invalidates this.
+    staleTime: 5 * 60 * 1000,
   });
 
-  const handleSelect = useCallback((item: InboxItem) => {
-    if (!item.otherUser) return;
-    setSelectedPeerId(item.otherUser.id);
-  }, []);
+  const handleSelect = useCallback(
+    (item: InboxItem) => {
+      if (!item.otherUser) return;
+      // The inbox row is fresher than a cached `with` lookup (e.g. cached
+      // before the peer started this thread) — re-resolve only on mismatch.
+      const cached = queryClient.getQueryData<ConversationWithUser>(
+        chatKeys.with(item.otherUser.id),
+      );
+      if (cached && cached.conversation?.id !== item.id)
+        void queryClient.invalidateQueries({
+          queryKey: chatKeys.with(item.otherUser.id),
+        });
+      setSelectedPeerId(item.otherUser.id);
+    },
+    [queryClient],
+  );
 
   const handleBack = useCallback(() => setSelectedPeerId(null), []);
 

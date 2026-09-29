@@ -98,13 +98,19 @@ export function MessageThread({
         toast.error(t("errors.e2eUnavailable"));
         return;
       }
+      // Block state is cached (see `withPeer` in chat-workspace); a 403 means
+      // it changed, so re-resolve it to show the blocked banner.
+      if (status === 403)
+        void queryClient.invalidateQueries({
+          queryKey: chatKeys.with(peer.id),
+        });
       toast.error(
         status === 403
           ? t("composer.blockedError")
           : message || t("errors.sendFailed"),
       );
     },
-    [t],
+    [t, queryClient, peer.id],
   );
 
   const thread = useChatThread({
