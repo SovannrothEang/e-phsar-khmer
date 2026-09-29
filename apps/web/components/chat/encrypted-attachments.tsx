@@ -1,11 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, ImageOff, Loader2 } from "lucide-react";
+import { Download, FileText, ImageOff, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
 import { loadAttachment } from "@/lib/e2e/attachments/download";
+import { mediaFileName, saveBlob } from "@/lib/chat/save-file";
+import { toast } from "@/components/ui/sonner";
+
+/** Save decrypted bytes (cache first, else download → verify → decrypt). */
+async function downloadAttachment(
+  meta: AttachmentMeta,
+  failedMessage: string,
+): Promise<void> {
+  try {
+    const { bytes, mime } = await loadAttachment(meta);
+    const ok = await saveBlob(
+      new Blob([bytes], { type: mime }),
+      meta.name ?? mediaFileName(mime),
+    );
+    if (!ok) toast.error(failedMessage);
+  } catch {
+    toast.error(failedMessage);
+  }
+}
 
 type State =
   | { status: "loading" }
@@ -54,48 +73,66 @@ function EncryptedImage({
   const ratio = meta.w && meta.h ? meta.w / meta.h : 1;
 
   return (
-    <button
-      type="button"
-      disabled={state.status !== "ready"}
-      onClick={() => state.status === "ready" && onOpen?.(state.url)}
-      className={cn(
-        "relative block overflow-hidden rounded-2xl border border-border bg-muted",
-        single ? "w-52 sm:w-60" : "aspect-square w-full",
-      )}
-      style={single ? { aspectRatio: String(Math.min(Math.max(ratio, 0.6), 1.8)) } : undefined}
-    >
-      {state.status === "ready" ? (
-        // Blob URL of locally decrypted bytes — nothing for next/image to optimize.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={state.url}
-          alt={t("message.imageAlt")}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <>
-          {thumb && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumb}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full scale-110 object-cover blur-md"
-            />
-          )}
-          <span className="absolute inset-0 flex items-center justify-center">
-            {state.status === "loading" ? (
-              <Loader2 className="size-5 animate-spin text-white drop-shadow" />
-            ) : (
-              <ImageOff
-                aria-label={t("message.decryptFailed")}
-                className="size-5 text-muted-foreground"
+    <div className="group relative">
+      <button
+        type="button"
+        disabled={state.status !== "ready"}
+        onClick={() => state.status === "ready" && onOpen?.(state.url)}
+        className={cn(
+          "relative block overflow-hidden rounded-2xl border border-border bg-muted",
+          single ? "w-52 sm:w-60" : "aspect-square w-full",
+        )}
+        style={
+          single
+            ? { aspectRatio: String(Math.min(Math.max(ratio, 0.6), 1.8)) }
+            : undefined
+        }
+      >
+        {state.status === "ready" ? (
+          // Blob URL of locally decrypted bytes — nothing for next/image to optimize.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={state.url}
+            alt={t("message.imageAlt")}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <>
+            {thumb && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumb}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 h-full w-full scale-110 object-cover blur-md"
               />
             )}
-          </span>
-        </>
+            <span className="absolute inset-0 flex items-center justify-center">
+              {state.status === "loading" ? (
+                <Loader2 className="size-5 animate-spin text-white drop-shadow" />
+              ) : (
+                <ImageOff
+                  aria-label={t("message.decryptFailed")}
+                  className="size-5 text-muted-foreground"
+                />
+              )}
+            </span>
+          </>
+        )}
+      </button>
+      {state.status === "ready" && (
+        <button
+          type="button"
+          aria-label={t("message.download")}
+          onClick={() =>
+            void downloadAttachment(meta, t("message.downloadFailed"))
+          }
+          className="absolute right-1.5 bottom-1.5 rounded-full bg-black/55 p-1.5 text-white opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <Download className="size-3.5" />
+        </button>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -110,12 +147,12 @@ function EncryptedFile({ meta }: { meta: AttachmentMeta }) {
     setFailed(false);
     try {
       const { bytes, mime } = await loadAttachment(meta);
-      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = meta.name ?? "file";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setFailed(
+        !(await saveBlob(
+          new Blob([bytes], { type: mime }),
+          meta.name ?? mediaFileName(mime),
+        )),
+      );
     } catch {
       setFailed(true);
     } finally {

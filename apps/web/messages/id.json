@@ -103,7 +103,9 @@
       "retry": "Coba lagi",
       "decrypting": "Mendekripsi…",
       "decryptFailed": "Tidak dapat mendekripsi pesan ini.",
-      "notOnThisDevice": "Dikirim sebelum perangkat ini disiapkan — buka di perangkat Anda yang lain."
+      "notOnThisDevice": "Dikirim sebelum perangkat ini disiapkan — buka di perangkat Anda yang lain.",
+      "download": "Unduh",
+      "downloadFailed": "Tidak dapat menyimpan file"
     },
     "composer": {
       "placeholder": "Tulis pesan…",

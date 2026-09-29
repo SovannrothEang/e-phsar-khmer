@@ -103,7 +103,9 @@
       "retry": "Thử lại",
       "decrypting": "Đang giải mã…",
       "decryptFailed": "Không thể giải mã tin nhắn này.",
-      "notOnThisDevice": "Được gửi trước khi thiết bị này được thiết lập — hãy mở trên thiết bị khác của bạn."
+      "notOnThisDevice": "Được gửi trước khi thiết bị này được thiết lập — hãy mở trên thiết bị khác của bạn.",
+      "download": "Tải xuống",
+      "downloadFailed": "Không thể lưu tệp"
     },
     "composer": {
       "placeholder": "Nhập tin nhắn…",

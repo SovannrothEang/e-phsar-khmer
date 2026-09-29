@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
+  Download,
   Loader2,
   MessageSquareOff,
   ShieldAlert,
@@ -23,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { dayKey } from "@/lib/chat/format";
+import { saveFromUrl } from "@/lib/chat/save-file";
 import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
@@ -431,6 +433,23 @@ export function MessageThread({
                 className="object-contain"
                 unoptimized
               />
+            </div>
+          )}
+          {lightbox && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void saveFromUrl(lightbox).then(
+                    (ok) => ok || toast.error(t("message.downloadFailed")),
+                  )
+                }
+              >
+                <Download className="size-4" />
+                {t("message.download")}
+              </Button>
             </div>
           )}
         </DialogContent>

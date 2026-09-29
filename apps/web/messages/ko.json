@@ -103,7 +103,9 @@
       "retry": "다시 시도",
       "decrypting": "복호화 중…",
       "decryptFailed": "이 메시지를 복호화할 수 없습니다.",
-      "notOnThisDevice": "이 기기를 설정하기 전에 보낸 메시지입니다. 다른 기기에서 확인하세요."
+      "notOnThisDevice": "이 기기를 설정하기 전에 보낸 메시지입니다. 다른 기기에서 확인하세요.",
+      "download": "다운로드",
+      "downloadFailed": "파일을 저장할 수 없습니다"
     },
     "composer": {
       "placeholder": "메시지를 입력하세요…",

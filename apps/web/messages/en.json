@@ -103,7 +103,9 @@
       "retry": "Retry",
       "decrypting": "Decrypting…",
       "decryptFailed": "Couldn't decrypt this message.",
-      "notOnThisDevice": "Sent before this device was set up — open it on your other device."
+      "notOnThisDevice": "Sent before this device was set up — open it on your other device.",
+      "download": "Download",
+      "downloadFailed": "Couldn’t save the file"
     },
     "composer": {
       "placeholder": "Write a message…",
