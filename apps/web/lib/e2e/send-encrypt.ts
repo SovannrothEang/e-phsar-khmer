@@ -38,6 +38,11 @@ export interface E2eSendOptions {
   plaintext: string;
   listingId?: string;
   /**
+   * Encrypted attachments (already uploaded + completed) this message
+   * carries; their keys are inside `plaintext`. v2 only.
+   */
+  attachmentIds?: string[];
+  /**
    * Stable dedup key from the optimistic echo — pass through on every
    * retry so a lost HTTP response cannot insert twice.
    */
@@ -60,6 +65,9 @@ export async function sendE2eText(
   opts: E2eSendOptions,
 ): Promise<E2eSendOutcome> {
   if (!engine) return { ok: false, reason: "engine-unavailable" };
+  // Attachments exist only on the v2 path — never degrade them to v1.
+  if (opts.attachmentIds?.length && !(E2E_V2_ENABLED && engine.deviceId))
+    return { ok: false, reason: "engine-unavailable" };
   try {
     return E2E_V2_ENABLED && engine.deviceId
       ? await sendV2(engine, engine.deviceId, opts)
@@ -288,6 +296,9 @@ function sendV2(
         recipientId: opts.recipientId,
         body,
         e2e: { v: 2, senderDeviceId: myDeviceId, envelopes },
+        ...(opts.attachmentIds?.length
+          ? { attachmentIds: opts.attachmentIds }
+          : {}),
         listingId: opts.listingId,
         clientMessageId: opts.clientMessageId,
       });

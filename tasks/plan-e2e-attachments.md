@@ -1,6 +1,8 @@
 # Plan: E2E Attachments (encrypted images/files, private bucket, signed URLs)
 
-**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2–P4 not started.
+**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2 (web send) + P3 (web receive) done 2026-09-29, not yet browser-tested end to end. P4 (cleanup schedule, docs) not started.
+
+**Deviations:** inbox uses `lastMessage.attachments` (already on every message read) instead of a separate `attachmentCount`. The web crypto round trip was checked with a throwaway Node script (8 checks: size, header, round trip, tampered byte, wrong attachment id, unknown version, forged hash + tampered tag, fresh key/IV), not vitest.
 
 **Verified against real storage (2026-09-29):** octet-stream upload 200; `info(path)` returns the real size (1234 → 1234); `text/html` upload refused (415 `invalid_mime_type`); public URL refused (400); signed download 200; `info` on a missing object → `data: null` + error.
 **Depends on:** E2E v2 multi-device (`tasks/plan-e2e-multi-device.md`). Attachments ship on the v2 send path only.

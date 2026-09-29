@@ -4,6 +4,8 @@
  * ISO strings they arrive as over JSON.
  */
 
+import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
+
 export type ListingStatus = "draft" | "active" | "expired" | "deleted";
 
 export interface ChatUserSummary {
@@ -58,7 +60,17 @@ export interface ChatMessage {
   senderDeviceId?: string | null;
   /** v2 only: the content key wrapped once per recipient device. */
   envelopes?: E2eEnvelope[];
+  /**
+   * v2 only, when the message carries encrypted files. Keys, MIME types and
+   * previews are inside the decrypted body (lib/e2e/attachments/content.ts).
+   */
+  attachments?: MessageAttachment[];
   listing?: ListingContext | null;
+}
+
+export interface MessageAttachment {
+  id: string;
+  kind: "image" | "file";
 }
 
 /** v2: the message content key, ratchet-encrypted for one device. */
@@ -126,6 +138,8 @@ export interface SendMessageInput {
   /** v1: the identity key the session was built against (server 409s if it changed). */
   recipientIdentityKey?: string;
   e2e?: E2eV2Payload;
+  /** Encrypted attachments carried by a v2 message (see actions/chat-attachments.ts). */
+  attachmentIds?: string[];
   /**
    * Stable client-minted dedup key. Mint once per logical send (optimistic
    * echo / draft) and reuse on every retry so a lost response or double-tap
@@ -162,6 +176,11 @@ export type ChatActionResult<T> =
  * on screen with a retry affordance instead of silently dropping it.
  */
 export interface ThreadMessage extends ChatMessage {
+  /**
+   * Decrypted file metadata of an encrypted-attachment message, parsed from
+   * its plaintext by the thread (the bubble renders `body` as the caption).
+   */
+  e2eFiles?: AttachmentMeta[];
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */

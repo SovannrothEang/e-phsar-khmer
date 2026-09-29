@@ -23,6 +23,16 @@ import {
 } from "@/lib/chat-draft-images";
 import { getE2eEngine } from "@/lib/e2e/engine-provider";
 import { sendE2eText } from "@/lib/e2e/send-encrypt";
+import type { E2eSendOutcome } from "@/lib/e2e/send-encrypt";
+import { E2E_ATTACHMENTS_ENABLED } from "@/lib/e2e/config";
+import {
+  contentFor,
+  createImageOutboxEntry,
+  sendOutboxEntry,
+} from "@/lib/e2e/attachments/send";
+import type { AttachmentSendOutcome } from "@/lib/e2e/attachments/send";
+import { getOutbox, listOutbox } from "@/lib/e2e/attachments/store";
+import type { OutboxEntry } from "@/lib/e2e/attachments/store";
 import type {
   ChatMessage,
   MessagePage,
@@ -54,6 +64,37 @@ function advanceWatermark(
   next: string | null,
 ): string | null {
   return next ?? current;
+}
+
+/** Optimistic bubble for an encrypted-attachment send (rendered from `body`). */
+function outboxEcho(
+  entry: OutboxEntry,
+  tempId: string,
+  senderId: string,
+  pending: boolean,
+): ThreadMessage {
+  return {
+    id: tempId,
+    tempId,
+    clientMessageId: entry.clientMessageId,
+    conversationId: entry.conversationId ?? "",
+    senderId,
+    body: contentFor(entry),
+    attachments: entry.attachments.map((a) => ({
+      id: a.meta.id,
+      kind: a.meta.kind,
+    })),
+    listingId: entry.listingId ?? null,
+    imageUrl: null,
+    imagePath: null,
+    groupId: null,
+    readAt: null,
+    createdAt: new Date(entry.createdAt).toISOString(),
+    isE2e: false,
+    e2eHeader: null,
+    pending,
+    failed: !pending,
+  };
 }
 
 export interface SendDraft {
@@ -313,12 +354,113 @@ export function useChatThread({
   }, [ackCandidateId, conversationId, queryClient]);
 
   // ── Send ──────────────────────────────────────────────────────────────────
+  const markFailed = useCallback((tempId: string) => {
+    setLocal((prev) =>
+      prev.map((m) =>
+        m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
+      ),
+    );
+  }, []);
+
+  const reportE2eFailure = useCallback(
+    (outcome: Exclude<E2eSendOutcome | AttachmentSendOutcome, { ok: true }>) => {
+      if (outcome.reason === "no-recipient-keys")
+        onSendError?.("E2E_NO_KEYS", 404);
+      else if (outcome.reason === "send-failed")
+        onSendError?.(outcome.message, outcome.status);
+      else if (outcome.reason === "upload-failed")
+        onSendError?.("Image upload failed", outcome.status);
+      else onSendError?.("E2E_UNAVAILABLE", 0);
+    },
+    [onSendError],
+  );
+
+  /**
+   * Encrypted-attachment send: upload what's left, then one E2E message.
+   * The outbox entry survives failures, so retry/reload resume it with the
+   * same ids (lib/e2e/attachments/send.ts).
+   */
+  const dispatchOutbox = useCallback(
+    async (entry: OutboxEntry, tempId: string, draftKeys: string[] = []) => {
+      if (!viewerId) return;
+      setIsSending(true);
+      const engine = await getE2eEngine(viewerId).catch(() => null);
+      const outcome = await sendOutboxEntry(engine, entry, {
+        senderId: viewerId,
+        send: sendChatMessage,
+      });
+      setIsSending(false);
+      if (!outcome.ok) {
+        markFailed(tempId);
+        reportE2eFailure(outcome);
+        return;
+      }
+      for (const key of draftKeys) removeDraftImage(key);
+      // Same reason as text sends: show the known plaintext, not ciphertext.
+      setLocal((prev) => [
+        ...prev.filter((m) => m.tempId !== tempId),
+        {
+          ...outcome.result.message,
+          body: contentFor(entry),
+          pending: false,
+          failed: false,
+        },
+      ]);
+      if (conversationId === null)
+        onConversationCreated?.(outcome.result.conversationId);
+      onMutated?.();
+    },
+    [
+      viewerId,
+      conversationId,
+      markFailed,
+      reportE2eFailure,
+      onConversationCreated,
+      onMutated,
+    ],
+  );
+
   const dispatch = useCallback(
     async (draft: SendDraft, tempId: string, clientMessageId: string) => {
       if (!recipientId || !viewerId) return;
-      setIsSending(true);
+
+      // A retry of an encrypted-attachment send resumes its outbox entry.
+      const saved = await getOutbox(clientMessageId).catch(() => null);
+      if (saved) return dispatchOutbox(saved, tempId);
 
       const draftKeys = draft.draftKeys ?? [];
+      if (draftKeys.length > 0 && E2E_ATTACHMENTS_ENABLED) {
+        const engine = await getE2eEngine(viewerId).catch(() => null);
+        if (engine?.deviceId) {
+          setIsSending(true);
+          let entry: OutboxEntry;
+          try {
+            entry = await createImageOutboxEntry({
+              clientMessageId,
+              recipientId,
+              conversationId,
+              listingId: draft.listingId,
+              text: draft.body,
+              files: draftKeys
+                .map((k) => getDraftFile(k))
+                .filter((f): f is File => f !== null),
+            });
+          } catch (err) {
+            setIsSending(false);
+            markFailed(tempId);
+            onSendError?.(
+              err instanceof Error ? err.message : "Image upload failed",
+              0,
+            );
+            return;
+          }
+          return dispatchOutbox(entry, tempId, draftKeys);
+        }
+        // No v2 device (flag off / bootstrap failed): legacy image send below.
+      }
+
+      setIsSending(true);
+
       const imageCount = draftKeys.length;
       const hasBody = !!draft.body;
 
@@ -445,8 +587,31 @@ export function useChatThread({
       onConversationCreated,
       onMutated,
       onSendError,
+      dispatchOutbox,
+      markFailed,
     ],
   );
+
+  // Resume encrypted-attachment sends interrupted by a reload or crash, once
+  // per thread mount. Same ids → the server dedups anything already done.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (!recipientId || !viewerId || resumedRef.current) return;
+    resumedRef.current = true;
+    void listOutbox(recipientId)
+      .then((entries) => {
+        for (const entry of entries) {
+          const tempId = `temp-outbox-${entry.clientMessageId}`;
+          setLocal((prev) =>
+            prev.some((m) => m.tempId === tempId)
+              ? prev
+              : [...prev, outboxEcho(entry, tempId, viewerId, true)],
+          );
+          void dispatchOutbox(entry, tempId);
+        }
+      })
+      .catch(() => undefined);
+  }, [recipientId, viewerId, dispatchOutbox]);
 
   const send = useCallback(
     (draft: SendDraft) => {

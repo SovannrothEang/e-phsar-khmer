@@ -27,6 +27,7 @@ import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useDecryptedMessages } from "@/hooks/use-decrypted-messages";
+import { parseAttachmentContent } from "@/lib/e2e/attachments/content";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -37,6 +38,19 @@ import type {
   ListingContext,
   ThreadMessage,
 } from "@/types/chat";
+
+/**
+ * An encrypted-attachment message's plaintext is JSON (caption + per-file
+ * keys); split it into the caption `body` and `e2eFiles` for the bubble.
+ * Only messages the server lists `attachments` on are parsed.
+ */
+function withFiles(m: ThreadMessage, plaintext: string | null): ThreadMessage {
+  if (!m.attachments?.length || plaintext === null)
+    return plaintext === m.body ? m : { ...m, body: plaintext };
+  const content = parseAttachmentContent(plaintext);
+  if (!content) return { ...m, body: null };
+  return { ...m, body: content.text ?? null, e2eFiles: content.attachments };
+}
 
 export function MessageThread({
   conversationId,
@@ -144,13 +158,13 @@ export function MessageThread({
   const decrypted = useDecryptedMessages(messages, e2eEngine);
 
   const displayMessages = useMemo<ThreadMessage[]>(() => {
-    if (!messages.some((m) => m.isE2e)) return messages;
+    if (!messages.some((m) => m.isE2e || m.attachments?.length))
+      return messages;
     return messages.map((m) => {
-      if (!m.isE2e) return m;
       // Local optimistic / failed rows already hold the user's plaintext.
-      if (m.tempId) return m;
+      if (m.tempId || !m.isE2e) return withFiles(m, m.body);
       const outcome = decrypted.get(m.id);
-      if (outcome?.status === "ok") return { ...m, body: outcome.plaintext };
+      if (outcome?.status === "ok") return withFiles(m, outcome.plaintext);
       if (outcome?.status === "unavailable")
         return { ...m, body: t("message.notOnThisDevice") };
       if (outcome?.status === "failed")

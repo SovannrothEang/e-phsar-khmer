@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { isReadByPeer } from "@/lib/chat/format";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
+import { EncryptedAttachments } from "@/components/chat/encrypted-attachments";
 import type { ThreadMessage } from "@/types/chat";
 
 export function MessageBubble({
@@ -84,6 +85,13 @@ export function MessageBubble({
               unoptimized
             />
           </button>
+        )}
+
+        {message.e2eFiles && message.e2eFiles.length > 0 && (
+          <EncryptedAttachments
+            files={message.e2eFiles}
+            onOpenImage={onOpenImage}
+          />
         )}
 
         {message.body && (
