@@ -43,15 +43,32 @@ export function useDecryptedMessages(
     if (pending.length === 0) return;
     pending.forEach((m) => dispatchedRef.current.add(m.id));
 
+    // Outcomes are committed in ONE state update per batch, not one per
+    // message, so the thread reveals a page of history all at once instead
+    // of bubble by bubble. An outcome is keyed by message id, so it stays
+    // valid even if the list changed while we waited — always commit it.
+    const batch = new Map<string, DecryptOutcome>();
+    const commit = () => {
+      if (batch.size === 0) return;
+      const done = new Map(batch);
+      batch.clear();
+      setResults((prev) => {
+        const next = new Map(prev);
+        for (const [id, outcome] of done) next.set(id, outcome);
+        return next;
+      });
+    };
+
     // Cleanup (the message list changed, or the engine did) stops the loop,
     // but the ids it never reached were already marked dispatched — hand them
-    // back, or the next run skips them and they sit on "Decrypting…" forever.
+    // back, or the next run skips them and they are never decrypted.
     let cancelled = false;
     void (async () => {
       for (const [i, message] of pending.entries()) {
         if (cancelled) {
           for (const rest of pending.slice(i))
             dispatchedRef.current.delete(rest.id);
+          commit();
           return;
         }
         const outcome = await decryptMessage(engine, store, {
@@ -64,14 +81,9 @@ export function useDecryptedMessages(
           senderDeviceId: message.senderDeviceId,
           envelopes: message.envelopes,
         });
-        // An outcome is keyed by message id, so it stays valid even if the
-        // list changed while we waited — always record it.
-        setResults((prev) => {
-          const next = new Map(prev);
-          next.set(message.id, outcome);
-          return next;
-        });
+        batch.set(message.id, outcome);
       }
+      commit();
     })();
 
     return () => {

@@ -29,6 +29,7 @@ import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useDecryptedMessages } from "@/hooks/use-decrypted-messages";
+import { isDecryptable } from "@/lib/e2e/decrypt-message";
 import { parseAttachmentContent } from "@/lib/e2e/attachments/content";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
@@ -40,6 +41,9 @@ import type {
   ListingContext,
   ThreadMessage,
 } from "@/types/chat";
+
+/** How long the opening loading block may wait on decryption. */
+const DECRYPT_REVEAL_TIMEOUT_MS = 10_000;
 
 /**
  * An encrypted-attachment message's plaintext is JSON (caption + per-file
@@ -159,28 +163,62 @@ export function MessageThread({
   const e2eEngine = useE2eEngine(viewerId);
   const decrypted = useDecryptedMessages(messages, e2eEngine);
 
+  // Server E2E rows with no decrypt outcome yet (engine bootstrapping, or
+  // the batch is still running).
+  const hasUndecrypted = messages.some(
+    (m) => !m.tempId && isDecryptable(m) && !decrypted.has(m.id),
+  );
+
+  // The thread opens behind one loading block until its first page is fully
+  // decrypted, then reveals everything at once — never a wall of per-bubble
+  // "Decrypting…". Latched per mount (the thread remounts per conversation).
+  // The timeout is the escape hatch for an engine that never comes up
+  // (useE2eEngine stays null on bootstrap failure): the thread then opens
+  // with per-bubble placeholders rather than a spinner forever.
+  const [decryptTimedOut, setDecryptTimedOut] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const initialDecryptDone = !isLoading && !hasUndecrypted;
+  if (!revealed && (initialDecryptDone || decryptTimedOut)) setRevealed(true);
+
+  useEffect(() => {
+    if (revealed) return;
+    const timer = setTimeout(
+      () => setDecryptTimedOut(true),
+      DECRYPT_REVEAL_TIMEOUT_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [revealed]);
+
   const displayMessages = useMemo<ThreadMessage[]>(() => {
     if (!messages.some((m) => m.isE2e || m.attachments?.length))
       return messages;
-    return messages.map((m) => {
+    const out: ThreadMessage[] = [];
+    for (const m of messages) {
       // Local optimistic / failed rows already hold the user's plaintext.
-      if (m.tempId || !m.isE2e) return withFiles(m, m.body);
+      if (m.tempId || !m.isE2e) {
+        out.push(withFiles(m, m.body));
+        continue;
+      }
       const outcome = decrypted.get(m.id);
-      if (outcome?.status === "ok") return withFiles(m, outcome.plaintext);
-      if (outcome?.status === "unavailable")
-        return { ...m, body: t("message.notOnThisDevice") };
-      if (outcome?.status === "failed")
-        return { ...m, body: t("message.decryptFailed") };
-      // Pending decrypt (or engine not ready): hide ciphertext behind a
-      // stable placeholder so bubble layout doesn't jump when it lands.
-      return { ...m, body: t("message.decrypting") };
-    });
-  }, [messages, decrypted, t]);
+      if (outcome?.status === "ok") out.push(withFiles(m, outcome.plaintext));
+      else if (outcome?.status === "unavailable")
+        out.push({ ...m, body: t("message.notOnThisDevice") });
+      else if (outcome?.status === "failed")
+        out.push({ ...m, body: t("message.decryptFailed") });
+      // Still decrypting. With a live engine, hold the row back — a new
+      // message or an older page appears once decrypted (milliseconds).
+      // Without one (bootstrap failed / timed out), show a neutral
+      // placeholder — never the raw ciphertext.
+      else if (!e2eEngine) out.push({ ...m, body: t("message.decrypting") });
+    }
+    return out;
+  }, [messages, decrypted, e2eEngine, t]);
 
   // ── Scroll management ─────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const restoreOffsetRef = useRef<number | null>(null);
+  const shownCountRef = useRef(0);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -200,13 +238,18 @@ export function MessageThread({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    // An older page is held back until decrypted, so only consume the anchor
+    // once rows were actually added — not when the raw page merely arrived.
+    const grew = displayMessages.length > shownCountRef.current;
+    shownCountRef.current = displayMessages.length;
     if (restoreOffsetRef.current !== null) {
+      if (!grew) return;
       el.scrollTop = el.scrollHeight - restoreOffsetRef.current;
       restoreOffsetRef.current = null;
       return;
     }
     if (atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [displayMessages]);
+  }, [displayMessages, revealed]);
 
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
@@ -305,6 +348,14 @@ export function MessageThread({
       >
         {isLoading ? (
           <ThreadSkeleton />
+        ) : !revealed ? (
+          <div
+            role="status"
+            className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground"
+          >
+            <Loader2 className="size-6 animate-spin" />
+            <p className="text-xs">{t("message.decrypting")}</p>
+          </div>
         ) : (
           <>
             {hasOlder && (
@@ -325,7 +376,7 @@ export function MessageThread({
               </div>
             )}
 
-            {displayMessages.length === 0 && (
+            {messages.length === 0 && (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
                 {listing !== undefined && showListingAttachment && (
                   <div className="flex flex-col items-center gap-1.5">
