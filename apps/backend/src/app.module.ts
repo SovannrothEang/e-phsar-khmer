@@ -63,8 +63,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
         connection: {
           host: configService.get<string>('queue.host') ?? 'localhost',
           port: configService.get<number>('queue.port') ?? 6379,
+          username: configService.get<string>('queue.username'),
           password: configService.get<string>('queue.password'),
           db: configService.get<number>('queue.db') ?? 0,
+          tls: configService.get<boolean>('queue.tls') ? {} : undefined,
         },
         prefix: configService.get<string>('queue.prefix') ?? 'psa',
       }),
