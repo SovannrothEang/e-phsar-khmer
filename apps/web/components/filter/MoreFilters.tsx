@@ -13,70 +13,49 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { locations } from "@/lib/location";
 import {
-  SORT_PARAM,
-  SORT_OPTIONS,
+  CONDITION_OPTIONS,
+  CONDITION_PARAM,
+  DATE_OPTIONS,
+  DATE_PARAM,
   DEFAULT_SORT,
-  type SortValue,
-} from "@/components/filter/SortFilter";
-import {
-  MIN_AD_PRICE_PARAM,
-  MAX_AD_PRICE_PARAM,
-} from "@/components/filter/PriceFilter";
-import {
-  LOCATION_PRO_PARAM,
-  LOCATION_DIS_PARAM,
+  DELIVERY_PARAM,
+  FILTER_PARAMS,
   LOCATION_COM_PARAM,
-} from "@/components/filter/LocationSelectorFilter";
-import type { Post } from "@/lib/posts";
+  LOCATION_DIS_PARAM,
+  LOCATION_PRO_PARAM,
+  MAX_AD_PRICE_PARAM,
+  MIN_AD_PRICE_PARAM,
+  Q_PARAM,
+  SORT_OPTIONS,
+  SORT_PARAM,
+  normalizeQuery,
+  parseSortParam,
+  type DateValue,
+  type SortValue,
+} from "@/lib/search-params";
+import { useCommunes, useDistricts, useProvinces } from "./use-locations";
 import { IconFilterCog } from "@tabler/icons-react";
 
-// ─── Shared param keys (imported by AllAdsHeader) ─────────────────────────────
-export const KEYWORD_PARAM = "keyword";
-export const DATE_PARAM = "date";
-
-// ─── Date options ─────────────────────────────────────────────────────────────
-export const DATE_OPTIONS = [
-  { value: "", label: "All Time" },
-  { value: "today", label: "Today" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-] as const;
-export type DateValue = (typeof DATE_OPTIONS)[number]["value"];
-
-// ─── Post filter helpers ──────────────────────────────────────────────────────
-export function filterPostsByKeyword(posts: Post[], keyword: string): Post[] {
-  if (!keyword.trim()) return posts;
-  const q = keyword.toLowerCase();
-  return posts.filter((p) => p.title.toLowerCase().includes(q));
-}
-
-export function filterPostsByDate(posts: Post[], date: DateValue): Post[] {
-  if (!date) return posts;
-  const start = new Date();
-  if (date === "today") {
-    start.setHours(0, 0, 0, 0);
-  } else if (date === "week") {
-    start.setDate(start.getDate() - 7);
-    start.setHours(0, 0, 0, 0);
-  } else if (date === "month") {
-    start.setDate(start.getDate() - 30);
-    start.setHours(0, 0, 0, 0);
-  }
-  return posts.filter((p) => p.createdat >= start);
-}
+// The keyword is the same `q` the header search bar writes — one keyword
+// param everywhere. Re-exported for existing importers.
+export const KEYWORD_PARAM = Q_PARAM;
+export { DATE_PARAM, DATE_OPTIONS };
+export type { DateValue };
 
 // ─── Active filter badge count ────────────────────────────────────────────────
 function countActiveFilters(params: URLSearchParams): number {
   let n = 0;
-  if (params.get(KEYWORD_PARAM)) n++;
+  if (params.get(Q_PARAM)) n++;
   if (params.get(DATE_PARAM)) n++;
   if (params.get(LOCATION_PRO_PARAM)) n++;
   if (params.get(SORT_PARAM) && params.get(SORT_PARAM) !== DEFAULT_SORT) n++;
   if (params.get(MIN_AD_PRICE_PARAM)) n++;
   if (params.get(MAX_AD_PRICE_PARAM)) n++;
+  if (params.get(CONDITION_PARAM)) n++;
+  if (params.get(DELIVERY_PARAM)) n++;
   return n;
 }
 
@@ -154,41 +133,35 @@ export default function MoreFilters() {
   const [comId, setComId] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [condition, setCondition] = useState("");
+  const [delivery, setDelivery] = useState(false);
 
   // Sync draft from URL whenever dialog opens
   useEffect(() => {
     if (!open) return;
     // Sync draft from URL each time the dialog opens.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setKeyword(searchParams.get(KEYWORD_PARAM) ?? "");
-    setSort((searchParams.get(SORT_PARAM) as SortValue) ?? DEFAULT_SORT);
+    setKeyword(searchParams.get(Q_PARAM) ?? "");
+    setSort(parseSortParam(searchParams.get(SORT_PARAM)));
     setDate((searchParams.get(DATE_PARAM) as DateValue) ?? "");
     setProId(searchParams.get(LOCATION_PRO_PARAM) ?? "");
     setDisId(searchParams.get(LOCATION_DIS_PARAM) ?? "");
     setComId(searchParams.get(LOCATION_COM_PARAM) ?? "");
     setMinPrice(searchParams.get(MIN_AD_PRICE_PARAM) ?? "");
     setMaxPrice(searchParams.get(MAX_AD_PRICE_PARAM) ?? "");
+    setCondition(searchParams.get(CONDITION_PARAM) ?? "");
+    setDelivery(searchParams.get(DELIVERY_PARAM) === "1");
   }, [open, searchParams]);
 
   // ── Location cascade options ─────────────────────────────────────────────
-  const provinceOptions = locations.map((p) => ({
-    value: p.proId,
-    label: p.name,
-  }));
-
-  const selectedProvince = locations.find((p) => p.proId === proId);
-  const districtOptions = (selectedProvince?.districts ?? []).map((d) => ({
-    value: d.disId,
-    label: d.name,
-  }));
-
-  const selectedDistrict = selectedProvince?.districts.find(
-    (d) => d.disId === disId,
+  // Real geography; the values are the slugs the URL and backend use.
+  const toOptions = (rows: { slug: string; name: string }[] | undefined) =>
+    (rows ?? []).map((r) => ({ value: r.slug, label: r.name }));
+  const provinceOptions = toOptions(useProvinces(open).data);
+  const districtOptions = toOptions(useDistricts(open ? proId : null).data);
+  const communeOptions = toOptions(
+    useCommunes(open ? proId : null, open ? disId : null).data,
   );
-  const communeOptions = (selectedDistrict?.communes ?? []).map((c) => ({
-    value: c.comId,
-    label: c.name,
-  }));
 
   const handleProvinceChange = (v: string) => {
     setProId(v);
@@ -206,7 +179,7 @@ export default function MoreFilters() {
     const set = (key: string, val: string) =>
       val.trim() ? params.set(key, val.trim()) : params.delete(key);
 
-    set(KEYWORD_PARAM, keyword);
+    set(Q_PARAM, normalizeQuery(keyword));
     set(DATE_PARAM, date);
     if (sort === DEFAULT_SORT) {
       params.delete(SORT_PARAM);
@@ -218,6 +191,8 @@ export default function MoreFilters() {
     set(LOCATION_COM_PARAM, comId);
     set(MIN_AD_PRICE_PARAM, minPrice);
     set(MAX_AD_PRICE_PARAM, maxPrice);
+    set(CONDITION_PARAM, condition);
+    set(DELIVERY_PARAM, delivery ? "1" : "");
 
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
@@ -236,7 +211,16 @@ export default function MoreFilters() {
     setComId("");
     setMinPrice("");
     setMaxPrice("");
-    router.replace(pathname, { scroll: false });
+    setCondition("");
+    setDelivery(false);
+    // Only the filter params — a subcategory page's brand/type drill-down and
+    // the search page's category stay put.
+    const params = new URLSearchParams(searchParams.toString());
+    for (const key of FILTER_PARAMS) params.delete(key);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
     setOpen(false);
   };
   const activeCount = countActiveFilters(searchParams);
@@ -346,6 +330,22 @@ export default function MoreFilters() {
               }
             />
           </div>
+          {/* Condition */}
+          <SelectField
+            label="Condition"
+            value={condition}
+            onChange={setCondition}
+            options={CONDITION_OPTIONS.map((o) => ({
+              value: o.value,
+              label: o.label,
+            }))}
+            placeholder="Any"
+          />
+          {/* Free delivery */}
+          <label className="flex items-center justify-between gap-3 text-sm font-medium text-foreground cursor-pointer">
+            Free delivery only
+            <Switch checked={delivery} onCheckedChange={setDelivery} />
+          </label>
           {/* Price */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground ">

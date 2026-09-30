@@ -180,5 +180,27 @@
       "setDescription": "Ít nhất {count} ký tự. Bạn cần nó để đọc trò chuyện trên thiết bị mới. Chúng tôi không thể khôi phục giúp bạn.",
       "save": "Lưu mã khóa"
     }
+  },
+  "Search": {
+    "home": "Home",
+    "search": "Search",
+    "placeholder": "What are you looking for...",
+    "allCategoriesOption": "All Categories",
+    "resultsFor": "Results for “{q}”",
+    "allAds": "All ads",
+    "resultCount": "{count, plural, =0 {No ads} one {# ad} other {# ads}}",
+    "categories": "Categories",
+    "allCategories": "All categories",
+    "removeFilter": "Remove {name}",
+    "loadMore": "Load more",
+    "loading": "Loading…",
+    "loadMoreError": "Couldn’t load more ads. Try again.",
+    "emptyTitle": "No ads match “{q}”",
+    "emptyTitleNoQuery": "No ads match these filters",
+    "emptyHint": "Try a different keyword or fewer filters.",
+    "clearFilters": "Clear filters",
+    "clearSearch": "Clear search",
+    "metaTitle": "{q} – Search",
+    "metaTitleAll": "Search ads"
   }
 }

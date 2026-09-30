@@ -9,63 +9,48 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { locations, Province, District, Commune } from "@/lib/location";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Post } from "@/lib/posts";
-// ─── URL param keys ────────────────────────────────────────────────────────────
-export const LOCATION_PRO_PARAM = "loc_pro";
-export const LOCATION_DIS_PARAM = "loc_dis";
-export const LOCATION_COM_PARAM = "loc_com";
-// ─── Post filter helper (same pattern as filterPostsByPrice) ──────────────────
-export function filterPostsByLocation(
-  posts: Post[],
-  proId?: string,
-  disId?: string,
-): Post[] {
-  if (!proId && !disId) return posts;
-  return posts.filter((post) => {
-    if (proId && post.proId !== proId) return false;
-    if (disId && post.disId !== disId) return false;
-    return true;
-  });
-}
+import {
+  LOCATION_COM_PARAM,
+  LOCATION_DIS_PARAM,
+  LOCATION_PRO_PARAM,
+} from "@/lib/search-params";
+import {
+  type Place,
+  slugLabel,
+  useCommunes,
+  useDistricts,
+  useProvinces,
+} from "./use-locations";
+
+// Re-exported for existing importers; the source of truth is lib/search-params.
+export { LOCATION_PRO_PARAM, LOCATION_DIS_PARAM, LOCATION_COM_PARAM };
+
 // ─── Step types ────────────────────────────────────────────────────────────────
 type Step = "province" | "district" | "commune";
+/** A chosen place: the slug is what the URL carries, the name what we show. */
+interface Pick {
+  slug: string;
+  name: string;
+}
 interface Selection {
-  province: Province | null;
-  district: District | null;
-  commune: Commune | null;
+  province: Pick | null;
+  district: Pick | null;
+  commune: Pick | null;
 }
-// ─── Resolve a Selection from URL params ──────────────────────────────────────
-function resolveSelectionFromParams(
-  proId: string | null,
-  disId: string | null,
-  comId: string | null,
-): Selection {
-  const province = proId
-    ? (locations.find((p) => p.proId === proId) ?? null)
-    : null;
-  const district =
-    province && disId
-      ? (province.districts.find((d) => d.disId === disId) ?? null)
-      : null;
-  const commune =
-    district && comId
-      ? (district.communes.find((c) => c.comId === comId) ?? null)
-      : null;
-  return { province, district, commune };
-}
-// ─── Label builder ─────────────────────────────────────────────────────────────
-function buildLabel(selection: Selection, placeholder: string): string {
-  if (selection.commune) return selection.commune.name;
-  if (selection.district) return selection.district.name;
-  if (selection.province) return selection.province.name;
-  return placeholder;
-}
+const EMPTY: Selection = { province: null, district: null, commune: null };
+const pick = (p: Place): Pick => ({ slug: p.slug, name: p.name });
+
 // ─── Component ────────────────────────────────────────────────────────────────
 interface LocationSelectorProps {
   placeholder?: string;
 }
+/**
+ * Province → district → commune drill-down over the real geography
+ * (`GET /locations/...`). The URL carries slugs (`loc_pro`/`loc_dis`/`loc_com`)
+ * — the same slugs the feed's `provinceSlug`/`districtSlug`/`communeSlug`
+ * filters resolve.
+ */
 export function LocationSelectorFilter({
   placeholder = "Location",
 }: LocationSelectorProps) {
@@ -73,17 +58,45 @@ export function LocationSelectorFilter({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const proParam = searchParams.get(LOCATION_PRO_PARAM);
-  const disParam = searchParams.get(LOCATION_DIS_PARAM);
-  const comParam = searchParams.get(LOCATION_COM_PARAM);
-  // Derive current selection directly from URL params — single source of truth
-  const selection = React.useMemo(
-    () => resolveSelectionFromParams(proParam, disParam, comParam),
-    [proParam, disParam, comParam],
-  );
+  const disParam = proParam ? searchParams.get(LOCATION_DIS_PARAM) : null;
+  const comParam = disParam ? searchParams.get(LOCATION_COM_PARAM) : null;
+
   const [open, setOpen] = React.useState(false);
   const [step, setStep] = React.useState<Step>("province");
   // Local draft while the user is navigating the drill-down (before they commit)
-  const [draft, setDraft] = React.useState<Selection>(selection);
+  const [draft, setDraft] = React.useState<Selection>(EMPTY);
+
+  // Names for the committed selection's label (cached, so usually instant).
+  const provinces = useProvinces(open || !!proParam);
+  const committedDistricts = useDistricts(disParam ? proParam : null);
+  const committedCommunes = useCommunes(
+    comParam ? proParam : null,
+    comParam ? disParam : null,
+  );
+  // Lists for the step being browsed.
+  const draftDistricts = useDistricts(
+    open && step !== "province" ? draft.province?.slug : null,
+  );
+  const draftCommunes = useCommunes(
+    open && step === "commune" ? draft.province?.slug : null,
+    open && step === "commune" ? draft.district?.slug : null,
+  );
+
+  const nameOf = (list: Place[] | undefined, slug: string) =>
+    list?.find((p) => p.slug === slug)?.name ?? slugLabel(slug);
+
+  const selection: Selection = {
+    province: proParam
+      ? { slug: proParam, name: nameOf(provinces.data, proParam) }
+      : null,
+    district: disParam
+      ? { slug: disParam, name: nameOf(committedDistricts.data, disParam) }
+      : null,
+    commune: comParam
+      ? { slug: comParam, name: nameOf(committedCommunes.data, comParam) }
+      : null,
+  };
+
   // Sync draft when popover opens so it reflects the current URL state
   const handleOpenChange = (o: boolean) => {
     setOpen(o);
@@ -95,45 +108,27 @@ export function LocationSelectorFilter({
   // ── Write to URL ─────────────────────────────────────────────────────────────
   function pushLocation(sel: Selection) {
     const params = new URLSearchParams(searchParams.toString());
-    if (sel.province) {
-      params.set(LOCATION_PRO_PARAM, sel.province.proId);
-    } else {
-      params.delete(LOCATION_PRO_PARAM);
-    }
-    if (sel.district) {
-      params.set(LOCATION_DIS_PARAM, sel.district.disId);
-    } else {
-      params.delete(LOCATION_DIS_PARAM);
-    }
-    if (sel.commune) {
-      params.set(LOCATION_COM_PARAM, sel.commune.comId);
-    } else {
-      params.delete(LOCATION_COM_PARAM);
-    }
+    const put = (key: string, p: Pick | null) =>
+      p ? params.set(key, p.slug) : params.delete(key);
+    put(LOCATION_PRO_PARAM, sel.province);
+    put(LOCATION_DIS_PARAM, sel.district);
+    put(LOCATION_COM_PARAM, sel.commune);
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
     });
   }
   // ── Step handlers ─────────────────────────────────────────────────────────────
-  const selectProvince = (province: Province) => {
-    const next: Selection = { province, district: null, commune: null };
-    setDraft(next);
+  const selectProvince = (province: Place) => {
+    setDraft({ province: pick(province), district: null, commune: null });
     setStep("district");
   };
-  const selectDistrict = (district: District) => {
-    const next: Selection = { ...draft, district, commune: null };
-    if (district.communes.length > 0) {
-      setDraft(next);
-      setStep("commune");
-    } else {
-      pushLocation(next);
-      setOpen(false);
-    }
+  const selectDistrict = (district: Place) => {
+    setDraft({ ...draft, district: pick(district), commune: null });
+    setStep("commune");
   };
-  const selectCommune = (commune: Commune) => {
-    const next: Selection = { ...draft, commune };
-    pushLocation(next);
+  const selectCommune = (commune: Place) => {
+    pushLocation({ ...draft, commune: pick(commune) });
     setOpen(false);
   };
   // "Show all ads in <province/district>" — commits without going deeper
@@ -152,30 +147,34 @@ export function LocationSelectorFilter({
   const clearSelection = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    pushLocation({ province: null, district: null, commune: null });
+    pushLocation(EMPTY);
   };
   // ── Derived display values ────────────────────────────────────────────────────
   const hasSelection = !!selection.province;
-  const locationLabel = buildLabel(selection, placeholder);
+  const locationLabel =
+    selection.commune?.name ??
+    selection.district?.name ??
+    selection.province?.name ??
+    placeholder;
   const showAllLabel: string | null = {
     province: null,
     district: `Show all ads in ${draft.province?.name}`,
     commune: `Show all ads in ${draft.district?.name}`,
   }[step];
-  const items: { id: string; name: string; hasChildren: boolean }[] =
+  const current =
     step === "province"
-      ? locations.map((p) => ({ id: p.proId, name: p.name, hasChildren: true }))
+      ? provinces
       : step === "district"
-        ? (draft.province?.districts ?? []).map((d) => ({
-            id: d.disId,
-            name: d.name,
-            hasChildren: d.communes.length > 0,
-          }))
-        : (draft.district?.communes ?? []).map((c) => ({
-            id: c.comId,
-            name: c.name,
-            hasChildren: false,
-          }));
+        ? draftDistricts
+        : draftCommunes;
+  const items = current.data ?? [];
+  const onPick =
+    step === "province"
+      ? selectProvince
+      : step === "district"
+        ? selectDistrict
+        : selectCommune;
+
   return (
     <div className="relative inline-flex items-center">
       <Popover open={open} onOpenChange={handleOpenChange}>
@@ -205,6 +204,7 @@ export function LocationSelectorFilter({
               <button
                 onClick={goBack}
                 className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                aria-label="Back"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -223,29 +223,19 @@ export function LocationSelectorFilter({
           )}
           {/* Item list */}
           <div className="max-h-[320px] overflow-y-auto">
+            {current.isLoading && (
+              <p className="px-4 py-2.5 text-sm text-muted-foreground">
+                Loading…
+              </p>
+            )}
             {items.map((item) => (
               <button
                 key={item.id}
-                onClick={() => {
-                  if (step === "province") {
-                    const prov = locations.find((p) => p.proId === item.id)!;
-                    selectProvince(prov);
-                  } else if (step === "district") {
-                    const dist = draft.province!.districts.find(
-                      (d) => d.disId === item.id,
-                    )!;
-                    selectDistrict(dist);
-                  } else {
-                    const com = draft.district!.communes.find(
-                      (c) => c.comId === item.id,
-                    )!;
-                    selectCommune(com);
-                  }
-                }}
+                onClick={() => onPick(item)}
                 className="flex items-center justify-between w-full px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left cursor-pointer"
               >
                 <span>{item.name}</span>
-                {item.hasChildren && (
+                {step !== "commune" && (
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 )}
               </button>

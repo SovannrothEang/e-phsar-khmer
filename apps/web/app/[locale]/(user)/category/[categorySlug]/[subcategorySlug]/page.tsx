@@ -10,11 +10,11 @@ import LSPCYEHeader, {
 // ─── Content & posts ─────────────────────────────────────────────────────────
 import SubcategoryContent from "@/components/subcategory-layouts/SubcategoryContent";
 import type { OptionRow } from "@/components/subcategory-layouts/SubcategoryContent";
-import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
-import { ListCardPost } from "@/components/ads/ListCardPost";
 import { ListCardSell } from "@/components/ads/ListCardSell";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
+import { FeedResults } from "@/components/search/FeedResults";
+import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 import {
   getBrandsForSubcategory,
   getCategoryWithSubcategories,
@@ -22,6 +22,7 @@ import {
   getListingsFeed,
   getModelsForBrand,
   toCardPost,
+  type ListingsFeedParams,
 } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 
@@ -187,11 +188,15 @@ export default async function SubcategoryPage({
   searchParams,
 }: {
   params: Promise<{ categorySlug: string; subcategorySlug: string }>;
-  searchParams: Promise<{
-    ad_field?: string;
-    ad_type?: string;
-    ad_model?: string;
-  }>;
+  // ad_field / ad_type / ad_model drive the brand/type/model drill-down; the
+  // rest are the shared filter-bar params (lib/search-params.ts).
+  searchParams: Promise<
+    {
+      ad_field?: string;
+      ad_type?: string;
+      ad_model?: string;
+    } & Record<string, string | string[] | undefined>
+  >;
 }) {
   const { categorySlug, subcategorySlug } = await params;
   const sp = await searchParams;
@@ -283,22 +288,18 @@ export default async function SubcategoryPage({
       ? sets.flatMap((s) => s.options).find((o) => o.slug === adType)?.name
       : undefined;
 
-  // Real active listings — every subcategory now runs the real feed; the
-  // grid/list toggle drives the two TabsContent views below.
-  const feedItems: Post[] = (
-    (
-      await getListingsFeed(
-        {
-          subcategorySlug,
-          brand: brandName,
-          bodyType: bodyTypeName,
-          attrKey,
-          attrValue: attrKey ? clickedOption?.name : undefined,
-        },
-        locale,
-      )
-    )?.items ?? []
-  ).map(toCardPost);
+  // Real active listings — every subcategory runs the real feed, narrowed by
+  // the drill-down (brand/type) and the filter bar's URL params.
+  const feedQuery: ListingsFeedParams = {
+    ...parseFeedParams(sp),
+    subcategorySlug,
+    brand: brandName,
+    bodyType: bodyTypeName,
+    attrKey,
+    attrValue: attrKey ? clickedOption?.name : undefined,
+  };
+  const feed = await getListingsFeed(feedQuery, locale);
+  const feedItems: Post[] = (feed?.items ?? []).map(toCardPost);
 
   // ── Header component ────────────────────────────────────────────────────────
   const headerFlags =
@@ -415,22 +416,15 @@ export default async function SubcategoryPage({
           />
         </div>
         {/* ── Post sections: grid/list views driven by the bar's toggle ── */}
-        <TabsContent value="grid" className="mt-2">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <GridCardSell />
-            {feedItems.map((post) => (
-              <GridCardPost key={post.postId} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="list" className="mt-2">
-          <>
-            <ListCardSell />
-            {feedItems.map((post) => (
-              <ListCardPost key={post.postId} post={post} />
-            ))}
-          </>
-        </TabsContent>
+        <FeedResults
+          key={feedQueryKey(feedQuery)}
+          initialPosts={feedItems}
+          initialCursor={feed?.nextCursor ?? null}
+          query={feedQuery}
+          locale={locale}
+          gridLead={<GridCardSell />}
+          listLead={<ListCardSell />}
+        />
       </Tabs>
     </main>
   );

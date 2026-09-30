@@ -2946,3 +2946,60 @@ no company/phone/email at all    rows: @nocontact  + exactly one divider
 - Screenshotted the captain's own example (the admin villa card) and read it back:
   the globe row, the divider, the phone row, the divider, then Message Seller — the
   empty mail row is gone.
+
+# SHIPPED — Search page (`/search?q=…`), real filters, per-category counts (2026-09-30)
+
+Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flipped to
+"yes — per-category counts").
+
+**Backend** (`src/listings/`, migration `0031_listing_search`)
+- `q` is now tokenized (≤5 tokens), `%`/`_`/`\` escaped, and matched against title
+  **or description** (`keyword-search.ts`); trigram GIN indexes on both columns
+  (`pg_trgm`, installed into Supabase's `extensions` schema).
+- New `effective_price` stored generated column = the price after discount;
+  `minPrice`/`maxPrice` now filter on it (was: the original price), inverted range → 400.
+- New params: `sort=newest|price_asc|price_desc`, `postedWithin=today|week|month`
+  (today = since midnight Asia/Phnom_Penh, on `published_at`), `communeSlug`,
+  `deliveryFree`, `includeTotal`, `includeFacets`.
+- Sort-aware keyset cursor (`feed-cursor.ts`, `{s,v,id}`), values carried as Postgres
+  text so µs timestamps no longer skip rows; legacy `{createdAt,id}` still accepted.
+- `meta.facets` = per-category counts (and per-subcategory once a category is chosen),
+  computed over every filter **except** the category dimension.
+- Tests: 428/428 (35 suites), incl. 56 new; build + lint clean.
+
+**Web**
+- `lib/search-params.ts` — the one URL vocabulary + `parseFeedParams`; search,
+  category, subcategory and all-ads pages all forward the filter bar to the feed
+  (**the bar was UI-only before on every page**).
+- `/[locale]/search` page: header + count, sticky filter bar, category sidebar with
+  counts (chip rows on mobile), removable category/sub chips, load-more, empty state
+  (Clear filters / Clear search), `noindex`.
+- Header `SearchBar`: real categories (lazy), submit → `/search`, mirrors the URL there.
+- Location filter + More Filters now use the real geography (URL values are slugs).
+  More Filters gained Condition + Free delivery; keyword param is `q` everywhere;
+  "New Ads" removed and "Most Hit" hidden (views are never counted).
+- Subcategory bar (`LSPYCEHeader`): Location/Sort/Price/More swapped for the shared
+  filters, Condition wired to the URL; Year/Engine remain local-only (out of scope).
+- All Ads uses the real feed (was mock posts filtered in the browser).
+
+**Verification**
+- Live API sweep against the dev DB (27 checks): every sort pages through all 145
+  rows with no dups/gaps (limit 2 for ties), negotiable last, `q=%` literal, Khmer
+  keyword found, facet sums = total, picking a category leaves other counts unchanged,
+  `effective_price` == `applyDiscount` on 135 live rows + 8 edge fixtures (rolled back).
+- EXPLAIN: the trigram BitmapOr plan is usable; at 145 rows the planner prefers the
+  status index (expected on a tiny table).
+- Browser (headless Chromium over CDP, against the running dev stack): header search,
+  facet click/expand/highlight, chip removal, load-more to 145 in backend order,
+  empty state links, location picker (25 real provinces → districts → slug in URL),
+  category page price filter (20 → 11), cars-for-sale Condition chip (13 → 8),
+  all-ads `q`. 0 console errors. Dark mode checked.
+
+**Not done / notes**
+- `pnpm --filter web build` not run — a dev server was using `.next`; `tsc --noEmit`
+  and eslint on every touched file are clean.
+- Mobile (390px) pages scroll horizontally by ~395px — **pre-existing** (navbar + card
+  component; the category page has the identical overflow). The new chip rows scroll
+  inside their own containers.
+- Out of scope, per spec: relevance ranking, autocomplete, view counting ("Most Hit"),
+  Year/Engine chips, multi-attribute filters, saved searches, Khmer place names.

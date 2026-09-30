@@ -48,6 +48,10 @@ export const routing = defineRouting({
       zh: "/all-ads",
     },
 
+    "/search": {},
+
+    "/insight": {},
+
     "/me": {},
     "/me/about": {},
     "/me/applied-jobs": {},

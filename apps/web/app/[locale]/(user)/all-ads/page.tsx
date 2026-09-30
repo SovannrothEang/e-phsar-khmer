@@ -5,8 +5,23 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import AdsPhoto from "@/components/ads/AdsPhoto";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
 import AllAdsHeader from "@/components/all-ads/AllAdsHeader";
+import { getLocale } from "next-intl/server";
+import {
+  getListingsFeed,
+  toCardPost,
+  type ListingsFeedParams,
+} from "@/lib/api/categories";
+import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 
-export default function AllAdsPage() {
+export default async function AllAdsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const locale = await getLocale();
+  const query: ListingsFeedParams = parseFeedParams(await searchParams);
+  const feed = await getListingsFeed(query, locale);
+
   return (
     <main className="min-h-screen flex flex-col bg-muted">
       <div className="w-full flex justify-center py-6">
@@ -53,7 +68,13 @@ export default function AllAdsPage() {
         </div>
       </div>
       <div className="max-w-7xl mx-auto w-full pb-2">
-        <AllAdsHeader />
+        <AllAdsHeader
+          posts={(feed?.items ?? []).map(toCardPost)}
+          nextCursor={feed?.nextCursor ?? null}
+          query={query}
+          locale={locale}
+          feedKey={feedQueryKey(query)}
+        />
         {/* <CategoryGridSmall />
         <NormalAd />
         <NormalAd /> */}

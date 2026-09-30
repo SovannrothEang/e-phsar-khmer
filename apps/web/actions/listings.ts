@@ -17,7 +17,12 @@ import {
   getColors,
   getModelsForBrand,
   getYears,
+  getAllCategories,
+  getListingsFeed,
+  toCardPost,
+  type ListingsFeedParams,
 } from "@/lib/api/categories";
+import type { Post } from "@/lib/posts";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
@@ -339,6 +344,56 @@ export async function getListingFormConfig(
     photoMax,
     provinces,
     contact,
+  };
+}
+
+/** Category tree for the header search bar's scope dropdown. */
+export interface SearchCategory {
+  slug: string;
+  name: string;
+  icon: string | null;
+  subcategories: { slug: string; name: string; icon: string | null }[];
+}
+
+export async function getSearchCategories(
+  locale: string,
+): Promise<SearchCategory[]> {
+  const all = (await getAllCategories(locale)) ?? [];
+  return all.map((c) => ({
+    slug: c.slug,
+    name: c.name,
+    icon: c.icon,
+    subcategories: c.subcategories.map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      icon: s.icon,
+    })),
+  }));
+}
+
+/** Location cascade: all provinces (client-invoked by the filter bar). */
+export async function getLocationProvinces(): Promise<BackendPlace[]> {
+  return getProvinces();
+}
+
+/**
+ * Next page of a feed for the "Load more" button. The query is whatever the
+ * page parsed from its URL (`parseFeedParams`), so the pages it appends are
+ * filtered and sorted exactly like the first one.
+ */
+export async function loadMoreListings(
+  query: ListingsFeedParams,
+  cursor: string,
+  locale: string,
+): Promise<{ posts: Post[]; nextCursor: string | null }> {
+  // Counts belong to the first page only; later pages skip those queries.
+  const feed = await getListingsFeed(
+    { ...query, includeTotal: false, includeFacets: false, cursor },
+    locale,
+  );
+  return {
+    posts: (feed?.items ?? []).map(toCardPost),
+    nextCursor: feed?.nextCursor ?? null,
   };
 }
 

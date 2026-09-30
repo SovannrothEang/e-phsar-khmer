@@ -4,6 +4,7 @@ import type { RealDetailData } from "@/components/post/Post-Detail";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
 import { applyDiscount } from "@/lib/utils";
+import type { FeedQuery } from "@/lib/search-params";
 
 const slugify = (s: string) =>
   s
@@ -273,40 +274,56 @@ export async function getAllCategories(
   return getJson<BackendCategory[]>("/categories", locale);
 }
 
+export interface FeedFacet {
+  slug: string;
+  count: number;
+}
+
 export interface ListingsFeed {
   items: BackendListing[];
   nextCursor: string | null;
+  /** Only when requested with `includeTotal`. */
+  total?: number;
+  /** Only when requested with `includeFacets`. */
+  facets?: { categories: FeedFacet[]; subcategories?: FeedFacet[] };
 }
 
-/** Public active-listings feed (cursor pagination is exposed, not consumed here). */
+export interface ListingsFeedParams extends FeedQuery {
+  brand?: string;
+  bodyType?: string;
+  /**
+   * Generic attribute filter — the key the *subcategory's own schema* uses
+   * for the clicked grid (see `resolveAttrKey` in the subcategory page).
+   * `bodyType` above is only right for cars/lorries; every other grid stores
+   * its value under its own key (`type`, `vehicleType`, `accessory`, …).
+   */
+  attrKey?: string;
+  attrValue?: string;
+  limit?: number;
+  cursor?: string;
+  includeTotal?: boolean;
+  includeFacets?: boolean;
+}
+
+/**
+ * Public active-listings feed. Every defined param is forwarded as-is — the
+ * URL-side validation lives in `parseFeedParams` (lib/search-params.ts).
+ */
 export async function getListingsFeed(
-  params: {
-    categorySlug?: string;
-    subcategorySlug?: string;
-    brand?: string;
-    bodyType?: string;
-    /**
-     * Generic attribute filter — the key the *subcategory's own schema* uses
-     * for the clicked grid (see `resolveAttrKey` in the subcategory page).
-     * `bodyType` above is only right for cars/lorries; every other grid stores
-     * its value under its own key (`type`, `vehicleType`, `accessory`, …).
-     */
-    attrKey?: string;
-    attrValue?: string;
-    limit?: number;
-  },
+  params: ListingsFeedParams,
   locale: string,
 ): Promise<ListingsFeed | null> {
   const qs = new URLSearchParams();
-  if (params.categorySlug) qs.set("categorySlug", params.categorySlug);
-  if (params.subcategorySlug) qs.set("subcategorySlug", params.subcategorySlug);
-  if (params.brand) qs.set("brand", params.brand);
-  if (params.bodyType) qs.set("bodyType", params.bodyType);
-  if (params.attrKey && params.attrValue) {
-    qs.set("attrKey", params.attrKey);
-    qs.set("attrValue", params.attrValue);
+  const { attrKey, attrValue, limit, ...rest } = params;
+  for (const [key, value] of Object.entries(rest)) {
+    if (value === undefined || value === "" || value === false) continue;
+    qs.set(key, String(value));
   }
-  qs.set("limit", String(params.limit ?? 20));
+  if (attrKey && attrValue) {
+    qs.set("attrKey", attrKey);
+    qs.set("attrValue", attrValue);
+  }
+  qs.set("limit", String(limit ?? 20));
   try {
     const res = await fetch(`${API_URL}/listings?${qs.toString()}`, {
       headers: { "Accept-Language": locale },
@@ -316,12 +333,18 @@ export async function getListingsFeed(
     const body = (await res.json()) as {
       success: boolean;
       data?: BackendListing[];
-      meta?: { nextCursor: string | null };
+      meta?: {
+        nextCursor: string | null;
+        total?: number;
+        facets?: ListingsFeed["facets"];
+      };
     };
     if (!body.success) return null;
     return {
       items: body.data ?? [],
       nextCursor: body.meta?.nextCursor ?? null,
+      total: body.meta?.total,
+      facets: body.meta?.facets,
     };
   } catch {
     return null;

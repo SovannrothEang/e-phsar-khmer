@@ -8,16 +8,17 @@ import ServicesCategoryLayout from "@/components/category-layouts/ServicesCatego
 import JobsCategoryLayout from "@/components/category-layouts/JobsCategoryLayout";
 import CarsCategoryLayout from "@/components/category-layouts/CarsCategoryLayout";
 import SubcategoryGrid from "@/components/category-layouts/SubcategoryGrid";
-import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
-import { ListCardPost } from "@/components/ads/ListCardPost";
 import { ListCardSell } from "@/components/ads/ListCardSell";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
+import { FeedResults } from "@/components/search/FeedResults";
 import {
   getCategoryWithSubcategories,
   getListingsFeed,
   toCardPost,
+  type ListingsFeedParams,
 } from "@/lib/api/categories";
+import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 
 const SUBCATEGORY_LAYOUT: Record<string, number> = {
   "cars-and-vehicles": 5,
@@ -52,8 +53,10 @@ const JOBS_CATEGORIES = ["jobs"];
 
 export default async function CategoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ categorySlug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { categorySlug } = await params;
   const locale = await getLocale();
@@ -83,31 +86,15 @@ export default async function CategoryPage({
   //  FIXED
   const cols = SUBCATEGORY_LAYOUT[category.slug] ?? 6;
 
-  // Real active listings feed for every category. Cards render through the
-  // existing GridCardPost / ListCardPost templates via the toCardPost adapter.
-  const feedPosts = (
-    (await getListingsFeed({ categorySlug }, locale))?.items ?? []
-  ).map(toCardPost);
-
-  // Same content as the All Ads feed: Sell-banner card + the posts feed, rendered
-  // as grid cards (grid view) or list cards (list view).
-  const gridSections = (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      <GridCardSell />
-      {feedPosts.map((post) => (
-        <GridCardPost key={post.postId} post={post} />
-      ))}
-    </div>
-  );
-
-  const listSections = (
-    <>
-      <ListCardSell />
-      {feedPosts.map((post) => (
-        <ListCardPost key={post.postId} post={post} />
-      ))}
-    </>
-  );
+  // Real active listings feed for every category, filtered by the filter
+  // bar's URL params (location, price, sort, keyword, …). Cards render through
+  // the GridCardPost / ListCardPost templates via the toCardPost adapter.
+  const feedQuery: ListingsFeedParams = {
+    ...parseFeedParams(await searchParams),
+    categorySlug,
+  };
+  const feed = await getListingsFeed(feedQuery, locale);
+  const feedPosts = (feed?.items ?? []).map(toCardPost);
 
   return (
     <main className="min-h-screen flex flex-col bg-muted">
@@ -169,12 +156,17 @@ export default async function CategoryPage({
             cols={cols}
           />
         </div>
-        <TabsContent value="grid" className="mt-4">
-          {gridSections}
-        </TabsContent>
-        <TabsContent value="list" className="mt-4">
-          {listSections}
-        </TabsContent>
+        {/* Sell-banner card + the posts feed, as grid cards (grid view) or
+            list cards (list view), with "Load more" past the first page. */}
+        <FeedResults
+          key={feedQueryKey(feedQuery)}
+          initialPosts={feedPosts}
+          initialCursor={feed?.nextCursor ?? null}
+          query={feedQuery}
+          locale={locale}
+          gridLead={<GridCardSell />}
+          listLead={<ListCardSell />}
+        />
       </Tabs>
     </main>
   );

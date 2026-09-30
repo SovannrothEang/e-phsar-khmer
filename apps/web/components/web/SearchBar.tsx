@@ -1,4 +1,9 @@
-import { useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,28 +18,122 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { categories } from "@/lib/categories";
-import { IconSelector, IconSearch, IconChevronDown } from "@tabler/icons-react";
-import Image from "next/image";
+import DbImage from "@/components/common/DbImage";
+import { usePathname, useRouter } from "@/i18n/routing";
+import { getSearchCategories } from "@/actions/listings";
+import {
+  CATEGORY_PARAM,
+  MAX_QUERY_LENGTH,
+  Q_PARAM,
+  SUB_PARAM,
+  normalizeQuery,
+} from "@/lib/search-params";
+import {
+  IconSelector,
+  IconSearch,
+  IconChevronDown,
+  IconLayoutGrid,
+} from "@tabler/icons-react";
 
+/** What the search is limited to: everything, one category, or one subcategory. */
+type Scope =
+  | { kind: "all" }
+  | { kind: "category"; slug: string }
+  | { kind: "sub"; slug: string; categorySlug: string };
+
+/**
+ * Header search: a category scope dropdown (real catalogue, loaded on first
+ * open) + keyword input. Submitting goes to `/search?q=…&category=…|sub=…`.
+ * On the search page itself the bar mirrors the URL.
+ */
 export default function SearchBar() {
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const t = useTranslations("Search");
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const onSearchPage = pathname === "/search";
+
+  const urlQ = onSearchPage ? (searchParams.get(Q_PARAM) ?? "") : "";
+  const urlCategory = onSearchPage ? searchParams.get(CATEGORY_PARAM) : null;
+  const urlSub = onSearchPage ? searchParams.get(SUB_PARAM) : null;
+
   const [open, setOpen] = useState(false);
+  const [text, setText] = useState(urlQ);
+  const [scope, setScope] = useState<Scope>({ kind: "all" });
+
+  const categories = useQuery({
+    queryKey: ["search-categories", locale],
+    queryFn: () => getSearchCategories(locale),
+    staleTime: 10 * 60 * 1000,
+    // Needed to open the menu, or to name a scope that came from the URL.
+    enabled: open || !!urlCategory || !!urlSub,
+  });
+
+  // Mirror the URL whenever it changes (navigation, filter edits, back/forward).
+  // Deliberately NOT keyed on the category list: its lazy load must not reset
+  // a scope the user just picked.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setText(urlQ);
+    if (urlSub) {
+      setScope({ kind: "sub", slug: urlSub, categorySlug: urlCategory ?? "" });
+    } else if (urlCategory) {
+      setScope({ kind: "category", slug: urlCategory });
+    } else {
+      setScope({ kind: "all" });
+    }
+  }, [urlQ, urlCategory, urlSub]);
+
+  const scopeLabel = (() => {
+    if (scope.kind === "all") return t("allCategoriesOption");
+    for (const c of categories.data ?? []) {
+      if (scope.kind === "category" && c.slug === scope.slug) return c.name;
+      const s = c.subcategories.find((x) => x.slug === scope.slug);
+      if (scope.kind === "sub" && s) return s.name;
+    }
+    return t("allCategoriesOption");
+  })();
+
+  const submit = () => {
+    const q = normalizeQuery(text);
+    const query: Record<string, string> = {};
+    if (q) query[Q_PARAM] = q;
+    if (scope.kind === "category") query[CATEGORY_PARAM] = scope.slug;
+    if (scope.kind === "sub") {
+      const parent =
+        scope.categorySlug ||
+        categories.data?.find((c) =>
+          c.subcategories.some((s) => s.slug === scope.slug),
+        )?.slug;
+      if (parent) query[CATEGORY_PARAM] = parent;
+      query[SUB_PARAM] = scope.slug;
+    }
+    router.push({ pathname: "/search", query });
+  };
+
   return (
-    <div className="flex flex-1 items-center max-w-lg">
+    <form
+      role="search"
+      className="flex flex-1 items-center max-w-lg"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
       <div className="flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a0e9] transition-all duration-100 shadow-sm">
         <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
+              type="button"
               variant="ghost"
               className="relative flex items-center rounded-l-xs rounded-r-none bg-card text-foreground hover:bg-muted/60 h-full px-4 focus:ring-0 whitespace-nowrap text-sm w-[170px] justify-between transition-colors duration-75 cursor-pointer"
             >
               <span className="absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center">
-                {selectedCategory}
+                {scopeLabel}
               </span>
               <IconChevronDown className="ml-auto scale-80 text-card-foreground" />
             </Button>
-            {/* <Separator orientation="vertical" /> */}
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
@@ -42,49 +141,70 @@ export default function SearchBar() {
             className=" w-[340px] max-h-[68vh] overflow-y-auto overflow-x-hidden p-1.5 rounded-xl border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100"
           >
             <DropdownMenuItem
-              onClick={() => setSelectedCategory("All Categories")}
+              onClick={() => setScope({ kind: "all" })}
               className="flex items-center gap-3 px-3 py-2 cursor-pointer mb-1 outline-none hover:bg-muted/60"
             >
               <div className="flex w-6 justify-center">
                 <IconSelector className="text-card-foreground" />
               </div>
               <span className="text-sm font-semibold text-card-foreground">
-                All Categories
+                {t("allCategoriesOption")}
               </span>
             </DropdownMenuItem>
             <div className="my-1 h-px bg-border/60" />
-            {categories.map((category) => (
+            {categories.isLoading && (
+              <p className="px-4 py-2 text-sm text-muted-foreground">
+                {t("loading")}
+              </p>
+            )}
+            {(categories.data ?? []).map((category) => (
               <div key={category.slug}>
                 <DropdownMenuItem
-                  onClick={() => setSelectedCategory(category.name)}
+                  onClick={() =>
+                    setScope({ kind: "category", slug: category.slug })
+                  }
                   className="flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer outline-none transition-all duration-75 hover:bg-muted/60"
                 >
-                  <Image
-                    src={category.cateIcon}
-                    alt={category.name}
-                    width={28}
-                    height={28}
-                    className="object-contain"
-                    unoptimized
-                  />
+                  <span className="flex size-7 shrink-0 items-center justify-center">
+                    {category.icon ? (
+                      <DbImage
+                        src={category.icon}
+                        alt=""
+                        width={28}
+                        height={28}
+                        className="object-contain"
+                      />
+                    ) : (
+                      <IconLayoutGrid className="size-5 text-muted-foreground" />
+                    )}
+                  </span>
                   <span className="text-sm font-semibold text-card-foreground ">
                     {category.name}
                   </span>
                 </DropdownMenuItem>
-                {category.subcategories?.map((sub) => (
+                {category.subcategories.map((sub) => (
                   <DropdownMenuItem
                     key={sub.slug}
-                    onClick={() => setSelectedCategory(sub.name)}
+                    onClick={() =>
+                      setScope({
+                        kind: "sub",
+                        slug: sub.slug,
+                        categorySlug: category.slug,
+                      })
+                    }
                     className="flex items-center gap-3 cursor-pointer py-2 px-3 ml-9 rounded-lg outline-none transition-all duration-75 hover:bg-muted/60"
                   >
-                    <Image
-                      src={sub.subcate}
-                      alt={sub.name}
-                      width={22}
-                      height={22}
-                      className="object-contain"
-                      unoptimized
-                    />
+                    <span className="flex size-[22px] shrink-0 items-center justify-center">
+                      {sub.icon && (
+                        <DbImage
+                          src={sub.icon}
+                          alt=""
+                          width={22}
+                          height={22}
+                          className="object-contain"
+                        />
+                      )}
+                    </span>
                     <span className="text-sm text-card-foreground">
                       {sub.name}
                     </span>
@@ -96,14 +216,27 @@ export default function SearchBar() {
           </DropdownMenuContent>
         </DropdownMenu>
         <InputGroup className="relative flex-1 h-full rounded-xs flex items-center ">
-          <InputGroupInput placeholder="What are you looking for..." />
+          <InputGroupInput
+            type="search"
+            name={Q_PARAM}
+            value={text}
+            maxLength={MAX_QUERY_LENGTH}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t("placeholder")}
+            aria-label={t("search")}
+          />
           <InputGroupAddon align="inline-end">
-            <InputGroupButton variant="ghost" className="h-10  rounded-full">
-              <IconSearch className="scale-125 text-muted-foreground  cursor-pointer" />
+            <InputGroupButton
+              type="submit"
+              variant="ghost"
+              className="h-10 rounded-full cursor-pointer"
+              aria-label={t("search")}
+            >
+              <IconSearch className="scale-125 text-muted-foreground" />
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </div>
-    </div>
+    </form>
   );
 }

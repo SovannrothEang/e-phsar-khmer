@@ -8,42 +8,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-// import {
-//   MAX_AD_PRICE_PARAM,
-//   MIN_AD_PRICE_PARAM,
-// } from "@/lib/filterPostsByPrice"
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import type { Post } from "@/lib/posts";
+import { MAX_AD_PRICE_PARAM, MIN_AD_PRICE_PARAM } from "@/lib/search-params";
 
-export const MIN_AD_PRICE_PARAM = "min_ad_price";
-export const MAX_AD_PRICE_PARAM = "max_ad_price";
-
-export function parsePriceParam(value: string | null): number | undefined {
-  if (!value?.trim()) return undefined;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-export function filterPostsByPrice(
-  posts: Post[],
-  min?: number,
-  max?: number,
-): Post[] {
-  if (min === undefined && max === undefined) return posts;
-
-  return posts.filter((post) => {
-    // A "Negotiable" listing has no price to compare, so it cannot be said to
-    // fall inside a range — exclude it while a range is active. (It would
-    // otherwise coerce to 0 and appear in every "under $X" filter.)
-    if (post.price === null) return false;
-    if (min !== undefined && post.price < min) return false;
-    if (max !== undefined && post.price > max) return false;
-    return true;
-  });
-}
+// Re-exported for existing importers; the source of truth is lib/search-params.
+export { MAX_AD_PRICE_PARAM, MIN_AD_PRICE_PARAM };
 
 function formatChipValue(value: string) {
   const n = Number(value);
