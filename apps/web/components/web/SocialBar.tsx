@@ -120,7 +120,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconFolderOpen
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -129,14 +132,20 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                 My Ads
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me/likes")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconHeart
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
               />
               <span className="text-sm text-foreground font-medium">Likes</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me/saved")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconBookmark
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -144,7 +153,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               <span className="text-sm text-foreground font-medium">Saved</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me/applied-jobs")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconBriefcase
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -153,7 +165,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                 Applied Jobs
               </span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me/job-applications")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconClipboardList
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -172,7 +187,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/me/subscriptions")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconCreditCard
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -182,7 +200,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/insight")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <ChartNoAxesCombined
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
@@ -192,7 +213,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               </span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenuItem
+              onClick={() => router.push("/settings")}
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+            >
               <IconSettings
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
