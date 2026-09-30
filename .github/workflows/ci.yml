@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # prod is gated by deploy.yml, which calls this workflow before migrating
+  # and deploying, so a prod push doesn't run it twice.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    name: format, lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Lint and typecheck
+        run: pnpm exec turbo run lint check-types --output-logs=errors-only --ui=stream
+
+      # The backend's lint script runs `eslint --fix`, which would silently
+      # repair fixable errors on the runner and pass. Any diff means the
+      # committed code was not lint-clean.
+      - name: Lint left no autofixes
+        run: git diff --exit-code
+
+      - name: Backend unit tests
+        run: pnpm --filter backend test -- --ci
+
+      # generate diffs the schema against the last migration snapshot and never
+      # connects, so a placeholder URL is enough. A new file means someone
+      # changed src/db/schema without committing the migration.
+      - name: Migrations match schema
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+        run: |
+          pnpm exec drizzle-kit generate
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            echo "::error::src/db/schema has changes with no migration. Run 'pnpm --filter backend db:generate' and commit the result."
+            git status --porcelain drizzle
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm exec turbo run build --output-logs=errors-only --ui=stream
