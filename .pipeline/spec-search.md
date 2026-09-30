@@ -128,7 +128,7 @@ effective_price numeric(14,2) GENERATED ALWAYS AS (
 
 | Param | Rule |
 |---|---|
-| `postedWithin=today\|week\|month` | `published_at >= X`. `today` = since 00:00 **Asia/Phnom_Penh**; `week` = now − 7 d; `month` = now − 30 d. (`published_at` rather than `created_at`, because a draft can sit for days before it is published.) |
+| `postedWithin=today\|week\|month` | `coalesce(published_at, created_at) >= X`. `today` = since 00:00 **Asia/Phnom_Penh**; `week` = now − 7 d; `month` = now − 30 d. (`published_at` first, because a draft can sit for days before it is published; `created_at` as the fallback because seeded rows skip the publish endpoint and have no `published_at` — amended in round 2, 2026-09-30.) |
 | `communeSlug` | Resolved inside the district, like `districtSlug` inside the province. Ignored without `districtSlug`. An unknown slug short-circuits to `[]` (existing pattern). |
 | `deliveryFree=true` | `delivery_free = true`. `false`/absent applies nothing. |
 | `includeTotal=true` | Adds `meta.total` (a `count(*)` over the same WHERE, run with `Promise.all` alongside the page query). Only the search page asks for it; the other feeds don't pay for it. |

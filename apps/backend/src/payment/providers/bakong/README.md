@@ -289,8 +289,9 @@ failure points are independent and it's worth checking both when Bakong
 - **Poll-round outbox volume scales with `1 / BAKONG_POLL_INTERVAL_MS`.** At
   the default 4s interval and 5-minute KHQR expiry, one attempt produces up
   to ~75 `payment.attempt.poll_requested` rows before settling or expiring.
-  Each is cheap and short-lived (cleaned up by the existing
-  `OUTBOX_RETENTION_DAYS` sweep like any other outbox row), but a much
+  Each is cheap and short-lived (deleted `OUTBOX_RETENTION_DAYS` after
+  publishing by the hourly `OutboxRetention` sweep,
+  `src/outbox/outbox-retention.service.ts`), but a much
   shorter interval or much higher payment volume would be worth revisiting
   against real load before assuming it's free.
 - **No admin/operator visibility into "how many attempts are currently

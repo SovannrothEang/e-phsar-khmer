@@ -10,6 +10,7 @@ import {
 } from '../../entity';
 import { PaymentPersistenceError } from '../payments';
 import { LedgerImbalanceError } from './errors';
+import { checkEntriesBalance } from './ledger-balance';
 
 export interface PostLedgerTransactionEntryInput {
   accountId: string;
@@ -42,7 +43,9 @@ type PostLedgerTransactionError =
  * Posts one balanced double-entry ledger_transaction + its ledger_entries.
  * Balance (debits sum to credits, per currency) is checked here rather than
  * left to Postgres — a CHECK constraint can't see sibling rows (see the
- * module README's "Balance invariant"). Dedupes on `idempotencyKey` exactly
+ * module README's "Balance invariant"); the exactness rules behind that
+ * check live in `ledger-balance.ts` so they can be unit-tested without
+ * Effect. Dedupes on `idempotencyKey` exactly
  * like createPaymentProviderEvent: a caller retrying the same settlement
  * (e.g. a redelivered BullMQ job that got this far before a prior crash)
  * gets the existing row back with `isNew: false` instead of a duplicate
@@ -57,24 +60,11 @@ export const postLedgerTransaction = Effect.fn('postLedgerTransaction')(
     PostLedgerTransactionError,
     DbClientTag
   > {
-    if (input.entries.length < 2) {
+    const balance = checkEntriesBalance(input.entries, input.currency);
+    if (!balance.ok) {
       return yield* new LedgerImbalanceError({
         idempotencyKey: input.idempotencyKey,
-        detail: 'A ledger_transaction needs at least two entries',
-      });
-    }
-
-    let debitTotal = 0;
-    let creditTotal = 0;
-    for (const entry of input.entries) {
-      const amount = Number(entry.amount);
-      if (entry.entryType === 'debit') debitTotal += amount;
-      else creditTotal += amount;
-    }
-    if (Math.abs(debitTotal - creditTotal) > 1e-9) {
-      return yield* new LedgerImbalanceError({
-        idempotencyKey: input.idempotencyKey,
-        detail: `Unbalanced entries for ${input.currency}: debit=${debitTotal} credit=${creditTotal}`,
+        detail: balance.detail,
       });
     }
 

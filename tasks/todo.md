@@ -3003,3 +3003,90 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
   inside their own containers.
 - Out of scope, per spec: relevance ranking, autocomplete, view counting ("Most Hit"),
   Year/Engine chips, multi-attribute filters, saved searches, Khmer place names.
+
+# SHIPPED — Search round 2: correctness fixes, Best match, typo fallback, Year/Engine chips, i18n (2026-09-30)
+
+Follow-up to the search ship above, from the "what's left" review.
+
+**Correctness (backend `src/listings/`)**
+- **Date posted hid 23 listings.** `postedWithin` compared `published_at`, which seeded
+  rows never got (they skip the publish endpoint), so no date filter could match them.
+  Now `coalesce(published_at, created_at)`. Live: "This Month" = 145 (was 122).
+- **Expired ads never left the feed.** Nothing flips `status` to `expired` when
+  `expires_at` passes; the feed now requires `expires_at IS NULL OR expires_at > now()`
+  (`liveConditions()`, shared by page/total/facets). No row is past expiry today, so
+  counts are unchanged — this prevents the 30-day problem rather than fixing a
+  visible one.
+
+**Search quality**
+- `sort=relevance` ("Best match"): title contains phrase (+1), title starts with it
+  (+0.5), + `word_similarity(phrase, title)`; float8 score in the keyset cursor. The web
+  makes it the default whenever there is a keyword and hides it otherwise; choosing
+  another sort with a keyword is stored explicitly (`sort=latest-ads`).
+- **Typo fallback**: a first page with zero exact hits reruns with
+  `word_similarity(token, title) >= 0.4` for tokens of 4+ chars (pg_trgm's 0.6 default
+  misses "toyta"→"Toyota" at 0.5) and returns `meta.fuzzy`; the cursor's `f` flag keeps
+  later pages fuzzy, and a later exact page that runs dry never flips to fuzzy. The
+  search page shows "No exact matches for “q” — showing similar ads." Live: `hyundia`→
+  Hyundai Truck, `toyta`→Toyota Camry, `zzqqxxww`→0.
+
+**Filters**
+- Backend `yearMin`/`yearMax` (4-digit `attributes->>'year'` only, inverted → 400) and
+  `engineType`.
+- Subcategory bar: Year and Engine chips are now URL-driven (`year_min`, `year_max`,
+  `engine`). The Engine chip's options come from the `enginetypes` set — the old
+  hardcoded list offered "Gasoline", which no listing stores (they say "Petrol"). The
+  three dropdown chips are one theme-aware `ChipSelect` (the old ones were hardcoded
+  `bg-white`, broken in dark mode).
+
+**i18n**: the `Search` namespace is translated for km/zh/ko/id/vi (was English copies),
+plus the new `fuzzyNotice`.
+
+**Verification**
+- Backend: 448/448 tests (20 new), lint + tsc clean.
+- Live API (12 checks) against the dev DB/backend: all pass (month=145, total=live rule,
+  relevance ranks title matches first and pages 9/9 without dups, relevance without q =
+  newest, fuzzy on/off, year 2021–2023 = DB, Petrol, inverted year → 400).
+- Browser (13 checks, headless Chromium over CDP): Best match default order == backend
+  relevance order; sort list with/without keyword; fuzzy notice; Khmer page strings;
+  This Month 145; Year 2021 (13→2) and Year+Petrol (→1) on cars-for-sale match the API;
+  More Filters badge counts them; dark-mode dropdown. 0 console errors.
+
+**Still open**: `pnpm --filter web build` (dev server holds `.next`); autocomplete;
+zero-result logging; view counter / "Most Hit"; field_schema-driven filters; saved
+searches; `name_km` in the location picker; counts on browse pages; rate-limit split;
+currency; pre-existing mobile overflow.
+
+# SHIPPED — Review follow-ups: outbox retention, ledger amount rules, typed feed ordering (2026-09-30)
+
+From the two-axis review of the search-round-2 + ledger working tree.
+
+**Outbox retention (was: config only, no sweep)**
+- `OUTBOX_RETENTION_DAYS` was parsed but never read — `outbox_events` grew forever, and the
+  Bakong README claimed a sweep that did not exist (≈75 poll rows per pending KHQR attempt).
+- New `OutboxRetention` (`src/outbox/outbox-retention.service.ts`): hourly (+ once at boot)
+  on worker-enabled instances, deletes `published` rows older than the retention in batches of
+  1000 (`OutboxService.purgePublished`, `for update skip locked`, uses the existing partial
+  `outbox_events_published_at_idx`), max 50 batches per sweep, never throws; `<= 0` disables.
+- `failed` rows are kept as dead letters on purpose (`markFailed` never sets `published_at`).
+  Freed `dedupe_key`s are safe: every keyed producer keys on a once-only transition.
+
+**Ledger amounts**
+- `ledger-balance.ts` now rejects signed and zero amounts (direction lives in `entryType`;
+  -5/-5 and 0/0 used to pass as balanced) and amounts past 18 whole digits (`numeric(20,2)`).
+- DB backstop: `ledger_entries_amount_positive CHECK (amount > 0)` — migration
+  `0032_ledger_entries_amount_positive` **generated, not applied** to the shared dev DB.
+
+**Search code quality**
+- `FeedOrdering` union (`feed-cursor.ts`): relevance carries its score, so "relevance without a
+  score" is a type error — removed the runtime `requireScore` throw and `query.q!`;
+  `resolveFeedOrdering` (`keyword-search.ts`) is the one place the keyword fallback lives.
+- `MoreFilters` uses `defaultSortFor(false)` instead of a hardcoded `"latest-ads"`.
+- Docs: `spec-search.md` D5 amended to `coalesce(published_at, created_at)`; payment + Bakong
+  READMEs and `docs/notifications.md` updated.
+
+**Verification**: backend 473/473 (25 new), `tsc --noEmit` clean, eslint clean on touched files.
+
+**Left open**: apply `0032`; filter-bar i18n (sort labels + chips are English-only across the
+whole bar, not just the new ones); payment use-case/processor tests (blocked on ESM `effect`
+under Jest); `failed` outbox + `idempotency_keys` retention; no `payment.failed` event.

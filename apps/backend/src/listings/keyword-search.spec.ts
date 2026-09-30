@@ -2,10 +2,65 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   MAX_QUERY_TOKENS,
   MAX_TOKEN_LENGTH,
+  canFuzzy,
   escapeLike,
   keywordCondition,
+  relevanceExpr,
+  resolveFeedOrdering,
   tokenizeQuery,
 } from './keyword-search';
+
+describe('canFuzzy', () => {
+  it.each([
+    ['toyta', true],
+    ['bmw x5', false],
+    ['', false],
+    ['kia sorento', true],
+  ])('%p → %p', (q, expected) => {
+    expect(canFuzzy(q)).toBe(expected);
+  });
+});
+
+describe('relevanceExpr', () => {
+  it('scores phrase-in-title, title prefix and similarity, as float8', () => {
+    const { sql, params } = new PgDialect().sqlToQuery(
+      relevanceExpr('  Toyota   Prius '),
+    );
+    expect(sql).toContain('word_similarity($3, "listings"."title")');
+    expect(sql).toMatch(/::float8$/);
+    // Normalized phrase; LIKE patterns escaped the same way as the filter.
+    expect(params).toEqual(['%Toyota Prius%', 'Toyota Prius%', 'Toyota Prius']);
+  });
+
+  it('escapes metacharacters in its LIKE arms', () => {
+    const { params } = new PgDialect().sqlToQuery(relevanceExpr('50%'));
+    expect(params).toEqual(['%50\\%%', '50\\%%', '50%']);
+  });
+});
+
+describe('resolveFeedOrdering', () => {
+  it('attaches a score to relevance when there is a keyword', () => {
+    const ordering = resolveFeedOrdering('relevance', 'toyota');
+    expect(ordering.sort).toBe('relevance');
+    expect(ordering).toHaveProperty('score');
+  });
+
+  it.each([undefined, '', '   '])(
+    'falls back to newest for relevance without a keyword (%p)',
+    (q) => {
+      expect(resolveFeedOrdering('relevance', q)).toEqual({ sort: 'newest' });
+    },
+  );
+
+  it('defaults to newest and passes other sorts through unscored', () => {
+    expect(resolveFeedOrdering(undefined, 'toyota')).toEqual({
+      sort: 'newest',
+    });
+    expect(resolveFeedOrdering('price_asc', 'toyota')).toEqual({
+      sort: 'price_asc',
+    });
+  });
+});
 
 describe('escapeLike', () => {
   it.each([
@@ -59,6 +114,13 @@ describe('keywordCondition', () => {
     expect(sql).toMatch(/"title" ilike .* or .*"description" ilike/);
     expect(sql).not.toContain('toyota');
     expect(params).toEqual(['%toyota%', '%toyota%', '%prius%', '%prius%']);
+  });
+
+  it('fuzzy mode adds a word_similarity arm only for tokens of 4+ chars', () => {
+    const cond = keywordCondition('bmw toyta', { fuzzy: true });
+    const { sql, params } = new PgDialect().sqlToQuery(cond!);
+    expect(sql.match(/word_similarity/g)).toHaveLength(1);
+    expect(params).toEqual(expect.arrayContaining(['toyta', 0.4]));
   });
 
   it('escapes metacharacters so "%" matches literally', () => {

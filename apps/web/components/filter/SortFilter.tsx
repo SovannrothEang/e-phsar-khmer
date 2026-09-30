@@ -13,19 +13,21 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import {
-  DEFAULT_SORT,
   SORT_OPTIONS,
   SORT_PARAM,
+  defaultSortFor,
+  hasQueryParam,
   parseSortParam,
+  sortOptionsFor,
   type SortValue,
 } from "@/lib/search-params";
 
 // Re-exported for existing importers; the source of truth is lib/search-params.
-export { DEFAULT_SORT, SORT_OPTIONS, SORT_PARAM, parseSortParam };
+export { SORT_OPTIONS, SORT_PARAM, parseSortParam };
 export type { SortValue };
 
-function SortLabel(sort: SortValue) {
-  if (sort === DEFAULT_SORT) return "Sort";
+function SortLabel(sort: SortValue, defaultSort: SortValue) {
+  if (sort === defaultSort) return "Sort";
   const option = SORT_OPTIONS.find((o) => o.value === sort);
   return option ? `Sort :${option.label}` : "Sort";
 }
@@ -35,16 +37,20 @@ export default function SortFilter() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const sortParam = parseSortParam(searchParams.get(SORT_PARAM));
+  // With a keyword the default is "Best match"; without one, "Latest Ads".
+  const hasQuery = hasQueryParam(searchParams);
+  const defaultSort = defaultSortFor(hasQuery);
+  const options = sortOptionsFor(hasQuery);
+  const sortParam = parseSortParam(searchParams.get(SORT_PARAM), hasQuery);
   const [open, setOpen] = useState(false);
 
-  const hasActiveFilter = sortParam !== DEFAULT_SORT;
-  const adsLabel = SortLabel(sortParam);
+  const hasActiveFilter = sortParam !== defaultSort;
+  const adsLabel = SortLabel(sortParam, defaultSort);
 
   function pushSort(next: SortValue) {
     const params = new URLSearchParams(searchParams.toString());
 
-    if (next === DEFAULT_SORT) {
+    if (next === defaultSort) {
       params.delete(SORT_PARAM);
     } else {
       params.set(SORT_PARAM, next);
@@ -63,7 +69,7 @@ export default function SortFilter() {
   function removeFilter(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    pushSort(DEFAULT_SORT);
+    pushSort(defaultSort);
     setOpen(false);
   }
 
@@ -102,7 +108,7 @@ export default function SortFilter() {
         <p className="text-base text-foreground text-center pt-2 ">Sort</p>
         <ul className="">
           <div className="border-b border-gray-200" />
-          {SORT_OPTIONS.map((option) => {
+          {options.map((option) => {
             const isSelected = sortParam === option.value;
             return (
               <li key={option.value}>

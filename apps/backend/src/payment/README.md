@@ -39,8 +39,10 @@ actual business logic — `Effect.fn`-wrapped generators — split into two
 subfolders that mirror the processing/ledger boundary above:
 [`use-cases/payments/`](./use-cases/payments) and
 [`use-cases/ledgers/`](./use-cases/ledgers) (resolve-or-create a system
-ledger account; post one balanced `ledger_transaction`; the chart-of-accounts
-mapping that turns a settled `payment_transaction` into that posting).
+ledger account; post one balanced `ledger_transaction`, checked by the
+dependency-free balance rules in `ledger-balance.ts`; the
+chart-of-accounts mapping that turns a settled `payment_transaction` into
+that posting).
 
 `use-cases/payments/` itself is further split by role:
 [`transaction/`](./use-cases/payments/transaction),
@@ -49,7 +51,13 @@ mapping that turns a settled `payment_transaction` into that posting).
 primitives that have more than one caller (`checkPayment`, `upsertPayment`,
 `findPaymentAttempt`, `updatePaymentAttempt`, `settlePaymentProviderEvent`,
 ...) — genuinely shared across the three processor flows or several
-controller routes, which is what earns a primitive its own file here.
+controller routes, which is what earns a primitive its own file here. Two
+primitives have exactly one caller each — `listPayments`
+(`PaymentsController`) and `findPaymentAttemptByProviderAttemptId`
+(`AbaPaywayWebhookController`, in [`../webhooks/`](../webhooks)) — and both
+are deliberate exceptions to the single-caller fold below: their only caller
+is a Nest controller, so folding would put a Drizzle query inside a route
+handler. The thin-controller rule wins over file count in that case.
 [`processing/`](./use-cases/payments/processing) holds everything that
 composes several primitives into one business action —
 `createPaymentTransaction`, `receivePaymentProviderEvent`,
@@ -205,9 +213,19 @@ jobs, not as alternatives:
 ### Balance invariant
 
 Nothing in the schema enforces that a `ledger_transaction`'s entries sum to
-zero per currency — a Postgres `CHECK` constraint can't see sibling rows.
+zero per currency — a Postgres `CHECK` constraint can't see sibling rows. What
+it *can* see is one row, so `ledger_entries_amount_positive` (`amount > 0`,
+migration `0032`) pins the per-line half: direction lives in `entry_type`,
+never in the sign, so a -5/-5 or 0/0 pair can't pose as balanced.
 This has to be a single service-layer write path that always inserts
-debit/credit pairs inside one DB transaction.
+debit/credit pairs inside one DB transaction. The check itself lives in
+[`use-cases/ledgers/ledger-balance.ts`](./use-cases/ledgers/ledger-balance.ts)
+— a dependency-free function (bigint-exact sums, no float rounding; rejects
+malformed, signed or zero amounts, anything past `numeric(20, 2)`'s scale
+— which Postgres would round *after* a looser check — and anything past its
+18 whole digits) so it can be unit-tested directly in
+[`ledger-balance.spec.ts`](./use-cases/ledgers/ledger-balance.spec.ts);
+`postLedgerTransaction` maps a failed check onto `LedgerImbalanceError`.
 
 ## Lifecycle, end to end
 
@@ -345,7 +363,7 @@ Key properties this gives us:
 | Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases, **and now has a registered consumer** — `PaymentSettledOutboxHandler` (see next row). `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items).                                                                                                                                                                                                                                                                       |
 | Notification emission (success path)                                  | Done — `PaymentSettledOutboxHandler` (`outbox/payment-settled-outbox-handler.ts`) consumes `payment.succeeded` directly (no BullMQ hop — see its own doc comment) and calls the new `NotificationsModule` (`src/notifications/`). `NotificationsService.notify()` fans out to a small `NotificationChannel[]` — today just `InAppNotificationChannel`, which inserts a `notifications` row a client reads via `GET /notifications` / `/notifications/unread-count` / marks read via `PATCH /notifications/:id/read` \| `/notifications/read-all`. A transaction with no `customerId` no-ops (logged, not retried). Email/SMS/push are unbuilt — see Open items for the extension point.            |
 | Notification emission (failure path)                                  | Not started — no outbox event or handler for a terminal payment failure; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered). No unit/e2e tests yet for the use-cases, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (272 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
+| Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered), plus the balance rules in [`ledger-balance.spec.ts`](./use-cases/ledgers/ledger-balance.spec.ts). No unit/e2e tests yet for the use-case orchestration, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (473 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
 
 ## Open items
 
@@ -401,14 +419,22 @@ Key properties this gives us:
   a `refund` yet because the `refund` transaction type itself doesn't
   exist (see the ledger-mapping item below).
 - **Still no test coverage for the use-cases, controllers, processor, or
-  outbox handlers.** Every use-case is a pure `Effect.fn` taking its
+  outbox handlers — and there is now a confirmed blocker, not just missing
+  effort.** Every use-case is a pure `Effect.fn` taking its
   dependencies through `DbClientTag`/`PaymentGatewayRegistryTag`
   specifically so a fake layer can be swapped in for testing without a real
-  Postgres or Redis — that seam has never actually been exercised by a
-  test. Only pure-function tests exist so far, and only for the provider(s)
-  that have them (see that provider's own README). Confidence for
-  everything else rests on `tsc`, `nest build`, `pnpm test` (no
-  regressions), and one manual boot check confirming DI wiring — not on
+  Postgres or Redis — but any spec that (transitively) imports `effect`
+  fails to load: `effect@4.0.0-rc` ships ESM-only (`type: module`,
+  `import.meta` in `dist/`), while jest runs CJS, and un-ignoring it in
+  `transformIgnorePatterns` only gets past the `export` token before
+  `import.meta` breaks the compiled output. Testing use-case orchestration
+  needs a jest ESM decision first (`--experimental-vm-modules` +
+  `extensionsToTreatAsEsm`, repo-wide) — that is why the balance rules were
+  extracted to dependency-free `ledger-balance.ts` instead of being tested
+  through `postLedgerTransaction`. Pure-function tests otherwise exist only
+  for the provider(s) that have them (see that provider's own README).
+  Confidence for everything else rests on `tsc`, `nest build`, `pnpm test`
+  (no regressions), and one manual boot check confirming DI wiring — not on
   anything that actually runs the attempt/event flow end-to-end against a
   real Postgres + Redis + live gateway sandbox.
 - **Provider-specific integration risk lives in that provider's own

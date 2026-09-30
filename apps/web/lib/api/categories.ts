@@ -286,6 +286,8 @@ export interface ListingsFeed {
   total?: number;
   /** Only when requested with `includeFacets`. */
   facets?: { categories: FeedFacet[]; subcategories?: FeedFacet[] };
+  /** Nothing matched exactly; these are typo-tolerant (similar) results. */
+  fuzzy?: boolean;
 }
 
 export interface ListingsFeedParams extends FeedQuery {
@@ -337,6 +339,7 @@ export async function getListingsFeed(
         nextCursor: string | null;
         total?: number;
         facets?: ListingsFeed["facets"];
+        fuzzy?: boolean;
       };
     };
     if (!body.success) return null;
@@ -345,6 +348,7 @@ export async function getListingsFeed(
       nextCursor: body.meta?.nextCursor ?? null,
       total: body.meta?.total,
       facets: body.meta?.facets,
+      fuzzy: body.meta?.fuzzy === true,
     };
   } catch {
     return null;

@@ -1,0 +1,1 @@
+ALTER TABLE "payment"."ledger_entries" ADD CONSTRAINT "ledger_entries_amount_positive" CHECK (amount > 0);

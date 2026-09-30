@@ -16,7 +16,12 @@ import { listings } from '../db/schema/listings.schema';
  * has that flaw; it is accepted only so already-issued links keep paging.)
  */
 
-export const FEED_SORTS = ['newest', 'price_asc', 'price_desc'] as const;
+export const FEED_SORTS = [
+  'newest',
+  'price_asc',
+  'price_desc',
+  'relevance',
+] as const;
 export type FeedSort = (typeof FEED_SORTS)[number];
 
 export interface FeedCursor {
@@ -24,9 +29,16 @@ export interface FeedCursor {
   /** Last row's sort value as text; null only for a price sort's null tail. */
   v: string | null;
   id: string;
+  /**
+   * Set when the first page fell back to fuzzy keyword matching, so every
+   * later page stays in that mode instead of re-deciding it.
+   */
+  f?: true;
 }
 
 const NUMERIC_RE = /^-?\d+(\.\d+)?$/;
+/** float8 text: `1.5`, `0.2857143`, `1e-05`. */
+const FLOAT_RE = /^-?\d+(\.\d+)?(e[-+]?\d+)?$/i;
 
 export function encodeCursor(cursor: FeedCursor): string {
   return Buffer.from(JSON.stringify(cursor)).toString('base64');
@@ -57,30 +69,47 @@ export function decodeCursor(
   }
 
   if (o.s !== sort) return null;
+  const base = (v: string | null): FeedCursor =>
+    o.f === true
+      ? { s: sort, v, id: o.id as string, f: true }
+      : { s: sort, v, id: o.id as string };
   if (sort === 'newest') {
-    return typeof o.v === 'string' && isTimestamp(o.v)
-      ? { s: sort, v: o.v, id: o.id }
-      : null;
+    return typeof o.v === 'string' && isTimestamp(o.v) ? base(o.v) : null;
   }
-  if (o.v === null) return { s: sort, v: null, id: o.id };
-  return typeof o.v === 'string' && NUMERIC_RE.test(o.v)
-    ? { s: sort, v: o.v, id: o.id }
-    : null;
+  if (sort === 'relevance') {
+    return typeof o.v === 'string' && FLOAT_RE.test(o.v) ? base(o.v) : null;
+  }
+  if (o.v === null) return base(null);
+  return typeof o.v === 'string' && NUMERIC_RE.test(o.v) ? base(o.v) : null;
 }
 
 function isTimestamp(v: string): boolean {
   return !Number.isNaN(Date.parse(v));
 }
 
+/**
+ * A sort resolved for one query. Relevance carries the score expression it
+ * orders by (keyword-search.ts `resolveFeedOrdering`), so "relevance with no
+ * score" cannot be represented — the type replaces a runtime check.
+ */
+export type FeedOrdering =
+  | { sort: 'relevance'; score: SQL }
+  | { sort: Exclude<FeedSort, 'relevance'> };
+
 /** The expression whose text value a cursor carries, per sort. */
-export function sortKeyExpr(sort: FeedSort): SQL<string | null> {
-  return sort === 'newest'
+export function sortKeyExpr(ordering: FeedOrdering): SQL<string | null> {
+  if (ordering.sort === 'relevance') {
+    return sql<string>`(${ordering.score})::text`;
+  }
+  return ordering.sort === 'newest'
     ? sql<string>`${listings.createdAt}::text`
     : sql<string | null>`${listings.effectivePrice}::text`;
 }
 
-export function orderByFor(sort: FeedSort): SQL[] {
-  switch (sort) {
+export function orderByFor(ordering: FeedOrdering): SQL[] {
+  switch (ordering.sort) {
+    case 'relevance':
+      return [sql`${ordering.score} desc`, sql`${listings.id} desc`];
     case 'price_asc':
       return [
         sql`${listings.effectivePrice} asc nulls last`,
@@ -97,22 +126,32 @@ export function orderByFor(sort: FeedSort): SQL[] {
 }
 
 /**
- * "Rows strictly after the cursor" for the cursor's own ordering. Price sorts
+ * "Rows strictly after the cursor" for the ordering it was issued under
+ * (`decodeCursor` already rejects a cursor whose `s` differs). Price sorts
  * put nulls ("Negotiable") last, so a non-null cursor must still admit the
  * whole null tail, and a null cursor is already inside it.
  */
-export function cursorPredicate(cursor: FeedCursor): SQL {
-  const { s, v, id } = cursor;
-  if (s === 'newest') {
+export function cursorPredicate(
+  cursor: FeedCursor,
+  ordering: FeedOrdering,
+): SQL {
+  const { v, id } = cursor;
+  if (ordering.sort === 'newest') {
     const ts = sql`${v}::timestamptz`;
     return or(
       sql`${listings.createdAt} < ${ts}`,
       and(sql`${listings.createdAt} = ${ts}`, lt(listings.id, id)),
     )!;
   }
+  if (ordering.sort === 'relevance') {
+    const sc = ordering.score;
+    const f = sql`${v}::float8`;
+    return or(sql`${sc} < ${f}`, and(sql`${sc} = ${f}`, lt(listings.id, id)))!;
+  }
   const ep = listings.effectivePrice;
   if (v === null) return and(isNull(ep), lt(listings.id, id))!;
   const n = sql`${v}::numeric`;
-  const beyond = s === 'price_asc' ? sql`${ep} > ${n}` : sql`${ep} < ${n}`;
+  const beyond =
+    ordering.sort === 'price_asc' ? sql`${ep} > ${n}` : sql`${ep} < ${n}`;
   return or(beyond, and(eq(ep, sql`${n}`), lt(listings.id, id)), isNull(ep))!;
 }

@@ -225,6 +225,13 @@
       "when": 1790734854722,
       "tag": "0031_listing_search",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790742092641,
+      "tag": "0032_ledger_entries_amount_positive",
+      "breakpoints": true
     }
   ]
 }

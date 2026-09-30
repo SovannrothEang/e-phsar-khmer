@@ -11,7 +11,9 @@ import {
   eq,
   getTableColumns,
   gte,
+  isNull,
   lte,
+  or,
   sql,
   inArray,
 } from 'drizzle-orm';
@@ -38,7 +40,11 @@ import {
   orderByFor,
   sortKeyExpr,
 } from './feed-cursor';
-import { keywordCondition } from './keyword-search';
+import {
+  canFuzzy,
+  keywordCondition,
+  resolveFeedOrdering,
+} from './keyword-search';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
@@ -52,6 +58,8 @@ export interface FeedFacet {
 export interface FeedMeta extends PaginationMeta {
   /** Present only with `includeFacets=true`. */
   facets?: { categories: FeedFacet[]; subcategories?: FeedFacet[] };
+  /** Present when nothing matched exactly and typo-tolerant results are shown. */
+  fuzzy?: true;
 }
 
 interface ResolvedFilters {
@@ -249,13 +257,21 @@ export class ListingsService {
     query: QueryListingsDto,
   ): Promise<{ data: ListingWithPhotos[]; meta: FeedMeta }> {
     const limit = query.limit ?? 20;
-    const sort = query.sort ?? 'newest';
+    const ordering = resolveFeedOrdering(query.sort, query.q);
+    const { sort } = ordering;
     if (
       query.minPrice != null &&
       query.maxPrice != null &&
       query.minPrice > query.maxPrice
     ) {
       throw new BadRequestException('minPrice must not exceed maxPrice');
+    }
+    if (
+      query.yearMin != null &&
+      query.yearMax != null &&
+      query.yearMin > query.yearMax
+    ) {
+      throw new BadRequestException('yearMin must not exceed yearMax');
     }
 
     const resolved = await this.resolveFilterIds(query);
@@ -272,35 +288,58 @@ export class ListingsService {
       };
     }
 
-    // `common` is everything EXCEPT the category dimension — the facet counts
-    // are computed over it, so choosing a category never zeroes the others.
-    const common: SQL[] = [
-      eq(listings.status, 'active'),
-      ...resolved.geo,
-      ...this.feedConditions(query),
-    ];
-    const full = [...common, ...this.categoryConditions(resolved)];
-
     const cursor = decodeCursor(query.cursor, sort);
-    const pageWhere = cursor ? [...full, cursorPredicate(cursor)] : full;
 
-    const [rows, total, facets] = await Promise.all([
-      this.db
-        .select({ ...getTableColumns(listings), sortKey: sortKeyExpr(sort) })
-        .from(listings)
-        .where(and(...pageWhere))
-        .orderBy(...orderByFor(sort))
-        .limit(limit + 1),
-      query.includeTotal ? this.countWhere(full) : undefined,
-      query.includeFacets ? this.facetCounts(common, resolved) : undefined,
-    ]);
+    const run = async (fuzzy: boolean) => {
+      // `common` is everything EXCEPT the category dimension — the facet
+      // counts are computed over it, so choosing a category never zeroes the
+      // others.
+      const common: SQL[] = [
+        ...this.liveConditions(),
+        ...resolved.geo,
+        ...this.feedConditions(query, { fuzzy }),
+      ];
+      const full = [...common, ...this.categoryConditions(resolved)];
+      const pageWhere = cursor
+        ? [...full, cursorPredicate(cursor, ordering)]
+        : full;
+      const [rows, total, facets] = await Promise.all([
+        this.db
+          .select({
+            ...getTableColumns(listings),
+            sortKey: sortKeyExpr(ordering),
+          })
+          .from(listings)
+          .where(and(...pageWhere))
+          .orderBy(...orderByFor(ordering))
+          .limit(limit + 1),
+        query.includeTotal ? this.countWhere(full) : undefined,
+        query.includeFacets ? this.facetCounts(common, resolved) : undefined,
+      ]);
+      return { rows, total, facets };
+    };
+
+    // A later page stays in whatever mode its first page chose. A first page
+    // that finds nothing exactly retries with typo tolerance ("toyta").
+    let fuzzy = cursor?.f === true;
+    let result = await run(fuzzy);
+    if (!cursor && !fuzzy && result.rows.length === 0 && canFuzzy(query.q)) {
+      fuzzy = true;
+      result = await run(true);
+    }
+    const { rows, total, facets } = result;
 
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
     const last = page[page.length - 1];
     const nextCursor =
       hasMore && last
-        ? encodeCursor({ s: sort, v: last.sortKey, id: last.id })
+        ? encodeCursor({
+            s: sort,
+            v: last.sortKey,
+            id: last.id,
+            ...(fuzzy ? { f: true as const } : {}),
+          })
         : null;
 
     // `sortKey` only feeds the cursor; strip it from the response rows.
@@ -320,8 +359,22 @@ export class ListingsService {
         limit,
         ...(total !== undefined ? { total } : {}),
         ...(facets ? { facets } : {}),
+        ...(fuzzy ? { fuzzy: true as const } : {}),
       },
     };
+  }
+
+  /**
+   * What makes a listing publicly visible: active AND not past its expiry.
+   * Nothing flips `status` to 'expired' when `expires_at` passes (no job does
+   * it yet), so the date itself must be checked or 30-day-old ads never leave
+   * the feed. A null expiry (legacy/seeded rows) counts as live.
+   */
+  private liveConditions(): SQL[] {
+    return [
+      eq(listings.status, 'active'),
+      or(isNull(listings.expiresAt), sql`${listings.expiresAt} > now()`)!,
+    ];
   }
 
   async findMine(
@@ -500,10 +553,13 @@ export class ListingsService {
   }
 
   /** The non-slug feed filters (keyword, price, condition, attributes, date, delivery). */
-  private feedConditions(query: QueryListingsDto): SQL[] {
+  private feedConditions(
+    query: QueryListingsDto,
+    { fuzzy = false }: { fuzzy?: boolean } = {},
+  ): SQL[] {
     const out: SQL[] = [];
 
-    const keyword = keywordCondition(query.q);
+    const keyword = keywordCondition(query.q, { fuzzy });
     if (keyword) out.push(keyword);
 
     // Final (discounted) price — what the cards show. A null price is
@@ -537,16 +593,30 @@ export class ListingsService {
       );
     }
 
-    // `published_at`, not `created_at`: a draft can sit for days before it
-    // goes live, and "posted today" means went live today.
+    // Model year lives in the JSONB as the display string ("2021"); anything
+    // that is not four digits never matches a year bound instead of erroring.
+    const year = sql`(CASE WHEN ${listings.attributes}->>'year' ~ '^[0-9]{4}$' THEN (${listings.attributes}->>'year')::int END)`;
+    if (query.yearMin != null) out.push(sql`${year} >= ${query.yearMin}`);
+    if (query.yearMax != null) out.push(sql`${year} <= ${query.yearMax}`);
+    if (query.engineType) {
+      out.push(
+        eq(sql`${listings.attributes}->>'engineType'`, query.engineType),
+      );
+    }
+
+    // "Went live" time: `published_at`, since a draft can sit for days before
+    // it is published — falling back to `created_at` for active rows that
+    // never went through publish (seeded/demo rows have no published_at, and
+    // without the fallback no date filter could ever match them).
+    const postedAt = sql`coalesce(${listings.publishedAt}, ${listings.createdAt})`;
     if (query.postedWithin === 'today') {
       out.push(
-        sql`${listings.publishedAt} >= (date_trunc('day', now() AT TIME ZONE 'Asia/Phnom_Penh') AT TIME ZONE 'Asia/Phnom_Penh')`,
+        sql`${postedAt} >= (date_trunc('day', now() AT TIME ZONE 'Asia/Phnom_Penh') AT TIME ZONE 'Asia/Phnom_Penh')`,
       );
     } else if (query.postedWithin === 'week') {
-      out.push(sql`${listings.publishedAt} >= now() - interval '7 days'`);
+      out.push(sql`${postedAt} >= now() - interval '7 days'`);
     } else if (query.postedWithin === 'month') {
-      out.push(sql`${listings.publishedAt} >= now() - interval '30 days'`);
+      out.push(sql`${postedAt} >= now() - interval '30 days'`);
     }
 
     if (query.deliveryFree) {

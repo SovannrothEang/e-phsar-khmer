@@ -338,12 +338,112 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(params).toContain('%prius%');
   });
 
-  it('postedWithin=today counts from midnight Phnom Penh on published_at', async () => {
+  it('postedWithin=today counts from midnight Phnom Penh on the go-live time', async () => {
     const [page] = queue([]);
     await service.findFeed({ postedWithin: 'today' });
     const { sql } = whereOf(page);
-    expect(sql).toContain('"published_at" >=');
+    // published_at, falling back to created_at for rows never published
+    // through the API (seeded rows) — otherwise they could never match.
+    expect(sql).toMatch(
+      /coalesce\("listings"\."published_at", "listings"\."created_at"\) >=/,
+    );
     expect(sql).toContain("'Asia/Phnom_Penh'");
+  });
+
+  it('only shows live listings: active and not past expires_at', async () => {
+    const [page] = queue([]);
+    await service.findFeed({});
+    const { sql } = whereOf(page);
+    expect(sql).toContain('"status" = $');
+    expect(sql).toMatch(
+      /\("listings"\."expires_at" is null or "listings"\."expires_at" > now\(\)\)/,
+    );
+  });
+
+  it('filters model year numerically and engine type by name', async () => {
+    const [page] = queue([]);
+    await service.findFeed({
+      yearMin: 2018,
+      yearMax: 2022,
+      engineType: 'Petrol',
+    });
+    const { sql, params } = whereOf(page);
+    expect(sql).toContain("~ '^[0-9]{4}$'");
+    expect(sql).toMatch(/::int END\) >= \$\d+/);
+    expect(sql).toMatch(/::int END\) <= \$\d+/);
+    expect(sql).toContain("->>'engineType'");
+    expect(params).toEqual(expect.arrayContaining([2018, 2022, 'Petrol']));
+  });
+
+  it('rejects an inverted year range', async () => {
+    await expect(
+      service.findFeed({ yearMin: 2022, yearMax: 2018 }),
+    ).rejects.toThrow('yearMin must not exceed yearMax');
+  });
+
+  describe('best match + typo fallback', () => {
+    const hit = { id: 'a', sortKey: '1.5' };
+
+    it('orders by the relevance score for sort=relevance', async () => {
+      const [page] = queue([hit]);
+      await service.findFeed({ q: 'toyota', sort: 'relevance' });
+      const first = compile(page.orderBy[0]).sql;
+      expect(first).toContain('word_similarity');
+      expect(first).toMatch(/::float8 desc$/);
+    });
+
+    it('falls back to newest when relevance has no keyword', async () => {
+      const [page] = queue([]);
+      await service.findFeed({ sort: 'relevance' });
+      expect(compile(page.orderBy[0]).sql).toMatch(/created_at" desc/);
+    });
+
+    it('does not fuzz while the exact search has results', async () => {
+      const [page] = queue([hit]);
+      const res = await service.findFeed({ q: 'toyota' });
+      // The page query + the photo batch for its row — no second page query.
+      expect(db.select).toHaveBeenCalledTimes(2);
+      expect(whereOf(page).sql).not.toContain('word_similarity');
+      expect(res.meta).not.toHaveProperty('fuzzy');
+    });
+
+    it('retries with typo tolerance when nothing matches exactly', async () => {
+      const [exact, fuzzy] = queue([], [hit, { id: 'b', sortKey: '1' }]);
+      const res = await service.findFeed({ q: 'toyta', limit: 1 });
+      expect(whereOf(exact).sql).not.toContain('word_similarity');
+      expect(whereOf(fuzzy).sql).toContain('word_similarity');
+      expect(res.meta.fuzzy).toBe(true);
+      const cursor = JSON.parse(
+        Buffer.from(res.meta.nextCursor!, 'base64').toString('utf8'),
+      ) as { f?: boolean };
+      expect(cursor.f).toBe(true);
+    });
+
+    it('keeps a fuzzy cursor fuzzy on later pages, without re-deciding', async () => {
+      const [page] = queue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ s: 'newest', v: '2026-09-30', id: 'a', f: true }),
+      ).toString('base64');
+      const res = await service.findFeed({ q: 'toyta', cursor });
+      expect(whereOf(page).sql).toContain('word_similarity');
+      expect(db.select).toHaveBeenCalledTimes(1);
+      expect(res.meta.fuzzy).toBe(true);
+    });
+
+    it('never fuzzes a later exact page that runs dry', async () => {
+      queue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ s: 'newest', v: '2026-09-30', id: 'a' }),
+      ).toString('base64');
+      await service.findFeed({ q: 'toyota', cursor });
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fuzz tokens shorter than 4 characters', async () => {
+      queue([]);
+      await service.findFeed({ q: 'bmw' });
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('deliveryFree=true filters on delivery_free', async () => {
@@ -451,7 +551,8 @@ describe('ListingsService.findFeed search + facets', () => {
     it('category facets drop the category dimension but keep the rest', async () => {
       const cats = [{ slug: 'cars-and-vehicles', count: 3 }];
       const subs = [{ slug: 'cars-for-sale', count: 3 }];
-      const recs = queue([{ id: 'cat-1' }], [], cats, subs);
+      // One page row, so the empty-result typo retry does not kick in.
+      const recs = queue([{ id: 'cat-1' }], [{ id: 'x' }], cats, subs);
       const res = await service.findFeed({
         categorySlug: 'cars-and-vehicles',
         q: 'toyota',

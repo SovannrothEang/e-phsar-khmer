@@ -19,6 +19,9 @@ export const CONDITION_PARAM = "condition";
 export const DATE_PARAM = "date";
 export const DELIVERY_PARAM = "delivery";
 export const SORT_PARAM = "sort";
+export const YEAR_MIN_PARAM = "year_min";
+export const YEAR_MAX_PARAM = "year_max";
+export const ENGINE_PARAM = "engine";
 
 /** Everything the filter bar owns — "Clear all" removes exactly these. */
 export const FILTER_PARAMS = [
@@ -32,24 +35,52 @@ export const FILTER_PARAMS = [
   DATE_PARAM,
   DELIVERY_PARAM,
   SORT_PARAM,
+  YEAR_MIN_PARAM,
+  YEAR_MAX_PARAM,
+  ENGINE_PARAM,
 ] as const;
 
 export const MAX_QUERY_LENGTH = 100;
 
 // "Most Hit" is hidden until listing views are counted (nothing increments
 // views_count yet), and "New Ads" was a duplicate of "Latest Ads".
+// "Best match" only exists while there is a keyword — and is then the default.
 export const SORT_OPTIONS = [
+  { value: "best-match", label: "Best Match", backend: "relevance" },
   { value: "latest-ads", label: "Latest Ads", backend: "newest" },
   { value: "price-asc", label: "Price: Low to High", backend: "price_asc" },
   { value: "price-desc", label: "Price: High to Low", backend: "price_desc" },
 ] as const;
 export type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 export type BackendSort = (typeof SORT_OPTIONS)[number]["backend"];
-export const DEFAULT_SORT: SortValue = "latest-ads";
 
-/** Unknown or retired values (`new-ads`, `most-hit`) fall back to the default. */
-export function parseSortParam(value: string | null | undefined): SortValue {
-  return SORT_OPTIONS.find((o) => o.value === value)?.value ?? DEFAULT_SORT;
+/** The sort an absent `sort` param means: best match with a keyword, else newest. */
+export function defaultSortFor(hasQuery: boolean): SortValue {
+  return hasQuery ? "best-match" : "latest-ads";
+}
+
+/** The options to offer — "Best match" needs a keyword to rank against. */
+export function sortOptionsFor(hasQuery: boolean) {
+  return SORT_OPTIONS.filter((o) => hasQuery || o.value !== "best-match");
+}
+
+/**
+ * Unknown or retired values (`new-ads`, `most-hit`), and "best-match" without
+ * a keyword, fall back to the default for the current keyword state.
+ */
+export function parseSortParam(
+  value: string | null | undefined,
+  hasQuery: boolean,
+): SortValue {
+  return (
+    sortOptionsFor(hasQuery).find((o) => o.value === value)?.value ??
+    defaultSortFor(hasQuery)
+  );
+}
+
+/** Whether the URL currently has a (non-blank) keyword. */
+export function hasQueryParam(params: URLSearchParams): boolean {
+  return normalizeQuery(params.get(Q_PARAM)) !== "";
 }
 
 export const DATE_OPTIONS = [
@@ -79,6 +110,9 @@ export interface FeedQuery {
   condition?: ConditionValue;
   postedWithin?: Exclude<DateValue, "">;
   deliveryFree?: boolean;
+  yearMin?: number;
+  yearMax?: number;
+  engineType?: string;
   sort?: BackendSort;
 }
 
@@ -102,6 +136,12 @@ function price(v: string | undefined): number | undefined {
   if (!v?.trim()) return undefined;
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
+
+function year(v: string | undefined): number | undefined {
+  if (!v || !/^\d{4}$/.test(v)) return undefined;
+  const n = Number(v);
+  return n >= 1900 && n <= 2100 ? n : undefined;
 }
 
 export function normalizeQuery(v: string | undefined | null): string {
@@ -159,8 +199,19 @@ export function parseFeedParams(
 
   if (get(DELIVERY_PARAM) === "1") out.deliveryFree = true;
 
+  let yearMin = year(get(YEAR_MIN_PARAM));
+  let yearMax = year(get(YEAR_MAX_PARAM));
+  if (yearMin !== undefined && yearMax !== undefined && yearMin > yearMax) {
+    [yearMin, yearMax] = [yearMax, yearMin];
+  }
+  if (yearMin !== undefined) out.yearMin = yearMin;
+  if (yearMax !== undefined) out.yearMax = yearMax;
+
+  const engine = get(ENGINE_PARAM)?.trim();
+  if (engine && engine.length <= 60) out.engineType = engine;
+
   const sort = SORT_OPTIONS.find(
-    (o) => o.value === parseSortParam(get(SORT_PARAM)),
+    (o) => o.value === parseSortParam(get(SORT_PARAM), !!out.q),
   )!.backend;
   if (sort !== "newest") out.sort = sort;
 

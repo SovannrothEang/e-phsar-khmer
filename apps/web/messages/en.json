@@ -201,6 +201,7 @@
     "clearFilters": "Clear filters",
     "clearSearch": "Clear search",
     "metaTitle": "{q} – Search",
-    "metaTitleAll": "Search ads"
+    "metaTitleAll": "Search ads",
+    "fuzzyNotice": "No exact matches for “{q}” — showing similar ads."
   }
 }

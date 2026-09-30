@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsIn,
+  IsInt,
+  Max,
   IsNumber,
   IsOptional,
   IsString,
@@ -100,7 +102,40 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsString()
   communeSlug?: string;
 
-  @ApiPropertyOptional({ enum: FEED_SORTS, default: 'newest' })
+  @ApiPropertyOptional({
+    description:
+      "Min model year — listings.attributes->>'year' (non-numeric years never match)",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  yearMin?: number;
+
+  @ApiPropertyOptional({ description: 'Max model year (see yearMin)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1900)
+  @Max(2100)
+  yearMax?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Engine type display name — listings.attributes->>'engineType' (e.g. Petrol)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  engineType?: string;
+
+  @ApiPropertyOptional({
+    enum: FEED_SORTS,
+    default: 'newest',
+    description:
+      'relevance = best match for q (falls back to newest without q)',
+  })
   @IsOptional()
   @IsIn(FEED_SORTS)
   sort?: FeedSort;

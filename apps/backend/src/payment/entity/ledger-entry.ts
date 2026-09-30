@@ -1,4 +1,6 @@
+import { sql } from 'drizzle-orm';
 import {
+  check,
   index,
   integer,
   numeric,
@@ -43,6 +45,7 @@ export const ledgerEntries = paymentSchema.table(
   (t) => [
     index('ledger_entries_transaction_idx').on(t.ledgerTransactionId),
     index('ledger_entries_account_idx').on(t.accountId, t.createdAt),
+    check('ledger_entries_amount_positive', sql`amount > 0`),
   ],
 );
 

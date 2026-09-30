@@ -1,4 +1,5 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import {
   cursorPredicate,
@@ -24,6 +25,39 @@ describe('feed cursor', () => {
     it.each(cases)('$s / $v', (c) => {
       expect(decodeCursor(encodeCursor(c), c.s)).toEqual(c);
     });
+  });
+
+  it('round-trips relevance scores, including float8 exponent form', () => {
+    for (const v of ['1.5', '0.2857143', '1e-05']) {
+      const c: FeedCursor = { s: 'relevance', v, id: ID };
+      expect(decodeCursor(encodeCursor(c), 'relevance')).toEqual(c);
+    }
+    const nullScore = b64({ s: 'relevance', v: null, id: ID });
+    expect(decodeCursor(nullScore, 'relevance')).toBeNull();
+  });
+
+  it('carries the fuzzy flag, and only a literal true', () => {
+    const fuzzy = encodeCursor({
+      s: 'newest',
+      v: '2026-09-30',
+      id: ID,
+      f: true,
+    });
+    expect(decodeCursor(fuzzy, 'newest')?.f).toBe(true);
+    const bogus = b64({ s: 'newest', v: '2026-09-30', id: ID, f: 'yes' });
+    expect(decodeCursor(bogus, 'newest')).not.toHaveProperty('f');
+  });
+
+  it('relevance predicate compares the score as float8', () => {
+    const score = sql`(1)::float8`;
+    const { sql: text, params } = toSql(
+      cursorPredicate(
+        { s: 'relevance', v: '1.25', id: ID },
+        { sort: 'relevance', score },
+      ),
+    );
+    expect(text).toMatch(/< \$\d+::float8/);
+    expect(params).toEqual(expect.arrayContaining(['1.25', ID]));
   });
 
   it('accepts the legacy {createdAt, id} cursor for newest', () => {
@@ -68,15 +102,15 @@ describe('feed cursor', () => {
 
   describe('orderByFor', () => {
     it('puts negotiable (null) prices last in both directions', () => {
-      const asc = orderByFor('price_asc').map((s) => toSql(s).sql);
-      const desc = orderByFor('price_desc').map((s) => toSql(s).sql);
+      const asc = orderByFor({ sort: 'price_asc' }).map((s) => toSql(s).sql);
+      const desc = orderByFor({ sort: 'price_desc' }).map((s) => toSql(s).sql);
       expect(asc[0]).toMatch(/effective_price" asc nulls last/);
       expect(desc[0]).toMatch(/effective_price" desc nulls last/);
       expect(asc[1]).toMatch(/"id" desc/);
     });
 
     it('keeps newest on (created_at, id) desc', () => {
-      const parts = orderByFor('newest').map((s) => toSql(s).sql);
+      const parts = orderByFor({ sort: 'newest' }).map((s) => toSql(s).sql);
       expect(parts[0]).toMatch(/created_at" desc/);
       expect(parts[1]).toMatch(/"id" desc/);
     });
@@ -85,7 +119,10 @@ describe('feed cursor', () => {
   describe('cursorPredicate', () => {
     it('binds the value and id as parameters', () => {
       const { sql, params } = toSql(
-        cursorPredicate({ s: 'price_asc', v: '10.00', id: ID }),
+        cursorPredicate(
+          { s: 'price_asc', v: '10.00', id: ID },
+          { sort: 'price_asc' },
+        ),
       );
       expect(params).toEqual(expect.arrayContaining(['10.00', ID]));
       expect(sql).not.toContain('10.00');
@@ -93,7 +130,10 @@ describe('feed cursor', () => {
 
     it('asc: greater price, equal price with smaller id, or the null tail', () => {
       const { sql } = toSql(
-        cursorPredicate({ s: 'price_asc', v: '10.00', id: ID }),
+        cursorPredicate(
+          { s: 'price_asc', v: '10.00', id: ID },
+          { sort: 'price_asc' },
+        ),
       );
       expect(sql).toMatch(/effective_price" > \$\d+::numeric/);
       expect(sql).toMatch(/effective_price" is null/);
@@ -101,7 +141,10 @@ describe('feed cursor', () => {
 
     it('desc: smaller price, and still the null tail', () => {
       const { sql } = toSql(
-        cursorPredicate({ s: 'price_desc', v: '10.00', id: ID }),
+        cursorPredicate(
+          { s: 'price_desc', v: '10.00', id: ID },
+          { sort: 'price_desc' },
+        ),
       );
       expect(sql).toMatch(/effective_price" < \$\d+::numeric/);
       expect(sql).toMatch(/effective_price" is null/);
@@ -109,7 +152,10 @@ describe('feed cursor', () => {
 
     it('a null cursor stays inside the null tail', () => {
       const { sql } = toSql(
-        cursorPredicate({ s: 'price_asc', v: null, id: ID }),
+        cursorPredicate(
+          { s: 'price_asc', v: null, id: ID },
+          { sort: 'price_asc' },
+        ),
       );
       expect(sql).toMatch(/effective_price" is null and .*"id" < \$\d+/);
       expect(sql).not.toMatch(/numeric/);
@@ -118,7 +164,7 @@ describe('feed cursor', () => {
     it('newest compares the exact timestamp text, not a JS Date', () => {
       const v = '2026-09-30 10:15:42.123456+00';
       const { sql, params } = toSql(
-        cursorPredicate({ s: 'newest', v, id: ID }),
+        cursorPredicate({ s: 'newest', v, id: ID }, { sort: 'newest' }),
       );
       expect(sql).toMatch(/created_at" < \$\d+::timestamptz/);
       expect(params).toContain(v); // microseconds intact

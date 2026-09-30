@@ -20,8 +20,8 @@ import {
   CONDITION_PARAM,
   DATE_OPTIONS,
   DATE_PARAM,
-  DEFAULT_SORT,
   DELIVERY_PARAM,
+  ENGINE_PARAM,
   FILTER_PARAMS,
   LOCATION_COM_PARAM,
   LOCATION_DIS_PARAM,
@@ -29,10 +29,14 @@ import {
   MAX_AD_PRICE_PARAM,
   MIN_AD_PRICE_PARAM,
   Q_PARAM,
-  SORT_OPTIONS,
   SORT_PARAM,
+  YEAR_MAX_PARAM,
+  YEAR_MIN_PARAM,
+  defaultSortFor,
+  hasQueryParam,
   normalizeQuery,
   parseSortParam,
+  sortOptionsFor,
   type DateValue,
   type SortValue,
 } from "@/lib/search-params";
@@ -51,11 +55,14 @@ function countActiveFilters(params: URLSearchParams): number {
   if (params.get(Q_PARAM)) n++;
   if (params.get(DATE_PARAM)) n++;
   if (params.get(LOCATION_PRO_PARAM)) n++;
-  if (params.get(SORT_PARAM) && params.get(SORT_PARAM) !== DEFAULT_SORT) n++;
+  const sort = params.get(SORT_PARAM);
+  if (sort && sort !== defaultSortFor(hasQueryParam(params))) n++;
   if (params.get(MIN_AD_PRICE_PARAM)) n++;
   if (params.get(MAX_AD_PRICE_PARAM)) n++;
   if (params.get(CONDITION_PARAM)) n++;
   if (params.get(DELIVERY_PARAM)) n++;
+  if (params.get(YEAR_MIN_PARAM) || params.get(YEAR_MAX_PARAM)) n++;
+  if (params.get(ENGINE_PARAM)) n++;
   return n;
 }
 
@@ -126,7 +133,9 @@ export default function MoreFilters() {
 
   // ── Draft state ──────────────────────────────────────────────────────────
   const [keyword, setKeyword] = useState("");
-  const [sort, setSort] = useState<SortValue>(DEFAULT_SORT);
+  const [sort, setSort] = useState<SortValue>(defaultSortFor(false));
+  // The draft keyword decides which sorts exist and which one is the default.
+  const draftHasQuery = normalizeQuery(keyword) !== "";
   const [date, setDate] = useState<DateValue>("");
   const [proId, setProId] = useState("");
   const [disId, setDisId] = useState("");
@@ -142,7 +151,9 @@ export default function MoreFilters() {
     // Sync draft from URL each time the dialog opens.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setKeyword(searchParams.get(Q_PARAM) ?? "");
-    setSort(parseSortParam(searchParams.get(SORT_PARAM)));
+    setSort(
+      parseSortParam(searchParams.get(SORT_PARAM), hasQueryParam(searchParams)),
+    );
     setDate((searchParams.get(DATE_PARAM) as DateValue) ?? "");
     setProId(searchParams.get(LOCATION_PRO_PARAM) ?? "");
     setDisId(searchParams.get(LOCATION_DIS_PARAM) ?? "");
@@ -181,10 +192,12 @@ export default function MoreFilters() {
 
     set(Q_PARAM, normalizeQuery(keyword));
     set(DATE_PARAM, date);
-    if (sort === DEFAULT_SORT) {
+    // Re-validate against the draft keyword: "best-match" without one is moot.
+    const finalSort = parseSortParam(sort, draftHasQuery);
+    if (finalSort === defaultSortFor(draftHasQuery)) {
       params.delete(SORT_PARAM);
     } else {
-      params.set(SORT_PARAM, sort);
+      params.set(SORT_PARAM, finalSort);
     }
     set(LOCATION_PRO_PARAM, proId);
     set(LOCATION_DIS_PARAM, disId);
@@ -204,7 +217,7 @@ export default function MoreFilters() {
   // ── Clear everything ─────────────────────────────────────────────────────
   const clearAll = () => {
     setKeyword("");
-    setSort(DEFAULT_SORT);
+    setSort(defaultSortFor(false));
     setDate("");
     setProId("");
     setDisId("");
@@ -283,7 +296,7 @@ export default function MoreFilters() {
             label="Sort"
             value={sort}
             onChange={(v) => setSort(v as SortValue)}
-            options={SORT_OPTIONS.map((o) => ({
+            options={sortOptionsFor(draftHasQuery).map((o) => ({
               value: o.value,
               label: o.label,
             }))}

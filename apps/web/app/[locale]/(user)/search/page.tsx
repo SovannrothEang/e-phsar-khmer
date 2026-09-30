@@ -197,6 +197,15 @@ export default async function SearchPage({
               </div>
             )}
 
+            {feed?.fuzzy && posts.length > 0 && (
+              <p
+                role="status"
+                className="mt-3 rounded-sm border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+              >
+                {t("fuzzyNotice", { q })}
+              </p>
+            )}
+
             {posts.length === 0 ? (
               <div className="mt-4 flex flex-col items-center gap-3 rounded-sm border bg-card px-6 py-16 text-center">
                 <IconSearch className="size-10 text-muted-foreground" aria-hidden />

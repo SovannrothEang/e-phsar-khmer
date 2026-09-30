@@ -17,6 +17,7 @@ import { FeedResults } from "@/components/search/FeedResults";
 import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 import {
   getBrandsForSubcategory,
+  getAttributeOptions,
   getCategoryWithSubcategories,
   getLinkedAttributeOptions,
   getListingsFeed,
@@ -306,6 +307,12 @@ export default async function SubcategoryPage({
     SUBCATEGORY_HEADER_FLAGS[subcategory.slug] ??
     CATEGORY_HEADER_FLAGS[category.slug] ??
     DEFAULT_HEADER_FLAGS;
+  // Engine chip options are the real `enginetypes` names — exactly what the
+  // post form stores in attributes.engineType — never a hardcoded list.
+  const engineOptions =
+    headerFlags.engine !== false
+      ? (await getAttributeOptions("enginetypes")).map((row) => row.name)
+      : [];
 
   // ── Active filter label — display names when available (slug-derived
   //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
@@ -403,7 +410,11 @@ export default async function SubcategoryPage({
           containing block (same pattern as the category page). */}
       <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
         {/* Subcategory header */}
-        <LSPCYEHeader title={subcategory.name} {...headerFlags} />
+        <LSPCYEHeader
+          title={subcategory.name}
+          {...headerFlags}
+          engineOptions={engineOptions}
+        />
         {/* Main listing content (visible in both grid/list views — same as
             SubcategoryGrid on the category page) */}
         <div>
