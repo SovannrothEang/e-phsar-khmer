@@ -121,10 +121,7 @@ export async function CategoryFacets({
   }
 
   return (
-    <nav
-      aria-label={t("categories")}
-      className="rounded-sm border bg-card p-2"
-    >
+    <nav aria-label={t("categories")} className="rounded-sm border bg-card p-2">
       <p className="px-3 pt-1 pb-2 text-sm font-semibold">{t("categories")}</p>
       <ul className="space-y-0.5">
         {rows.map((r) => (

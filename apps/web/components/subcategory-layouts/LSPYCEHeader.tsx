@@ -107,7 +107,12 @@ function ChipSelect({
  * "& older" bucket. A bucket is a `year_min`/`year_max` pair; the key encodes
  * both so a URL-driven range can be matched back to its row.
  */
-function yearOptions(): { key: string; label: string; min?: number; max?: number }[] {
+function yearOptions(): {
+  key: string;
+  label: string;
+  min?: number;
+  max?: number;
+}[] {
   const newest = new Date().getFullYear() + 1; // next model year is sold already
   const singles = Array.from({ length: 8 }, (_, i) => newest - i).map((y) => ({
     key: `${y}-${y}`,
@@ -202,8 +207,7 @@ export default function LSPYCEHeader({
             <ChipSelect
               label="Condition"
               activeLabel={
-                CONDITION_OPTIONS.find((o) => o.value === conditionValue)
-                  ?.label
+                CONDITION_OPTIONS.find((o) => o.value === conditionValue)?.label
               }
               value={conditionValue}
               options={[

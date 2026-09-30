@@ -25,22 +25,22 @@ Append to the existing file (same `chat` Postgres schema as `conversations`/`mes
 ```ts
 // imports gain: boolean, integer, jsonb
 
-export const userE2eIdentities = chatSchema.table('user_e2e_identities', {
-  userId: uuid('user_id')
+export const userE2eIdentities = chatSchema.table("user_e2e_identities", {
+  userId: uuid("user_id")
     .primaryKey()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  identityKey: text('identity_key').notNull(), // base64 Curve25519 public key
-  registrationId: integer('registration_id').notNull(),
-  signedPrekeyId: integer('signed_prekey_id').notNull(),
-  signedPrekeyPublic: text('signed_prekey_public').notNull(), // base64
-  signedPrekeySignature: text('signed_prekey_signature').notNull(), // base64
-  signedPrekeyCreatedAt: timestamp('signed_prekey_created_at', {
+    .references(() => users.id, { onDelete: "cascade" }),
+  identityKey: text("identity_key").notNull(), // base64 Curve25519 public key
+  registrationId: integer("registration_id").notNull(),
+  signedPrekeyId: integer("signed_prekey_id").notNull(),
+  signedPrekeyPublic: text("signed_prekey_public").notNull(), // base64
+  signedPrekeySignature: text("signed_prekey_signature").notNull(), // base64
+  signedPrekeyCreatedAt: timestamp("signed_prekey_created_at", {
     withTimezone: true,
   }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
@@ -49,33 +49,32 @@ export type UserE2eIdentityRow = typeof userE2eIdentities.$inferSelect;
 export type NewUserE2eIdentity = typeof userE2eIdentities.$inferInsert;
 
 export const userE2eOneTimePrekeys = chatSchema.table(
-  'user_e2e_one_time_prekeys',
+  "user_e2e_one_time_prekeys",
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    userId: uuid('user_id')
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    prekeyId: integer('prekey_id').notNull(),
-    publicKey: text('public_key').notNull(), // base64
-    usedAt: timestamp('used_at', { withTimezone: true }), // null = available
-    createdAt: timestamp('created_at', { withTimezone: true })
+      .references(() => users.id, { onDelete: "cascade" }),
+    prekeyId: integer("prekey_id").notNull(),
+    publicKey: text("public_key").notNull(), // base64
+    usedAt: timestamp("used_at", { withTimezone: true }), // null = available
+    createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (t) => [
-    uniqueIndex('user_e2e_otp_user_prekey_uq').on(t.userId, t.prekeyId),
+    uniqueIndex("user_e2e_otp_user_prekey_uq").on(t.userId, t.prekeyId),
     // Serves the claim query in E2eKeysService.getBundle: only unused rows,
     // scoped to one user — same partial-index shape as
     // messages_conversation_unread_idx (chat.schema.ts) and
     // users_username_active_uq (users.schema.ts).
-    index('user_e2e_otp_available_idx')
+    index("user_e2e_otp_available_idx")
       .on(t.userId)
       .where(sql`used_at is null`),
   ],
 );
 
-export type UserE2eOneTimePrekeyRow =
-  typeof userE2eOneTimePrekeys.$inferSelect;
+export type UserE2eOneTimePrekeyRow = typeof userE2eOneTimePrekeys.$inferSelect;
 export type NewUserE2eOneTimePrekey = typeof userE2eOneTimePrekeys.$inferInsert;
 ```
 
@@ -157,8 +156,8 @@ No new Nest module — registered directly in the existing `ChatModule` (same pa
 `dto/one-time-prekey.dto.ts`:
 
 ```ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsString, Min, MaxLength } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsInt, IsNotEmpty, IsString, Min, MaxLength } from "class-validator";
 
 export class OneTimePrekeyDto {
   @ApiProperty()
@@ -177,7 +176,7 @@ export class OneTimePrekeyDto {
 `dto/register-e2e-keys.dto.ts`:
 
 ```ts
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
@@ -187,9 +186,9 @@ import {
   Min,
   MaxLength,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { OneTimePrekeyDto } from './one-time-prekey.dto';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { OneTimePrekeyDto } from "./one-time-prekey.dto";
 
 export class RegisterE2eKeysDto {
   @ApiProperty()
@@ -245,16 +244,16 @@ export interface E2eKeyBundle {
 ### 2.3 `e2e-keys.service.ts`
 
 ```ts
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { DRIZZLE } from '../../db/drizzle.provider';
-import type { DbClient } from '../../db/drizzle.provider';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { DRIZZLE } from "../../db/drizzle.provider";
+import type { DbClient } from "../../db/drizzle.provider";
 import {
   userE2eIdentities,
   userE2eOneTimePrekeys,
-} from '../../db/schema/chat.schema';
-import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
-import type { E2eKeyBundle } from './e2e-keys.types';
+} from "../../db/schema/chat.schema";
+import type { RegisterE2eKeysDto } from "./dto/register-e2e-keys.dto";
+import type { E2eKeyBundle } from "./e2e-keys.types";
 
 @Injectable()
 export class E2eKeysService {
@@ -309,7 +308,10 @@ export class E2eKeysService {
           // Matches the partial unique index — a replayed registration call
           // (e.g. a retried request) never duplicates a prekey id.
           .onConflictDoNothing({
-            target: [userE2eOneTimePrekeys.userId, userE2eOneTimePrekeys.prekeyId],
+            target: [
+              userE2eOneTimePrekeys.userId,
+              userE2eOneTimePrekeys.prekeyId,
+            ],
           });
       }
     });
@@ -331,7 +333,7 @@ export class E2eKeysService {
       .where(eq(userE2eIdentities.userId, userId))
       .limit(1);
     if (!identity)
-      throw new NotFoundException('User has not registered E2E keys');
+      throw new NotFoundException("User has not registered E2E keys");
 
     const [claimed] = await this.db
       .update(userE2eOneTimePrekeys)
@@ -385,21 +387,21 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { RequestUser } from '../../common/types/api-response.types';
-import { E2eKeysService } from './e2e-keys.service';
-import { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import type { RequestUser } from "../../common/types/api-response.types";
+import { E2eKeysService } from "./e2e-keys.service";
+import { RegisterE2eKeysDto } from "./dto/register-e2e-keys.dto";
 
-@ApiTags('chats')
+@ApiTags("chats")
 @ApiBearerAuth()
-@Controller('chats/e2e/keys')
+@Controller("chats/e2e/keys")
 export class E2eKeysController {
   constructor(private readonly e2eKeysService: E2eKeysService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Register or rotate this account\'s E2E keys' })
+  @ApiOperation({ summary: "Register or rotate this account's E2E keys" })
   registerKeys(
     @CurrentUser() user: RequestUser,
     @Body() dto: RegisterE2eKeysDto,
@@ -407,15 +409,15 @@ export class E2eKeysController {
     return this.e2eKeysService.registerKeys(user.id, dto);
   }
 
-  @Get('me/prekey-count')
-  @ApiOperation({ summary: 'Remaining one-time prekeys for replenishment' })
+  @Get("me/prekey-count")
+  @ApiOperation({ summary: "Remaining one-time prekeys for replenishment" })
   getPrekeyCount(@CurrentUser() user: RequestUser) {
     return this.e2eKeysService.getPrekeyCount(user.id);
   }
 
-  @Get(':userId/bundle')
-  @ApiOperation({ summary: 'Fetch a key bundle to start an X3DH session' })
-  getBundle(@Param('userId', ParseUUIDPipe) userId: string) {
+  @Get(":userId/bundle")
+  @ApiOperation({ summary: "Fetch a key bundle to start an X3DH session" })
+  getBundle(@Param("userId", ParseUUIDPipe) userId: string) {
     return this.e2eKeysService.getBundle(userId);
   }
 }
@@ -426,8 +428,8 @@ Route order is `me/prekey-count` before `:userId/bundle` — not strictly requir
 ### 2.5 `chat.module.ts`
 
 ```ts
-import { E2eKeysController } from './e2e/e2e-keys.controller';
-import { E2eKeysService } from './e2e/e2e-keys.service';
+import { E2eKeysController } from "./e2e/e2e-keys.controller";
+import { E2eKeysService } from "./e2e/e2e-keys.service";
 
 @Module({
   imports: [AuthModule],

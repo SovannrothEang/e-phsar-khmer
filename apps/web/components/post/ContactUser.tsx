@@ -20,8 +20,7 @@ export default function ContactUser({
   const phone0 = user?.phone?.[0];
   const phone1 = user?.phone?.[1];
   const heading =
-    locationLine ??
-    [district?.name, province?.name].filter(Boolean).join(", ");
+    locationLine ?? [district?.name, province?.name].filter(Boolean).join(", ");
 
   return (
     <>

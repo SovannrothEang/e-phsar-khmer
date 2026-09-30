@@ -14,17 +14,17 @@ renews, …) actually enforced. Admin comp grants keep working.
 
 Read before designing — every decision below is constrained by these.
 
-| Area | What is built | Consequence for this plan |
-| --- | --- | --- |
-| `users` (`db/schema/users.schema.ts`) | Individual accounts, soft-delete, `role` user/admin/super_admin. No org concept. | Keep untouched. Tenancy is **additive**. |
-| Subscription config (`subscriptions.schema.ts`) | 4 tiers: `subscription_categories → plans → packages → terms`. Packages carry integer quotas (`photos, ads, renews, autoRenews, videos`). Terms carry `price numeric(10,2)` + `discount/discountType` + `durationValue/Unit`. Admin CRUD done. | Catalogue is reusable as-is. **No link** from `subscription_categories` (Auto / Food / General / Property / Services…) to listing `categories` — quotas cannot be scoped to listings yet. |
-| `user_subscriptions` | `userId` FK cascade, `termId` FK set null, `priceUsd` snapshot, `paymentMethod` **free text**, `subscribedAt/expiresAt`. Status derived (`expiresAt > now`). Only writer: admin `POST /admin/user-subscriptions`. Readers: `UserSubscriptionsService`, `AdminService` premium `EXISTS`. | User-scoped, no payment FK, no package/plan snapshot (a deleted term loses what was bought). |
-| `payment.payment_transactions` | `tenantId uuid NOT NULL` **no FK**; controller writes `DEFAULT_TENANT_ID = 00000000-…` on every row. `orderId uuid` no FK, "loose pointer to a subscription term, a listing boost…". `customerId → users`. | The payment module already expects a tenant + an order. We supply both instead of inventing a parallel path. |
-| Payment settlement | Success → ledger posting + outbox `payment.succeeded` (payload has `tenantId, orderId, customerId, amount, currency`), dedupe `payment-succeeded:<txId>`. Consumer: `PaymentSettledOutboxHandler` → in-app notification. | Activation hook point exists. **But `OutboxRegistry` allows exactly one handler per event type** (throws on a second) — the subscription module cannot just register another `payment.succeeded` handler. |
-| `POST /payments` | Client supplies `amount`, `currency`, `orderId`. | A client could pay $0.01 against a subscription order id. Activation must **re-verify amount/currency/customer against the order snapshot**, and subscription checkout must create the payment server-side. |
-| `src/tenant/README.md` | Proposal only: `tenants(name, slug, status)` + `tenant_members(role owner/admin/member)`. No code. | Adopt its shape, extend it (personal tenants). |
-| Web | `(subscriptions)/premium-account`, `premium-account/[category]`, `checkout` (fully commented out), `/me/subscriptions`, `lib/Subscriptions.ts` — **all mock**. Mock checkout adds 10 % VAT. Admin subscription pages are real. | Web work is wiring existing designs to real data, not new design. |
-| Listings | No quota enforcement; `photos` hard-capped `@ArrayMaxSize(8)`. | Entitlements are a new concern. |
+| Area                                            | What is built                                                                                                                                                                                                                                                                           | Consequence for this plan                                                                                                                                                                                   |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users` (`db/schema/users.schema.ts`)           | Individual accounts, soft-delete, `role` user/admin/super_admin. No org concept.                                                                                                                                                                                                        | Keep untouched. Tenancy is **additive**.                                                                                                                                                                    |
+| Subscription config (`subscriptions.schema.ts`) | 4 tiers: `subscription_categories → plans → packages → terms`. Packages carry integer quotas (`photos, ads, renews, autoRenews, videos`). Terms carry `price numeric(10,2)` + `discount/discountType` + `durationValue/Unit`. Admin CRUD done.                                          | Catalogue is reusable as-is. **No link** from `subscription_categories` (Auto / Food / General / Property / Services…) to listing `categories` — quotas cannot be scoped to listings yet.                   |
+| `user_subscriptions`                            | `userId` FK cascade, `termId` FK set null, `priceUsd` snapshot, `paymentMethod` **free text**, `subscribedAt/expiresAt`. Status derived (`expiresAt > now`). Only writer: admin `POST /admin/user-subscriptions`. Readers: `UserSubscriptionsService`, `AdminService` premium `EXISTS`. | User-scoped, no payment FK, no package/plan snapshot (a deleted term loses what was bought).                                                                                                                |
+| `payment.payment_transactions`                  | `tenantId uuid NOT NULL` **no FK**; controller writes `DEFAULT_TENANT_ID = 00000000-…` on every row. `orderId uuid` no FK, "loose pointer to a subscription term, a listing boost…". `customerId → users`.                                                                              | The payment module already expects a tenant + an order. We supply both instead of inventing a parallel path.                                                                                                |
+| Payment settlement                              | Success → ledger posting + outbox `payment.succeeded` (payload has `tenantId, orderId, customerId, amount, currency`), dedupe `payment-succeeded:<txId>`. Consumer: `PaymentSettledOutboxHandler` → in-app notification.                                                                | Activation hook point exists. **But `OutboxRegistry` allows exactly one handler per event type** (throws on a second) — the subscription module cannot just register another `payment.succeeded` handler.   |
+| `POST /payments`                                | Client supplies `amount`, `currency`, `orderId`.                                                                                                                                                                                                                                        | A client could pay $0.01 against a subscription order id. Activation must **re-verify amount/currency/customer against the order snapshot**, and subscription checkout must create the payment server-side. |
+| `src/tenant/README.md`                          | Proposal only: `tenants(name, slug, status)` + `tenant_members(role owner/admin/member)`. No code.                                                                                                                                                                                      | Adopt its shape, extend it (personal tenants).                                                                                                                                                              |
+| Web                                             | `(subscriptions)/premium-account`, `premium-account/[category]`, `checkout` (fully commented out), `/me/subscriptions`, `lib/Subscriptions.ts` — **all mock**. Mock checkout adds 10 % VAT. Admin subscription pages are real.                                                          | Web work is wiring existing designs to real data, not new design.                                                                                                                                           |
+| Listings                                        | No quota enforcement; `photos` hard-capped `@ArrayMaxSize(8)`.                                                                                                                                                                                                                          | Entitlements are a new concern.                                                                                                                                                                             |
 
 ---
 
@@ -48,11 +48,11 @@ Why (max 5):
 
 Rejected alternatives:
 
-| Option | Why not |
-| --- | --- |
-| Add nullable `tenantId` next to `userId` on `user_subscriptions` | Two owner columns + CHECK "exactly one"; every reader branches; premium derivation has two paths forever. |
-| Parallel `tenant_subscriptions` table, keep `user_subscriptions` | Two tables mean the same thing; admin grants and paid subs diverge. |
-| Skip tenants, keep user-only | Leaves the payment placeholder forever; org billing (the stated direction in the tenant README) becomes a rewrite later. |
+| Option                                                           | Why not                                                                                                                  |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Add nullable `tenantId` next to `userId` on `user_subscriptions` | Two owner columns + CHECK "exactly one"; every reader branches; premium derivation has two paths forever.                |
+| Parallel `tenant_subscriptions` table, keep `user_subscriptions` | Two tables mean the same thing; admin grants and paid subs diverge.                                                      |
+| Skip tenants, keep user-only                                     | Leaves the payment placeholder forever; org billing (the stated direction in the tenant README) becomes a rewrite later. |
 
 ---
 
@@ -127,8 +127,8 @@ Rules:
   `tenantId` cascade.
 - `tenants.personalOwnerUserId` **unique** → `ensurePersonalTenant(userId)`
   is an `INSERT … ON CONFLICT (personal_owner_user_id) DO NOTHING RETURNING`
-  + fallback select. Race-safe, no check-then-insert (avoid the
-  `generateUniqueUsername` 23505 trap).
+  - fallback select. Race-safe, no check-then-insert (avoid the
+    `generateUniqueUsername` 23505 trap).
 - `tenants` → **`ON DELETE RESTRICT`** from payments/subscriptions (money
   history must never cascade away; ledger already follows this rule).
 - `tenant_subscriptions.orderId` **unique** → activation idempotent by
@@ -136,10 +136,10 @@ Rules:
 - `entitlements` JSONB is a **snapshot** of the package at purchase — an
   admin editing a package later never changes what a customer bought.
 - Status stays **derived** (`startsAt <= now < expiresAt and cancelledAt is
-  null`), matching today's `user_subscriptions` convention.
+null`), matching today's `user_subscriptions` convention.
 - One active subscription **per (tenant, subscription category)**. Buying
   the same category again **extends** (`startsAt = max(now, current
-  expiresAt)`); different categories coexist (Auto + Property).
+expiresAt)`); different categories coexist (Auto + Property).
 - `subscription_category_links(subscriptionCategoryId, categoryId)` maps
   "Auto" → cars-and-vehicles etc. Needed for entitlement scoping.
 - `payment_transactions`: add FK `tenant_id → tenants.id` (RESTRICT) **after**
@@ -193,18 +193,18 @@ Key properties:
 
 ## 5. Module boundaries
 
-| Module | Owns | Must not |
-| --- | --- | --- |
-| `src/tenant/` (new, real) | `tenants`, `tenant_members`, `TenantService.ensurePersonalTenant`, `resolveBillingTenant(userId)` | Know about payments or plans. |
+| Module                                  | Owns                                                                                                                                            | Must not                                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `src/tenant/` (new, real)               | `tenants`, `tenant_members`, `TenantService.ensurePersonalTenant`, `resolveBillingTenant(userId)`                                               | Know about payments or plans.                                                                           |
 | `src/subscriptions/` (new, user-facing) | `subscription_orders`, `tenant_subscriptions`, checkout, activation listener, entitlements query (`EntitlementsService`), public catalogue read | Touch payment tables directly; use `effect`. Plain NestJS services (Effect stays unique to `payment/`). |
-| `src/admin/subscriptions/` (existing) | Config CRUD (unchanged), grants → rewritten to write `tenant_subscriptions` with `source='admin_grant'` | — |
-| `src/payment/` (existing) | Gains 2 small seams only (below) | Import subscriptions. |
+| `src/admin/subscriptions/` (existing)   | Config CRUD (unchanged), grants → rewritten to write `tenant_subscriptions` with `source='admin_grant'`                                         | —                                                                                                       |
+| `src/payment/` (existing)               | Gains 2 small seams only (below)                                                                                                                | Import subscriptions.                                                                                   |
 
 Two payment seams (smallest diffs that keep payment gateway-agnostic):
 
 1. **`PaymentsFacade`** — exported plain service wrapping the existing
    `runInTransaction(createPayment + createPaymentAttempt +
-   enqueuePaymentAttempt)` that `PaymentsController.create` already does, so
+enqueuePaymentAttempt)` that `PaymentsController.create` already does, so
    another module can create a payment without importing Effect. Controller
    then delegates to it (one code path).
 2. **`PAYMENT_SETTLEMENT_LISTENERS`** — a multi-provider token (same pattern
@@ -250,7 +250,7 @@ See §8. Minimum to unblock Phase 1: D1, D2.
       `subscription_category_links`.
 - [ ] Migration `0032`: for each `user_subscriptions` row → ensure personal
       tenant → insert `tenant_subscriptions(source='migrated',
-      entitlements from current package)`. Keep `user_subscriptions` table
+entitlements from current package)`. Keep `user_subscriptions` table
       **read-only** one release, then drop (`0033`).
 - [ ] Admin grant/list/delete (`UserSubscriptionsService`) and
       `AdminService` premium `EXISTS` read `tenant_subscriptions` via
@@ -266,10 +266,10 @@ See §8. Minimum to unblock Phase 1: D1, D2.
 - [ ] Public `GET /subscriptions/catalogue` (`@Public`, active rows only,
       nested category→plan→package→term) — replaces `lib/Subscriptions.ts`.
 - [ ] `POST /subscriptions/checkout {termId, provider, method,
-      browserReturnUrl?}` → order + payment. Throttled, idempotency-key
+browserReturnUrl?}` → order + payment. Throttled, idempotency-key
       honoured (existing middleware).
 - [ ] `GET /subscriptions/me` (active + history), `GET
-      /subscriptions/orders/:id` (owner only, 404 otherwise).
+/subscriptions/orders/:id` (owner only, 404 otherwise).
 - [ ] `SubscriptionSettlementListener` with verification + idempotent
       activation + extension math. Unit tests: happy path, replay, amount
       mismatch, expired order, concurrent double purchase.
@@ -312,30 +312,30 @@ See §8. Minimum to unblock Phase 1: D1, D2.
 
 ## 7. Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Activation driven by a client-created cheap payment | Server-side pricing + listener verifies amount/currency/customer vs order snapshot. |
-| Double activation / double extension under retries or concurrent buys | Unique `orderId`, `FOR UPDATE` on order + current sub, outbox dedupe. |
-| Migrating `user_subscriptions` breaks admin pages / premium stats | Keep response shapes; old table read-only for one release; compare counts pre/post in migration log. |
-| Adding FK to `payment_transactions.tenant_id` fails on placeholder rows | Insert placeholder-id platform tenant in the same migration, before the FK. |
-| Listener retry re-sends the payment notification | Handler retries the whole event, so notify may run twice. Run listeners first, notify last; verify `NotificationsService.notify` idempotency (unverified) and add a dedupe key if it isn't. Decide in Phase 3. |
-| Quota check race at publish | Count + insert inside one tx with advisory lock per tenant (`pg_advisory_xact_lock(hashtext(tenantId))`). |
-| `db:migrate` silently skipping older-stamped files | Verify `__drizzle_migrations` after each migrate. |
+| Risk                                                                    | Mitigation                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Activation driven by a client-created cheap payment                     | Server-side pricing + listener verifies amount/currency/customer vs order snapshot.                                                                                                                            |
+| Double activation / double extension under retries or concurrent buys   | Unique `orderId`, `FOR UPDATE` on order + current sub, outbox dedupe.                                                                                                                                          |
+| Migrating `user_subscriptions` breaks admin pages / premium stats       | Keep response shapes; old table read-only for one release; compare counts pre/post in migration log.                                                                                                           |
+| Adding FK to `payment_transactions.tenant_id` fails on placeholder rows | Insert placeholder-id platform tenant in the same migration, before the FK.                                                                                                                                    |
+| Listener retry re-sends the payment notification                        | Handler retries the whole event, so notify may run twice. Run listeners first, notify last; verify `NotificationsService.notify` idempotency (unverified) and add a dedupe key if it isn't. Decide in Phase 3. |
+| Quota check race at publish                                             | Count + insert inside one tx with advisory lock per tenant (`pg_advisory_xact_lock(hashtext(tenantId))`).                                                                                                      |
+| `db:migrate` silently skipping older-stamped files                      | Verify `__drizzle_migrations` after each migrate.                                                                                                                                                              |
 
 ---
 
 ## 8. Open decisions (need captain)
 
-| # | Question | Recommendation |
-| --- | --- | --- |
-| D1 | Is "tenant" = organization/shop, or just "the paying account"? | Both via `kind`; ship personal only now. |
-| D2 | Personal tenant created lazily (on first checkout/grant) or eagerly for every user? | Lazy + backfill only for users with subscriptions. |
-| D3 | VAT 10 % on top (mock checkout shows it) or prices tax-inclusive? | Store `taxAmount` either way; ask finance. Ledger needs a `tax_payable` split if VAT is on top. |
-| D4 | Free (non-premium) baseline: how many active ads / photos per category? | Needed before Phase 5; config table or env, not hardcoded. |
-| D5 | Exact mapping of the mock subscription categories (Auto/Food/General/Property/Services/…) to listing categories; Jobs/Pets/Books? | Captain supplies list → seed. |
-| D6 | Buying a second plan in the same category: extend, upgrade (prorate), or block? | Extend if same package; block different package until upgrade logic exists. |
-| D7 | Currency: USD only, or KHR allowed via Bakong? | USD only v1 (terms are priced USD). |
-| D8 | Should admin comp grants be allowed on organization tenants from the admin UI now? | No — personal only until org UI exists. |
+| #   | Question                                                                                                                          | Recommendation                                                                                  |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| D1  | Is "tenant" = organization/shop, or just "the paying account"?                                                                    | Both via `kind`; ship personal only now.                                                        |
+| D2  | Personal tenant created lazily (on first checkout/grant) or eagerly for every user?                                               | Lazy + backfill only for users with subscriptions.                                              |
+| D3  | VAT 10 % on top (mock checkout shows it) or prices tax-inclusive?                                                                 | Store `taxAmount` either way; ask finance. Ledger needs a `tax_payable` split if VAT is on top. |
+| D4  | Free (non-premium) baseline: how many active ads / photos per category?                                                           | Needed before Phase 5; config table or env, not hardcoded.                                      |
+| D5  | Exact mapping of the mock subscription categories (Auto/Food/General/Property/Services/…) to listing categories; Jobs/Pets/Books? | Captain supplies list → seed.                                                                   |
+| D6  | Buying a second plan in the same category: extend, upgrade (prorate), or block?                                                   | Extend if same package; block different package until upgrade logic exists.                     |
+| D7  | Currency: USD only, or KHR allowed via Bakong?                                                                                    | USD only v1 (terms are priced USD).                                                             |
+| D8  | Should admin comp grants be allowed on organization tenants from the admin UI now?                                                | No — personal only until org UI exists.                                                         |
 
 ---
 

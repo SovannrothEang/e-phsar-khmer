@@ -20,19 +20,19 @@ Postgres only. No search engine, per CLAUDE.md rule 6.
 
 ## Current state (verified 2026-09-30)
 
-| Piece | File | Today |
-|---|---|---|
-| Header search bar | `apps/web/components/web/SearchBar.tsx` | Category dropdown comes from the mock `lib/categories`. The input has no state, no submit handler and no route. |
-| Backend keyword | `apps/backend/src/listings/listings.service.ts:235` (feed), `:326` (`/me/all`) | `ilike(title, '%'+q+'%')`: title only, `%`/`_` not escaped, no index (seq scan). |
-| Backend sort | same, `findFeed` | Fixed `created_at DESC, id DESC`. No `sort` param. |
-| Backend location | `resolveQueryFilters` (`:404`) | `provinceSlug`, `districtSlug`. No commune. |
-| Backend price | `findFeed` | `minPrice`/`maxPrice` compare the **original** `price`. Cards show the **discounted** price. |
-| Feed helper | `apps/web/lib/api/categories.ts:282` `getListingsFeed` | Forwards category/subcategory/brand/bodyType/attr only. Ignores `nextCursor`. |
-| Filter bar | `components/filter/{Sort,Price,LocationSelector,More}Filter(s).tsx` | Writes `sort`, `min_ad_price`, `max_ad_price`, `loc_pro/dis/com`, `keyword`, `date` to the URL. **No page forwards them.** |
-| Location filter data | `LocationSelectorFilter.tsx:12` | Reads the mock `lib/location.ts` (the 2019, ~21 %-complete extract), and its URL values are mock `proId`s. Those can never match a real listing. |
-| Subcategory chips | `components/subcategory-layouts/LSPYCEHeader.tsx` | Year/Engine/Condition chips are local `useState`: not in the URL, not wired. |
-| All Ads page | `app/[locale]/(user)/all-ads` + `AllAdsHeader.tsx` | Filters the mock `lib/posts` in the browser. |
-| Views | `listings.views_count` | Nothing increments it, so the "Most Hit" sort has no data. |
+| Piece                | File                                                                           | Today                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Header search bar    | `apps/web/components/web/SearchBar.tsx`                                        | Category dropdown comes from the mock `lib/categories`. The input has no state, no submit handler and no route.                                  |
+| Backend keyword      | `apps/backend/src/listings/listings.service.ts:235` (feed), `:326` (`/me/all`) | `ilike(title, '%'+q+'%')`: title only, `%`/`_` not escaped, no index (seq scan).                                                                 |
+| Backend sort         | same, `findFeed`                                                               | Fixed `created_at DESC, id DESC`. No `sort` param.                                                                                               |
+| Backend location     | `resolveQueryFilters` (`:404`)                                                 | `provinceSlug`, `districtSlug`. No commune.                                                                                                      |
+| Backend price        | `findFeed`                                                                     | `minPrice`/`maxPrice` compare the **original** `price`. Cards show the **discounted** price.                                                     |
+| Feed helper          | `apps/web/lib/api/categories.ts:282` `getListingsFeed`                         | Forwards category/subcategory/brand/bodyType/attr only. Ignores `nextCursor`.                                                                    |
+| Filter bar           | `components/filter/{Sort,Price,LocationSelector,More}Filter(s).tsx`            | Writes `sort`, `min_ad_price`, `max_ad_price`, `loc_pro/dis/com`, `keyword`, `date` to the URL. **No page forwards them.**                       |
+| Location filter data | `LocationSelectorFilter.tsx:12`                                                | Reads the mock `lib/location.ts` (the 2019, ~21 %-complete extract), and its URL values are mock `proId`s. Those can never match a real listing. |
+| Subcategory chips    | `components/subcategory-layouts/LSPYCEHeader.tsx`                              | Year/Engine/Condition chips are local `useState`: not in the URL, not wired.                                                                     |
+| All Ads page         | `app/[locale]/(user)/all-ads` + `AllAdsHeader.tsx`                             | Filters the mock `lib/posts` in the browser.                                                                                                     |
+| Views                | `listings.views_count`                                                         | Nothing increments it, so the "Most Hit" sort has no data.                                                                                       |
 
 ## Decisions
 
@@ -44,17 +44,17 @@ The search page, category page, subcategory page and all-ads page share **one
 URL vocabulary**. Existing param names are kept where they exist, so links that
 already work keep working.
 
-| URL param | Meaning | Backend param |
-|---|---|---|
-| `q` | Keyword. Trimmed, max 100 chars; empty means browse all. | `q` |
-| `category` | Category slug (search page only; the category pages take it from the path). | `categorySlug` |
-| `sub` | Subcategory slug (search page only). | `subcategorySlug` |
-| `loc_pro` / `loc_dis` / `loc_com` | **Real slugs** (value change, see D6). | `provinceSlug` / `districtSlug` / `communeSlug` |
-| `min_ad_price` / `max_ad_price` | Final-price range, USD. | `minPrice` / `maxPrice` |
-| `condition` | `new` \| `used` | `condition` |
-| `date` | `today` \| `week` \| `month` | `postedWithin` |
-| `delivery` | `1` = free delivery only | `deliveryFree=true` |
-| `sort` | `latest-ads` (default) \| `price-asc` \| `price-desc` | `sort` = `newest` \| `price_asc` \| `price_desc` |
+| URL param                         | Meaning                                                                     | Backend param                                    |
+| --------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------ |
+| `q`                               | Keyword. Trimmed, max 100 chars; empty means browse all.                    | `q`                                              |
+| `category`                        | Category slug (search page only; the category pages take it from the path). | `categorySlug`                                   |
+| `sub`                             | Subcategory slug (search page only).                                        | `subcategorySlug`                                |
+| `loc_pro` / `loc_dis` / `loc_com` | **Real slugs** (value change, see D6).                                      | `provinceSlug` / `districtSlug` / `communeSlug`  |
+| `min_ad_price` / `max_ad_price`   | Final-price range, USD.                                                     | `minPrice` / `maxPrice`                          |
+| `condition`                       | `new` \| `used`                                                             | `condition`                                      |
+| `date`                            | `today` \| `week` \| `month`                                                | `postedWithin`                                   |
+| `delivery`                        | `1` = free delivery only                                                    | `deliveryFree=true`                              |
+| `sort`                            | `latest-ads` (default) \| `price-asc` \| `price-desc`                       | `sort` = `newest` \| `price_asc` \| `price_desc` |
 
 - `MoreFilters`' `KEYWORD_PARAM` changes from `"keyword"` to **`"q"`**, so there is one
   keyword param everywhere.
@@ -107,10 +107,10 @@ effective_price numeric(14,2) GENERATED ALWAYS AS (
 
 `sort` ∈ `newest` (default) | `price_asc` | `price_desc`.
 
-| sort | ORDER BY |
-|---|---|
-| `newest` | `created_at DESC, id DESC` (unchanged) |
-| `price_asc` | `effective_price ASC NULLS LAST, id DESC` |
+| sort         | ORDER BY                                   |
+| ------------ | ------------------------------------------ |
+| `newest`     | `created_at DESC, id DESC` (unchanged)     |
+| `price_asc`  | `effective_price ASC NULLS LAST, id DESC`  |
 | `price_desc` | `effective_price DESC NULLS LAST, id DESC` |
 
 - Cursor format: base64 JSON `{ s, v, id }` (`s` = sort, `v` = the last row's
@@ -126,13 +126,13 @@ effective_price numeric(14,2) GENERATED ALWAYS AS (
 
 ### D5. New filters
 
-| Param | Rule |
-|---|---|
+| Param                             | Rule                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `postedWithin=today\|week\|month` | `coalesce(published_at, created_at) >= X`. `today` = since 00:00 **Asia/Phnom_Penh**; `week` = now − 7 d; `month` = now − 30 d. (`published_at` first, because a draft can sit for days before it is published; `created_at` as the fallback because seeded rows skip the publish endpoint and have no `published_at` — amended in round 2, 2026-09-30.) |
-| `communeSlug` | Resolved inside the district, like `districtSlug` inside the province. Ignored without `districtSlug`. An unknown slug short-circuits to `[]` (existing pattern). |
-| `deliveryFree=true` | `delivery_free = true`. `false`/absent applies nothing. |
-| `includeTotal=true` | Adds `meta.total` (a `count(*)` over the same WHERE, run with `Promise.all` alongside the page query). Only the search page asks for it; the other feeds don't pay for it. |
-| `includeFacets=true` | Adds `meta.facets` (per-category counts, see D5a). Search page only. |
+| `communeSlug`                     | Resolved inside the district, like `districtSlug` inside the province. Ignored without `districtSlug`. An unknown slug short-circuits to `[]` (existing pattern).                                                                                                                                                                                        |
+| `deliveryFree=true`               | `delivery_free = true`. `false`/absent applies nothing.                                                                                                                                                                                                                                                                                                  |
+| `includeTotal=true`               | Adds `meta.total` (a `count(*)` over the same WHERE, run with `Promise.all` alongside the page query). Only the search page asks for it; the other feeds don't pay for it.                                                                                                                                                                               |
+| `includeFacets=true`              | Adds `meta.facets` (per-category counts, see D5a). Search page only.                                                                                                                                                                                                                                                                                     |
 
 ### D5a. Category facets (per-category counts)
 
@@ -144,9 +144,9 @@ every active filter (`q`, location, price, condition, date, delivery) **except
 the category dimension itself**. So picking "Cars" does not collapse the other
 categories to 0: the user still sees "Phones (12)" and can switch.
 
-| Facet | WHERE | GROUP BY |
-|---|---|---|
-| `categories` | all filters **minus** `categorySlug` + `subcategorySlug` | `category_id` |
+| Facet                                             | WHERE                                                          | GROUP BY         |
+| ------------------------------------------------- | -------------------------------------------------------------- | ---------------- |
+| `categories`                                      | all filters **minus** `categorySlug` + `subcategorySlug`       | `category_id`    |
 | `subcategories` (only when `categorySlug` is set) | all filters **minus** `subcategorySlug`, **plus** the category | `subcategory_id` |
 
 Response shape (slugs only; the web already holds the localized names from
@@ -194,7 +194,7 @@ New file `apps/web/lib/search-params.ts`:
   inverted price range and drops garbage.
 - `getListingsFeed` in `lib/api/categories.ts` takes the widened `FeedQuery`
   (adding `q, provinceSlug, districtSlug, communeSlug, minPrice, maxPrice,
-  condition, postedWithin, deliveryFree, sort, cursor, includeTotal`) and returns
+condition, postedWithin, deliveryFree, sort, cursor, includeTotal`) and returns
   `{ items, nextCursor, total? }`.
 - Callers: the new search page, the category page, the subcategory page (merging
   the parsed params with its existing brand/attr resolution), and All Ads.
@@ -204,6 +204,7 @@ New file `apps/web/lib/search-params.ts`:
 ### D8. Pages
 
 **Header `SearchBar`**
+
 - The category dropdown reads real categories. `NavBar` gets them from an RSC
   parent via `getAllCategories` and passes them as a prop, so no mock import
   remains. The selected entry stores `{kind: 'category'|'sub', slug, name}`.
@@ -214,6 +215,7 @@ New file `apps/web/lib/search-params.ts`:
   existing glyph fallback.
 
 **`/[locale]/search` page** (RSC)
+
 - Layout reuses the category page's shell: a breadcrumb (Home › Search), an
   `h1` reading **Results for "q"** (or **All ads** when `q` is empty) with the
   `total`, then the sticky filter bar with Location, Sort, Price and MoreFilters.
@@ -244,6 +246,7 @@ New file `apps/web/lib/search-params.ts`:
 - `generateMetadata`: title `"<q> | <site>"`, `robots: { index: false }`.
 
 **`/[locale]/all-ads`**
+
 - `AllAdsHeader` swaps the mock `posts` and its browser-side filter pipeline for
   the real feed through the same parser. The page is "search with no `q`", but
   it keeps its own route and banner. (A redirect to `/search` is an open
@@ -255,36 +258,37 @@ New file `apps/web/lib/search-params.ts`:
 
 ## Backend changes (files)
 
-| File | Change |
-|---|---|
-| `src/listings/dto/query-listings.dto.ts` | `q` gains `@MaxLength(100)`; new `sort` (`@IsIn`), `postedWithin` (`@IsIn`), `communeSlug`, `deliveryFree` (`@Transform` 'true' → boolean), `includeTotal`. Cross-field min ≤ max check. |
-| `src/listings/feed-cursor.ts` (new) | Pure: `encodeCursor`, `decodeCursor` (legacy-aware), `cursorPredicate(sort, cursor)`, `orderByFor(sort)`. |
-| `src/listings/listings.service.ts` | `keywordCondition` (tokenize + `escapeLike`); `findFeed` uses the cursor module, the new filters, `effective_price` and the optional count; `findMine` uses the same `keywordCondition`; `resolveQueryFilters` resolves the commune. |
-| `src/db/schema/listings.schema.ts` | `effectivePrice` via `generatedAlwaysAs`; indexes `listings_title_trgm_idx`, `listings_description_trgm_idx` (GIN `gin_trgm_ops`) and `listings_status_effective_price_idx (status, effective_price, id)`. |
-| `drizzle/migrations/0031_*.sql` | `CREATE EXTENSION IF NOT EXISTS pg_trgm;`, the column, the 3 indexes. **Check the Supabase extension schema:** if `pg_trgm` lives in `extensions`, the opclass must be written as `extensions.gin_trgm_ops`. Hand-edit the generated SQL if drizzle-kit emits the bare name. |
-| `src/listings/README.md` | Only if one exists. Otherwise skip (no new README in this ship). |
+| File                                     | Change                                                                                                                                                                                                                                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/listings/dto/query-listings.dto.ts` | `q` gains `@MaxLength(100)`; new `sort` (`@IsIn`), `postedWithin` (`@IsIn`), `communeSlug`, `deliveryFree` (`@Transform` 'true' → boolean), `includeTotal`. Cross-field min ≤ max check.                                                                                     |
+| `src/listings/feed-cursor.ts` (new)      | Pure: `encodeCursor`, `decodeCursor` (legacy-aware), `cursorPredicate(sort, cursor)`, `orderByFor(sort)`.                                                                                                                                                                    |
+| `src/listings/listings.service.ts`       | `keywordCondition` (tokenize + `escapeLike`); `findFeed` uses the cursor module, the new filters, `effective_price` and the optional count; `findMine` uses the same `keywordCondition`; `resolveQueryFilters` resolves the commune.                                         |
+| `src/db/schema/listings.schema.ts`       | `effectivePrice` via `generatedAlwaysAs`; indexes `listings_title_trgm_idx`, `listings_description_trgm_idx` (GIN `gin_trgm_ops`) and `listings_status_effective_price_idx (status, effective_price, id)`.                                                                   |
+| `drizzle/migrations/0031_*.sql`          | `CREATE EXTENSION IF NOT EXISTS pg_trgm;`, the column, the 3 indexes. **Check the Supabase extension schema:** if `pg_trgm` lives in `extensions`, the opclass must be written as `extensions.gin_trgm_ops`. Hand-edit the generated SQL if drizzle-kit emits the bare name. |
+| `src/listings/README.md`                 | Only if one exists. Otherwise skip (no new README in this ship).                                                                                                                                                                                                             |
 
 ## Web changes (files)
 
-| File | Change |
-|---|---|
-| `lib/search-params.ts` (new) | `parseFeedParams`, `FeedQuery`, sort-value mapping. |
-| `lib/api/categories.ts` | Widen `getListingsFeed`; return `total`. |
-| `app/[locale]/(user)/search/page.tsx` (new) | Search page (D8). |
-| `components/search/FeedResults.tsx` (new; shipped name, was `SearchResultsMore`) | Grid/list views + load-more, reused by search, category, subcategory and all-ads pages. |
-| `components/search/CategoryFacets.tsx` (new) | Category sidebar/chip row with counts (D5a, D8). |
-| `actions/listings.ts` | `loadMoreListings`, `getLocationProvinces`. |
-| `components/web/SearchBar.tsx`, `NavBar.tsx` | Real categories, controlled input, submit. |
-| `components/filter/LocationSelectorFilter.tsx` | Real geo data, slug params (D6). |
-| `components/filter/MoreFilters.tsx` | `KEYWORD_PARAM = "q"`; free-delivery toggle; condition select. |
-| `components/filter/SortFilter.tsx` | Drop `new-ads`, hide `most-hit`. |
-| `app/[locale]/(user)/category/[categorySlug]/page.tsx`, `…/[subcategorySlug]/page.tsx` | Forward `parseFeedParams(searchParams)` into the feed call. |
-| `components/all-ads/AllAdsHeader.tsx` | Real feed. |
-| `messages/*.json` (6) | `Search` namespace. |
+| File                                                                                   | Change                                                                                  |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `lib/search-params.ts` (new)                                                           | `parseFeedParams`, `FeedQuery`, sort-value mapping.                                     |
+| `lib/api/categories.ts`                                                                | Widen `getListingsFeed`; return `total`.                                                |
+| `app/[locale]/(user)/search/page.tsx` (new)                                            | Search page (D8).                                                                       |
+| `components/search/FeedResults.tsx` (new; shipped name, was `SearchResultsMore`)       | Grid/list views + load-more, reused by search, category, subcategory and all-ads pages. |
+| `components/search/CategoryFacets.tsx` (new)                                           | Category sidebar/chip row with counts (D5a, D8).                                        |
+| `actions/listings.ts`                                                                  | `loadMoreListings`, `getLocationProvinces`.                                             |
+| `components/web/SearchBar.tsx`, `NavBar.tsx`                                           | Real categories, controlled input, submit.                                              |
+| `components/filter/LocationSelectorFilter.tsx`                                         | Real geo data, slug params (D6).                                                        |
+| `components/filter/MoreFilters.tsx`                                                    | `KEYWORD_PARAM = "q"`; free-delivery toggle; condition select.                          |
+| `components/filter/SortFilter.tsx`                                                     | Drop `new-ads`, hide `most-hit`.                                                        |
+| `app/[locale]/(user)/category/[categorySlug]/page.tsx`, `…/[subcategorySlug]/page.tsx` | Forward `parseFeedParams(searchParams)` into the feed call.                             |
+| `components/all-ads/AllAdsHeader.tsx`                                                  | Real feed.                                                                              |
+| `messages/*.json` (6)                                                                  | `Search` namespace.                                                                     |
 
 ## Tests / verification gate
 
 **Backend unit tests (Jest)**
+
 - `escapeLike`: `%`, `_`, `\`, mixed, Khmer passthrough.
 - Tokenizer: whitespace collapse, 5-token cap, 50-char cap, empty → no condition.
 - `feed-cursor`: round-trip per sort; the legacy cursor is accepted for `newest`;
@@ -310,6 +314,7 @@ indexes exist; `EXPLAIN` a `q=toyota` feed query and confirm it uses a
 may still pick a seq scan; if so, `SET enable_seqscan=off` for the check).
 
 **Browser (CDP recipe from CLAUDE.md):**
+
 1. Header: type "toyota" → Enter → lands on `/en/search?q=toyota`; results are all Toyota ads and the count matches.
 2. Pick a category in the dropdown and search → the `category` chip shows; removing it widens the results.
 3. `q=%` returns **only** listings whose text contains `%` (not everything).

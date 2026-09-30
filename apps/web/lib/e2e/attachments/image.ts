@@ -31,8 +31,7 @@ function makeCanvas(w: number, h: number): AnyCanvas {
 }
 
 function toBlob(canvas: AnyCanvas, type: string, quality: number) {
-  if ("convertToBlob" in canvas)
-    return canvas.convertToBlob({ type, quality });
+  if ("convertToBlob" in canvas) return canvas.convertToBlob({ type, quality });
   return new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("encode failed"))),
@@ -63,13 +62,17 @@ function draw(bitmap: ImageBitmap, w: number, h: number): AnyCanvas {
 
 function fit(w: number, h: number, edge: number): [number, number] {
   const scale = Math.min(1, edge / Math.max(w, h));
-  return [Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale))];
+  return [
+    Math.max(1, Math.round(w * scale)),
+    Math.max(1, Math.round(h * scale)),
+  ];
 }
 
 function bytesToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i++)
+    binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
 

@@ -214,7 +214,7 @@ jobs, not as alternatives:
 
 Nothing in the schema enforces that a `ledger_transaction`'s entries sum to
 zero per currency — a Postgres `CHECK` constraint can't see sibling rows. What
-it *can* see is one row, so `ledger_entries_amount_positive` (`amount > 0`,
+it _can_ see is one row, so `ledger_entries_amount_positive` (`amount > 0`,
 migration `0032`) pins the per-line half: direction lives in `entry_type`,
 never in the sign, so a -5/-5 or 0/0 pair can't pose as balanced.
 This has to be a single service-layer write path that always inserts
@@ -222,7 +222,7 @@ debit/credit pairs inside one DB transaction. The check itself lives in
 [`use-cases/ledgers/ledger-balance.ts`](./use-cases/ledgers/ledger-balance.ts)
 — a dependency-free function (bigint-exact sums, no float rounding; rejects
 malformed, signed or zero amounts, anything past `numeric(20, 2)`'s scale
-— which Postgres would round *after* a looser check — and anything past its
+— which Postgres would round _after_ a looser check — and anything past its
 18 whole digits) so it can be unit-tested directly in
 [`ledger-balance.spec.ts`](./use-cases/ledgers/ledger-balance.spec.ts);
 `postLedgerTransaction` maps a failed check onto `LedgerImbalanceError`.
@@ -363,7 +363,7 @@ Key properties this gives us:
 | Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases, **and now has a registered consumer** — `PaymentSettledOutboxHandler` (see next row). `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items).                                                                                                                                                                                                                                                                       |
 | Notification emission (success path)                                  | Done — `PaymentSettledOutboxHandler` (`outbox/payment-settled-outbox-handler.ts`) consumes `payment.succeeded` directly (no BullMQ hop — see its own doc comment) and calls the new `NotificationsModule` (`src/notifications/`). `NotificationsService.notify()` fans out to a small `NotificationChannel[]` — today just `InAppNotificationChannel`, which inserts a `notifications` row a client reads via `GET /notifications` / `/notifications/unread-count` / marks read via `PATCH /notifications/:id/read` \| `/notifications/read-all`. A transaction with no `customerId` no-ops (logged, not retried). Email/SMS/push are unbuilt — see Open items for the extension point.            |
 | Notification emission (failure path)                                  | Not started — no outbox event or handler for a terminal payment failure; diagram is the target shape.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered), plus the balance rules in [`ledger-balance.spec.ts`](./use-cases/ledgers/ledger-balance.spec.ts). No unit/e2e tests yet for the use-case orchestration, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (473 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                                                                                                                                           |
+| Automated tests                                                       | Partial — pure-function unit tests exist for the provider(s) that have them so far (see that provider's own README for what's covered), plus the balance rules in [`ledger-balance.spec.ts`](./use-cases/ledgers/ledger-balance.spec.ts). No unit/e2e tests yet for the use-case orchestration, controllers, processor, or outbox handlers at the module level. Verification beyond that is `tsc`/`nest build`/`pnpm test` (473 passing, no regressions) plus one manual boot check confirming DI wiring and route registration — no live sandbox call against any real gateway has been exercised in this environment.                                                                            |
 
 ## Open items
 

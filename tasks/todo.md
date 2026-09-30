@@ -2953,6 +2953,7 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
 "yes — per-category counts").
 
 **Backend** (`src/listings/`, migration `0031_listing_search`)
+
 - `q` is now tokenized (≤5 tokens), `%`/`_`/`\` escaped, and matched against title
   **or description** (`keyword-search.ts`); trigram GIN indexes on both columns
   (`pg_trgm`, installed into Supabase's `extensions` schema).
@@ -2968,6 +2969,7 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
 - Tests: 428/428 (35 suites), incl. 56 new; build + lint clean.
 
 **Web**
+
 - `lib/search-params.ts` — the one URL vocabulary + `parseFeedParams`; search,
   category, subcategory and all-ads pages all forward the filter bar to the feed
   (**the bar was UI-only before on every page**).
@@ -2983,6 +2985,7 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
 - All Ads uses the real feed (was mock posts filtered in the browser).
 
 **Verification**
+
 - Live API sweep against the dev DB (27 checks): every sort pages through all 145
   rows with no dups/gaps (limit 2 for ties), negotiable last, `q=%` literal, Khmer
   keyword found, facet sums = total, picking a category leaves other counts unchanged,
@@ -2996,6 +2999,7 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
   all-ads `q`. 0 console errors. Dark mode checked.
 
 **Not done / notes**
+
 - `pnpm --filter web build` not run — a dev server was using `.next`; `tsc --noEmit`
   and eslint on every touched file are clean.
 - Mobile (390px) pages scroll horizontally by ~395px — **pre-existing** (navbar + card
@@ -3009,6 +3013,7 @@ Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flip
 Follow-up to the search ship above, from the "what's left" review.
 
 **Correctness (backend `src/listings/`)**
+
 - **Date posted hid 23 listings.** `postedWithin` compared `published_at`, which seeded
   rows never got (they skip the publish endpoint), so no date filter could match them.
   Now `coalesce(published_at, created_at)`. Live: "This Month" = 145 (was 122).
@@ -3019,6 +3024,7 @@ Follow-up to the search ship above, from the "what's left" review.
   visible one.
 
 **Search quality**
+
 - `sort=relevance` ("Best match"): title contains phrase (+1), title starts with it
   (+0.5), + `word_similarity(phrase, title)`; float8 score in the keyset cursor. The web
   makes it the default whenever there is a keyword and hides it otherwise; choosing
@@ -3031,6 +3037,7 @@ Follow-up to the search ship above, from the "what's left" review.
   Hyundai Truck, `toyta`→Toyota Camry, `zzqqxxww`→0.
 
 **Filters**
+
 - Backend `yearMin`/`yearMax` (4-digit `attributes->>'year'` only, inverted → 400) and
   `engineType`.
 - Subcategory bar: Year and Engine chips are now URL-driven (`year_min`, `year_max`,
@@ -3043,6 +3050,7 @@ Follow-up to the search ship above, from the "what's left" review.
 plus the new `fuzzyNotice`.
 
 **Verification**
+
 - Backend: 448/448 tests (20 new), lint + tsc clean.
 - Live API (12 checks) against the dev DB/backend: all pass (month=145, total=live rule,
   relevance ranks title matches first and pages 9/9 without dups, relevance without q =
@@ -3062,6 +3070,7 @@ currency; pre-existing mobile overflow.
 From the two-axis review of the search-round-2 + ledger working tree.
 
 **Outbox retention (was: config only, no sweep)**
+
 - `OUTBOX_RETENTION_DAYS` was parsed but never read — `outbox_events` grew forever, and the
   Bakong README claimed a sweep that did not exist (≈75 poll rows per pending KHQR attempt).
 - New `OutboxRetention` (`src/outbox/outbox-retention.service.ts`): hourly (+ once at boot)
@@ -3072,12 +3081,14 @@ From the two-axis review of the search-round-2 + ledger working tree.
   Freed `dedupe_key`s are safe: every keyed producer keys on a once-only transition.
 
 **Ledger amounts**
+
 - `ledger-balance.ts` now rejects signed and zero amounts (direction lives in `entryType`;
   -5/-5 and 0/0 used to pass as balanced) and amounts past 18 whole digits (`numeric(20,2)`).
 - DB backstop: `ledger_entries_amount_positive CHECK (amount > 0)` — migration
   `0032_ledger_entries_amount_positive` **generated, not applied** to the shared dev DB.
 
 **Search code quality**
+
 - `FeedOrdering` union (`feed-cursor.ts`): relevance carries its score, so "relevance without a
   score" is a type error — removed the runtime `requireScore` throw and `query.q!`;
   `resolveFeedOrdering` (`keyword-search.ts`) is the one place the keyword fallback lives.

@@ -96,7 +96,10 @@ export default async function SearchPage({
       label: activeSub.name,
       query: queryWith(sp, { [SUB_PARAM]: null }),
     },
-  ].filter((c): c is { key: string; label: string; query: Record<string, string> } => !!c);
+  ].filter(
+    (c): c is { key: string; label: string; query: Record<string, string> } =>
+      !!c,
+  );
 
   // "Clear filters" keeps the keyword and category; "Clear search" resets all.
   const clearFilters = queryWith(
@@ -122,12 +125,20 @@ export default async function SearchPage({
               {t("home")}
             </span>
           </Link>
-          <IconChevronRightFilled size={16} className="block mt-1 text-gray-500" />
-          <span className="text-gray-500 dark:text-gray-400">{t("search")}</span>
+          <IconChevronRightFilled
+            size={16}
+            className="block mt-1 text-gray-500"
+          />
+          <span className="text-gray-500 dark:text-gray-400">
+            {t("search")}
+          </span>
         </nav>
       </div>
 
-      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full px-4 xl:px-0 pb-8">
+      <Tabs
+        defaultValue="grid"
+        className="max-w-7xl mx-auto w-full px-4 xl:px-0 pb-8"
+      >
         {/* HEADER */}
         <div className="px-6 py-3 bg-card rounded-t-sm border flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h1 className="font-semibold text-lg min-w-0 break-words">
@@ -208,11 +219,16 @@ export default async function SearchPage({
 
             {posts.length === 0 ? (
               <div className="mt-4 flex flex-col items-center gap-3 rounded-sm border bg-card px-6 py-16 text-center">
-                <IconSearch className="size-10 text-muted-foreground" aria-hidden />
+                <IconSearch
+                  className="size-10 text-muted-foreground"
+                  aria-hidden
+                />
                 <h2 className="text-lg font-semibold break-words max-w-full">
                   {q ? t("emptyTitle", { q }) : t("emptyTitleNoQuery")}
                 </h2>
-                <p className="text-sm text-muted-foreground">{t("emptyHint")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("emptyHint")}
+                </p>
                 <div className="flex flex-wrap justify-center gap-4 pt-2 text-sm font-medium">
                   <Link
                     href={{ pathname: "/search", query: clearFilters }}

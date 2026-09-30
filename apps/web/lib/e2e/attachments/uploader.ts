@@ -37,7 +37,11 @@ export const directUploader: AttachmentUploader = {
     // ATTACHMENT_NOT_PENDING: a previous attempt already uploaded it (its
     // response got lost) — go straight to complete.
     if (!ticket.ok && ticket.code !== "ATTACHMENT_NOT_PENDING")
-      throw new AttachmentUploadError(ticket.message, ticket.status, ticket.code);
+      throw new AttachmentUploadError(
+        ticket.message,
+        ticket.status,
+        ticket.code,
+      );
 
     if (ticket.ok) {
       const res = await fetch(ticket.data.uploadUrl, {
@@ -46,8 +50,7 @@ export const directUploader: AttachmentUploader = {
         headers: { "Content-Type": "application/octet-stream" },
         body: blob,
       });
-      if (!res.ok)
-        throw new AttachmentUploadError("Upload failed", res.status);
+      if (!res.ok) throw new AttachmentUploadError("Upload failed", res.status);
     }
 
     const done = await completeChatAttachment(id);

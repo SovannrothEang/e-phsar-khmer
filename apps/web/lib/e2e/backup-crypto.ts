@@ -107,7 +107,9 @@ export function unwrapBackupKey(
 
 /** UTF-8 bytes one item adds to a segment's JSON payload (incl. separator). */
 export function segmentItemBytes(item: PlaintextItem): number {
-  return enc.encode(JSON.stringify([item.messageId, item.plaintext])).length + 1;
+  return (
+    enc.encode(JSON.stringify([item.messageId, item.plaintext])).length + 1
+  );
 }
 
 export function sealSegment(bk: Uint8Array, items: PlaintextItem[]): string {

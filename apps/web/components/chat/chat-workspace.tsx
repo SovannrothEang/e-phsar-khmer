@@ -419,7 +419,9 @@ export function ChatWorkspace({
         ref={asideRef}
         style={
           sidebarWidth !== null
-            ? ({ "--chat-sidebar-w": `${sidebarWidth}px` } as React.CSSProperties)
+            ? ({
+                "--chat-sidebar-w": `${sidebarWidth}px`,
+              } as React.CSSProperties)
             : undefined
         }
         className={cn(
