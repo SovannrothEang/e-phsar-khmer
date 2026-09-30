@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -8,9 +9,7 @@ import {
   and,
   desc,
   eq,
-  lt,
-  or,
-  ilike,
+  getTableColumns,
   gte,
   lte,
   sql,
@@ -27,14 +26,40 @@ import type {
   NewListing,
 } from '../db/schema/listings.schema';
 import { categories, subcategories } from '../db/schema/categories.schema';
-import { districts, provinces } from '../db/schema/users.schema';
+import { communes, districts, provinces } from '../db/schema/users.schema';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
 import type { QueryListingsDto } from './dto/query-listings.dto';
 import type { PaginationMeta } from '../common/types/api-response.types';
+import {
+  cursorPredicate,
+  decodeCursor,
+  encodeCursor,
+  orderByFor,
+  sortKeyExpr,
+} from './feed-cursor';
+import { keywordCondition } from './keyword-search';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
+}
+
+export interface FeedFacet {
+  slug: string;
+  count: number;
+}
+
+export interface FeedMeta extends PaginationMeta {
+  /** Present only with `includeFacets=true`. */
+  facets?: { categories: FeedFacet[]; subcategories?: FeedFacet[] };
+}
+
+interface ResolvedFilters {
+  categoryId?: string;
+  subcategoryId?: string;
+  /** Scope of the subcategory facet: the chosen category, else the chosen subcategory's parent. */
+  facetCategoryId?: string;
+  geo: SQL[];
 }
 
 @Injectable()
@@ -222,92 +247,81 @@ export class ListingsService {
 
   async findFeed(
     query: QueryListingsDto,
-  ): Promise<{ data: ListingWithPhotos[]; meta: PaginationMeta }> {
+  ): Promise<{ data: ListingWithPhotos[]; meta: FeedMeta }> {
     const limit = query.limit ?? 20;
-    const conditions = [eq(listings.status, 'active')];
-
-    const extra = await this.resolveQueryFilters(query);
-    if (extra === null)
-      return { data: [], meta: { nextCursor: null, hasMore: false, limit } };
-    conditions.push(...extra);
-
-    if (query.q) {
-      conditions.push(ilike(listings.title, `%${query.q}%`));
-    }
-    if (query.minPrice != null) {
-      conditions.push(gte(listings.price, String(query.minPrice)));
-    }
-    if (query.maxPrice != null) {
-      conditions.push(lte(listings.price, String(query.maxPrice)));
-    }
-    if (query.condition) {
-      conditions.push(eq(listings.condition, query.condition));
-    }
-    // Attribute filters match the display names stored in `attributes` JSONB
-    // (e.g. `attributes.brand = 'Toyota'`), which is what the post form writes.
-    if (query.brand) {
-      conditions.push(eq(sql`${listings.attributes}->>'brand'`, query.brand));
-    }
-    if (query.bodyType) {
-      conditions.push(
-        eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType),
-      );
-    }
-    // Generic attribute filter for every grid that is NOT a car's Body Type.
-    // The key is bound as a parameter (`->>$n`), never interpolated, and the
-    // DTO additionally constrains it to a plain identifier — so this stays a
-    // read of the JSONB, not a path injection. Half a filter (one param
-    // without the other) applies nothing rather than erroring, matching how
-    // `districtSlug` without `provinceSlug` is already treated.
-    if (query.attrKey && query.attrValue) {
-      conditions.push(
-        eq(sql`${listings.attributes}->>${query.attrKey}`, query.attrValue),
-      );
+    const sort = query.sort ?? 'newest';
+    if (
+      query.minPrice != null &&
+      query.maxPrice != null &&
+      query.minPrice > query.maxPrice
+    ) {
+      throw new BadRequestException('minPrice must not exceed maxPrice');
     }
 
-    if (query.cursor) {
-      try {
-        const { createdAt, id } = JSON.parse(
-          Buffer.from(query.cursor, 'base64').toString('utf8'),
-        ) as { createdAt: string; id: string };
-        conditions.push(
-          or(
-            lt(listings.createdAt, new Date(createdAt)),
-            and(
-              eq(listings.createdAt, new Date(createdAt)),
-              lt(listings.id, id),
-            ),
-          )!,
-        );
-      } catch {
-        // ignore invalid cursor
-      }
+    const resolved = await this.resolveFilterIds(query);
+    if (resolved === null) {
+      return {
+        data: [],
+        meta: {
+          nextCursor: null,
+          hasMore: false,
+          limit,
+          ...(query.includeTotal ? { total: 0 } : {}),
+          ...(query.includeFacets ? { facets: { categories: [] } } : {}),
+        },
+      };
     }
 
-    const rows = await this.db
-      .select()
-      .from(listings)
-      .where(and(...conditions))
-      .orderBy(desc(listings.createdAt), desc(listings.id))
-      .limit(limit + 1);
+    // `common` is everything EXCEPT the category dimension — the facet counts
+    // are computed over it, so choosing a category never zeroes the others.
+    const common: SQL[] = [
+      eq(listings.status, 'active'),
+      ...resolved.geo,
+      ...this.feedConditions(query),
+    ];
+    const full = [...common, ...this.categoryConditions(resolved)];
+
+    const cursor = decodeCursor(query.cursor, sort);
+    const pageWhere = cursor ? [...full, cursorPredicate(cursor)] : full;
+
+    const [rows, total, facets] = await Promise.all([
+      this.db
+        .select({ ...getTableColumns(listings), sortKey: sortKeyExpr(sort) })
+        .from(listings)
+        .where(and(...pageWhere))
+        .orderBy(...orderByFor(sort))
+        .limit(limit + 1),
+      query.includeTotal ? this.countWhere(full) : undefined,
+      query.includeFacets ? this.facetCounts(common, resolved) : undefined,
+    ]);
 
     const hasMore = rows.length > limit;
-    const data = hasMore ? rows.slice(0, limit) : rows;
-    const last = data[data.length - 1];
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
     const nextCursor =
       hasMore && last
-        ? Buffer.from(
-            JSON.stringify({ createdAt: last.createdAt, id: last.id }),
-          ).toString('base64')
+        ? encodeCursor({ s: sort, v: last.sortKey, id: last.id })
         : null;
 
+    // `sortKey` only feeds the cursor; strip it from the response rows.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const data = page.map(({ sortKey, ...l }) => l);
     const photosMap = await this.batchLoadPhotos(data.map((l) => l.id));
     const dataWithPhotos = data.map((l) => ({
       ...l,
       photos: photosMap.get(l.id) ?? [],
     }));
 
-    return { data: dataWithPhotos, meta: { nextCursor, hasMore, limit } };
+    return {
+      data: dataWithPhotos,
+      meta: {
+        nextCursor,
+        hasMore,
+        limit,
+        ...(total !== undefined ? { total } : {}),
+        ...(facets ? { facets } : {}),
+      },
+    };
   }
 
   async findMine(
@@ -315,19 +329,18 @@ export class ListingsService {
     query: QueryListingsDto,
   ): Promise<{ data: ListingWithPhotos[]; meta: PaginationMeta }> {
     const limit = query.limit ?? 20;
-    const conditions = [eq(listings.userId, userId)];
+    const conditions: SQL[] = [eq(listings.userId, userId)];
 
     if (query.status) {
       conditions.push(
         eq(listings.status, query.status as ListingRow['status']),
       );
     }
-    if (query.q) {
-      conditions.push(ilike(listings.title, `%${query.q}%`));
-    }
+    const keyword = keywordCondition(query.q);
+    if (keyword) conditions.push(keyword);
 
-    const extra = await this.resolveQueryFilters(query);
-    if (extra === null)
+    const resolved = await this.resolveFilterIds(query);
+    if (resolved === null)
       return {
         data: [],
         meta: {
@@ -339,7 +352,7 @@ export class ListingsService {
           pageSize: query.pageSize,
         },
       };
-    conditions.push(...extra);
+    conditions.push(...resolved.geo, ...this.categoryConditions(resolved));
 
     const offset =
       query.page && query.pageSize ? (query.page - 1) * query.pageSize : 0;
@@ -401,10 +414,16 @@ export class ListingsService {
     return { ...updated, photos };
   }
 
-  private async resolveQueryFilters(
+  /**
+   * Resolves the slug filters to ids. Returns null when any given slug is
+   * unknown — callers short-circuit to an empty result rather than erroring.
+   * The category dimension is kept apart from the geo conditions because the
+   * facet counts must be able to drop it.
+   */
+  private async resolveFilterIds(
     query: QueryListingsDto,
-  ): Promise<SQL[] | null> {
-    const extra: SQL[] = [];
+  ): Promise<ResolvedFilters | null> {
+    const resolved: ResolvedFilters = { geo: [] };
 
     if (query.categorySlug) {
       const [cat] = await this.db
@@ -413,17 +432,19 @@ export class ListingsService {
         .where(eq(categories.slug, query.categorySlug))
         .limit(1);
       if (!cat) return null;
-      extra.push(eq(listings.categoryId, cat.id));
+      resolved.categoryId = cat.id;
+      resolved.facetCategoryId = cat.id;
     }
 
     if (query.subcategorySlug) {
       const [sub] = await this.db
-        .select({ id: subcategories.id })
+        .select({ id: subcategories.id, categoryId: subcategories.categoryId })
         .from(subcategories)
         .where(eq(subcategories.slug, query.subcategorySlug))
         .limit(1);
       if (!sub) return null;
-      extra.push(eq(listings.subcategoryId, sub.id));
+      resolved.subcategoryId = sub.id;
+      resolved.facetCategoryId ??= sub.categoryId;
     }
 
     if (query.provinceSlug) {
@@ -433,7 +454,7 @@ export class ListingsService {
         .where(eq(provinces.slug, query.provinceSlug))
         .limit(1);
       if (!prov) return null;
-      extra.push(eq(listings.provinceId, prov.id));
+      resolved.geo.push(eq(listings.provinceId, prov.id));
 
       if (query.districtSlug) {
         const [dist] = await this.db
@@ -447,11 +468,138 @@ export class ListingsService {
           )
           .limit(1);
         if (!dist) return null;
-        extra.push(eq(listings.districtId, dist.id));
+        resolved.geo.push(eq(listings.districtId, dist.id));
+
+        if (query.communeSlug) {
+          const [com] = await this.db
+            .select({ id: communes.id })
+            .from(communes)
+            .where(
+              and(
+                eq(communes.districtId, dist.id),
+                eq(communes.slug, query.communeSlug),
+              ),
+            )
+            .limit(1);
+          if (!com) return null;
+          resolved.geo.push(eq(listings.communeId, com.id));
+        }
       }
     }
 
-    return extra;
+    return resolved;
+  }
+
+  private categoryConditions(resolved: ResolvedFilters): SQL[] {
+    const out: SQL[] = [];
+    if (resolved.categoryId)
+      out.push(eq(listings.categoryId, resolved.categoryId));
+    if (resolved.subcategoryId)
+      out.push(eq(listings.subcategoryId, resolved.subcategoryId));
+    return out;
+  }
+
+  /** The non-slug feed filters (keyword, price, condition, attributes, date, delivery). */
+  private feedConditions(query: QueryListingsDto): SQL[] {
+    const out: SQL[] = [];
+
+    const keyword = keywordCondition(query.q);
+    if (keyword) out.push(keyword);
+
+    // Final (discounted) price — what the cards show. A null price is
+    // "Negotiable" and drops out of any bounded range (null >= x is null).
+    if (query.minPrice != null) {
+      out.push(gte(listings.effectivePrice, String(query.minPrice)));
+    }
+    if (query.maxPrice != null) {
+      out.push(lte(listings.effectivePrice, String(query.maxPrice)));
+    }
+    if (query.condition) {
+      out.push(eq(listings.condition, query.condition));
+    }
+    // Attribute filters match the display names stored in `attributes` JSONB
+    // (e.g. `attributes.brand = 'Toyota'`), which is what the post form writes.
+    if (query.brand) {
+      out.push(eq(sql`${listings.attributes}->>'brand'`, query.brand));
+    }
+    if (query.bodyType) {
+      out.push(eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType));
+    }
+    // Generic attribute filter for every grid that is NOT a car's Body Type.
+    // The key is bound as a parameter (`->>$n`), never interpolated, and the
+    // DTO additionally constrains it to a plain identifier — so this stays a
+    // read of the JSONB, not a path injection. Half a filter (one param
+    // without the other) applies nothing rather than erroring, matching how
+    // `districtSlug` without `provinceSlug` is already treated.
+    if (query.attrKey && query.attrValue) {
+      out.push(
+        eq(sql`${listings.attributes}->>${query.attrKey}`, query.attrValue),
+      );
+    }
+
+    // `published_at`, not `created_at`: a draft can sit for days before it
+    // goes live, and "posted today" means went live today.
+    if (query.postedWithin === 'today') {
+      out.push(
+        sql`${listings.publishedAt} >= (date_trunc('day', now() AT TIME ZONE 'Asia/Phnom_Penh') AT TIME ZONE 'Asia/Phnom_Penh')`,
+      );
+    } else if (query.postedWithin === 'week') {
+      out.push(sql`${listings.publishedAt} >= now() - interval '7 days'`);
+    } else if (query.postedWithin === 'month') {
+      out.push(sql`${listings.publishedAt} >= now() - interval '30 days'`);
+    }
+
+    if (query.deliveryFree) {
+      out.push(eq(listings.deliveryFree, true));
+    }
+    return out;
+  }
+
+  private async countWhere(conditions: SQL[]): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(listings)
+      .where(and(...conditions));
+    return row?.count ?? 0;
+  }
+
+  /**
+   * Per-category counts over `common` (every filter except the category
+   * dimension), plus per-subcategory counts inside the selected category.
+   * Zero-count rows are simply absent (GROUP BY). Ordered by the catalogue's
+   * own sort_order so the list does not reshuffle as the counts change.
+   */
+  private async facetCounts(
+    common: SQL[],
+    resolved: ResolvedFilters,
+  ): Promise<NonNullable<FeedMeta['facets']>> {
+    const count = sql<number>`count(*)::int`;
+    const [cats, subs] = await Promise.all([
+      this.db
+        .select({ slug: categories.slug, count })
+        .from(listings)
+        .innerJoin(categories, eq(listings.categoryId, categories.id))
+        .where(and(...common))
+        .groupBy(categories.id)
+        .orderBy(categories.sortOrder, categories.slug),
+      resolved.facetCategoryId
+        ? this.db
+            .select({ slug: subcategories.slug, count })
+            .from(listings)
+            .innerJoin(
+              subcategories,
+              eq(listings.subcategoryId, subcategories.id),
+            )
+            .where(
+              and(...common, eq(listings.categoryId, resolved.facetCategoryId)),
+            )
+            .groupBy(subcategories.id)
+            .orderBy(subcategories.sortOrder, subcategories.slug)
+        : undefined,
+    ]);
+    return subs
+      ? { categories: cats, subcategories: subs }
+      : { categories: cats };
   }
 
   private async batchLoadPhotos(

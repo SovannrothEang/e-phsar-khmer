@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
@@ -8,8 +9,24 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { FEED_SORTS } from '../feed-cursor';
+import type { FeedSort } from '../feed-cursor';
+
+export const POSTED_WITHIN = ['today', 'week', 'month'] as const;
+export type PostedWithin = (typeof POSTED_WITHIN)[number];
+
+/**
+ * Query-string boolean: only the literal `true`/`"true"` is true. The global
+ * pipe's implicit conversion would turn the string "false" into `true`
+ * (`Boolean("false")`), so read the raw value instead.
+ */
+const QueryBoolean = () =>
+  Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }) => {
+    const raw = obj[key];
+    return raw === true || raw === 'true';
+  });
 
 export class QueryListingsDto extends PaginationQueryDto {
   @ApiPropertyOptional()
@@ -22,19 +39,32 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsString()
   subcategorySlug?: string;
 
-  @ApiPropertyOptional({ description: 'Search query against title' })
+  @ApiPropertyOptional({
+    description:
+      'Keyword search: whitespace-split (max 5 tokens), every token must ' +
+      'appear in the title or description (case-insensitive substring).',
+  })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Bound on the final (discounted) price, effective_price. Listings ' +
+      'with no price ("Negotiable") are excluded while a bound is set.',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   minPrice?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      'Bound on the final (discounted) price, effective_price. Listings ' +
+      'with no price ("Negotiable") are excluded while a bound is set.',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -62,6 +92,49 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   districtSlug?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by commune slug (requires districtSlug)',
+  })
+  @IsOptional()
+  @IsString()
+  communeSlug?: string;
+
+  @ApiPropertyOptional({ enum: FEED_SORTS, default: 'newest' })
+  @IsOptional()
+  @IsIn(FEED_SORTS)
+  sort?: FeedSort;
+
+  @ApiPropertyOptional({
+    enum: POSTED_WITHIN,
+    description:
+      'today = since 00:00 Asia/Phnom_Penh; week = last 7 days; month = last 30 days',
+  })
+  @IsOptional()
+  @IsIn(POSTED_WITHIN)
+  postedWithin?: PostedWithin;
+
+  @ApiPropertyOptional({ description: 'Only listings with free delivery' })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  deliveryFree?: boolean;
+
+  @ApiPropertyOptional({ description: 'Add meta.total (feed only)' })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  includeTotal?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Add meta.facets: per-category counts (and per-subcategory counts ' +
+      'once a category is selected) for the current filters (feed only)',
+  })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  includeFacets?: boolean;
 
   @ApiPropertyOptional({
     description: "Filter by the ad's brand (listings.attributes->>'brand')",

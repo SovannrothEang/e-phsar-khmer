@@ -79,6 +79,23 @@ export const listings = pgTable(
     contactEmail: varchar('contact_email', { length: 255 }),
     status: listingStatusEnum('status').default('draft').notNull(),
     viewsCount: integer('views_count').default(0).notNull(),
+    // The price a buyer actually pays — what cards show and what price
+    // filters/sorts must use. MUST stay equal to `applyDiscount` in
+    // apps/web/lib/utils.ts (v <= 0 → no discount, percent >= 100 → 0, amount
+    // floors at 0, rounded to cents). Null price ("Negotiable") stays null.
+    effectivePrice: numeric('effective_price', {
+      precision: 14,
+      scale: 2,
+    }).generatedAlwaysAs(
+      sql`CASE
+        WHEN price IS NULL THEN NULL
+        WHEN discount_value IS NULL OR discount_type IS NULL OR discount_value <= 0 THEN price
+        WHEN discount_type = 'percent' THEN
+          CASE WHEN discount_value >= 100 THEN 0
+               ELSE round(price * (1 - discount_value / 100), 2) END
+        ELSE GREATEST(round(price - discount_value, 2), 0)
+      END`,
+    ),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
@@ -100,6 +117,20 @@ export const listings = pgTable(
     index('listings_province_id_idx').on(t.provinceId),
     index('listings_district_id_idx').on(t.districtId),
     index('listings_commune_id_idx').on(t.communeId),
+    // Price sorts/filters on the final price (see effectivePrice).
+    index('listings_status_effective_price_idx').on(
+      t.status,
+      t.effectivePrice,
+      t.id,
+    ),
+    // Trigram indexes let the keyword search's leading-% ILIKE use an index
+    // (pg_trgm, created in migration 0031). Substring matching rather than
+    // tsvector because Khmer has no word spaces.
+    index('listings_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    index('listings_description_trgm_idx').using(
+      'gin',
+      t.description.op('gin_trgm_ops'),
+    ),
     check('listings_price_nonnegative', sql`price >= 0`),
     check('listings_discount_value_nonnegative', sql`discount_value >= 0`),
     check(

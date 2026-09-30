@@ -255,3 +255,253 @@ describe('ListingsService.findFeed filters', () => {
     });
   });
 });
+
+/**
+ * Search/filter additions (spec-search.md). A generic chainable mock: every
+ * builder method records its arguments and returns the chain, and awaiting
+ * the chain yields the queued rows — so one helper covers slug lookups, the
+ * page query, the count and both facet GROUP BYs.
+ */
+describe('ListingsService.findFeed search + facets', () => {
+  type Rec = Record<string, unknown[]>;
+  const dialect = new PgDialect();
+  const compile = (s: unknown) => dialect.sqlToQuery(s as never);
+
+  let db: ReturnType<typeof makeDb>;
+  let service: ListingsService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  function chain(result: unknown[], rec: Rec) {
+    const c: Record<string, unknown> = {};
+    for (const m of [
+      'from',
+      'where',
+      'orderBy',
+      'limit',
+      'innerJoin',
+      'groupBy',
+    ]) {
+      c[m] = (...args: unknown[]) => {
+        rec[m] = args;
+        return c;
+      };
+    }
+    c.then = (
+      resolve: (v: unknown[]) => unknown,
+      reject: (e: unknown) => unknown,
+    ) => Promise.resolve(result).then(resolve, reject);
+    return c;
+  }
+
+  /** Queues one result per db.select() call; returns each call's record. */
+  function queue(...results: unknown[][]): Rec[] {
+    // Pre-allocated so callers can destructure before the calls happen.
+    const recs: Rec[] = results.map(() => ({}));
+    let i = 0;
+    db.select.mockImplementation(() => {
+      const rec: Rec = recs[i] ?? {};
+      if (i >= recs.length) recs.push(rec);
+      return chain(results[i++] ?? [], rec);
+    });
+    return recs;
+  }
+
+  const whereOf = (rec: Rec) => compile(rec.where[0]);
+
+  it('rejects an inverted price range', async () => {
+    await expect(
+      service.findFeed({ minPrice: 500, maxPrice: 100 }),
+    ).rejects.toThrow('minPrice must not exceed maxPrice');
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('filters price on the final (discounted) price', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ minPrice: 100, maxPrice: 500 });
+    const { sql, params } = whereOf(page);
+    expect(sql).toMatch(/"effective_price" >= \$\d+/);
+    expect(sql).toMatch(/"effective_price" <= \$\d+/);
+    expect(sql).not.toMatch(/"price" >=/);
+    expect(params).toEqual(expect.arrayContaining(['100', '500']));
+  });
+
+  it('matches the keyword in title and description', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ q: 'prius' });
+    const { sql, params } = whereOf(page);
+    expect(sql).toMatch(/"title" ilike/);
+    expect(sql).toMatch(/"description" ilike/);
+    expect(params).toContain('%prius%');
+  });
+
+  it('postedWithin=today counts from midnight Phnom Penh on published_at', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ postedWithin: 'today' });
+    const { sql } = whereOf(page);
+    expect(sql).toContain('"published_at" >=');
+    expect(sql).toContain("'Asia/Phnom_Penh'");
+  });
+
+  it('deliveryFree=true filters on delivery_free', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ deliveryFree: true });
+    expect(whereOf(page).sql).toContain('"delivery_free" = $');
+  });
+
+  describe('commune', () => {
+    it('resolves inside the district', async () => {
+      const recs = queue(
+        [{ id: 'prov-1' }],
+        [{ id: 'dist-1' }],
+        [{ id: 'com-1' }],
+        [],
+      );
+      await service.findFeed({
+        provinceSlug: 'phnom-penh',
+        districtSlug: 'chamkar-mon',
+        communeSlug: 'tonle-basak',
+      });
+      expect(recs).toHaveLength(4);
+      expect(whereOf(recs[2]).params).toEqual(
+        expect.arrayContaining(['dist-1', 'tonle-basak']),
+      );
+      expect(whereOf(recs[3]).params).toContain('com-1');
+    });
+
+    it('short-circuits on an unknown commune', async () => {
+      queue([{ id: 'prov-1' }], [{ id: 'dist-1' }], []);
+      const res = await service.findFeed({
+        provinceSlug: 'phnom-penh',
+        districtSlug: 'chamkar-mon',
+        communeSlug: 'nope',
+      });
+      expect(res.data).toEqual([]);
+      expect(db.select).toHaveBeenCalledTimes(3);
+    });
+
+    it('is ignored without a district', async () => {
+      queue([{ id: 'prov-1' }], []);
+      await service.findFeed({ provinceSlug: 'phnom-penh', communeSlug: 'x' });
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('sort + cursor', () => {
+    const row = (id: string, sortKey: string | null) => ({ id, sortKey });
+
+    it('orders price_asc with nulls last', async () => {
+      const [page] = queue([]);
+      await service.findFeed({ sort: 'price_asc' });
+      const first = compile(page.orderBy[0]).sql;
+      expect(first).toMatch(/effective_price" asc nulls last/);
+    });
+
+    it('issues a cursor for its own sort and strips sortKey from rows', async () => {
+      queue([row('a', '10.00'), row('b', '20.00'), row('c', '30.00')]);
+      const res = await service.findFeed({ sort: 'price_asc', limit: 2 });
+      expect(res.data.map((l) => l.id)).toEqual(['a', 'b']);
+      expect(res.data[0]).not.toHaveProperty('sortKey');
+      const cursor = JSON.parse(
+        Buffer.from(res.meta.nextCursor!, 'base64').toString('utf8'),
+      ) as unknown;
+      expect(cursor).toEqual({ s: 'price_asc', v: '20.00', id: 'b' });
+    });
+
+    it('applies a matching cursor', async () => {
+      const [page] = queue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ s: 'price_desc', v: '20.00', id: 'b' }),
+      ).toString('base64');
+      await service.findFeed({ sort: 'price_desc', cursor });
+      expect(whereOf(page).params).toEqual(
+        expect.arrayContaining(['20.00', 'b']),
+      );
+    });
+
+    it('ignores a cursor issued for another sort', async () => {
+      const [page] = queue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ s: 'price_asc', v: '20.00', id: 'b' }),
+      ).toString('base64');
+      await service.findFeed({ sort: 'price_desc', cursor });
+      expect(whereOf(page).params).not.toContain('20.00');
+    });
+  });
+
+  describe('total + facets', () => {
+    it('omits total and facets unless asked', async () => {
+      queue([]);
+      const res = await service.findFeed({ q: 'x' });
+      expect(res.meta).not.toHaveProperty('total');
+      expect(res.meta).not.toHaveProperty('facets');
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns total over the full filter set', async () => {
+      const [, count] = queue([], [{ count: 7 }]);
+      const res = await service.findFeed({ q: 'x', includeTotal: true });
+      expect(res.meta.total).toBe(7);
+      expect(whereOf(count).params).toContain('%x%');
+    });
+
+    it('category facets drop the category dimension but keep the rest', async () => {
+      const cats = [{ slug: 'cars-and-vehicles', count: 3 }];
+      const subs = [{ slug: 'cars-for-sale', count: 3 }];
+      const recs = queue([{ id: 'cat-1' }], [], cats, subs);
+      const res = await service.findFeed({
+        categorySlug: 'cars-and-vehicles',
+        q: 'toyota',
+        includeFacets: true,
+      });
+
+      expect(whereOf(recs[1]).sql).toContain('"category_id" = $');
+
+      const catFacet = whereOf(recs[2]);
+      expect(catFacet.sql).not.toContain('"category_id" = $');
+      expect(catFacet.params).toContain('%toyota%');
+
+      const subFacet = whereOf(recs[3]);
+      expect(subFacet.sql).toContain('"category_id" = $');
+      expect(subFacet.sql).not.toContain('"subcategory_id" = $');
+
+      expect(res.meta.facets).toEqual({
+        categories: cats,
+        subcategories: subs,
+      });
+    });
+
+    it('scopes the subcategory facet to the parent of a lone subcategory', async () => {
+      const recs = queue([{ id: 'sub-1', categoryId: 'cat-9' }], [], [], []);
+      await service.findFeed({
+        subcategorySlug: 'cars-for-sale',
+        includeFacets: true,
+      });
+      const subFacet = whereOf(recs[3]);
+      expect(subFacet.params).toContain('cat-9');
+      expect(subFacet.sql).not.toContain('"subcategory_id" = $');
+    });
+
+    it('has no subcategory facet without a category', async () => {
+      queue([], []);
+      const res = await service.findFeed({ includeFacets: true });
+      expect(res.meta.facets).toEqual({ categories: [] });
+      expect(db.select).toHaveBeenCalledTimes(2);
+    });
+
+    it('an unknown category short-circuits to zero with empty facets', async () => {
+      queue([]);
+      const res = await service.findFeed({
+        categorySlug: 'nope',
+        includeTotal: true,
+        includeFacets: true,
+      });
+      expect(res.meta.total).toBe(0);
+      expect(res.meta.facets).toEqual({ categories: [] });
+      expect(db.select).toHaveBeenCalledTimes(1);
+    });
+  });
+});
