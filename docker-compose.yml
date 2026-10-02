@@ -1,0 +1,76 @@
+# Full stack in containers: Redis + backend + web. Postgres, Auth and Storage
+# stay on Supabase, so apps/backend/.env still supplies DATABASE_URL and the
+# SUPABASE_* keys.
+#
+#   docker compose up --build
+#   web      http://localhost:3001
+#   backend  http://localhost:3000  (health: /health, docs: /api/docs)
+#
+# Migrations are not run here. Apply them first with
+# `pnpm --filter backend db:migrate`, as the deploy workflow does.
+
+services:
+  redis:
+    image: redis:7-alpine
+    # BullMQ needs noeviction: an evicting Redis can silently drop queued
+    # jobs. appendonly keeps them across a container restart.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    env_file: apps/backend/.env
+    # These win over the .env, which is written for running on the host.
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      QUEUE_HOST: redis
+      QUEUE_PORT: "6379"
+      QUEUE_USERNAME: ""
+      QUEUE_PASSWORD: ""
+      QUEUE_TLS: "false"
+      FRONTEND_ORIGINS: http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # The slim image has no curl; Node's fetch does the job.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Inlined into the browser bundle at build time. The browser runs on
+        # the host, so it reaches the backend through the published port.
+        NEXT_PUBLIC_WS_URL: ws://localhost:3000
+        SUPABASE_URL: ${SUPABASE_URL:-}
+    environment:
+      # Server-side calls stay on the compose network.
+      API_URL: http://backend:3000/api/v1
+    ports:
+      - "3001:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:

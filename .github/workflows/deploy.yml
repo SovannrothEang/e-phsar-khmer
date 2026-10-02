@@ -4,8 +4,8 @@ name: Deploy
 # migrations, then ships the backend to Vercel. Each step only runs if the
 # previous one passed, so a red CI or a failed migration never deploys.
 #
-# Vercel's own git integration must NOT also deploy prod (see
-# apps/backend/vercel.json), or it would ship before CI and migrations ran.
+# Vercel's own git integration must NOT also deploy prod (see the `git` block
+# in the root vercel.json), or it would ship before CI and migrations ran.
 
 on:
   push:
@@ -91,7 +91,7 @@ jobs:
       # Vercel's deployment protection and would answer 401.
       - name: Smoke test
         env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://psa-npic.vercel.app' }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://phsar-backend.sovannroth.xyz' }}
         run: |
           for i in 1 2 3 4 5; do
             status=$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)

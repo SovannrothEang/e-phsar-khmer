@@ -12,6 +12,9 @@ const supabaseHost = process.env.SUPABASE_URL
 
 /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
+  // Emits .next/standalone: a minimal server.js plus only the node_modules it
+  // traces, which is what apps/web/Dockerfile ships. Vercel ignores it.
+  output: "standalone",
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
