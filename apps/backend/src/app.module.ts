@@ -15,6 +15,7 @@ import { AppService } from './app.service';
 import { SupabaseModule } from './common/supabase/supabase.module';
 import { DbModule } from './db/db.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { UserAwareThrottlerGuard } from './common/guards/user-aware-throttler.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
@@ -103,6 +104,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('{*splat}');
     consumer
       .apply(IdempotencyMiddleware)
       .forRoutes(
