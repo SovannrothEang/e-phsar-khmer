@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [prod]
   pull_request:
   # prod is gated by deploy.yml, which calls this workflow before migrating
   # and deploying, so a prod push doesn't run it twice.
