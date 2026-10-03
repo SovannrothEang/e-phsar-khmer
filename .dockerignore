@@ -1,4 +1,6 @@
-# Docker build context is the repo root (see apps/backend/Dockerfile).
+# Docker build context is the repo root (see Dockerfile.vercel). Mirrors the
+# exclusions in .vercelignore (which trims the upload) plus VCS/CI files the
+# Vercel CLI already drops itself.
 **/node_modules
 **/dist
 **/.next
@@ -14,6 +16,11 @@
 .vscode
 .opencode
 .pipeline
+.vercel
 graphify-out
 docs
 tasks
+
+# The image compiles apps/backend only (pnpm --filter backend... in
+# Dockerfile.vercel), so the frontend is never needed in the build context.
+apps/web
