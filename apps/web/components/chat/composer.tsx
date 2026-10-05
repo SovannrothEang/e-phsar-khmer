@@ -54,6 +54,20 @@ export function Composer({
   const maxAllowed = hasListing ? MAX_IMAGES - 1 : MAX_IMAGES;
   const remaining = maxAllowed - staged.length;
 
+  // Authoritative staged list, mirroring `staged` synchronously.
+  //
+  // The limit check must NOT go through the state updater: React runs an
+  // updater during the next render, so a flag set inside one is still unset on
+  // the following line — reading it there rejected every image, deleted the
+  // draft it had just stored, and left the send with nothing to upload. Every
+  // mutation goes through `commitStaged`, so the ref and the state cannot
+  // diverge.
+  const stagedRef = useRef<StagedImage[]>([]);
+  const commitStaged = useCallback((next: StagedImage[]) => {
+    stagedRef.current = next;
+    setStaged(next);
+  }, []);
+
   // Cleanup all drafts when tab/window closes.
   useEffect(() => {
     function handleBeforeUnload() {
@@ -73,8 +87,8 @@ export function Composer({
       draftKeys: staged.map((s) => s.key),
     });
     setText("");
-    setStaged([]);
-  }, [canSend, text, staged, onSend]);
+    commitStaged([]);
+  }, [canSend, text, staged, onSend, commitStaged]);
 
   async function handleFile(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -89,19 +103,23 @@ export function Composer({
     try {
       // Use random ID to avoid key collisions on rapid picks.
       const tempId = crypto.randomUUID();
-      const draft = await storeDraftImage(tempId, staged.length, file);
-      let accepted = false;
-      setStaged((prev) => {
-        // Re-check limit inside the updater — concurrent pastes see stale state.
-        if (prev.length >= maxAllowed) return prev;
-        accepted = true;
-        return [...prev, { key: draft.key, dataUrl: draft.dataUrl }];
-      });
-      if (!accepted) {
+      const draft = await storeDraftImage(
+        tempId,
+        stagedRef.current.length,
+        file,
+      );
+      // Check-and-commit with no await between them: the ref is updated
+      // synchronously, so an overlapping pick cannot slip past the limit — the
+      // guarantee the in-updater check was reaching for.
+      if (stagedRef.current.length >= maxAllowed) {
         removeDraftImage(draft.key);
         toast.error(t("composer.imageLimitError", { max: maxAllowed }));
         return;
       }
+      commitStaged([
+        ...stagedRef.current,
+        { key: draft.key, dataUrl: draft.dataUrl },
+      ]);
       onActivity?.();
     } catch (err) {
       toast.error(
@@ -113,10 +131,10 @@ export function Composer({
   }
 
   function discardStaged(index: number) {
-    const item = staged[index];
+    const item = stagedRef.current[index];
     if (!item) return;
     removeDraftImage(item.key);
-    setStaged((prev) => prev.filter((_, i) => i !== index));
+    commitStaged(stagedRef.current.filter((_, i) => i !== index));
   }
 
   if (disabled) {
@@ -133,7 +151,10 @@ export function Composer({
       {staged.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-3 pt-3">
           {staged.map((s, i) => (
-            <div key={s.key} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
+            <div
+              key={s.key}
+              className="relative h-16 w-16 overflow-hidden rounded-lg border border-border"
+            >
               <Image
                 src={s.dataUrl}
                 alt={t("composer.stagedImageAlt")}

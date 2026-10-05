@@ -8,6 +8,7 @@ export default function ContactUser({
   province,
   coords,
   locationLine,
+  addressLine,
 }: {
   user: { phone?: string[] };
   district?: { name?: string };
@@ -16,12 +17,15 @@ export default function ContactUser({
   coords?: { lat: number; lng: number } | null;
   /** The listing's location as text (real listings carry it on the row). */
   locationLine?: string;
+  /** The seller's street address — printed under the location. */
+  addressLine?: string;
 }) {
   const phone0 = user?.phone?.[0];
   const phone1 = user?.phone?.[1];
   const heading =
-    locationLine ??
-    [district?.name, province?.name].filter(Boolean).join(", ");
+    locationLine ?? [district?.name, province?.name].filter(Boolean).join(", ");
+  // The map link searches the most precise text we have, address included.
+  const mapQuery = [heading, addressLine].filter(Boolean).join(", ");
 
   return (
     <>
@@ -73,7 +77,12 @@ export default function ContactUser({
           <IconMapPin className="scale-80 mr-2 text-muted-foreground" />
           {heading}
         </h3>
-        <ListingLocationMap coords={coords ?? null} locationLine={heading} />
+        {/* The street address sits on its own line under the location, and
+            only when the seller gave one — no empty line otherwise. */}
+        {addressLine ? (
+          <p className="text-sm text-muted-foreground mb-2">{addressLine}</p>
+        ) : null}
+        <ListingLocationMap coords={coords ?? null} locationLine={mapQuery} />
       </div>
     </>
   );

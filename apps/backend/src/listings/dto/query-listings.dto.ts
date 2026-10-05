@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   Min,
@@ -50,6 +51,23 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['draft', 'active', 'expired', 'deleted'])
   status?: string;
+
+  /**
+   * One seller's ads — the public profile's post history.
+   *
+   * Feed-only, and deliberately NOT a substitute for `/listings/me/all`:
+   * `findMine` is scoped to the caller's own JWT and does not filter by
+   * status, so it must never back a page anyone can open. This one rides the
+   * feed, which always ANDs `status = 'active'` — a draft, an expired ad or a
+   * soft-deleted one stays invisible no matter what the caller sends.
+   */
+  @ApiPropertyOptional({
+    description:
+      'Only the active listings owned by this user (the public profile feed)',
+  })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 
   @ApiPropertyOptional({ description: 'Filter by province slug' })
   @IsOptional()

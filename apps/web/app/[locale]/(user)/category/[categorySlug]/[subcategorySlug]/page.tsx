@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
+import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
@@ -23,6 +24,7 @@ import {
   getModelsForBrand,
   toCardPost,
 } from "@/lib/api/categories";
+import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import type { Post } from "@/lib/posts";
 
 // ─── Bar chip flags: the design groups chips per main category; the vehicles
@@ -172,15 +174,10 @@ const IMAGE_TILE_SETS = new Set([
   "types",
 ]);
 // ─── The exception, by MAIN CATEGORY: Furniture & Decor draws its Type grid as
-//     bordered TEXT tiles. It is the only text-drawn slice of `types` in the
-//     mock — furniture's type rows carry no `image` key at all, while every
-//     other slice does. Keyed by category rather than by subcategory so a new
-//     Type link anywhere under furniture cannot silently re-grow icon circles.
-//     (Property's kind rows — Flat/House/Villa, Factory/Warehouse/… — are drawn
-//     with icons in the mock too, so Home & Land stays on the icon grid.) ─────
-const TEXT_TILE_SETS_BY_CATEGORY: Record<string, Set<string>> = {
-  "furniture-and-decor": new Set(["types"]),
-};
+//     bordered TEXT tiles (see `TEXT_TILE_SETS_BY_CATEGORY` in
+//     `lib/attribute-types.ts` for the declaration and the reasoning). It lives
+//     there rather than here because the post form's pickers obey the same
+//     declaration — one design fact, two surfaces, one source. ───────────────
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function SubcategoryPage({
   params,
@@ -199,13 +196,13 @@ export default async function SubcategoryPage({
 
   // Single category fetch covers both sides: breadcrumb names + subcategory
   // identity (id/slug/name/icon). The backend localizes names via
-  // Accept-Language; failures degrade to a 404-free "Page not found".
+  // Accept-Language; an unknown slug is a real 404.
   const category = await getCategoryWithSubcategories(categorySlug, locale);
   const subcategory = category?.subcategories.find(
     (s) => s.slug === subcategorySlug,
   );
   if (!category || !subcategory) {
-    return <div>Page not found</div>;
+    notFound();
   }
 
   // Live option grids for every subcategory with linked data: brands + models

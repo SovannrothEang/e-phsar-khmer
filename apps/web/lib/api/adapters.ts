@@ -14,6 +14,14 @@ export interface BackendUser {
   status: "active" | "suspended" | "deleted";
   preferredLanguage: string;
   isBusiness: boolean;
+  /** Profile fields `GET /users/me` returns (PublicUser) — the settings form needs them. */
+  gender: "male" | "female" | null;
+  yearOfBirth: number | null;
+  company: string | null;
+  address: string | null;
+  provinceId: string | null;
+  districtId: string | null;
+  communeId: string | null;
   phoneVerifiedAt: string | null;
   emailVerifiedAt: string | null;
   lastSeenAt: string | null;

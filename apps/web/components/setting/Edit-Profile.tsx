@@ -1,13 +1,13 @@
 "use client";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Field, FieldLabel } from "@/components/ui/field";
+  Field,
+  FieldLabel,
+  FieldSet,
+  FieldGroup,
+  FieldContent,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,17 +18,87 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldSet, FieldGroup, FieldContent } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Link, useRouter } from "@/i18n/routing";
+import { toast } from "sonner";
 import SettingSidebar from "./SettingSidebar";
-export default function EditProfile() {
-  const [open, setOpen] = React.useState(false);
-  const [date, setDate] = React.useState<Date | undefined>(undefined);
+import LocationPicker, {
+  type PlaceSelection,
+} from "@/components/post/LocationPicker";
+import { updateMyProfile } from "@/actions/settings";
+import { formatPhoneLocal } from "@/lib/phone";
+import type { BackendPlace } from "@/lib/api/categories";
+import type { SettingsUser } from "@/lib/auth/current-user";
+
+const CURRENT_YEAR = new Date().getFullYear();
+/** Newest first — the common case is near the top. */
+const BIRTH_YEARS = Array.from({ length: CURRENT_YEAR - 1899 }, (_, i) =>
+  String(CURRENT_YEAR - i),
+);
+
+export default function EditProfile({
+  me,
+  provinces,
+  savedPlace,
+}: {
+  me: SettingsUser;
+  provinces: BackendPlace[];
+  savedPlace: PlaceSelection;
+}) {
+  const router = useRouter();
+
+  const [firstName, setFirstName] = React.useState(me.firstName ?? "");
+  const [lastName, setLastName] = React.useState(me.lastName ?? "");
+  const [gender, setGender] = React.useState<"male" | "female" | null>(
+    me.gender,
+  );
+  const [yearOfBirth, setYearOfBirth] = React.useState(
+    me.yearOfBirth === null ? "" : String(me.yearOfBirth),
+  );
+  const [email, setEmail] = React.useState(me.email ?? "");
+  const [company, setCompany] = React.useState(me.company ?? "");
+  const [place, setPlace] = React.useState<PlaceSelection>(savedPlace);
+  const [address, setAddress] = React.useState(me.address ?? "");
+  const [saving, setSaving] = React.useState(false);
+
+  const canSubmit = firstName.trim().length > 0 && !saving;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setSaving(true);
+
+    const result = await updateMyProfile({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      gender,
+      // An empty picker clears the year rather than leaving the old one.
+      yearOfBirth: yearOfBirth ? Number(yearOfBirth) : null,
+      email: email.trim() || null,
+      company: company.trim() || null,
+      // The cascade is always sent in full, so clearing it clears the account.
+      provinceId: place.province?.id ?? null,
+      districtId: place.district?.id ?? null,
+      communeId: place.commune?.id ?? null,
+      address: address.trim() || null,
+    });
+
+    if (!result.success) {
+      toast.error(result.error ?? "Could not save your profile");
+      setSaving(false);
+      return;
+    }
+
+    toast.success("Profile updated");
+    setSaving(false);
+    // Re-renders the rail, the hub and the navbar chip from the new row.
+    router.refresh();
+  }
+
   return (
     <div className="min-h-screen bg-muted pb-30 pt-4">
       <div className="max-w-6xl mx-auto  ">
         <div className="flex gap-5 ">
-          <SettingSidebar />
+          <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
               <h1 className="text-2xl font-medium text-foreground mb-4 mt-4 px-4">
@@ -36,110 +106,125 @@ export default function EditProfile() {
               </h1>
               <div className="mt-2 px-4 space-y-4">
                 <Field>
-                  <FieldLabel htmlFor="input-required">
+                  <FieldLabel htmlFor="first-name">
                     First Name <span className="text-destructive">*</span>
                   </FieldLabel>
                   <Input
-                    id="input-required"
+                    id="first-name"
                     placeholder="First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    maxLength={100}
                     required
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">
+                  <FieldLabel htmlFor="last-name">
                     Last Name <span className="text-destructive">*</span>
                   </FieldLabel>
-                  <Input id="input-required" placeholder="Last Name" required />
+                  <Input
+                    id="last-name"
+                    placeholder="Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    maxLength={100}
+                    required
+                  />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">Gender</FieldLabel>
+                  <FieldLabel>Gender</FieldLabel>
                   <div className="flex gap-2">
-                    <button className="flex-1 border border-sky-400 bg-sky-100 text-sky-600 py-1.5 rounded-sm">
+                    <button
+                      type="button"
+                      onClick={() => setGender("male")}
+                      className={`flex-1 border py-1.5 rounded-sm cursor-pointer ${
+                        gender === "male"
+                          ? "border-sky-400 bg-sky-100 text-sky-600"
+                          : "border-border"
+                      }`}
+                    >
                       Male
                     </button>
-                    <button className="flex-1 border border-border py-1.5 rounded-sm">
+                    <button
+                      type="button"
+                      onClick={() => setGender("female")}
+                      className={`flex-1 border py-1.5 rounded-sm cursor-pointer ${
+                        gender === "female"
+                          ? "border-sky-400 bg-sky-100 text-sky-600"
+                          : "border-border"
+                      }`}
+                    >
                       Female
                     </button>
                   </div>
                 </Field>
                 <Field className="mx-auto ">
-                  <FieldLabel htmlFor="date">Date of birth</FieldLabel>
-                  <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        id="date"
-                        className="justify-start font-normal h-10"
-                      >
-                        {date
-                          ? date.toLocaleDateString()
-                          : "Select Date of Birth"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto overflow-hidden p-0"
-                      align="center"
-                    >
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        defaultMonth={date}
-                        captionLayout="dropdown"
-                        onSelect={(date) => {
-                          setDate(date);
-                          setOpen(false);
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="input-required">Email</FieldLabel>
-                  <Input
-                    id="input-required"
-                    placeholder="[EMAIL_ADDRESS]"
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="input-required">Company</FieldLabel>
-                  <Input
-                    id="input-required"
-                    placeholder="Company Name"
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="input-required">
-                    Phone Number <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <Input
-                    id="input-required"
-                    placeholder="+855........."
-                    required
-                  />
-                </Field>
-                <Field className="w-full">
-                  <FieldLabel>Location</FieldLabel>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose Location" />
+                  {/* The account stores a birth YEAR, not a date — a calendar
+                      that dropped the day and month would be lying. */}
+                  <FieldLabel htmlFor="year-of-birth">Year of birth</FieldLabel>
+                  <Select value={yearOfBirth} onValueChange={setYearOfBirth}>
+                    <SelectTrigger id="year-of-birth" className="w-full h-10">
+                      <SelectValue placeholder="Select Year of Birth" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[296px]">
                       <SelectGroup>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="support">
-                          Customer Support
-                        </SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
+                        {BIRTH_YEARS.map((year) => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="email">Email</FieldLabel>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="company">Company</FieldLabel>
+                  <Input
+                    id="company"
+                    placeholder="Company Name"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    maxLength={150}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="phone-number">
+                    Phone Number <span className="text-destructive">*</span>
+                  </FieldLabel>
+                  {/* Read-only: a phone only changes through the code sent to
+                      it, which is what the Activate Phone page does. */}
+                  <Input
+                    id="phone-number"
+                    value={
+                      me.primaryPhone ? formatPhoneLocal(me.primaryPhone) : ""
+                    }
+                    placeholder="Not set"
+                    disabled
+                  />
+                  <Link
+                    href={{ pathname: "/settings/change-phone" }}
+                    className="text-sm text-[#00a0e9] hover:underline"
+                  >
+                    Change your active phone number
+                  </Link>
+                </Field>
+                <Field className="w-full">
+                  <FieldLabel>Location</FieldLabel>
+                  <LocationPicker
+                    provinces={provinces}
+                    value={place}
+                    onChange={setPlace}
+                  />
                 </Field>
                 <FieldSet className="w-full">
                   <FieldGroup>
@@ -149,32 +234,12 @@ export default function EditProfile() {
                         id="address"
                         placeholder="Enter your address..."
                         rows={4}
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
                       />
                     </Field>
                   </FieldGroup>
                 </FieldSet>
-                <Field className="w-full">
-                  <FieldLabel>Select Location</FieldLabel>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="support">
-                          Customer Support
-                        </SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
                 <Field orientation="horizontal">
                   <Checkbox
                     id="terms-checkbox-2"
@@ -187,8 +252,13 @@ export default function EditProfile() {
                     </FieldLabel>
                   </FieldContent>
                 </Field>
-                <Button className="bg-orange-500 text-card rounded-sm w-full h-8 mb-4">
-                  Submit
+                <Button
+                  type="button"
+                  onClick={() => void submit()}
+                  disabled={!canSubmit}
+                  className="bg-orange-500 text-card rounded-sm w-full h-8 mb-4 cursor-pointer"
+                >
+                  {saving ? "Saving…" : "Submit"}
                 </Button>
               </div>
             </div>

@@ -202,7 +202,9 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       const db = makeDb();
       db.select.mockImplementation(() => {
         selectCall++;
-        // call 1: existing-user check → none; call 2: username probe → free
+        // call 1: existing-user check → none; call 2: recovery-window lookup
+        // (an account this phone could revive) → none; call 3: username
+        // probe → free
         return {
           from: () => ({
             where: () => ({ limit: () => Promise.resolve([]) }),
@@ -231,7 +233,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
         lastName: 'Dara',
         username: 'sokdara',
       });
-      expect(selectCall).toBe(2);
+      expect(selectCall).toBe(3);
     });
 
     it('omits username when names are absent', async () => {
@@ -455,6 +457,183 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       ).rejects.toThrow('INVALID_CREDENTIALS');
       expect(supabase.signInWithOtp).not.toHaveBeenCalled();
     });
+  });
+
+  describe('verifyPhoneOtp — an account inside its recovery window', () => {
+    it('revives it instead of creating a second account for the number', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const recoverable = makeUser({
+        primaryPhone: PHONE,
+        deletedAt: new Date(),
+        status: 'deleted',
+      });
+      let selectCall = 0;
+      const db = makeDb();
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: the active-account lookup → none; 2: the recovery lookup → the
+        // deleted account (the WHERE that makes it *recoverable* — window and
+        // surviving phone — is SQL and is exercised against the database).
+        const rows = selectCall === 1 ? [] : [recoverable];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return {
+            where: () => ({
+              returning: () => Promise.resolve([{ ...recoverable, ...values }]),
+            }),
+          };
+        },
+      }));
+      const supabase = makeSupabase();
+      const service = makeAuthService(db, supabase);
+
+      const result = await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '000000',
+        password: 'password123',
+      });
+
+      expect(result.accessToken).toBe('signed-token');
+      expect(sets).toContainEqual({
+        status: 'active',
+        deletedAt: null,
+      });
+      // The whole point: no `users` insert, so the phone never forks into a
+      // fresh account while the old row is still waiting to be purged.
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('still checks the password before burning an OTP attempt', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      const db = makeDb();
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        return {
+          from: () => ({
+            where: () => ({
+              limit: () =>
+                Promise.resolve(
+                  selectCall === 1
+                    ? []
+                    : [
+                        makeUser({
+                          primaryPhone: PHONE,
+                          deletedAt: new Date(),
+                        }),
+                      ],
+                ),
+            }),
+          }),
+        };
+      });
+      const supabase = makeSupabase();
+      const service = makeAuthService(db, supabase);
+
+      await expect(
+        service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '000000',
+          password: 'wrong-pass',
+        }),
+      ).rejects.toThrow('INVALID_CREDENTIALS');
+      expect(supabase.verifyOtp).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('AuthService reactivation on password login', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function mockReactivation(db: ReturnType<typeof makeDb>, recovered: UserRow) {
+    let selectCall = 0;
+    db.select.mockImplementation(() => {
+      selectCall++;
+      // 1: no active account matches; 2: the recovery lookup finds the
+      // deleted one. The window and the surviving-phone test live in that
+      // query's WHERE, which the mock bypasses.
+      const rows = selectCall === 1 ? [] : [recovered];
+      return {
+        from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }),
+      };
+    });
+
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockImplementation(() => ({
+      set: (values: Record<string, unknown>) => {
+        sets.push(values);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...recovered, ...values }]),
+          }),
+        };
+      },
+    }));
+    return sets;
+  }
+
+  it('clears the deletion and signs the owner back in', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const deleted = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'deleted',
+    });
+    const db = makeDb();
+    const sets = mockReactivation(db, deleted);
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    const result = await service.loginWithPassword({
+      identifier: 'testuser',
+      password: 'password123',
+    });
+
+    expect(result.accessToken).toBe('signed-token');
+    expect(result.user.status).toBe('active');
+    expect(sets).toContainEqual({ status: 'active', deletedAt: null });
+  });
+
+  it('does not sign in someone whose password no longer matches', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    const db = makeDb();
+    mockReactivation(
+      db,
+      makeUser({ deletedAt: new Date(), status: 'deleted' }),
+    );
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({
+        identifier: 'testuser',
+        password: 'wrong-pass',
+      }),
+    ).rejects.toThrow(UnauthorizedException);
+    // Still deleted — a failed attempt must not quietly undo the deletion.
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects identifiers that match nothing at all', async () => {
+    const db = makeDb();
+    db.select.mockImplementation(() => ({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    }));
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({ identifier: 'nobody', password: 'x' }),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(db.update).not.toHaveBeenCalled();
   });
 });
 

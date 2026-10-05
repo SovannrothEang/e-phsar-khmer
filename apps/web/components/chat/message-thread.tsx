@@ -32,7 +32,11 @@ import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ImageGroup } from "@/components/chat/image-group";
 import { groupImageMessages } from "@/lib/chat/group-images";
-import type { ChatUserSummary, ListingContext, ThreadMessage } from "@/types/chat";
+import type {
+  ChatUserSummary,
+  ListingContext,
+  ThreadMessage,
+} from "@/types/chat";
 
 export function MessageThread({
   conversationId,
@@ -139,6 +143,14 @@ export function MessageThread({
       if (!m.isE2e) return m;
       // Local optimistic / failed rows already hold the user's plaintext.
       if (m.tempId) return m;
+      // use-decrypted-messages only ever dispatches a row carrying BOTH a
+      // header and a body, so a row missing either can never produce an
+      // outcome — that is terminal, not pending, and leaving it on
+      // "Decrypting…" forever would be a permanent lie. (Real case: rows
+      // written by the device-based E2E format, whose ciphertext lives in
+      // message_envelopes and leaves e2eHeader null.)
+      if (!m.e2eHeader || m.body === null)
+        return { ...m, body: t("message.decryptFailed") };
       const outcome = decrypted.get(m.id);
       if (outcome?.status === "ok") return { ...m, body: outcome.plaintext };
       if (outcome?.status === "failed")

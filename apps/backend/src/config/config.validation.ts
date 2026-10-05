@@ -47,6 +47,16 @@ const envSchema = z.object({
   OUTBOX_BACKOFF_MAX_MS: z.coerce.number().default(900000),
   OUTBOX_RETENTION_DAYS: z.coerce.number().default(7),
 
+  // Sweeper that hard-deletes self-deleted accounts once their 90-day
+  // recovery window closes. Every instance sweeps by default — claiming is
+  // atomic, so more sweepers just delete sooner. Set false to run an
+  // instance that must never delete anything.
+  ACCOUNT_PURGE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  ACCOUNT_PURGE_INTERVAL_MS: z.coerce.number().default(21600000),
+
   // BullMQ queue configuration
   QUEUE_HOST: z.string().default('localhost'),
   QUEUE_PORT: z.coerce.number().default(6379),

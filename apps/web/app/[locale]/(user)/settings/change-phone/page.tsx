@@ -1,10 +1,14 @@
 import ChangePhone from "@/components/setting/Change-Phone";
+import { getSettingsUser } from "@/lib/auth/current-user";
+
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Change Phone - Psakhmer",
-  description: "Change Phone",
+  title: "Change Active Phone - Psakhmer",
+  description: "Change Active Phone - Psakhmer",
 };
-export default function ChangePhonePage() {
-  return <ChangePhone />;
+
+export default async function ChangePhonePage() {
+  const me = await getSettingsUser();
+  return <ChangePhone me={me} />;
 }

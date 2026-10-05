@@ -28,6 +28,10 @@ import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { userLogout } from "@/actions/logout";
 import { resetE2eEngine } from "@/lib/e2e/engine-provider";
 
+/** The one layout every account-menu entry shares. */
+const ITEM =
+  "flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none";
+
 interface SocialBarUser {
   username: string;
   firstName?: string | null;
@@ -118,86 +122,112 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconFolderOpen
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">
-                My Ads
-              </span>
+            {/* Every item is a real link — `asChild` puts the item's own
+                (already merged) classes on the anchor, so a middle-click or a
+                copied address works and these are not buttons pretending to
+                navigate. They were all inert before: no href, no onClick. */}
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me">
+                <IconFolderOpen
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  My Ads
+                </span>
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconHeart
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">Likes</span>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/likes">
+                <IconHeart
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Likes
+                </span>
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconBookmark
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">Saved</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconBriefcase
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">
-                Applied Jobs
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconClipboardList
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">
-                Job Applications
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconId
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">
-                Resume (CV)
-              </span>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/saved">
+                <IconBookmark
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Saved
+                </span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconCreditCard
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-sm text-foreground font-medium">
-                Subscriptions
-              </span>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/applied-jobs">
+                <IconBriefcase
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Applied Jobs
+                </span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/job-applications">
+                <IconClipboardList
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Job Applications
+                </span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/resume">
+                <IconId
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Resume (CV)
+                </span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <ChartNoAxesCombined
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-[14px] text-foreground font-medium">
-                Insight
-              </span>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/me/subscriptions">
+                <IconCreditCard
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-sm text-foreground font-medium">
+                  Subscriptions
+                </span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none">
-              <IconSettings
-                className="scale-150 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <span className="text-[14px] text-foreground font-medium">
-                Settings
-              </span>
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/insight">
+                <ChartNoAxesCombined
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-[14px] text-foreground font-medium">
+                  Insight
+                </span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className={ITEM}>
+              <Link href="/settings">
+                <IconSettings
+                  className="scale-150 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <span className="text-[14px] text-foreground font-medium">
+                  Settings
+                </span>
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

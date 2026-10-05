@@ -54,12 +54,21 @@ export const routing = defineRouting({
     "/me/billing-addresses": {},
     "/me/job-applications": {},
     "/me/likes": {},
+    "/me/membership": {},
     "/me/saved": {},
     "/me/subscriptions": {},
+    "/me/resume": {},
+    "/me/followers": {},
+    "/me/following": {},
+
+    // The route has existed for a while; it was never declared, so nothing
+    // could link to it — the typed `Link`/`router` rejects an undeclared path.
+    "/insight": {},
 
     "/[username]": {},
     "/[username]/about": {},
-    "/membership": {},
+    "/[username]/followers": {},
+    "/[username]/following": {},
 
     "/premium-account": {},
 

@@ -6,18 +6,18 @@ import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import { getProvinceById, getDistrictById } from "@/lib/data";
 import { DotIcon, ImageIcon, TruckIcon, HeartIcon, Play } from "lucide-react";
-import { useState } from "react";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { toast } from "sonner";
+import { useReactions } from "@/components/reactions/reactions-provider";
 import { ThreeDotPost } from "../Card/ThreeDotPost";
 
 export function GridCardPost({ post }: { post: Post }) {
-  const [isLiked, setIsLiked] = useState(false);
+  const reactions = useReactions();
+  const listingId = String(post.postId);
   // No photo at all, or a stored photo missing from storage → empty area. The
   // DB is the only image source: no static stand-in, no broken <img>.
   const photo = post.images[0];
@@ -98,10 +98,15 @@ export function GridCardPost({ post }: { post: Post }) {
           )}
         </div>
       </div>
-      <CardHeader>
+      <CardHeader className="flex flex-1 flex-col items-stretch">
         <CardTitle className="text-base truncate block">{post.title}</CardTitle>
-        <CardDescription className="flex flex-col text-xs text-muted-foreground">
-          <div className="flex items-center">
+        {/* `min-w-0`: CardHeader is a grid, and a grid item's `min-width: auto`
+            would let the location row size the track wider than the card — then
+            the card's `overflow-hidden` clips the ellipsis and the heart. With
+            it the track stays at the card's width and `truncate` does its job
+            (ListCardPost already carries the same guard). */}
+        <CardDescription className="flex min-w-0 flex-col text-xs text-muted-foreground">
+          <div className="flex min-w-0 items-center">
             <span className="shrink-0">
               {new Intl.DateTimeFormat("en-US", {
                 hour: "2-digit",
@@ -111,14 +116,17 @@ export function GridCardPost({ post }: { post: Post }) {
             <DotIcon className="scale-120" />
             <span className="truncate">
               {post.location ??
-                [province?.name, district?.name].filter(Boolean).join(", ")}
+                [district?.name, province?.name].filter(Boolean).join(", ")}
             </span>
           </div>
           <div className="text-sm font-medium text-muted-foreground">
             {post.condition}
           </div>
         </CardDescription>
-        <div className="flex items-center justify-between">
+        {/* `mt-auto`: with the header stretched (flex-1), the price + heart row
+            pins to the card's bottom — so cards in a row line up even when one
+            has no condition line (captain, 2026-10-06). */}
+        <div className="mt-auto flex items-center justify-between">
           {/* LEFT: price */}
           <div className="flex items-center gap-3">
             <span className="text-red-600 font-semibold text-lg">
@@ -136,31 +144,16 @@ export function GridCardPost({ post }: { post: Post }) {
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-
-              const willLike = !isLiked;
-              toast.promise(
-                new Promise((resolve) =>
-                  setTimeout(
-                    () => resolve(willLike ? "Liked" : "Unliked"),
-                    1000,
-                  ),
-                ),
-                {
-                  loading: "Processing...",
-                  success: (msg) => `${msg} successfully`,
-                  error: "Error",
-                  position: "top-right",
-                },
-              );
-              setIsLiked(willLike);
+              reactions.toggleLike(listingId);
             }}
-            className="h-9 w-9 z-30  rounded-full bg-card hover:bg-black/10 flex items-center justify-center cursor-pointer"
+            disabled={reactions.isPending(listingId)}
+            className="group/heart h-9 w-9 z-30  rounded-full bg-card hover:bg-gray-500 flex items-center justify-center cursor-pointer"
           >
             <HeartIcon
               className={`h-6 w-6 transition ${
-                isLiked
-                  ? "fill-blue-500 text-blue-500 scale-110"
-                  : "text-gray-400 group-hover:text-blue-500 group-hover:scale-110"
+                reactions.isLiked(listingId)
+                  ? "fill-red-500 text-red-500 scale-110"
+                  : "text-gray-400 group-hover/heart:text-white"
               }`}
             />
           </button>

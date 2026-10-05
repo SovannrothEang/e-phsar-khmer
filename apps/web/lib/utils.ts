@@ -32,3 +32,25 @@ export function applyDiscount(
   }
   return Math.max(0, Math.round((price - v) * 100) / 100);
 }
+
+/**
+ * The card-sized location line.
+ *
+ * The post picker stores the location largest → smallest
+ * (`province, district, commune` — `placeLabel` in LocationPicker), while the
+ * cards and the detail's ID row read `district, province` in the design. So
+ * drop everything below the district and swap the first two levels; a
+ * single-level value ("Phnom Penh") passes through untouched, and an empty one
+ * stays undefined so callers can fall back instead of printing a blank line.
+ */
+export function shortLocation(
+  location: string | null | undefined,
+): string | undefined {
+  const parts = (location ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return undefined;
+  if (parts.length === 1) return parts[0];
+  return `${parts[1]}, ${parts[0]}`;
+}

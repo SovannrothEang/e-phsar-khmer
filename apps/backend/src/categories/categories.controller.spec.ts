@@ -26,14 +26,21 @@ describe('CategoriesController', () => {
   });
 
   describe('listCategories', () => {
+    const SELLER_ID = '18d78b3e-1767-43b5-b4a0-947c2b5f8e1f';
+
     it('passes resolved locale to service', async () => {
-      await controller.listCategories('km-KH,en;q=0.9');
-      expect(mockService.listCategories).toHaveBeenCalledWith('km');
+      await controller.listCategories(undefined, 'km-KH,en;q=0.9');
+      expect(mockService.listCategories).toHaveBeenCalledWith('km', undefined);
     });
 
     it('defaults to en when header is undefined', async () => {
-      await controller.listCategories(undefined);
-      expect(mockService.listCategories).toHaveBeenCalledWith('en');
+      await controller.listCategories(undefined, undefined);
+      expect(mockService.listCategories).toHaveBeenCalledWith('en', undefined);
+    });
+
+    it('forwards the seller scope alongside the locale', async () => {
+      await controller.listCategories(SELLER_ID, 'km-KH');
+      expect(mockService.listCategories).toHaveBeenCalledWith('km', SELLER_ID);
     });
   });
 

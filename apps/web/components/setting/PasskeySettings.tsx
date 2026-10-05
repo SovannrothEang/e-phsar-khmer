@@ -2,13 +2,16 @@ import { Button } from "@/components/ui/button";
 
 import SettingSidebar from "./SettingSidebar";
 import { UserRoundKey, Plus } from "lucide-react";
+import { getSettingsUser } from "@/lib/auth/current-user";
 
-export default function PasskeySettings() {
+export default async function PasskeySettings() {
+  // Passkeys are not built yet; the rail still shows the real account.
+  const me = await getSettingsUser();
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-6xl mx-auto  ">
         <div className="flex gap-5 ">
-          <SettingSidebar />
+          <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
               <h1 className="text-xl font-medium text-foreground mb-4 mt-6 px-4">

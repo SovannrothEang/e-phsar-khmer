@@ -1,5 +1,6 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
+import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
@@ -8,12 +9,14 @@ import ServicesCategoryLayout from "@/components/category-layouts/ServicesCatego
 import JobsCategoryLayout from "@/components/category-layouts/JobsCategoryLayout";
 import CarsCategoryLayout from "@/components/category-layouts/CarsCategoryLayout";
 import SubcategoryGrid from "@/components/category-layouts/SubcategoryGrid";
+import OptionGrid from "@/components/subcategory-layouts/OptionGrid";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
 import { ListCardPost } from "@/components/ads/ListCardPost";
 import { ListCardSell } from "@/components/ads/ListCardSell";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
+  getAttributeOptions,
   getCategoryWithSubcategories,
   getListingsFeed,
   toCardPost,
@@ -52,18 +55,19 @@ const JOBS_CATEGORIES = ["jobs"];
 
 export default async function CategoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ categorySlug: string }>;
+  searchParams: Promise<{ ad_type?: string }>;
 }) {
   const { categorySlug } = await params;
+  const { ad_type: adType } = await searchParams;
   const locale = await getLocale();
 
   const category = await getCategoryWithSubcategories(categorySlug, locale);
 
   if (!category) {
-    return (
-      <div className="container mx-auto px-4 py-8">Category not found</div>
-    );
+    notFound();
   }
 
   let Layout;
@@ -83,10 +87,40 @@ export default async function CategoryPage({
   //  FIXED
   const cols = SUBCATEGORY_LAYOUT[category.slug] ?? 6;
 
+  // Job Type on the category page (captain, 2026-09-27): the jobs page runs the
+  // same `jobtypes` grid its subcategory pages do, so a visitor can narrow the
+  // feed by type BEFORE choosing a job. The rows are the ones ticked for this
+  // category's subcategories — `subcategoryIds` is the truth once a set is
+  // managed, and `jobtypes` is (all 36 job subcategories) — and the grid steps
+  // aside once a type is applied, exactly as the subcategory grids do. The
+  // pick then carries into the chosen job: the tile links forward the current
+  // query (`ad_type` included), where `SET_FIELD_KEYS.jobtypes` resolves it to
+  // the same `jobType` predicate, so the feed stays filtered. Only jobs gets
+  // this; another family would need its own decision about which set applies.
+  const subIds = new Set(category.subcategories.map((s) => s.id));
+  const jobTypeOptions =
+    category.slug === "jobs"
+      ? (await getAttributeOptions("jobtypes"))
+          .filter((row) => row.subcategoryIds.some((id) => subIds.has(id)))
+          .map((row) => ({ slug: row.slug, name: row.name, image: row.image }))
+      : [];
+  const appliedJobType = adType
+    ? jobTypeOptions.find((o) => o.slug === adType)?.name
+    : undefined;
+
   // Real active listings feed for every category. Cards render through the
   // existing GridCardPost / ListCardPost templates via the toCardPost adapter.
   const feedPosts = (
-    (await getListingsFeed({ categorySlug }, locale))?.items ?? []
+    (
+      await getListingsFeed(
+        {
+          categorySlug,
+          attrKey: appliedJobType ? "jobType" : undefined,
+          attrValue: appliedJobType,
+        },
+        locale,
+      )
+    )?.items ?? []
   ).map(toCardPost);
 
   // Same content as the All Ads feed: Sell-banner card + the posts feed, rendered
@@ -169,6 +203,16 @@ export default async function CategoryPage({
             cols={cols}
           />
         </div>
+        {/* Below the tiles' Show More, per the captain's note (2026-09-27). */}
+        {jobTypeOptions.length > 0 && !appliedJobType && (
+          <OptionGrid
+            title="Job Type"
+            options={jobTypeOptions}
+            baseHref={`/category/${category.slug}`}
+            paramKey="body_type"
+            imageTiles
+          />
+        )}
         <TabsContent value="grid" className="mt-4">
           {gridSections}
         </TabsContent>

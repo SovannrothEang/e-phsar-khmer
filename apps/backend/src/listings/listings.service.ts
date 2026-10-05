@@ -15,10 +15,12 @@ import {
   lte,
   sql,
   inArray,
+  getTableColumns,
 } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
+import { ReactionsService } from '../reactions/reactions.service';
 import type { DbClient } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import type {
@@ -27,7 +29,7 @@ import type {
   NewListing,
 } from '../db/schema/listings.schema';
 import { categories, subcategories } from '../db/schema/categories.schema';
-import { districts, provinces } from '../db/schema/users.schema';
+import { districts, provinces, users } from '../db/schema/users.schema';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
 import type { QueryListingsDto } from './dto/query-listings.dto';
@@ -35,6 +37,20 @@ import type { PaginationMeta } from '../common/types/api-response.types';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
+  /**
+   * The owner's handle, so a client can link to their profile.
+   *
+   * Optional because only `findById` resolves it: the mutation paths
+   * (`update`/`publish`/`remove`) return the row they wrote from their own
+   * queries and have no use for it.
+   */
+  sellerUsername?: string | null;
+  /**
+   * How many users liked this listing — resolved by `findById` only (same
+   * reasoning as `sellerUsername`), so the detail page's "N Likes" control
+   * starts truthful. Counted on read; there is no counter column to drift.
+   */
+  likeCount?: number;
 }
 
 @Injectable()
@@ -42,6 +58,7 @@ export class ListingsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly filesService: FilesService,
+    private readonly reactionsService: ReactionsService,
   ) {}
 
   async create(
@@ -204,20 +221,34 @@ export class ListingsService {
   }
 
   async findById(id: string): Promise<ListingWithPhotos> {
-    const [listing] = await this.db
-      .select()
+    // The owner's handle travels with the listing so a client never has to
+    // guess it — the detail page's seller card used to derive one from the
+    // free-text `contactName`, which is unrelated to the account and produced
+    // links to profiles that do not exist. Left join: a soft-deleted owner
+    // must not make their listing unreadable.
+    const [row] = await this.db
+      .select({ listing: listings, sellerUsername: users.username })
       .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
       .where(eq(listings.id, id))
       .limit(1);
-    if (!listing) throw new NotFoundException('Listing not found');
+    if (!row) throw new NotFoundException('Listing not found');
 
-    const photos = await this.db
-      .select()
-      .from(listingPhotos)
-      .where(eq(listingPhotos.listingId, listing.id))
-      .orderBy(listingPhotos.sort);
+    const [photos, likeCount] = await Promise.all([
+      this.db
+        .select()
+        .from(listingPhotos)
+        .where(eq(listingPhotos.listingId, row.listing.id))
+        .orderBy(listingPhotos.sort),
+      this.reactionsService.countLikes(row.listing.id),
+    ]);
 
-    return { ...listing, photos };
+    return {
+      ...row.listing,
+      photos,
+      sellerUsername: row.sellerUsername ?? null,
+      likeCount,
+    };
   }
 
   async findFeed(
@@ -225,6 +256,13 @@ export class ListingsService {
   ): Promise<{ data: ListingWithPhotos[]; meta: PaginationMeta }> {
     const limit = query.limit ?? 20;
     const conditions = [eq(listings.status, 'active')];
+
+    // One seller's active ads — the public profile's post history. The status
+    // condition above is what makes this safe to expose anonymously: `userId`
+    // narrows the feed, it never widens what the feed is allowed to show.
+    if (query.userId) {
+      conditions.push(eq(listings.userId, query.userId));
+    }
 
     const extra = await this.resolveQueryFilters(query);
     if (extra === null)
@@ -284,9 +322,17 @@ export class ListingsService {
       }
     }
 
+    // `getTableColumns` rather than a `{ listing, sellerUsername }` shape so
+    // this row keeps reading like a listing everywhere below (the cursor, the
+    // photo lookup) and simply carries one extra field. The owner's handle
+    // rides along because a card's "View Profile" needs it — those cards used
+    // to resolve the seller from mock data, so the control did nothing on a
+    // real listing. One indexed FK join; left, so a deleted owner does not
+    // drop their listing out of the feed.
     const rows = await this.db
-      .select()
+      .select({ ...getTableColumns(listings), sellerUsername: users.username })
       .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
       .where(and(...conditions))
       .orderBy(desc(listings.createdAt), desc(listings.id))
       .limit(limit + 1);

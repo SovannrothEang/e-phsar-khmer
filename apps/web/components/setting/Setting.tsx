@@ -6,21 +6,15 @@ import { Link } from "@/i18n/routing";
 import { ChevronRight } from "lucide-react";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
-import Image from "next/image";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { AccountIdentity } from "./AccountIdentity";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
+import { SignOutDialog } from "./SignOutDialog";
+import { formatPhoneLocal } from "@/lib/phone";
+import type { SettingsUser } from "@/lib/auth/current-user";
 
-export default function Settings() {
+/** The settings hub: a full-width list of account rows. */
+export default function Settings({ me }: { me?: SettingsUser | null }) {
   const [autoUpdate, setAutoUpdate] = useState(false);
   return (
     <div className="min-h-screen bg-muted pb-30 pt-2">
@@ -34,20 +28,7 @@ export default function Settings() {
             href={{ pathname: "/settings/edit-profile" }}
             className="flex items-center justify-between p-2 bg-card hover:bg-background/50 rounded-sm border border-transparent hover:border-border"
           >
-            <div className="flex items-center gap-4 px-2">
-              <Image
-                src="/avatar/sayi.png"
-                width={100}
-                height={100}
-                alt="Profile picture of Thuch Sayi"
-                priority
-                className="rounded-full  border border-gray-100 object-cover size-[50px] aspect-square flex-shrink-0"
-              />
-              <div>
-                <p className="font-medium text-foreground">Thuch Sayi</p>
-                <p className="text-sm text-muted-foreground">@thuchsayi</p>
-              </div>
-            </div>
+            <AccountIdentity me={me} />
             <ChevronRight size={24} className="text-gray-300" />
           </Link>
           <div className="mt-4">
@@ -80,7 +61,7 @@ export default function Settings() {
             >
               <p className="px-1">Username</p>
               <p className="flex items-center opacity-50 gap-1">
-                thuchsayi
+                {me?.username ?? ""}
                 <ChevronRight size={24} className="text-gray-300" />
               </p>
             </Link>
@@ -91,43 +72,34 @@ export default function Settings() {
             >
               <p className="px-1">Activate Phone</p>
               <p className="flex items-center opacity-50 gap-1">
-                09666166394
+                {me?.primaryPhone ? formatPhoneLocal(me.primaryPhone) : "Add"}
                 <ChevronRight size={24} className="text-gray-300" />
               </p>
             </Link>
             <Separator />
-            <Link
-              href={{ pathname: "/membership" }}
-              className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
-            >
+            {/* Connecting an identity needs a provider-linking flow the
+                backend does not have yet, so these rows state the option and
+                stop — no chevron, nothing to click. */}
+            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
               <p className="px-1">Facebook</p>
               <p className="flex items-center opacity-50 gap-1 capitalize">
-                thuch sayi
-                <ChevronRight size={24} className="text-gray-300" />
+                Add
               </p>
-            </Link>
+            </div>
             <Separator />
-            <Link
-              href={{ pathname: "/membership" }}
-              className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
-            >
+            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
               <p className="px-1">Google</p>
               <p className="flex items-center opacity-50 gap-1 capitalize">
-                thuch sayi
-                <ChevronRight size={24} className="text-gray-300" />
+                Add
               </p>
-            </Link>
+            </div>
             <Separator />
-            <Link
-              href={{ pathname: "/membership" }}
-              className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
-            >
+            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
               <p className="px-1">Telegram</p>
               <p className="flex items-center opacity-50 capitalize gap-1">
                 Add
-                <ChevronRight size={24} className="text-gray-300" />
               </p>
-            </Link>
+            </div>
             <Separator />
             <Link
               href={{ pathname: "/settings/passkeys" }}
@@ -180,45 +152,14 @@ export default function Settings() {
               />
             </Field>
             <Separator />
-            <Dialog>
-              <DialogTrigger asChild>
+            <DeleteAccountDialog
+              username={me?.username ?? ""}
+              trigger={
                 <button className="w-full flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border cursor-pointer">
                   <p className="px-1 ">Delete Account</p>
                 </button>
-              </DialogTrigger>
-
-              <DialogContent className="sm:max-w-[550px] rounded-md p-6">
-                <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-foreground">
-                    thouchsayi: Delete Account?
-                  </DialogTitle>
-                  <DialogDescription className="mt-4 text-[15px] leading-relaxed text-foreground/90">
-                    Your account will be deactivated and won&apos;t be visible
-                    to the public. During deactivation, you can reactivate your
-                    account anytime. After 90 days, your data will be deleted
-                    permanently.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <DialogFooter className="flex flex-row justify-end gap-3 mt-6">
-                  <DialogClose asChild>
-                    <Button
-                      variant="ghost"
-                      className="bg-[#eeeeee] hover:bg-gray-200 text-black px-6 rounded-sm font-medium cursor-pointer"
-                    >
-                      Cancel
-                    </Button>
-                  </DialogClose>
-
-                  <Button
-                    type="submit"
-                    className="bg-[#e3281b] hover:bg-red-700 text-white px-8 rounded-sm font-medium cursor-pointer"
-                  >
-                    Next
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+              }
+            />
             <Separator />
             <Link
               href={{ pathname: "/settings/privacy" }}
@@ -231,7 +172,7 @@ export default function Settings() {
             </Link>
             <Separator />
             <Link
-              href={{ pathname: "/membership" }}
+              href={{ pathname: "/me/membership" }}
               className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
             >
               <p className="px-1">Membership Information</p>
@@ -241,7 +182,7 @@ export default function Settings() {
             </Link>
             <Separator />
             <Link
-              href={{ pathname: "/billing-addresses" }}
+              href={{ pathname: "/me/billing-addresses" }}
               className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-b-lg border border-transparent hover:border-border"
             >
               <p className="px-1">Billing Address</p>
@@ -250,46 +191,15 @@ export default function Settings() {
               </p>
             </Link>
             <div className="mt-4">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="flex w-full items-center justify-center p-2.5 h-10 bg-card hover:bg-red-700/90 rounded-full border border-transparent hover:border-red-500/20 group transition-colors cursor-pointer">
+              <SignOutDialog
+                trigger={
+                  <button className="flex w-full items-center justify-center p-2.5 h-10 bg-card hover:bg-red-700/90 rounded-full border border-transparent hover:border-red-500/20 group transition-colors cursor-pointer">
                     <p className="text-red-500 font-medium group-hover:text-white">
                       Sign Out
                     </p>
-                  </Button>
-                </DialogTrigger>
-
-                <DialogContent className="sm:max-w-[600px] rounded-sm">
-                  <DialogHeader>
-                    <DialogTitle className="text-lg font-semibold">
-                      Sign Out
-                    </DialogTitle>
-                    <DialogDescription className="mt-2 text-base text-muted-foreground">
-                      Are you sure that you want to sign out from your account?
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <DialogFooter className="flex flex-row gap-2 mt-4">
-                    <DialogClose asChild>
-                      <Button
-                        variant="ghost"
-                        className="flex-1 border border-border hover:bg-card cursor-pointer"
-                      >
-                        Cancel
-                      </Button>
-                    </DialogClose>
-
-                    <form action="/" method="POST" className="flex-1">
-                      <Button
-                        type="submit"
-                        className="w-full bg-red-500  hover:bg-red-600 text-white font-medium cursor-pointer"
-                      >
-                        Sign Out
-                      </Button>
-                    </form>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </button>
+                }
+              />
             </div>
           </div>
         </main>

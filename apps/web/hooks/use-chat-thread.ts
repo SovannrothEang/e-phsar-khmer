@@ -271,8 +271,11 @@ export function useChatThread({
       for (let i = 0; i < imageCount; i++) {
         const key = draftKeys[i];
         try {
+          // A missing draft is a real failure, not a skip: `continue` here
+          // dropped the image with no request, no bubble and no toast, which is
+          // how a composer that deleted its own drafts stayed invisible.
           const dataUrl = localStorage.getItem(key);
-          if (!dataUrl) continue;
+          if (!dataUrl) throw new Error("Draft image is no longer available");
           const filename = `chat-image-${Date.now()}-${i}.jpg`;
           const file = dataUrlToFile(dataUrl, filename);
           const signed = await signChatUpload(filename);
