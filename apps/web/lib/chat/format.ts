@@ -1,3 +1,4 @@
+import { parseAttachmentContent } from "@/lib/e2e/attachments/content";
 import type { ChatMessage } from "@/types/chat";
 
 /** Sort key: chronological, with `id` as the tiebreak for same-millisecond rows. */
@@ -73,6 +74,14 @@ export function previewOf(
   decryptedPlaintext?: string | null,
 ): string {
   if (!message) return labels.none;
+  // Encrypted files: the label is known from the server's `attachments`
+  // alone; the caption (if any) needs the decrypted JSON.
+  if (message.attachments?.length) {
+    const caption = decryptedPlaintext
+      ? parseAttachmentContent(decryptedPlaintext)?.text
+      : undefined;
+    return caption ? `${labels.image} · ${caption}` : labels.image;
+  }
   if (message.isE2e) {
     if (decryptedPlaintext) return decryptedPlaintext;
     // Still decrypting (or failed): never surface base64 ciphertext.

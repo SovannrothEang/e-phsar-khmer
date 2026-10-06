@@ -90,13 +90,14 @@ export class SupabaseService {
   async createSignedUploadUrl(
     bucket: string,
     path: string,
+    options?: { upsert: boolean },
   ): Promise<{
     data: { signedUrl: string; path: string; token: string } | null;
     error: unknown;
   }> {
     return this.adminClient.storage
       .from(bucket)
-      .createSignedUploadUrl(path) as Promise<{
+      .createSignedUploadUrl(path, options) as Promise<{
       data: { signedUrl: string; path: string; token: string } | null;
       error: unknown;
     }>;
@@ -115,10 +116,38 @@ export class SupabaseService {
     }>;
   }
 
+  /** One storage round trip for many signed download URLs. */
+  async createSignedUrls(
+    bucket: string,
+    paths: string[],
+    expiresIn: number,
+  ): Promise<{
+    data: { path: string | null; signedUrl: string | null }[] | null;
+    error: unknown;
+  }> {
+    return this.adminClient.storage
+      .from(bucket)
+      .createSignedUrls(paths, expiresIn) as Promise<{
+      data: { path: string | null; signedUrl: string | null }[] | null;
+      error: unknown;
+    }>;
+  }
+
   getPublicUrl(bucket: string, path: string): { data: { publicUrl: string } } {
     return this.adminClient.storage.from(bucket).getPublicUrl(path) as {
       data: { publicUrl: string };
     };
+  }
+
+  /** Object metadata (size in bytes); `data: null` when the object is missing. */
+  async objectInfo(
+    bucket: string,
+    path: string,
+  ): Promise<{ data: { size?: number } | null; error: unknown }> {
+    return this.adminClient.storage.from(bucket).info(path) as Promise<{
+      data: { size?: number } | null;
+      error: unknown;
+    }>;
   }
 
   async removeObjects(

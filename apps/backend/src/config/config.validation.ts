@@ -11,6 +11,15 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_JWT_SECRET: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default('listings'),
+  // Private bucket for E2E chat attachments (ciphertext only). Create it in
+  // the Supabase dashboard with public off, a 25 MB file size limit and
+  // allowed MIME type application/octet-stream.
+  CHAT_FILES_BUCKET: z.string().default('chat-files'),
+  CHAT_ATTACHMENT_DAILY_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(209_715_200),
   DATABASE_URL: z.string().refine((v) => v.startsWith('postgres'), {
     message: 'DATABASE_URL must start with postgres',
   }),

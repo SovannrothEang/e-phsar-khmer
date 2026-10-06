@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -30,14 +31,22 @@ function makeService(db: ReturnType<typeof makeDb>) {
   const config = { get: jest.fn(() => 'listings') };
   const pubsub = { publish: jest.fn(() => Promise.resolve()) };
   const metrics = { beginSend: jest.fn(), endSend: jest.fn() };
+  const attachments = {
+    attachToMessage: jest.fn(
+      (_tx: unknown, _sender: string, _msg: string, ids: string[]) =>
+        Promise.resolve(ids.map((id) => ({ id, kind: 'image' }))),
+    ),
+    loadForMessages: jest.fn(() => Promise.resolve(new Map())),
+  };
   const service = new ChatService(
     db as never,
     supabase as never,
     config as never,
     pubsub as never,
     metrics as never,
+    attachments as never,
   );
-  return { service, supabase, pubsub };
+  return { service, supabase, pubsub, attachments };
 }
 
 // .from().where().limit() → rows
@@ -452,6 +461,325 @@ describe('ChatService.sendMessage', () => {
 
     expect(captured[1]).toMatchObject({ isE2e: false, e2eHeader: null });
   });
+
+  // ── v1 stale-identity check (Phase 0) ─────────────────────────────────────
+
+  function selectsWithIdentity(identityKey: string) {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([{ id: 'u2' }]); // recipient
+      if (callCount === 2) return limitQuery([]); // no block
+      return limitQuery([{ identityKey }]); // recipient's current identity
+    });
+  }
+
+  it('rejects a v1 send encrypted to a replaced identity with 409 E2E_SESSION_STALE', async () => {
+    selectsWithIdentity('new-key');
+
+    const err = await service
+      .sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'ciphertext',
+        e2eHeader,
+        recipientIdentityKey: 'old-key',
+      })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      code: 'E2E_SESSION_STALE',
+    });
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('accepts a v1 send whose identity key still matches', async () => {
+    selectsWithIdentity('same-key');
+    const captured: Record<string, unknown>[] = [];
+    mockInserts(captured);
+
+    await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'ciphertext',
+      e2eHeader,
+      recipientIdentityKey: 'same-key',
+    });
+
+    expect(captured[1]).toMatchObject({ isE2e: true, e2eVersion: 1 });
+  });
+});
+
+describe('ChatService.sendMessage — v2 multi-device', () => {
+  let db: ReturnType<typeof makeDb> & { transaction: jest.Mock };
+  let service: ChatService;
+  let pubsub: { publish: jest.Mock };
+
+  const header = { v: 1 as const, dh: 'dh', pn: 0, n: 0 };
+  const env = (recipientDeviceId: string) => ({
+    recipientDeviceId,
+    header,
+    wrappedKey: 'wrapped',
+  });
+
+  beforeEach(() => {
+    db = Object.assign(makeDb(), { transaction: jest.fn() });
+    ({ service, pubsub } = makeService(db));
+  });
+
+  /** Active devices: u1 = [d-me, d-me2], u2 = [d-peer]. */
+  function selectsWithDevices(
+    devices = [
+      { id: 'd-me', userId: 'u1' },
+      { id: 'd-me2', userId: 'u1' },
+      { id: 'd-peer', userId: 'u2' },
+    ],
+  ) {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return limitQuery([{ id: 'u2' }]); // recipient
+      if (callCount === 2) return limitQuery([]); // no block
+      return whereQuery(devices); // active devices of both users
+    });
+  }
+
+  function send(envelopes: ReturnType<typeof env>[], senderDeviceId = 'd-me') {
+    return service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'aead-ciphertext',
+      e2e: { v: 2, senderDeviceId, envelopes },
+    });
+  }
+
+  it('rejects combining e2e with e2eHeader', async () => {
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'x',
+        e2eHeader: header,
+        e2e: { v: 2, senderDeviceId: 'd-me', envelopes: [env('d-peer')] },
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects an envelope addressed to the sending device itself', async () => {
+    await expect(send([env('d-peer'), env('d-me')])).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it("returns 409 E2E_DEVICES_MISMATCH listing the peer's new device and a stale one", async () => {
+    selectsWithDevices();
+
+    const err = await send([env('d-me2'), env('d-gone')]).catch(
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      code: 'E2E_DEVICES_MISMATCH',
+      details: {
+        missing: [{ userId: 'u2', deviceId: 'd-peer' }],
+        stale: ['d-gone'],
+      },
+    });
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("requires the sender's own other devices too (self-sync)", async () => {
+    selectsWithDevices();
+
+    const err = await send([env('d-peer')]).catch((e: unknown) => e);
+
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      details: { missing: [{ userId: 'u1', deviceId: 'd-me2' }], stale: [] },
+    });
+  });
+
+  it('rejects a sending device that is not active with 403', async () => {
+    selectsWithDevices([{ id: 'd-peer', userId: 'u2' }]);
+
+    await expect(send([env('d-peer')])).rejects.toThrow(ForbiddenException);
+  });
+
+  it('returns 404 E2E_NO_RECIPIENT_DEVICES when the peer has no active device', async () => {
+    selectsWithDevices([{ id: 'd-me', userId: 'u1' }]);
+
+    await expect(send([env('d-peer')])).rejects.toThrow(NotFoundException);
+  });
+
+  it('stores message + envelopes in one transaction and pushes to both users', async () => {
+    selectsWithDevices();
+    const captured: Record<string, unknown>[] = [];
+    // Conversation upsert goes through db.insert; message + envelopes through tx.
+    db.insert.mockImplementation(() => ({
+      values: (v: Record<string, unknown>) => {
+        captured.push(v);
+        return {
+          onConflictDoUpdate: () => ({
+            returning: () => Promise.resolve([conversation]),
+          }),
+        };
+      },
+    }));
+    const txInserts: unknown[] = [];
+    const tx = {
+      insert: jest.fn(() => ({
+        values: (v: unknown) => {
+          txInserts.push(v);
+          return {
+            returning: () =>
+              Promise.resolve(
+                txInserts.length === 1
+                  ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                  : (v as Record<string, unknown>[]).map((e) => ({
+                      recipientDeviceId: e.recipientDeviceId,
+                      header: e.header,
+                      wrappedKey: e.wrappedKey,
+                    })),
+              ),
+          };
+        },
+      })),
+    };
+    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
+      cb(tx),
+    );
+
+    const result = await send([env('d-peer'), env('d-me2')]);
+
+    expect(txInserts[0]).toMatchObject({
+      isE2e: true,
+      e2eVersion: 2,
+      e2eHeader: null,
+      senderDeviceId: 'd-me',
+    });
+    expect(txInserts[1]).toEqual([
+      { messageId: 'm1', ...env('d-peer') },
+      { messageId: 'm1', ...env('d-me2') },
+    ]);
+    expect(result.message.envelopes).toHaveLength(2);
+
+    await new Promise((r) => setImmediate(r));
+    const targets = pubsub.publish.mock.calls
+      .map(([e]) => e as { targetUserId: string; type: string })
+      .filter((e) => e.type === 'message')
+      .map((e) => e.targetUserId);
+    expect(targets.sort()).toEqual(['u1', 'u2']);
+  });
+});
+
+describe('ChatService.sendMessage — attachments', () => {
+  let db: ReturnType<typeof makeDb> & { transaction: jest.Mock };
+  let service: ChatService;
+  let attachments: ReturnType<typeof makeService>['attachments'];
+  const header = { v: 1 as const, dh: 'dh', pn: 0, n: 0 };
+  const e2e = {
+    v: 2 as const,
+    senderDeviceId: 'd-me',
+    envelopes: [{ recipientDeviceId: 'd-peer', header, wrappedKey: 'w' }],
+  };
+
+  beforeEach(() => {
+    db = Object.assign(makeDb(), { transaction: jest.fn() });
+    ({ service, attachments } = makeService(db));
+    let calls = 0;
+    db.select.mockImplementation(() => {
+      calls++;
+      if (calls === 1) return limitQuery([{ id: 'u2' }]);
+      if (calls === 2) return limitQuery([]);
+      return whereQuery([
+        { id: 'd-me', userId: 'u1' },
+        { id: 'd-peer', userId: 'u2' },
+      ]);
+    });
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([conversation]),
+        }),
+      }),
+    }));
+  });
+
+  function mockTx() {
+    let n = 0;
+    const tx = {
+      insert: jest.fn(() => ({
+        values: () => ({
+          returning: () =>
+            Promise.resolve(
+              ++n === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : [{ recipientDeviceId: 'd-peer', header, wrappedKey: 'w' }],
+            ),
+        }),
+      })),
+    };
+    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
+      cb(tx),
+    );
+    return tx;
+  }
+
+  it('rejects attachments on a message that is not v2 E2E', async () => {
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'hi',
+        attachmentIds: ['a1'],
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(attachments.attachToMessage).not.toHaveBeenCalled();
+  });
+
+  it('attaches inside the send transaction and returns the attachments', async () => {
+    const tx = mockTx();
+
+    const result = await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'aead',
+      e2e,
+      attachmentIds: ['a1', 'a2'],
+    });
+
+    expect(attachments.attachToMessage).toHaveBeenCalledWith(tx, 'u1', 'm1', [
+      'a1',
+      'a2',
+    ]);
+    expect(result.message.attachments).toEqual([
+      { id: 'a1', kind: 'image' },
+      { id: 'a2', kind: 'image' },
+    ]);
+  });
+
+  it('fails the send when an attachment cannot be attached (tx rolls back)', async () => {
+    mockTx();
+    attachments.attachToMessage.mockRejectedValueOnce(
+      new BadRequestException({ code: 'ATTACHMENT_INVALID' }),
+    );
+
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        body: 'aead',
+        e2e,
+        attachmentIds: ['foreign'],
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('omits `attachments` on a v2 send without files', async () => {
+    mockTx();
+
+    const result = await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'aead',
+      e2e,
+    });
+
+    expect(result.message).not.toHaveProperty('attachments');
+  });
 });
 
 describe('ChatService.getMessages', () => {
@@ -708,6 +1036,41 @@ describe('ChatService.markRead', () => {
 
     const result = await service.markRead('u1', 'c1');
     expect(result).toEqual({ marked: 2 });
+  });
+
+  it('pushes a read receipt to the other participant', async () => {
+    const { service: svc, pubsub } = makeService(db);
+    db.select.mockReturnValue(limitQuery([conversation]));
+    db.update.mockReturnValue({
+      set: () => ({
+        where: () => ({ returning: () => Promise.resolve([{ id: 'm1' }]) }),
+      }),
+    });
+
+    // u2 reads → u1 (the sender) is told
+    await svc.markRead('u2', 'c1');
+    await new Promise((r) => setImmediate(r));
+
+    expect(pubsub.publish).toHaveBeenCalledWith({
+      targetUserId: 'u1',
+      type: 'read',
+      payload: { conversationId: 'c1' },
+    });
+  });
+
+  it('pushes nothing when there was nothing to mark', async () => {
+    const { service: svc, pubsub } = makeService(db);
+    db.select.mockReturnValue(limitQuery([conversation]));
+    db.update.mockReturnValue({
+      set: () => ({
+        where: () => ({ returning: () => Promise.resolve([]) }),
+      }),
+    });
+
+    await svc.markRead('u1', 'c1');
+    await new Promise((r) => setImmediate(r));
+
+    expect(pubsub.publish).not.toHaveBeenCalled();
   });
 });
 

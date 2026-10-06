@@ -1,4 +1,4 @@
-import type { MessageRow } from '../db/schema/chat.schema';
+import type { E2eHeader, MessageRow } from '../db/schema/chat.schema';
 import type { ListingRow } from '../db/schema/listings.schema';
 import type { PaginationMeta } from '../common/types/api-response.types';
 
@@ -17,14 +17,39 @@ export interface ListingContext {
   thumbnailUrl: string | null;
 }
 
-export interface MessageWithListing extends MessageRow {
+/** One v2 E2E envelope: the content key wrapped for one recipient device. */
+export interface MessageEnvelopeView {
+  recipientDeviceId: string;
+  header: E2eHeader;
+  wrappedKey: string;
+}
+
+/** Server-side view of an encrypted attachment; everything else is in the E2E body. */
+export interface MessageAttachmentView {
+  id: string;
+  kind: 'image' | 'file';
+}
+
+/**
+ * A message row plus, for v2 E2E rows only, every device envelope. All
+ * envelopes are returned (not just the caller's): each is ciphertext only
+ * the holder of that device's private keys can open, and it spares every
+ * read path from needing to know which device is asking.
+ */
+export interface MessageWithEnvelopes extends MessageRow {
+  envelopes?: MessageEnvelopeView[];
+  /** v2 rows only, and only when the message carries files. */
+  attachments?: MessageAttachmentView[];
+}
+
+export interface MessageWithListing extends MessageWithEnvelopes {
   listing: ListingContext | null;
 }
 
 export interface InboxItem {
   id: string;
   otherUser: ChatUserSummary | null;
-  lastMessage: MessageRow | null;
+  lastMessage: MessageWithEnvelopes | null;
   unreadCount: number;
   lastMessageAt: Date;
   createdAt: Date;

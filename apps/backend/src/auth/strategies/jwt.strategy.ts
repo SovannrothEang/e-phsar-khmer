@@ -7,10 +7,12 @@ import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
 import { users } from '../../db/schema/users.schema';
 import type { RequestUser } from '../../common/types/api-response.types';
+import { WS_TICKET_TYP } from '../../chat/ws-ticket';
 
 interface JwtPayload {
   sub: string;
   role: 'user' | 'admin' | 'super_admin';
+  typ?: string;
 }
 
 @Injectable()
@@ -27,6 +29,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload): Promise<RequestUser> {
+    // Chat WS tickets share JWT_SECRET but are single-purpose — never a bearer.
+    if (payload.typ === WS_TICKET_TYP) {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
     const [user] = await this.db
       .select({
         id: users.id,

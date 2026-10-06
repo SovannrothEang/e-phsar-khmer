@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -24,8 +25,15 @@ import {
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
-import { conversations, messages } from '../db/schema/chat.schema';
+import {
+  conversations,
+  messageEnvelopes,
+  messages,
+  userE2eDevices,
+  userE2eIdentities,
+} from '../db/schema/chat.schema';
 import type { ConversationRow, MessageRow } from '../db/schema/chat.schema';
+import { activeDeviceCondition, diffDevices } from './e2e/e2e-devices.util';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
@@ -34,6 +42,7 @@ import { isUniqueViolation } from './pg-errors.util';
 import { ChatPubSubService } from './chat-pubsub.service';
 import type { ChatPushEvent } from './chat-pubsub.service';
 import { ChatMetricsService } from './chat-metrics.service';
+import { ChatAttachmentsService } from './chat-attachments.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
@@ -44,6 +53,9 @@ import type {
   ConversationWithUser,
   InboxItem,
   ListingContext,
+  MessageAttachmentView,
+  MessageEnvelopeView,
+  MessageWithEnvelopes,
   MessageWithListing,
 } from './chat.types';
 
@@ -75,6 +87,7 @@ export class ChatService {
     private readonly configService: ConfigService,
     private readonly pubsub: ChatPubSubService,
     private readonly metrics: ChatMetricsService,
+    private readonly attachments: ChatAttachmentsService,
   ) {}
 
   /**
@@ -153,8 +166,25 @@ export class ChatService {
       throw new BadRequestException('Cannot message yourself');
     if (!dto.body && !dto.imagePath)
       throw new BadRequestException('Message must contain text or an image');
-    if (dto.e2eHeader && dto.imagePath)
+    if ((dto.e2eHeader || dto.e2e) && dto.imagePath)
       throw new BadRequestException('E2E messages cannot include an image yet');
+    if (dto.e2eHeader && dto.e2e)
+      throw new BadRequestException(
+        'Provide either e2eHeader or e2e, not both',
+      );
+    if (dto.e2e) {
+      if (!dto.body)
+        throw new BadRequestException('E2E messages must carry a body');
+      const ids = dto.e2e.envelopes.map((e) => e.recipientDeviceId);
+      if (new Set(ids).size !== ids.length)
+        throw new BadRequestException('Duplicate envelope device');
+      if (ids.includes(dto.e2e.senderDeviceId))
+        throw new BadRequestException('No envelope for the sending device');
+    }
+    if (dto.attachmentIds?.length && !dto.e2e)
+      throw new BadRequestException(
+        'Attachments require an encrypted (v2) message',
+      );
     if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
 
     // These three checks are independent reads (none depends on another's
@@ -163,23 +193,46 @@ export class ChatService {
     // on this path, not query execution time. Priority of which error wins
     // when multiple checks fail stays the same as the old sequential order:
     // recipient existence, then block, then listing ownership.
-    const [recipient, blocked, listing] = await Promise.all([
-      this.db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.id, dto.recipientId), isNull(users.deletedAt)))
-        .limit(1)
-        .then((rows) => rows[0]),
-      isBlockedEitherWay(this.db, senderId, dto.recipientId),
-      dto.listingId
-        ? this.db
-            .select({ id: listings.id, userId: listings.userId })
-            .from(listings)
-            .where(eq(listings.id, dto.listingId))
-            .limit(1)
-            .then((rows) => rows[0])
-        : Promise.resolve(undefined),
-    ]);
+    //
+    // The two E2E reads ride the same round trip and are skipped entirely
+    // (no query) for plaintext messages.
+    const [recipient, blocked, listing, activeDevices, recipientIdentity] =
+      await Promise.all([
+        this.db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.id, dto.recipientId), isNull(users.deletedAt)))
+          .limit(1)
+          .then((rows) => rows[0]),
+        isBlockedEitherWay(this.db, senderId, dto.recipientId),
+        dto.listingId
+          ? this.db
+              .select({ id: listings.id, userId: listings.userId })
+              .from(listings)
+              .where(eq(listings.id, dto.listingId))
+              .limit(1)
+              .then((rows) => rows[0])
+          : Promise.resolve(undefined),
+        dto.e2e
+          ? this.db
+              .select({ id: userE2eDevices.id, userId: userE2eDevices.userId })
+              .from(userE2eDevices)
+              .where(
+                and(
+                  inArray(userE2eDevices.userId, [senderId, dto.recipientId]),
+                  activeDeviceCondition(),
+                ),
+              )
+          : Promise.resolve(undefined),
+        dto.e2eHeader && dto.recipientIdentityKey
+          ? this.db
+              .select({ identityKey: userE2eIdentities.identityKey })
+              .from(userE2eIdentities)
+              .where(eq(userE2eIdentities.userId, dto.recipientId))
+              .limit(1)
+              .then((rows) => rows[0])
+          : Promise.resolve(undefined),
+      ]);
     if (!recipient) throw new NotFoundException('Recipient not found');
     if (blocked) throw new ForbiddenException('Messaging unavailable');
     if (dto.listingId) {
@@ -189,6 +242,55 @@ export class ChatService {
         (listing.userId !== senderId && listing.userId !== dto.recipientId)
       )
         throw new BadRequestException('Invalid listing context');
+    }
+
+    // v1: the sender's cached session was built against a recipient identity
+    // that has since been replaced (they logged in on another browser). The
+    // message would be undecryptable anywhere — make the client restart the
+    // session against the current keys instead of storing it.
+    if (
+      dto.e2eHeader &&
+      dto.recipientIdentityKey &&
+      recipientIdentity &&
+      recipientIdentity.identityKey !== dto.recipientIdentityKey
+    )
+      throw new ConflictException({
+        code: 'E2E_SESSION_STALE',
+        message: "Recipient's encryption keys changed",
+      });
+
+    // v2: envelopes must cover exactly the active device set. Checked
+    // server-side because the sender's device list goes stale the instant
+    // either user logs in or out anywhere else.
+    if (dto.e2e && activeDevices) {
+      const senderDeviceId = dto.e2e.senderDeviceId;
+      if (
+        !activeDevices.some(
+          (d) => d.id === senderDeviceId && d.userId === senderId,
+        )
+      )
+        throw new ForbiddenException({
+          code: 'E2E_DEVICE_INACTIVE',
+          message: 'This device is not registered for encrypted chat',
+        });
+      const expected = activeDevices
+        .filter((d) => d.id !== senderDeviceId)
+        .map((d) => ({ userId: d.userId, deviceId: d.id }));
+      if (!expected.some((d) => d.userId === dto.recipientId))
+        throw new NotFoundException({
+          code: 'E2E_NO_RECIPIENT_DEVICES',
+          message: 'Recipient has no devices registered for encrypted chat',
+        });
+      const { missing, stale } = diffDevices(
+        expected,
+        dto.e2e.envelopes.map((e) => e.recipientDeviceId),
+      );
+      if (missing.length > 0 || stale.length > 0)
+        throw new ConflictException({
+          code: 'E2E_DEVICES_MISMATCH',
+          message: 'Device list changed',
+          details: { missing, stale },
+        });
     }
 
     // Race-safe find-or-create + recency bump in one statement.
@@ -222,23 +324,63 @@ export class ChatService {
       imageUrl = data.publicUrl;
     }
 
+    const values = {
+      conversationId: conversation.id,
+      senderId,
+      body: dto.body ?? null,
+      clientMessageId: dto.clientMessageId ?? null,
+      listingId: dto.listingId ?? null,
+      imageUrl,
+      imagePath: dto.imagePath ?? null,
+      groupId: dto.groupId ?? null,
+      isE2e: Boolean(dto.e2eHeader || dto.e2e),
+      e2eHeader: dto.e2eHeader ?? null,
+      e2eVersion: dto.e2e ? 2 : dto.e2eHeader ? 1 : null,
+      senderDeviceId: dto.e2e?.senderDeviceId ?? null,
+    };
+
     let message: MessageRow;
+    let envelopes: MessageEnvelopeView[] | undefined;
+    let attached: MessageAttachmentView[] = [];
     try {
-      [message] = await this.db
-        .insert(messages)
-        .values({
-          conversationId: conversation.id,
-          senderId,
-          body: dto.body ?? null,
-          clientMessageId: dto.clientMessageId ?? null,
-          listingId: dto.listingId ?? null,
-          imageUrl,
-          imagePath: dto.imagePath ?? null,
-          groupId: dto.groupId ?? null,
-          isE2e: Boolean(dto.e2eHeader),
-          e2eHeader: dto.e2eHeader ?? null,
-        })
-        .returning();
+      if (dto.e2e) {
+        // Message + its envelopes (+ attachments) land together: a v2 row
+        // without envelopes would be undecryptable on every device, and one
+        // referencing a file that failed to attach would render broken.
+        const e2e = dto.e2e;
+        const attachmentIds = dto.attachmentIds ?? [];
+        [message, envelopes, attached] = await this.db.transaction(
+          async (tx) => {
+            const [row] = await tx.insert(messages).values(values).returning();
+            const rows = await tx
+              .insert(messageEnvelopes)
+              .values(
+                e2e.envelopes.map((e) => ({
+                  messageId: row.id,
+                  recipientDeviceId: e.recipientDeviceId,
+                  header: e.header,
+                  wrappedKey: e.wrappedKey,
+                })),
+              )
+              .returning({
+                recipientDeviceId: messageEnvelopes.recipientDeviceId,
+                header: messageEnvelopes.header,
+                wrappedKey: messageEnvelopes.wrappedKey,
+              });
+            // Throws ATTACHMENT_INVALID (rolling back the message) unless every
+            // id is this sender's, verified-uploaded and not yet attached.
+            const files = await this.attachments.attachToMessage(
+              tx,
+              senderId,
+              row.id,
+              attachmentIds,
+            );
+            return [row, rows, files] as const;
+          },
+        );
+      } else {
+        [message] = await this.db.insert(messages).values(values).returning();
+      }
     } catch (err) {
       // Two near-simultaneous retries with the same clientMessageId (a truly
       // concurrent double-send, not just a slow one) can both pass the replay
@@ -278,8 +420,10 @@ export class ChatService {
     const contexts = await this.batchLoadListingContexts(
       dto.listingId ? [dto.listingId] : [],
     );
-    const withListing = {
+    const withListing: MessageWithListing = {
       ...message,
+      ...(envelopes ? { envelopes } : {}),
+      ...(attached.length > 0 ? { attachments: attached } : {}),
       listing: dto.listingId ? (contexts.get(dto.listingId) ?? null) : null,
     };
 
@@ -296,6 +440,17 @@ export class ChatService {
       { targetUserId: dto.recipientId, type: 'inbox_update' },
       { targetUserId: senderId, type: 'inbox_update' },
       { targetUserId: dto.recipientId, type: 'unread_count' },
+      // v2 also fans out to the sender's OTHER devices — they hold an
+      // envelope too. The sending tab ignores its own echo (dedupe by id).
+      ...(dto.e2e
+        ? [
+            {
+              targetUserId: senderId,
+              type: 'message' as const,
+              payload: withListing,
+            },
+          ]
+        : []),
     ]);
 
     return { conversationId: conversation.id, message: withListing };
@@ -586,8 +741,11 @@ export class ChatService {
         data.map((m) => m.listingId).filter((id): id is string => id !== null),
       ),
     ];
-    const contexts = await this.batchLoadListingContexts(listingIds);
-    const withListing = data.map((m) => ({
+    const [contexts, withEnvelopes] = await Promise.all([
+      this.batchLoadListingContexts(listingIds),
+      this.attachEnvelopes(data),
+    ]);
+    const withListing = withEnvelopes.map((m) => ({
       ...m,
       listing: m.listingId ? (contexts.get(m.listingId) ?? null) : null,
     }));
@@ -608,7 +766,10 @@ export class ChatService {
     userId: string,
     conversationId: string,
   ): Promise<{ marked: number }> {
-    await this.getConversationForUserOrThrow(conversationId, userId);
+    const conversation = await this.getConversationForUserOrThrow(
+      conversationId,
+      userId,
+    );
     const marked = await this.db
       .update(messages)
       .set({ readAt: new Date() })
@@ -621,12 +782,19 @@ export class ChatService {
       )
       .returning({ id: messages.id });
 
-    // Only the reader's own badge/inbox state changed by reading — the
-    // sender's side is unaffected until they next poll or send.
+    // The reader's badge/inbox changed; the sender's read receipts changed.
+    // The sender needs an explicit push: while their socket is connected
+    // their thread's delta poll is paused, so peerLastReadAt would otherwise
+    // go stale until focus/reconnect.
     if (marked.length > 0) {
+      const peerId =
+        conversation.userAId === userId
+          ? conversation.userBId
+          : conversation.userAId;
       this.publishChatEvents([
         { targetUserId: userId, type: 'unread_count' },
         { targetUserId: userId, type: 'inbox_update' },
+        { targetUserId: peerId, type: 'read', payload: { conversationId } },
       ]);
     }
 
@@ -672,13 +840,16 @@ export class ChatService {
       .limit(1);
     if (!existing) return null;
 
-    const contexts = await this.batchLoadListingContexts(
-      existing.listingId ? [existing.listingId] : [],
-    );
+    const [contexts, [withEnvelopes]] = await Promise.all([
+      this.batchLoadListingContexts(
+        existing.listingId ? [existing.listingId] : [],
+      ),
+      this.attachEnvelopes([existing]),
+    ]);
     return {
       conversationId: existing.conversationId,
       message: {
-        ...existing,
+        ...withEnvelopes,
         listing: existing.listingId
           ? (contexts.get(existing.listingId) ?? null)
           : null,
@@ -812,7 +983,7 @@ export class ChatService {
 
   private async batchLoadLastMessages(
     conversationIds: string[],
-  ): Promise<Map<string, MessageRow>> {
+  ): Promise<Map<string, MessageWithEnvelopes>> {
     if (conversationIds.length === 0) return new Map();
     const rows = await this.db
       .selectDistinctOn([messages.conversationId])
@@ -823,7 +994,52 @@ export class ChatService {
         desc(messages.createdAt),
         desc(messages.id),
       );
-    return new Map(rows.map((m) => [m.conversationId, m]));
+    const withEnvelopes = await this.attachEnvelopes(rows);
+    return new Map(withEnvelopes.map((m) => [m.conversationId, m]));
+  }
+
+  /**
+   * Adds `envelopes` (and `attachments`, when present) to v2 E2E rows — one
+   * query each for the whole batch, run together. v1 and plaintext rows pass
+   * through untouched, and a batch with no v2 rows issues no query at all.
+   */
+  private async attachEnvelopes<T extends MessageRow>(
+    rows: T[],
+  ): Promise<
+    (T & {
+      envelopes?: MessageEnvelopeView[];
+      attachments?: MessageAttachmentView[];
+    })[]
+  > {
+    const v2Ids = rows.filter((m) => m.e2eVersion === 2).map((m) => m.id);
+    if (v2Ids.length === 0) return rows;
+
+    const [envelopeRows, filesByMessage] = await Promise.all([
+      this.db
+        .select()
+        .from(messageEnvelopes)
+        .where(inArray(messageEnvelopes.messageId, v2Ids)),
+      this.attachments.loadForMessages(v2Ids),
+    ]);
+    const byMessage = new Map<string, MessageEnvelopeView[]>();
+    for (const e of envelopeRows) {
+      const list = byMessage.get(e.messageId) ?? [];
+      list.push({
+        recipientDeviceId: e.recipientDeviceId,
+        header: e.header,
+        wrappedKey: e.wrappedKey,
+      });
+      byMessage.set(e.messageId, list);
+    }
+    return rows.map((m) => {
+      if (m.e2eVersion !== 2) return m;
+      const files = filesByMessage.get(m.id);
+      return {
+        ...m,
+        envelopes: byMessage.get(m.id) ?? [],
+        ...(files ? { attachments: files } : {}),
+      };
+    });
   }
 
   private async batchLoadUnreadCounts(

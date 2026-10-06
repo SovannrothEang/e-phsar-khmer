@@ -10,7 +10,12 @@ import Redis from 'ioredis';
 export type ChatPushEvent =
   | { targetUserId: string; type: 'message'; payload: unknown }
   | { targetUserId: string; type: 'inbox_update' }
-  | { targetUserId: string; type: 'unread_count' };
+  | { targetUserId: string; type: 'unread_count' }
+  // The other participant read my messages in `conversationId` — the open
+  // thread refetches its delta to pick up the new peerLastReadAt. Without
+  // this, a WS-connected sender (whose delta poll is paused) never sees the
+  // "seen" tick until focus/reconnect.
+  | { targetUserId: string; type: 'read'; payload: { conversationId: string } };
 
 const CHANNEL = 'chat:push';
 

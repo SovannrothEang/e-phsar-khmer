@@ -1,5 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -9,6 +12,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { E2eHeaderDto } from './e2e-header.dto';
+import { E2eV2PayloadDto } from './e2e-v2.dto';
+import { ATTACHMENTS_PER_MESSAGE_MAX } from '../chat-attachments.constants';
 
 export class SendMessageDto {
   @ApiProperty({ description: 'User to send the message to' })
@@ -66,4 +71,36 @@ export class SendMessageDto {
   @ValidateNested()
   @Type(() => E2eHeaderDto)
   e2eHeader?: E2eHeaderDto;
+
+  @ApiPropertyOptional({
+    description:
+      "v1 only: the recipient identity key this message was encrypted to. When present and it no longer matches the recipient's registered key, the send is rejected with 409 E2E_SESSION_STALE so the client restarts the session instead of sending an undecryptable message.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  recipientIdentityKey?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Multi-device E2E (v2). Mutually exclusive with e2eHeader. Files ride along via attachmentIds, never imagePath.',
+    type: E2eV2PayloadDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => E2eV2PayloadDto)
+  e2e?: E2eV2PayloadDto;
+
+  @ApiPropertyOptional({
+    description:
+      'Encrypted attachments (from POST /chats/attachments, completed) carried by this message. Requires `e2e` (v2); their keys and metadata are inside the encrypted body.',
+    type: [String],
+    maxItems: ATTACHMENTS_PER_MESSAGE_MAX,
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ATTACHMENTS_PER_MESSAGE_MAX)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  attachmentIds?: string[];
 }

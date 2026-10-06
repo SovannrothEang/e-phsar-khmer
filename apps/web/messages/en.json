@@ -81,7 +81,8 @@
       "deleteConfirm": "Delete",
       "deleteSuccess": "Conversation deleted.",
       "collapse": "Collapse the conversation list",
-      "expand": "Expand the conversation list"
+      "expand": "Expand the conversation list",
+      "resize": "Resize the conversation list"
     },
     "thread": {
       "back": "Back",
@@ -102,7 +103,10 @@
       "sending": "Sending…",
       "retry": "Retry",
       "decrypting": "Decrypting…",
-      "decryptFailed": "Couldn't decrypt this message."
+      "decryptFailed": "Couldn't decrypt this message.",
+      "notOnThisDevice": "Sent before this device was set up — open it on your other device.",
+      "download": "Download",
+      "downloadFailed": "Couldn’t save the file"
     },
     "composer": {
       "placeholder": "Write a message…",
@@ -142,6 +146,39 @@
       "e2eNoKeys": "This person hasn't set up encrypted messaging yet. Ask them to open Messages once.",
       "e2eUnavailable": "Encrypted messaging isn't ready. Please try again.",
       "deleteFailed": "Couldn't delete the conversation."
+    },
+    "backup": {
+      "lockedTitle": "Older messages are locked on this device",
+      "lockedDescription": "Enter your backup passcode, or approve this device from another device you are signed in on.",
+      "lockedNoPasscode": "No backup passcode is set. Approve this device from another device you are signed in on.",
+      "waitingApproval": "Waiting for approval on your other device…",
+      "declined": "The request was declined on your other device.",
+      "expired": "The request expired. Ask again.",
+      "genericError": "Something went wrong. Please try again.",
+      "enterPasscode": "Enter backup passcode",
+      "askOtherDevice": "Ask my other device",
+      "restored": "{count, plural, =0 {Chat history is up to date} one {Restored # message} other {Restored # messages}}",
+      "setNudge": "Set a backup passcode so you can read your chats on a new device.",
+      "setPasscode": "Set passcode",
+      "notNow": "Not now",
+      "approveTitle": "Allow a new device?",
+      "approveDescription": "{device} is asking to read your chat history. Only allow it if this is your own device.",
+      "unknownDevice": "An unknown device",
+      "decline": "Decline",
+      "allow": "Allow",
+      "wrongPasscode": "{count, plural, =0 {Wrong passcode.} one {Wrong passcode. # attempt left.} other {Wrong passcode. # attempts left.}}",
+      "lockedOut": "Too many wrong attempts. Try again after {time}.",
+      "enterTitle": "Enter backup passcode",
+      "enterDescription": "Your passcode unlocks your chat history on this device. It never leaves your device.",
+      "passcodePlaceholder": "Backup passcode",
+      "confirmPlaceholder": "Confirm passcode",
+      "unlocking": "Unlocking… this takes a few seconds",
+      "unlock": "Unlock",
+      "tooShort": "Use at least {count} characters.",
+      "mismatch": "Passcodes don't match.",
+      "setTitle": "Set a backup passcode",
+      "setDescription": "At least {count} characters. You will need it to read your chats on a new device. We cannot recover it for you.",
+      "save": "Save passcode"
     }
   }
 }

@@ -16,9 +16,23 @@ import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { mergeMessages } from "@/lib/chat/format";
 import { useAdaptivePolling } from "@/hooks/use-chat-polling";
 import { useChatWs } from "@/hooks/use-chat-ws";
-import { dataUrlToFile } from "@/lib/chat-draft-images";
+import {
+  getDraftFile,
+  getDraftPreviewUrl,
+  removeDraftImage,
+} from "@/lib/chat-draft-images";
 import { getE2eEngine } from "@/lib/e2e/engine-provider";
 import { sendE2eText } from "@/lib/e2e/send-encrypt";
+import type { E2eSendOutcome } from "@/lib/e2e/send-encrypt";
+import { E2E_ATTACHMENTS_ENABLED } from "@/lib/e2e/config";
+import {
+  contentFor,
+  createImageOutboxEntry,
+  sendOutboxEntry,
+} from "@/lib/e2e/attachments/send";
+import type { AttachmentSendOutcome } from "@/lib/e2e/attachments/send";
+import { getOutbox, listOutbox } from "@/lib/e2e/attachments/store";
+import type { OutboxEntry } from "@/lib/e2e/attachments/store";
 import type {
   ChatMessage,
   MessagePage,
@@ -28,6 +42,9 @@ import type {
 
 const PAGE_SIZE = 30;
 const MARK_READ_DEBOUNCE_MS = 700;
+const HISTORY_GC_MS = 30 * 60 * 1000;
+/** A delta right after a history fetch would return nothing new. */
+const DELTA_FRESH_MS = 5_000;
 
 /** Monotonic max over two ISO timestamps (read receipts). */
 function newerIso(a: string | null, b: string | null): string | null {
@@ -49,9 +66,54 @@ function advanceWatermark(
   return next ?? current;
 }
 
+/**
+ * Swap an optimistic echo for the server row. Drops any copy of that row
+ * already in `local` too: a v2 send is also pushed over WS to the sender (for
+ * their other devices), and that push can land before the HTTP response —
+ * appending again would render the same id twice.
+ */
+function replaceEcho(
+  prev: ThreadMessage[],
+  tempId: string,
+  row: ThreadMessage,
+): ThreadMessage[] {
+  return [...prev.filter((m) => m.tempId !== tempId && m.id !== row.id), row];
+}
+
+/** Optimistic bubble for an encrypted-attachment send (rendered from `body`). */
+function outboxEcho(
+  entry: OutboxEntry,
+  tempId: string,
+  senderId: string,
+  pending: boolean,
+): ThreadMessage {
+  return {
+    id: tempId,
+    tempId,
+    clientMessageId: entry.clientMessageId,
+    conversationId: entry.conversationId ?? "",
+    senderId,
+    body: contentFor(entry),
+    attachments: entry.attachments.map((a) => ({
+      id: a.meta.id,
+      kind: a.meta.kind,
+    })),
+    listingId: entry.listingId ?? null,
+    imageUrl: null,
+    imagePath: null,
+    groupId: null,
+    readAt: null,
+    createdAt: new Date(entry.createdAt).toISOString(),
+    isE2e: false,
+    e2eHeader: null,
+    pending,
+    failed: !pending,
+  };
+}
+
 export interface SendDraft {
   body?: string;
-  /** localStorage keys for draft images — uploaded to Supabase at send-time. */
+  /** Draft-image registry keys — uploaded to Supabase at send-time. */
   draftKeys?: string[];
   listingId?: string;
 }
@@ -120,13 +182,38 @@ export function useChatThread({
       // Merge into local state — deduped against server messages in `messages`.
       setLocal((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
+        // Our own send echoed back over WS (v2 also pushes to the sender's
+        // other devices) before its HTTP response: the response will swap
+        // the echo for this row with the known plaintext. Taking the push
+        // would try to decrypt it here, where no envelope exists for the
+        // sending device, and pin it as "not available on this device".
+        const clientId = msg.clientMessageId;
+        if (
+          clientId &&
+          prev.some((m) => m.tempId && m.clientMessageId === clientId)
+        )
+          return prev;
         return [...prev, { ...msg, pending: false, failed: false }];
       });
       markActivity();
     },
     [conversationId, markActivity],
   );
-  const ws = useChatWs({ enabled: wsEnabled, onMessage: handleWsMessage });
+  // The delta poll is paused while the socket is up, so a `read` push is the
+  // only way the sender's "seen" ticks update live. The delta query is
+  // declared below, hence the ref.
+  const refetchDeltaRef = useRef<(() => void) | null>(null);
+  const handleWsRead = useCallback(
+    (readConversationId: string) => {
+      if (readConversationId === conversationId) refetchDeltaRef.current?.();
+    },
+    [conversationId],
+  );
+  const ws = useChatWs({
+    enabled: wsEnabled,
+    onMessage: handleWsMessage,
+    onRead: handleWsRead,
+  });
 
   // ── History (initial page + upward pagination) ────────────────────────────
   const history = useInfiniteQuery({
@@ -155,21 +242,43 @@ export function useChatThread({
     },
     getNextPageParam: (last) => last.meta.nextCursor,
     staleTime: Infinity,
+    // Switching threads remounts this hook; keep recently opened threads so
+    // switching back costs one small `after=` delta, not a full page.
+    gcTime: HISTORY_GC_MS,
   });
 
   // ── Delta poll ────────────────────────────────────────────────────────────
-  // When the WebSocket is connected it delivers messages in real-time, so
-  // polling is only a safety net. Drop to idle interval to save bandwidth.
+  // While the WebSocket is connected it delivers messages in real-time, so the
+  // interval stops. The query itself stays enabled: pushes published while
+  // the socket was down (reconnect gap, server restart) are never replayed,
+  // so a one-shot delta on every (re)connect and on window focus is what
+  // closes that gap — otherwise the thread silently misses messages the
+  // inbox already shows.
   const wsConnected = ws.isConnected;
   const delta = useQuery({
     queryKey: [...chatKeys.thread(conversationId ?? "none"), "delta"],
-    enabled:
-      enabled && conversationId !== null && history.isSuccess && !wsConnected,
+    enabled: enabled && conversationId !== null && history.isSuccess,
     refetchInterval: wsConnected ? false : refetchInterval,
     refetchIntervalInBackground: false,
-    staleTime: 0,
+    // Seeded as fresh as the history it follows: a just-fetched history skips
+    // the redundant mount delta, while a thread restored from cache (older
+    // history) is stale and catches up once.
+    initialData: { messages: [], peerLastReadAt: null },
+    initialDataUpdatedAt: history.dataUpdatedAt,
+    staleTime: DELTA_FRESH_MS,
     gcTime: 0,
     queryFn: async () => {
+      // A remount restores history from cache without running its queryFn,
+      // so the refs start empty — seed them from the cached newest page or
+      // this delta would re-download a full page instead of `after=`.
+      const newest = history.data?.pages[0]?.meta;
+      if (watermarkRef.current === null && newest) {
+        watermarkRef.current = newest.latestCursor ?? null;
+        peerReadRef.current = newerIso(
+          peerReadRef.current,
+          newest.peerLastReadAt,
+        );
+      }
       const page = unwrap(
         await fetchMessages(conversationId as string, {
           // No watermark yet (brand-new or empty thread) → fall back to
@@ -199,6 +308,21 @@ export function useChatThread({
     },
   });
 
+  const { refetch: refetchDelta } = delta;
+  useEffect(() => {
+    refetchDeltaRef.current = history.isSuccess
+      ? () => void refetchDelta()
+      : null;
+  }, [history.isSuccess, refetchDelta]);
+  // Catch up only on a real (re)connect. The mount case is already covered
+  // by the delta's own staleness, so firing here too doubled every switch.
+  const wasConnectedRef = useRef(wsConnected);
+  useEffect(() => {
+    const reconnected = wsConnected && !wasConnectedRef.current;
+    wasConnectedRef.current = wsConnected;
+    if (reconnected && history.isSuccess) void refetchDelta();
+  }, [wsConnected, history.isSuccess, refetchDelta]);
+
   const serverMessages = useMemo(() => {
     const historyItems = (history.data?.pages ?? []).flatMap((p) => p.items);
     return mergeMessages(historyItems, delta.data?.messages ?? []);
@@ -207,7 +331,13 @@ export function useChatThread({
   const messages = useMemo<ThreadMessage[]>(() => {
     const serverIds = new Set(serverMessages.map((m) => m.id));
     // Drop optimistic echoes the server has already handed back to us.
-    const extras = local.filter((m) => !serverIds.has(m.id));
+    // Keyed by id so a row that reached `local` twice (WS push + HTTP
+    // response) still renders once; the later copy wins.
+    const extras = [
+      ...new Map(
+        local.filter((m) => !serverIds.has(m.id)).map((m) => [m.id, m]),
+      ).values(),
+    ];
     return [...serverMessages, ...extras];
   }, [serverMessages, local]);
 
@@ -255,12 +385,114 @@ export function useChatThread({
   }, [ackCandidateId, conversationId, queryClient]);
 
   // ── Send ──────────────────────────────────────────────────────────────────
+  const markFailed = useCallback((tempId: string) => {
+    setLocal((prev) =>
+      prev.map((m) =>
+        m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
+      ),
+    );
+  }, []);
+
+  const reportE2eFailure = useCallback(
+    (
+      outcome: Exclude<E2eSendOutcome | AttachmentSendOutcome, { ok: true }>,
+    ) => {
+      if (outcome.reason === "no-recipient-keys")
+        onSendError?.("E2E_NO_KEYS", 404);
+      else if (outcome.reason === "send-failed")
+        onSendError?.(outcome.message, outcome.status);
+      else if (outcome.reason === "upload-failed")
+        onSendError?.("Image upload failed", outcome.status);
+      else onSendError?.("E2E_UNAVAILABLE", 0);
+    },
+    [onSendError],
+  );
+
+  /**
+   * Encrypted-attachment send: upload what's left, then one E2E message.
+   * The outbox entry survives failures, so retry/reload resume it with the
+   * same ids (lib/e2e/attachments/send.ts).
+   */
+  const dispatchOutbox = useCallback(
+    async (entry: OutboxEntry, tempId: string, draftKeys: string[] = []) => {
+      if (!viewerId) return;
+      setIsSending(true);
+      const engine = await getE2eEngine(viewerId).catch(() => null);
+      const outcome = await sendOutboxEntry(engine, entry, {
+        senderId: viewerId,
+        send: sendChatMessage,
+      });
+      setIsSending(false);
+      if (!outcome.ok) {
+        markFailed(tempId);
+        reportE2eFailure(outcome);
+        return;
+      }
+      for (const key of draftKeys) removeDraftImage(key);
+      // Same reason as text sends: show the known plaintext, not ciphertext.
+      setLocal((prev) =>
+        replaceEcho(prev, tempId, {
+          ...outcome.result.message,
+          body: contentFor(entry),
+          pending: false,
+          failed: false,
+        }),
+      );
+      if (conversationId === null)
+        onConversationCreated?.(outcome.result.conversationId);
+      onMutated?.();
+    },
+    [
+      viewerId,
+      conversationId,
+      markFailed,
+      reportE2eFailure,
+      onConversationCreated,
+      onMutated,
+    ],
+  );
+
   const dispatch = useCallback(
     async (draft: SendDraft, tempId: string, clientMessageId: string) => {
       if (!recipientId || !viewerId) return;
-      setIsSending(true);
+
+      // A retry of an encrypted-attachment send resumes its outbox entry.
+      const saved = await getOutbox(clientMessageId).catch(() => null);
+      if (saved) return dispatchOutbox(saved, tempId);
 
       const draftKeys = draft.draftKeys ?? [];
+      if (draftKeys.length > 0 && E2E_ATTACHMENTS_ENABLED) {
+        const engine = await getE2eEngine(viewerId).catch(() => null);
+        if (engine?.deviceId) {
+          setIsSending(true);
+          let entry: OutboxEntry;
+          try {
+            entry = await createImageOutboxEntry({
+              clientMessageId,
+              recipientId,
+              conversationId,
+              listingId: draft.listingId,
+              text: draft.body,
+              files: draftKeys
+                .map((k) => getDraftFile(k))
+                .filter((f): f is File => f !== null),
+            });
+          } catch (err) {
+            setIsSending(false);
+            markFailed(tempId);
+            onSendError?.(
+              err instanceof Error ? err.message : "Image upload failed",
+              0,
+            );
+            return;
+          }
+          return dispatchOutbox(entry, tempId, draftKeys);
+        }
+        // No v2 device (flag off / bootstrap failed): legacy image send below.
+      }
+
+      setIsSending(true);
+
       const imageCount = draftKeys.length;
       const hasBody = !!draft.body;
 
@@ -271,13 +503,10 @@ export function useChatThread({
       for (let i = 0; i < imageCount; i++) {
         const key = draftKeys[i];
         try {
-          // A missing draft is a real failure, not a skip: `continue` here
-          // dropped the image with no request, no bubble and no toast, which is
-          // how a composer that deleted its own drafts stayed invisible.
-          const dataUrl = localStorage.getItem(key);
-          if (!dataUrl) throw new Error("Draft image is no longer available");
-          const filename = `chat-image-${Date.now()}-${i}.jpg`;
-          const file = dataUrlToFile(dataUrl, filename);
+          const file = getDraftFile(key);
+          if (!file) continue;
+          const ext = file.type.split("/")[1] ?? "jpg";
+          const filename = `chat-image-${Date.now()}-${i}.${ext}`;
           const signed = await signChatUpload(filename);
           if (!signed.ok) throw new Error(signed.message);
           const uploadRes = await fetch(signed.data.signedUrl, {
@@ -301,13 +530,16 @@ export function useChatThread({
           if (!sendRes.ok) throw new Error(sendRes.message);
 
           // Replace optimistic with server message.
-          setLocal((prev) => [
-            ...prev.filter((m) => m.tempId !== tempId),
-            { ...sendRes.data.message, pending: false, failed: false },
-          ]);
+          setLocal((prev) =>
+            replaceEcho(prev, tempId, {
+              ...sendRes.data.message,
+              pending: false,
+              failed: false,
+            }),
+          );
 
           // Cleanup this key after successful upload+send.
-          localStorage.removeItem(key);
+          removeDraftImage(key);
         } catch {
           // Upload/send failed — mark as failed, keep remaining drafts.
           setIsSending(false);
@@ -330,6 +562,7 @@ export function useChatThread({
         const engine = await getE2eEngine(viewerId).catch(() => null);
         const outcome = await sendE2eText(engine, {
           conversationId,
+          senderId: viewerId,
           recipientId,
           plaintext: draft.body as string,
           listingId: imageCount === 0 ? draft.listingId : undefined,
@@ -361,15 +594,14 @@ export function useChatThread({
         // and rendering it for one frame before the decrypt hook runs would
         // flash base64 at the user. History refetches re-resolve via the
         // decrypt cache (committed inside sendE2eText).
-        setLocal((prev) => [
-          ...prev.filter((m) => m.tempId !== tempId),
-          {
+        setLocal((prev) =>
+          replaceEcho(prev, tempId, {
             ...outcome.result.message,
             body: draft.body ?? null,
             pending: false,
             failed: false,
-          },
-        ]);
+          }),
+        );
         if (conversationId === null) {
           onConversationCreated?.(outcome.result.conversationId);
         }
@@ -389,8 +621,31 @@ export function useChatThread({
       onConversationCreated,
       onMutated,
       onSendError,
+      dispatchOutbox,
+      markFailed,
     ],
   );
+
+  // Resume encrypted-attachment sends interrupted by a reload or crash, once
+  // per thread mount. Same ids → the server dedups anything already done.
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (!recipientId || !viewerId || resumedRef.current) return;
+    resumedRef.current = true;
+    void listOutbox(recipientId)
+      .then((entries) => {
+        for (const entry of entries) {
+          const tempId = `temp-outbox-${entry.clientMessageId}`;
+          setLocal((prev) =>
+            prev.some((m) => m.tempId === tempId)
+              ? prev
+              : [...prev, outboxEcho(entry, tempId, viewerId, true)],
+          );
+          void dispatchOutbox(entry, tempId);
+        }
+      })
+      .catch(() => undefined);
+  }, [recipientId, viewerId, dispatchOutbox]);
 
   const send = useCallback(
     (draft: SendDraft) => {
@@ -401,13 +656,11 @@ export function useChatThread({
       // response / double-tap replays instead of inserting twice.
       const clientMessageId = crypto.randomUUID();
 
-      // Read dataUrls from localStorage for optimistic preview.
+      // Object URLs from the draft registry for the optimistic preview.
       const previewUrls: string[] = [];
-      if (draft.draftKeys && draft.draftKeys.length > 0) {
-        for (const key of draft.draftKeys) {
-          const dataUrl = localStorage.getItem(key);
-          if (dataUrl) previewUrls.push(dataUrl);
-        }
+      for (const key of draft.draftKeys ?? []) {
+        const url = getDraftPreviewUrl(key);
+        if (url) previewUrls.push(url);
       }
 
       // Create optimistic echo — first image shows preview, text shows body.

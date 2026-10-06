@@ -26,7 +26,8 @@ import { useState } from "react";
 import { Link, useRouter } from "@/i18n/routing";
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { userLogout } from "@/actions/logout";
-import { resetE2eEngine } from "@/lib/e2e/engine-provider";
+import { useQueryClient } from "@tanstack/react-query";
+import { markSignedOut } from "./SessionCacheGuard";
 
 /** The one layout every account-menu entry shares. */
 const ITEM =
@@ -43,6 +44,7 @@ interface SocialBarUser {
 export function SocialBar({ user }: { user: SocialBarUser }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
     user.username ||
@@ -232,10 +234,10 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                // Drop the cached engine so a subsequent login bootstraps
-                // for the new account rather than reusing the old promise
-                // (engine-provider keys by userId).
-                resetE2eEngine();
+                // Drop the previous account's cached chat data + E2E engine
+                // before the redirect, so neither the next visitor nor the
+                // next login ever sees it (see SessionCacheGuard).
+                markSignedOut(queryClient);
                 void userLogout();
               }}
               className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"

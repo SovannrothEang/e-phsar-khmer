@@ -17,6 +17,10 @@ export default () => {
       jwtSecret: env.SUPABASE_JWT_SECRET,
       storageBucket: env.SUPABASE_STORAGE_BUCKET,
     },
+    chat: {
+      filesBucket: env.CHAT_FILES_BUCKET,
+      attachmentDailyBytes: env.CHAT_ATTACHMENT_DAILY_BYTES,
+    },
     database: {
       url: env.DATABASE_URL,
       poolMax: env.DATABASE_POOL_MAX,

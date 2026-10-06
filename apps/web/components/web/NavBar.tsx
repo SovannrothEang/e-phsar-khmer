@@ -6,6 +6,7 @@ import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { FaCamera } from "react-icons/fa";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
+import { SessionCacheGuard } from "./SessionCacheGuard";
 import LocalSelector from "../LocalSelector";
 import { useLocale } from "next-intl";
 
@@ -25,6 +26,7 @@ export function NavBar({ user }: { user: User | null }) {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-card">
+      <SessionCacheGuard identity={user?.username ?? null} />
       <div className="mx-auto max-w-7xl  py-2.5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-shrink-0">

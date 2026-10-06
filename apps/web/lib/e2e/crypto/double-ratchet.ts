@@ -52,7 +52,10 @@ export function ratchetInitSender(
   associatedData: Uint8Array,
 ): DrSession {
   const dhSelf = generateX25519KeyPair();
-  const [newRootKey, sendChainKey] = kdfRootKey(rootKey, dh(dhSelf.secretKey, remoteDhPublic));
+  const [newRootKey, sendChainKey] = kdfRootKey(
+    rootKey,
+    dh(dhSelf.secretKey, remoteDhPublic),
+  );
   return {
     rootKey: newRootKey,
     dhSelf,
@@ -123,7 +126,11 @@ export function ratchetEncrypt(
   return {
     header,
     ciphertext,
-    session: { ...session, sendChainKey: nextChainKey, sendN: session.sendN + 1 },
+    session: {
+      ...session,
+      sendChainKey: nextChainKey,
+      sendN: session.sendN + 1,
+    },
   };
 }
 
@@ -150,7 +157,8 @@ export function ratchetDecrypt(
   }
 
   let working = session;
-  const isNewRatchetKey = !session.dhRemote || bytesToBase64(session.dhRemote) !== header.dh;
+  const isNewRatchetKey =
+    !session.dhRemote || bytesToBase64(session.dhRemote) !== header.dh;
 
   if (isNewRatchetKey) {
     // Messages still in flight on the OLD chain when the sender moved on —
@@ -176,7 +184,9 @@ export function ratchetDecrypt(
 function skipMessageKeys(session: DrSession, until: number): DrSession {
   if (!session.recvChainKey || until <= session.recvN) return session;
   if (until - session.recvN > MAX_SKIP)
-    throw new Error(`refusing to skip ${until - session.recvN} message keys (max ${MAX_SKIP})`);
+    throw new Error(
+      `refusing to skip ${until - session.recvN} message keys (max ${MAX_SKIP})`,
+    );
 
   let chainKey = session.recvChainKey;
   const skipped = { ...session.skipped };
@@ -189,7 +199,10 @@ function skipMessageKeys(session: DrSession, until: number): DrSession {
   return { ...session, recvChainKey: chainKey, recvN: until, skipped };
 }
 
-function dhRatchetStep(session: DrSession, remoteDhPublic: Uint8Array): DrSession {
+function dhRatchetStep(
+  session: DrSession,
+  remoteDhPublic: Uint8Array,
+): DrSession {
   const [rootAfterRecv, recvChainKey] = kdfRootKey(
     session.rootKey,
     dh(session.dhSelf.secretKey, remoteDhPublic),

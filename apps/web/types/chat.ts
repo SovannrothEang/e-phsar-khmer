@@ -4,6 +4,8 @@
  * ISO strings they arrive as over JSON.
  */
 
+import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
+
 export type ListingStatus = "draft" | "active" | "expired" | "deleted";
 
 export interface ChatUserSummary {
@@ -47,11 +49,44 @@ export interface ChatMessage {
   imageUrl: string | null;
   imagePath: string | null;
   groupId: string | null;
+  /** Sender's dedup key for this message, when one was sent. */
+  clientMessageId?: string | null;
   readAt: string | null;
   createdAt: string;
   isE2e: boolean;
+  /** v1 only — v2 rows carry one header per device in `envelopes`. */
   e2eHeader: E2eHeader | null;
+  /** null = plaintext, 1 = single-device E2E, 2 = multi-device E2E. */
+  e2eVersion?: number | null;
+  /** v2 only: the device that encrypted `body` (also its AEAD associated data). */
+  senderDeviceId?: string | null;
+  /** v2 only: the content key wrapped once per recipient device. */
+  envelopes?: E2eEnvelope[];
+  /**
+   * v2 only, when the message carries encrypted files. Keys, MIME types and
+   * previews are inside the decrypted body (lib/e2e/attachments/content.ts).
+   */
+  attachments?: MessageAttachment[];
   listing?: ListingContext | null;
+}
+
+export interface MessageAttachment {
+  id: string;
+  kind: "image" | "file";
+}
+
+/** v2: the message content key, ratchet-encrypted for one device. */
+export interface E2eEnvelope {
+  recipientDeviceId: string;
+  header: E2eHeader;
+  wrappedKey: string;
+}
+
+/** v2 send payload — see `E2eV2PayloadDto` on the backend. */
+export interface E2eV2Payload {
+  v: 2;
+  senderDeviceId: string;
+  envelopes: E2eEnvelope[];
 }
 
 export interface InboxItem {
@@ -102,6 +137,11 @@ export interface SendMessageInput {
   imagePath?: string;
   groupId?: string;
   e2eHeader?: E2eHeader;
+  /** v1: the identity key the session was built against (server 409s if it changed). */
+  recipientIdentityKey?: string;
+  e2e?: E2eV2Payload;
+  /** Encrypted attachments carried by a v2 message (see actions/chat-attachments.ts). */
+  attachmentIds?: string[];
   /**
    * Stable client-minted dedup key. Mint once per logical send (optimistic
    * echo / draft) and reuse on every retry so a lost response or double-tap
@@ -123,7 +163,14 @@ export interface SendMessageResult {
  */
 export type ChatActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; status: number; code: string; message: string };
+  | {
+      ok: false;
+      status: number;
+      code: string;
+      message: string;
+      /** Structured error payload, e.g. `{ missing, stale }` on E2E_DEVICES_MISMATCH. */
+      details?: unknown;
+    };
 
 /**
  * A message plus the client-only state an optimistic send needs. `pending`
@@ -131,6 +178,11 @@ export type ChatActionResult<T> =
  * on screen with a retry affordance instead of silently dropping it.
  */
 export interface ThreadMessage extends ChatMessage {
+  /**
+   * Decrypted file metadata of an encrypted-attachment message, parsed from
+   * its plaintext by the thread (the bubble renders `body` as the caption).
+   */
+  e2eFiles?: AttachmentMeta[];
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */
@@ -138,7 +190,7 @@ export interface ThreadMessage extends ChatMessage {
   /**
    * Dedup key for this logical send — minted with the optimistic echo and
    * kept across retries so `POST /chats/messages` can replay instead of
-   * duplicating. Client-only; not part of the server message wire type.
+   * duplicating. Also echoed back on server rows (ChatMessage).
    */
-  clientMessageId?: string;
+  clientMessageId?: string | null;
 }

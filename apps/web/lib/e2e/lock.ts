@@ -21,3 +21,10 @@ export function withConversationLock<T>(
     fn,
   ) as unknown as Promise<T>;
 }
+
+/**
+ * The single lock guarding ALL v2 (per-device) session state. v2 sessions
+ * with the sender's own other devices are shared across every conversation,
+ * so a per-conversation lock can't protect them.
+ */
+export const V2_LOCK = "v2-devices";

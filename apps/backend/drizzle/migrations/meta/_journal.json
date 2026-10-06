@@ -194,15 +194,43 @@
     {
       "idx": 27,
       "version": "7",
-      "when": 1790567679888,
-      "tag": "0027_add_user_follows",
+      "when": 1790406710559,
+      "tag": "0027_brave_scarlet_spider",
       "breakpoints": true
     },
     {
       "idx": 28,
       "version": "7",
-      "when": 1791215754853,
-      "tag": "0028_acoustic_chat",
+      "when": 1790406711559,
+      "tag": "0028_hot_charles_xavier",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790583190771,
+      "tag": "0029_flaky_starjammers",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790656344505,
+      "tag": "0030_flimsy_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790656344506,
+      "tag": "0031_add_user_follows",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790656344507,
+      "tag": "0032_acoustic_chat",
       "breakpoints": true
     }
   ]

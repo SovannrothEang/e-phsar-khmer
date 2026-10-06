@@ -41,8 +41,22 @@ export interface StoredIdentity {
   signedPrekeySignature: string;
   oneTimePrekeys: StoredOneTimePrekey[];
   nextPrekeyId: number;
-  /** False until POST /chats/e2e/keys has succeeded at least once. */
+  /** False until POST /chats/e2e/keys has succeeded at least once (v1). */
   registered: boolean;
+  /**
+   * v2 device id from POST /chats/e2e/devices. Absent on identities created
+   * before multi-device — those claim their migration-backfilled device (same
+   * identity key) on the next bootstrap, so no keys are regenerated.
+   */
+  deviceId?: string;
+  /**
+   * base64 account backup key (BK) — present once this device created the
+   * backup, restored it with the passcode, or was approved by another
+   * device. Encrypts the history segments this device uploads.
+   */
+  backupKey?: string;
+  /** Backup segments up to here are already pulled into `restored`. */
+  backupCursor?: string;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -111,7 +125,10 @@ export function generateIdentity(userId: string): StoredIdentity {
   const identity = encodeKeyPair(generateX25519KeyPair());
   const signing = encodeKeyPair(generateEd25519KeyPair());
   const signedPrekeyKp = generateX25519KeyPair();
-  const signature = sign(signedPrekeyKp.publicKey, base64ToBytes(signing.secretKey));
+  const signature = sign(
+    signedPrekeyKp.publicKey,
+    base64ToBytes(signing.secretKey),
+  );
   return {
     userId,
     registrationId: randomRegistrationId(),

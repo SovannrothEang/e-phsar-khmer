@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getChatWsTicket } from "@/actions/chat";
 import type { ChatMessage } from "@/types/chat";
 
 const WS_RECONNECT_BASE_MS = 1_000;
@@ -43,7 +44,27 @@ function resolveWsOrigin(): string {
 export type ChatWsEvent =
   | { type: "message"; payload: ChatMessage }
   | { type: "inbox_update" }
-  | { type: "unread_count" };
+  | { type: "unread_count" }
+  /** The peer read my messages in this conversation — refetch receipts. */
+  | { type: "read"; payload: { conversationId: string } }
+  /** Reply to our own `send_message` frame. */
+  | {
+      type: "ack";
+      payload: {
+        clientMessageId: string | null;
+        conversationId: string;
+        message: ChatMessage;
+      };
+    }
+  | {
+      type: "error";
+      payload: {
+        clientMessageId: string | null;
+        code: string;
+        message: string;
+        details?: unknown;
+      };
+    };
 
 type Listener = (event: ChatWsEvent) => void;
 type ConnectedListener = (connected: boolean) => void;
@@ -57,10 +78,21 @@ type ConnectedListener = (connected: boolean) => void;
  * replace their flat-interval polls instead of only helping while a thread
  * happens to be open.
  *
- * Bounded reconnect (10 attempts, exponential backoff up to 30s, then it
- * gives up) covers both a real disconnect and a signed-out visitor whose
- * connection the server rejects — it is not tied to auth state, so there is
- * no stale "not authenticated" flag to invalidate after a client-side login.
+ * Bounded reconnect (10 attempts, exponential backoff up to 30s) covers both
+ * a real disconnect and a signed-out visitor (no ticket / rejected socket) —
+ * it is not tied to auth state, so there is no stale "not authenticated" flag
+ * to invalidate after a client-side login. Exhausting the budget is not
+ * permanent: coming back online or refocusing the tab starts a fresh round.
+ *
+ * Every connect fetches a fresh short-lived ticket (`getChatWsTicket`) rather
+ * than relying on the auth cookie, which is never sent when the backend is on
+ * another origin (e.g. an ngrok tunnel) — and which may hold an expired access
+ * token on reconnect, since only server actions refresh it.
+ *
+ * Handlers of a superseded socket are ignored (`this.ws !== ws`): a torn-down
+ * socket's `onclose` fires asynchronously, often after a remount (StrictMode,
+ * navigation) already opened its replacement — without the guard it nulled
+ * the live socket, leaving `isConnected` true while `send()` dropped frames.
  */
 class ChatSocket {
   private ws: WebSocket | null = null;
@@ -69,11 +101,15 @@ class ChatSocket {
   private refCount = 0;
   private attempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped per connect/teardown so an in-flight ticket fetch can tell it's stale. */
+  private generation = 0;
+  private connecting = false;
   isConnected = false;
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     this.refCount += 1;
+    if (this.refCount === 1) this.addWakeListeners();
     this.ensureConnected();
     return () => {
       this.listeners.delete(listener);
@@ -103,25 +139,43 @@ class ChatSocket {
   }
 
   private ensureConnected() {
+    if (this.connecting) return;
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
         this.ws.readyState === WebSocket.CONNECTING)
     )
       return;
-    this.connect();
+    void this.connect();
   }
 
-  private connect() {
-    const ws = new WebSocket(`${resolveWsOrigin()}/ws/chat`);
+  private async connect() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.connecting = true;
+    const generation = ++this.generation;
+    const ticket = await getChatWsTicket().catch(() => null);
+    this.connecting = false;
+    // Torn down (or superseded) while the ticket was in flight.
+    if (generation !== this.generation || this.refCount === 0) return;
+    if (!ticket) {
+      this.scheduleReconnect();
+      return;
+    }
+
+    const ws = new WebSocket(
+      `${resolveWsOrigin()}/ws/chat?ticket=${encodeURIComponent(ticket)}`,
+    );
     this.ws = ws;
 
     ws.onopen = () => {
+      if (this.ws !== ws) return;
       this.attempt = 0;
       this.setConnected(true);
     };
 
     ws.onmessage = (event) => {
+      if (this.ws !== ws) return;
       let data: ChatWsEvent;
       try {
         data = JSON.parse(event.data) as ChatWsEvent;
@@ -132,8 +186,9 @@ class ChatSocket {
     };
 
     ws.onclose = () => {
-      this.setConnected(false);
+      if (this.ws !== ws) return; // superseded — the live socket is someone else
       this.ws = null;
+      this.setConnected(false);
       if (this.refCount > 0) this.scheduleReconnect();
     };
 
@@ -141,15 +196,38 @@ class ChatSocket {
   }
 
   private scheduleReconnect() {
-    if (this.attempt >= WS_RECONNECT_ATTEMPTS) return;
+    if (this.reconnectTimer || this.attempt >= WS_RECONNECT_ATTEMPTS) return;
     const delay = Math.min(
       WS_RECONNECT_BASE_MS * 2 ** this.attempt,
       WS_RECONNECT_MAX_MS,
     );
     this.attempt += 1;
     this.reconnectTimer = setTimeout(() => {
-      if (this.refCount > 0) this.connect();
+      this.reconnectTimer = null;
+      if (this.refCount > 0) void this.connect();
     }, delay);
+  }
+
+  /** Network back / tab refocused: retry now with a fresh backoff budget. */
+  private readonly wake = () => {
+    if (this.refCount === 0) return;
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState === "hidden"
+    )
+      return;
+    this.attempt = 0;
+    this.ensureConnected();
+  };
+
+  private addWakeListeners() {
+    window.addEventListener("online", this.wake);
+    document.addEventListener("visibilitychange", this.wake);
+  }
+
+  private removeWakeListeners() {
+    window.removeEventListener("online", this.wake);
+    document.removeEventListener("visibilitychange", this.wake);
   }
 
   private setConnected(v: boolean) {
@@ -158,10 +236,14 @@ class ChatSocket {
   }
 
   private teardown() {
+    this.removeWakeListeners();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
-    this.ws?.close();
-    this.ws = null;
+    this.generation += 1; // invalidates an in-flight ticket fetch
+    this.connecting = false;
+    const ws = this.ws;
+    this.ws = null; // detach first so its async onclose is ignored
+    ws?.close();
     this.attempt = 0;
     this.setConnected(false);
   }
@@ -193,20 +275,27 @@ export interface ChatWsState {
 export function useChatWs({
   enabled,
   onMessage,
+  onRead,
 }: {
   enabled: boolean;
   onMessage: (msg: ChatMessage) => void;
+  /** The peer read my messages in `conversationId`. */
+  onRead?: (conversationId: string) => void;
 }): ChatWsState {
   const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
   const onMessageRef = useRef(onMessage);
+  const onReadRef = useRef(onRead);
   useEffect(() => {
     onMessageRef.current = onMessage;
+    onReadRef.current = onRead;
   });
 
   useEffect(() => {
     if (!enabled) return;
     const unsubscribe = chatSocket.subscribe((event) => {
       if (event.type === "message") onMessageRef.current(event.payload);
+      else if (event.type === "read")
+        onReadRef.current?.(event.payload.conversationId);
     });
     const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
     return () => {
