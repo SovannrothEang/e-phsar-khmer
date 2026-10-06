@@ -15,6 +15,7 @@ import { AppService } from './app.service';
 import { SupabaseModule } from './common/supabase/supabase.module';
 import { DbModule } from './db/db.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { UserAwareThrottlerGuard } from './common/guards/user-aware-throttler.guard';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
@@ -63,8 +64,10 @@ import { WebhooksModule } from './webhooks/webhooks.module';
         connection: {
           host: configService.get<string>('queue.host') ?? 'localhost',
           port: configService.get<number>('queue.port') ?? 6379,
+          username: configService.get<string>('queue.username'),
           password: configService.get<string>('queue.password'),
           db: configService.get<number>('queue.db') ?? 0,
+          tls: configService.get<boolean>('queue.tls') ? {} : undefined,
         },
         prefix: configService.get<string>('queue.prefix') ?? 'psa',
       }),
@@ -101,6 +104,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('{*splat}');
     consumer
       .apply(IdempotencyMiddleware)
       .forRoutes(

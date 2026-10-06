@@ -1,0 +1,27 @@
+# Trim the upload for the backend container build. The Docker context and the
+# Vercel upload are the same set of files, so everything here must also be
+# absent from the image build — see .dockerignore.
+#
+# packages/* must NOT be excluded: pnpm-workspace.yaml globs packages/* and
+# `pnpm install --frozen-lockfile` in Dockerfile.vercel validates every
+# workspace importer in pnpm-lock.yaml against a matching package.json.
+# (apps/web is the exception — see below.)
+.turbo
+**/.next
+**/coverage
+**/*.log
+graphify-out
+docs
+tasks
+.claude
+.pipeline
+.opencode
+.idea
+.vscode
+
+# This project only builds the backend image (Framework preset = Container).
+# The frontend never enters the Docker build context — pnpm runs
+# `--filter backend...` — and its package.json isn't needed either: the same
+# build was verified to pass --frozen-lockfile with apps/web absent entirely.
+# Excluding it cuts the upload from ~257 MB to ~10 MB (1197 files, from 4633).
+apps/web

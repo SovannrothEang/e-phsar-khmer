@@ -46,8 +46,10 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
     const options = {
       host: this.config.get<string>('queue.host') ?? 'localhost',
       port: this.config.get<number>('queue.port') ?? 6379,
+      username: this.config.get<string>('queue.username'),
       password: this.config.get<string>('queue.password'),
       db: this.config.get<number>('queue.db') ?? 0,
+      tls: this.config.get<boolean>('queue.tls') ? {} : undefined,
     };
     // Pub/sub needs its own connection — a subscribed ioredis client can't
     // issue other commands — so this is deliberately separate from BullMQ's.
