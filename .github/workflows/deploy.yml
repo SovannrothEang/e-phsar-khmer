@@ -91,7 +91,7 @@ jobs:
       # Vercel's deployment protection and would answer 401.
       - name: Smoke test
         env:
-          PRODUCTION_URL: ${{ vars.BACKEND_PRODUCTION_URL || vars.PRODUCTION_URL || 'https://phsar-backend.sovannroth.xyz' }}
+          PRODUCTION_URL: ${{ vars.BACKEND_PRODUCTION_URL }}
         run: |
           for i in 1 2 3 4 5; do
             status=$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)
