@@ -18,7 +18,10 @@ const KEY_PREFIX = "chat_listing_preview:";
 
 export function storeListingPreview(listing: ListingContext): void {
   try {
-    sessionStorage.setItem(`${KEY_PREFIX}${listing.id}`, JSON.stringify(listing));
+    sessionStorage.setItem(
+      `${KEY_PREFIX}${listing.id}`,
+      JSON.stringify(listing),
+    );
   } catch {
     // Private mode / quota — the chat page falls back to the tombstone card.
   }

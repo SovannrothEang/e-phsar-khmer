@@ -9,63 +9,73 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+/**
+ * Every optional field follows one rule: `undefined` leaves the stored value
+ * alone, an explicit `null` clears it. Without that, a field could be set from
+ * the settings form but never emptied — the location cascade in particular
+ * (clearing it sends three nulls).
+ */
 export class UpdateProfileDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   firstName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   lastName?: string;
 
-  @ApiPropertyOptional({ enum: ['male', 'female'] })
+  @ApiPropertyOptional({ enum: ['male', 'female'], nullable: true })
   @IsOptional()
   @IsIn(['male', 'female'])
-  gender?: 'male' | 'female';
+  gender?: 'male' | 'female' | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsInt()
   @Min(1900)
   @Max(new Date().getFullYear())
   @Type(() => Number)
-  yearOfBirth?: number;
+  yearOfBirth?: number | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
-  company?: string;
+  @MaxLength(150)
+  company?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsEmail()
-  email?: string;
+  email?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsUUID()
-  provinceId?: string;
+  provinceId?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsUUID()
-  districtId?: string;
+  districtId?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsUUID()
-  communeId?: string;
+  communeId?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
-  address?: string;
+  address?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

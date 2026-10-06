@@ -56,16 +56,40 @@ const envSchema = z.object({
   OUTBOX_BACKOFF_MAX_MS: z.coerce.number().default(900000),
   OUTBOX_RETENTION_DAYS: z.coerce.number().default(7),
 
+  // Sweeper that hard-deletes self-deleted accounts once their 90-day
+  // recovery window closes. Every instance sweeps by default — claiming is
+  // atomic, so more sweepers just delete sooner. Set false to run an
+  // instance that must never delete anything.
+  ACCOUNT_PURGE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  ACCOUNT_PURGE_INTERVAL_MS: z.coerce.number().default(21600000),
+
   // BullMQ queue configuration
   QUEUE_HOST: z.string().default('localhost'),
   QUEUE_PORT: z.coerce.number().default(6379),
+  // ACL user. Leave unset for the built-in `default` user, which Redis
+  // authenticates from the password alone (Redis Cloud's default setup).
+  QUEUE_USERNAME: z
+    .string()
+    .optional()
+    .transform((value) => value || undefined),
   // Coerced to undefined when blank: an empty `QUEUE_PASSWORD=` line in a
   // .env would otherwise be sent to Redis as an empty password and fail auth.
   QUEUE_PASSWORD: z
     .string()
     .optional()
     .transform((value) => value || undefined),
+  // A numbered Redis database, not a provider's database name. Managed
+  // Redis (Redis Cloud, Upstash) only offers 0.
   QUEUE_DB: z.coerce.number().default(0),
+  // Connect over TLS (rediss://). Required by some managed Redis plans; off
+  // for a local Redis.
+  QUEUE_TLS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   // Namespaces every BullMQ key, so a shared Redis can host more than one
   // environment without one draining the other's jobs.
   QUEUE_PREFIX: z.string().default('psa'),

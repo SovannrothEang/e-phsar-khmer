@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -18,11 +19,18 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
+import { ListFollowsDto } from './dto/list-follows.dto';
 import type { RequestUser } from '../common/types/api-response.types';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddPhoneDto } from './dto/add-phone.dto';
 import { BlockUserDto } from './dto/block-user.dto';
+import { ChangeUsernameDto } from './dto/change-username.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
+import { RequestPhoneChangeDto } from './dto/request-phone-change.dto';
+import { VerifyPhoneChangeDto } from './dto/verify-phone-change.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -42,10 +50,59 @@ export class UsersController {
     return this.usersService.updateProfile(user.id, dto);
   }
 
+  @Patch('me/username')
+  @ApiOperation({ summary: 'Change current username' })
+  changeUsername(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: ChangeUsernameDto,
+  ) {
+    return this.usersService.changeUsername(user.id, dto);
+  }
+
+  @Patch('me/password')
+  @ApiOperation({ summary: 'Change current password' })
+  changePassword(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.usersService.changePassword(user.id, dto);
+  }
+
+  @Delete('me')
+  @ApiOperation({
+    summary: 'Deactivate (soft-delete) the current account',
+    description:
+      'Reversible by signing in again within 90 days; the account and all ' +
+      'cascading rows are purged after that.',
+  })
+  deleteMe(@CurrentUser() user: RequestUser, @Body() dto: DeleteAccountDto) {
+    return this.usersService.deleteOwnAccount(user.id, dto);
+  }
+
   @Get('me/phones')
   @ApiOperation({ summary: 'List current user phones' })
   listPhones(@CurrentUser() user: RequestUser) {
     return this.usersService.listPhones(user.id);
+  }
+
+  @Post('me/phones/otp')
+  @ApiOperation({ summary: 'Send a verification code to a new phone number' })
+  requestPhoneChangeOtp(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: RequestPhoneChangeDto,
+  ) {
+    return this.usersService.requestPhoneChangeOtp(user.id, dto);
+  }
+
+  @Post('me/phones/otp/verify')
+  @ApiOperation({
+    summary: 'Verify the code and make that phone the active number',
+  })
+  verifyPhoneChangeOtp(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: VerifyPhoneChangeDto,
+  ) {
+    return this.usersService.verifyPhoneChangeOtp(user.id, dto);
   }
 
   @Post('me/phones')
@@ -113,6 +170,70 @@ export class UsersController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
     return this.usersService.unblockUser(user.id, userId);
+  }
+
+  @Get('me/follow-counts')
+  @ApiOperation({ summary: 'Get current user follow counts' })
+  getFollowCounts(@CurrentUser() user: RequestUser) {
+    return this.usersService.getFollowCounts(user.id);
+  }
+
+  @Get('by-username/:username')
+  @Public()
+  @ApiOperation({
+    summary: 'Get a public profile by username',
+    description:
+      'Anonymous read. Serves only public identity fields and follow counts — never phone, email or moderation state.',
+  })
+  getProfileByUsername(@Param('username') username: string) {
+    return this.usersService.getPublicProfile(username);
+  }
+
+  @Get(':id/followers')
+  @ApiOperation({ summary: 'List users following this user' })
+  listFollowers(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListFollowsDto,
+  ) {
+    return this.usersService.listFollowers(user.id, id, query);
+  }
+
+  @Get(':id/following')
+  @ApiOperation({ summary: 'List users this user follows' })
+  listFollowing(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListFollowsDto,
+  ) {
+    return this.usersService.listFollowing(user.id, id, query);
+  }
+
+  @Get(':id/follow')
+  @ApiOperation({ summary: 'Whether the current user follows this user' })
+  getFollowStatus(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.isFollowing(user.id, id);
+  }
+
+  @Post(':id/follow')
+  @ApiOperation({ summary: 'Follow a user (idempotent)' })
+  followUser(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.followUser(user.id, id);
+  }
+
+  @Delete(':id/follow')
+  @ApiOperation({ summary: 'Unfollow a user (idempotent)' })
+  unfollowUser(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.unfollowUser(user.id, id);
   }
 
   @Get(':id')

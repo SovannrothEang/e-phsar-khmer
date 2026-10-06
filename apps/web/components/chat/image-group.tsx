@@ -71,10 +71,9 @@ export function ImageGroup({
           )}
         >
           <span className="text-[10px] text-muted-foreground">
-            {new Date(messages[messages.length - 1].createdAt).toLocaleTimeString(
-              [],
-              { hour: "2-digit", minute: "2-digit" },
-            )}
+            {new Date(
+              messages[messages.length - 1].createdAt,
+            ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
       </div>

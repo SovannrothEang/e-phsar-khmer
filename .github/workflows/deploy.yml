@@ -1,0 +1,103 @@
+name: Deploy
+
+# prod is the release branch: every push runs the full CI gate, then applies
+# migrations, then ships the backend to Vercel. Each step only runs if the
+# previous one passed, so a red CI or a failed migration never deploys.
+#
+# Vercel's own git integration must NOT also deploy prod (see the `git` block
+# in the root vercel.json), or it would ship before CI and migrations ran.
+
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never run two deploys at once, and never cancel one mid-migration.
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/prod'
+    uses: ./.github/workflows/ci.yml
+
+  migrate:
+    name: migrate database
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter backend...
+
+      # Runs before the new code ships, so every migration must be safe for
+      # the currently deployed code too (add columns/tables first; drop or
+      # rename in a later release).
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter backend db:migrate
+
+  deploy:
+    name: deploy backend to Vercel
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Pull Vercel project settings and env
+        run: npx --yes vercel@latest pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: npx --yes vercel@latest build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(npx --yes vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # The build can succeed while the app crashes on boot (e.g. a missing
+      # env var fails the Zod config check), so hit the health route. It goes
+      # through the production domain: the per-deployment URL sits behind
+      # Vercel's deployment protection and would answer 401.
+      - name: Smoke test
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://phsar-backend.sovannroth.xyz' }}
+        run: |
+          for i in 1 2 3 4 5; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)
+            echo "attempt $i: /health -> $status"
+            [ "$status" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::/health never returned 200. Roll back with 'vercel rollback' or from the Vercel dashboard."
+          exit 1

@@ -17,10 +17,17 @@ import {
   getColors,
   getModelsForBrand,
   getYears,
+  getAllCategories,
+  getListingsFeed,
+  toCardPost,
+  type ListingsFeedParams,
 } from "@/lib/api/categories";
+import type { Post } from "@/lib/posts";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
+import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
+import { ALL_ADS_PAGE_SIZE, type AllAdsFilters } from "@/lib/all-ads";
 
 /** Row of `GET /users/me/phones` — only `phone` is read here. */
 interface UserPhoneRow {
@@ -56,6 +63,12 @@ const PICKER_ATTR_TYPES: Record<string, string | null> = {
   cpu: null,
   vga: null,
   type: "types",
+  // One key, one set, two families (captain, 2026-09-27: keep them ONE
+  // `accessories` set). Phone Accessories and Fashion Accessories both read
+  // `accessories`; the per-subcategory ticks decide which rows each sees, and
+  // each family's own `field_schema` supplies its own label ("Accessory" vs
+  // "Accessory Type"). A `fashion_accessories` split was built and reverted the
+  // same day — see the `accessories` block in `attributes.seed.ts` for why.
   accessory: "accessories",
   network: "networks",
   // Home & Land's three property pickers. Each has a seeded set but every one
@@ -277,8 +290,20 @@ export async function getListingFormConfig(
       : [];
     const inline =
       (sub.fieldSchema ?? []).find((f) => f.key === key)?.options ?? [];
+    // A set its category draws as plain text advertises no image, whatever the
+    // rows hold — `SearchPicker` reads an image here as "this picker is the
+    // icon design" and would otherwise reserve an empty slot on every row (the
+    // shared `types` "other" row's `/sub-img/…` path is enough to do it, and
+    // `DbImage` refuses that path, so the slot can never be filled). The
+    // declaration is shared with the browse page's text-tile rule.
+    const textOnly =
+      type !== null &&
+      (TEXT_TILE_SETS_BY_CATEGORY[categorySlug]?.has(type) ?? false);
     pickLists[key] = managed
-      ? scoped.map((r) => ({ name: r.name, image: r.image }))
+      ? scoped.map((r) => ({
+          name: r.name,
+          image: textOnly ? null : r.image,
+        }))
       : inline.map((name) => ({ name, image: null }));
   }
 
@@ -342,6 +367,56 @@ export async function getListingFormConfig(
   };
 }
 
+/** Category tree for the header search bar's scope dropdown. */
+export interface SearchCategory {
+  slug: string;
+  name: string;
+  icon: string | null;
+  subcategories: { slug: string; name: string; icon: string | null }[];
+}
+
+export async function getSearchCategories(
+  locale: string,
+): Promise<SearchCategory[]> {
+  const all = (await getAllCategories(locale)) ?? [];
+  return all.map((c) => ({
+    slug: c.slug,
+    name: c.name,
+    icon: c.icon,
+    subcategories: c.subcategories.map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      icon: s.icon,
+    })),
+  }));
+}
+
+/** Location cascade: all provinces (client-invoked by the filter bar). */
+export async function getLocationProvinces(): Promise<BackendPlace[]> {
+  return getProvinces();
+}
+
+/**
+ * Next page of a feed for the "Load more" button. The query is whatever the
+ * page parsed from its URL (`parseFeedParams`), so the pages it appends are
+ * filtered and sorted exactly like the first one.
+ */
+export async function loadMoreListings(
+  query: ListingsFeedParams,
+  cursor: string,
+  locale: string,
+): Promise<{ posts: Post[]; nextCursor: string | null }> {
+  // Counts belong to the first page only; later pages skip those queries.
+  const feed = await getListingsFeed(
+    { ...query, includeTotal: false, includeFacets: false, cursor },
+    locale,
+  );
+  return {
+    posts: (feed?.items ?? []).map(toCardPost),
+    nextCursor: feed?.nextCursor ?? null,
+  };
+}
+
 /** Location cascade: districts of a province (lazy, client-invoked). */
 export async function getLocationDistricts(
   provinceSlug: string,
@@ -367,6 +442,58 @@ export async function getBrandModels(
   subcategorySlug: string,
 ): Promise<BackendModel[]> {
   return getModelsForBrand(brandId, subcategorySlug);
+}
+
+export interface AllAdsBatch {
+  items: Post[];
+  nextCursor: string | null;
+}
+
+/**
+ * One more screen of the All Ads feed — the page server-renders the first
+ * batch and the grid asks for the rest as the visitor reaches the bottom.
+ * `cursor` is the previous batch's `nextCursor`, and a null `nextCursor` back
+ * means the feed is finished (an unreachable backend reads the same way to the
+ * grid: stop asking).
+ */
+export async function getAllAdsBatch(
+  filters: AllAdsFilters,
+  cursor: string | undefined,
+  locale: string,
+): Promise<AllAdsBatch> {
+  const feed = await getListingsFeed(
+    { ...filters, cursor, limit: ALL_ADS_PAGE_SIZE },
+    locale,
+  );
+  return {
+    items: (feed?.items ?? []).map(toCardPost),
+    nextCursor: feed?.nextCursor ?? null,
+  };
+}
+
+/**
+ * One more screen of a *seller's* feed — the public profile renders the first
+ * batch server-side and this appends the rest as the visitor reaches the
+ * bottom, and it is also what the drill-down calls to swap the grid when a
+ * category or subcategory is picked (no navigation, no remount).
+ *
+ * Same contract as `getAllAdsBatch`; the seller is the scope, and the two
+ * slugs are the drill levels. The backend feed is active-only, so a draft of
+ * theirs can never surface here.
+ */
+export async function getSellerAdsBatch(
+  params: { userId: string; categorySlug?: string; subcategorySlug?: string },
+  cursor: string | undefined,
+  locale: string,
+): Promise<AllAdsBatch> {
+  const feed = await getListingsFeed(
+    { ...params, cursor, limit: ALL_ADS_PAGE_SIZE },
+    locale,
+  );
+  return {
+    items: (feed?.items ?? []).map(toCardPost),
+    nextCursor: feed?.nextCursor ?? null,
+  };
 }
 
 /**

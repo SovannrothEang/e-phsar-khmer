@@ -1,9 +1,11 @@
 import "server-only";
 import { API_URL } from "@/lib/api/client";
+import { displayName, getPublicProfile } from "@/lib/api/users";
 import type { RealDetailData } from "@/components/post/Post-Detail";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
-import { applyDiscount } from "@/lib/utils";
+import { applyDiscount, shortLocation } from "@/lib/utils";
+import type { FeedQuery } from "@/lib/search-params";
 
 const slugify = (s: string) =>
   s
@@ -12,33 +14,56 @@ const slugify = (s: string) =>
     .replace(/^-|-$/g, "");
 
 /**
- * Preview-visible seller identity from the listing's own contact fields —
- * `GET /users/:id` is JWT-protected, so there is no anonymous seller profile.
+ * The seller card's identity.
+ *
+ * The listing carries the owner's handle, so the card can resolve their real
+ * public profile (`GET /users/by-username/:username` — the one anonymous
+ * seller read; `GET /users/:id` is JWT-protected) and show it. Without that it
+ * drew a *placeholder* identity that read as a profile but was not one: a
+ * generated `ui-avatars` circle instead of the photo the seller had uploaded,
+ * and the **listing's** `createdAt` under a "Members Since" label — so a
+ * seller who joined in August appeared to have joined when they posted the ad.
+ *
+ * The contact fields stay per-ad: `contactPhones`/`contactEmail` are the
+ * numbers the poster chose for *this* listing, and `company` rides in
+ * `attributes` (it is not a contact column). It shows on the seller card, never
+ * in the specs grid.
  */
-function toSellerView(l: BackendListing): User {
-  const name = l.contactName && l.contactName.trim() ? l.contactName : "Seller";
-  const username = name.toLowerCase().replace(/[^a-z0-9]+/g, "");
-  // The jobs form's `company` rides in `attributes` (it is not a contact
-  // column). It shows on the seller card, never in the specs grid.
+async function toSellerView(l: BackendListing): Promise<User> {
+  const username = l.sellerUsername ?? "";
+  const profile = username ? await getPublicProfile(username) : null;
+
+  // The ad's own contact name still leads — it is what the poster chose to be
+  // called on this listing. The account's name is the fallback.
+  const contactName =
+    l.contactName && l.contactName.trim() ? l.contactName.trim() : null;
+  const name = contactName ?? (profile ? displayName(profile) : "Seller");
+
   const rawCompany = l.attributes?.company;
   const company =
     typeof rawCompany === "string" && rawCompany.trim()
       ? rawCompany.trim()
       : undefined;
+
   return {
     userId: l.userId,
     username,
     name,
     company,
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`,
-    cover: "",
+    // The uploaded photo when there is one; the generated circle is a fallback
+    // for an account with none, not a stand-in for a photo that exists.
+    avatar:
+      profile?.profilePhotoUrl ??
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`,
+    cover: profile?.coverPhotoUrl ?? "",
     locations: "",
-    following: 0,
-    follower: 0,
-    joinDate: new Date(l.createdAt).toISOString(),
+    following: profile?.following ?? 0,
+    follower: profile?.followers ?? 0,
+    // The account's join date, never the listing's.
+    joinDate: profile?.createdAt ?? new Date(l.createdAt).toISOString(),
     phone: l.contactPhones,
     email: l.contactEmail ?? undefined,
-    userlink: `@${username}`,
+    userlink: username ? `@${username}` : undefined,
   };
 }
 
@@ -73,7 +98,7 @@ export async function buildRealDetailData(
     subcate: sub ? { slug: sub.slug, name: sub.name } : undefined,
     brand: toBreadcrumb("brand"),
     model: toBreadcrumb("model"),
-    seller: toSellerView(listing),
+    seller: await toSellerView(listing),
   };
 }
 
@@ -162,6 +187,16 @@ export interface BackendListing {
   contactName: string | null;
   contactPhones: string[];
   contactEmail: string | null;
+  /**
+   * The owner's handle, joined on by `GET /listings/:id`. Absent from feed
+   * rows (they do not join `users`) and null when the owner is gone.
+   */
+  sellerUsername?: string | null;
+  /**
+   * How many users liked this listing — joined on by `GET /listings/:id`,
+   * absent from feed rows. Drives the detail page's "N Likes" control.
+   */
+  likeCount?: number | null;
   status: string;
   viewsCount: number;
   publishedAt: string | null;
@@ -267,46 +302,76 @@ export async function getListingById(
   return getJson<BackendListing>(`/listings/${id}`, locale);
 }
 
+/**
+ * The whole active category tree — or, with `userId`, only the categories that
+ * seller has an active listing in, each carrying only the subcategories they
+ * posted in under it (the profile's drill-down, both levels). Scoping here
+ * rather than in a second endpoint keeps the translated-name resolution in the
+ * one service that already owns it.
+ */
 export async function getAllCategories(
   locale: string,
+  userId?: string,
 ): Promise<BackendCategory[] | null> {
-  return getJson<BackendCategory[]>("/categories", locale);
+  return getJson<BackendCategory[]>(
+    `/categories${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
+    locale,
+  );
+}
+
+export interface FeedFacet {
+  slug: string;
+  count: number;
 }
 
 export interface ListingsFeed {
   items: BackendListing[];
   nextCursor: string | null;
+  /** Only when requested with `includeTotal`. */
+  total?: number;
+  /** Only when requested with `includeFacets`. */
+  facets?: { categories: FeedFacet[]; subcategories?: FeedFacet[] };
+  /** Nothing matched exactly; these are typo-tolerant (similar) results. */
+  fuzzy?: boolean;
 }
 
-/** Public active-listings feed (cursor pagination is exposed, not consumed here). */
+export interface ListingsFeedParams extends FeedQuery {
+  userId?: string;
+  brand?: string;
+  bodyType?: string;
+  /**
+   * Generic attribute filter — the key the *subcategory's own schema* uses
+   * for the clicked grid (see `resolveAttrKey` in the subcategory page).
+   * `bodyType` above is only right for cars/lorries; every other grid stores
+   * its value under its own key (`type`, `vehicleType`, `accessory`, …).
+   */
+  attrKey?: string;
+  attrValue?: string;
+  limit?: number;
+  cursor?: string;
+  includeTotal?: boolean;
+  includeFacets?: boolean;
+}
+
+/**
+ * Public active-listings feed. Every defined param is forwarded as-is — the
+ * URL-side validation lives in `parseFeedParams` (lib/search-params.ts).
+ */
 export async function getListingsFeed(
-  params: {
-    categorySlug?: string;
-    subcategorySlug?: string;
-    brand?: string;
-    bodyType?: string;
-    /**
-     * Generic attribute filter — the key the *subcategory's own schema* uses
-     * for the clicked grid (see `resolveAttrKey` in the subcategory page).
-     * `bodyType` above is only right for cars/lorries; every other grid stores
-     * its value under its own key (`type`, `vehicleType`, `accessory`, …).
-     */
-    attrKey?: string;
-    attrValue?: string;
-    limit?: number;
-  },
+  params: ListingsFeedParams,
   locale: string,
 ): Promise<ListingsFeed | null> {
   const qs = new URLSearchParams();
-  if (params.categorySlug) qs.set("categorySlug", params.categorySlug);
-  if (params.subcategorySlug) qs.set("subcategorySlug", params.subcategorySlug);
-  if (params.brand) qs.set("brand", params.brand);
-  if (params.bodyType) qs.set("bodyType", params.bodyType);
-  if (params.attrKey && params.attrValue) {
-    qs.set("attrKey", params.attrKey);
-    qs.set("attrValue", params.attrValue);
+  const { attrKey, attrValue, limit, ...rest } = params;
+  for (const [key, value] of Object.entries(rest)) {
+    if (value === undefined || value === "" || value === false) continue;
+    qs.set(key, String(value));
   }
-  qs.set("limit", String(params.limit ?? 20));
+  if (attrKey && attrValue) {
+    qs.set("attrKey", attrKey);
+    qs.set("attrValue", attrValue);
+  }
+  qs.set("limit", String(limit ?? 20));
   try {
     const res = await fetch(`${API_URL}/listings?${qs.toString()}`, {
       headers: { "Accept-Language": locale },
@@ -316,12 +381,20 @@ export async function getListingsFeed(
     const body = (await res.json()) as {
       success: boolean;
       data?: BackendListing[];
-      meta?: { nextCursor: string | null };
+      meta?: {
+        nextCursor: string | null;
+        total?: number;
+        facets?: ListingsFeed["facets"];
+        fuzzy?: boolean;
+      };
     };
     if (!body.success) return null;
     return {
       items: body.data ?? [],
       nextCursor: body.meta?.nextCursor ?? null,
+      total: body.meta?.total,
+      facets: body.meta?.facets,
+      fuzzy: body.meta?.fuzzy === true,
     };
   } catch {
     return null;
@@ -344,6 +417,10 @@ export function toCardPost(l: BackendListing): Post {
   return {
     postId: l.id,
     userId: l.userId,
+    // Carried so the card's "…" menu can offer View Profile — it used to look
+    // the seller up in mock data by id, which never hit for a real listing, so
+    // the control silently did nothing.
+    sellerUsername: l.sellerUsername ?? null,
     title: l.title,
     images: l.photos.map((p) => p.url),
     // The listing price is the ORIGINAL; the discount applies on top — the
@@ -362,7 +439,9 @@ export function toCardPost(l: BackendListing): Post {
     condition:
       l.condition === "used" ? "Used" : l.condition === "new" ? "New" : "",
     freeDelivery: l.deliveryFree,
-    location: [l.location, l.address].filter(Boolean).join(", ") || undefined,
+    // The card shows the design's short `district, province` — the commune and
+    // the street address belong to the detail page (see `shortLocation`).
+    location: shortLocation(l.location),
     oldPrice:
       price !== null && l.discountValue && l.discountType ? price : undefined,
   };
@@ -400,6 +479,49 @@ export async function getCommunes(
       "en",
     )) ?? []
   );
+}
+
+/** A user's saved location, as the post form's place picker expects it. */
+export interface UserPlaceSelection {
+  province: BackendPlace | null;
+  district: BackendPlace | null;
+  commune: BackendPlace | null;
+}
+
+/**
+ * Rebuilds the Location cascade from the ids stored on a user row. The lookup
+ * endpoints are slug-keyed, so each level is found by walking down from the
+ * province list — at most two extra calls, and only for the levels the user
+ * actually has saved.
+ */
+export async function resolvePlaceSelection(
+  provinceId: string | null,
+  districtId: string | null,
+  communeId: string | null,
+): Promise<UserPlaceSelection> {
+  const empty: UserPlaceSelection = {
+    province: null,
+    district: null,
+    commune: null,
+  };
+  if (!provinceId) return empty;
+
+  const provinces = await getProvinces();
+  const province = provinces.find((p) => p.id === provinceId) ?? null;
+  if (!province) return empty;
+  if (!districtId) return { ...empty, province };
+
+  const districts = await getDistricts(province.slug);
+  const district = districts.find((d) => d.id === districtId) ?? null;
+  if (!district) return { ...empty, province };
+  if (!communeId) return { province, district, commune: null };
+
+  const communes = await getCommunes(province.slug, district.slug);
+  return {
+    province,
+    district,
+    commune: communes.find((c) => c.id === communeId) ?? null,
+  };
 }
 
 export async function getYears(): Promise<BackendAttributeRow[]> {

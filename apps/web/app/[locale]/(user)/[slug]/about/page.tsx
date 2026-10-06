@@ -1,6 +1,12 @@
 import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
 import AboutProfile from "@/components/profile/About";
-import { users } from "@/lib/user";
+import { notFound } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import {
+  getFollowStatus,
+  getPublicProfile,
+  toProfileUser,
+} from "@/lib/api/users";
 
 export default async function AboutPage({
   params,
@@ -9,14 +15,21 @@ export default async function AboutPage({
 }) {
   const { slug } = await params;
 
-  // Assuming about is only for public profiles, not posts
-  const user = users.find((u) => u.username === slug);
+  // About is public-profile only — a listing slug resolves to no account.
+  const profile = await getPublicProfile(slug);
+  if (!profile) notFound();
 
-  if (!user) return <div>User not found</div>;
+  const user = toProfileUser(profile);
+  const viewer = await getCurrentUser();
+  const following = await getFollowStatus(profile.id);
 
   return (
     <>
-      <PublicProfileHeader user={user} />
+      <PublicProfileHeader
+        user={user}
+        viewerId={viewer?.id ?? null}
+        initialFollowing={following}
+      />
       <AboutProfile user={user} />
     </>
   );

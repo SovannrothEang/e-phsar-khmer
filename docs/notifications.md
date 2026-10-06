@@ -292,7 +292,7 @@ Everything that runs outside the request path on this branch:
 ### 6.3 Risks / findings worth a captain's attention
 
 1. **`GET /` is 404; the root handler lives at `GET /v1`.** `AppController` is not `VERSION_NEUTRAL` (only `HealthController` is, `health.controller.ts:8`), so URI versioning moves the root route. The e2e suite documents this deliberately (`app.e2e-spec.ts:52-62`: "Documents current behaviour; contradicts AGENTS.md's 'Root: GET /'"). `docs/todos/08` notes the fix is one decorator — **this is a pre-existing bug the branch surfaced, not introduced**.
-2. **Outbox rows are never reaped.** `published`/`failed` rows accumulate forever (no retention sweep; same gap as `idempotency_keys`). `AGENTS.md:524`.
+2. **Outbox `failed` rows are never reaped.** `published` rows are now purged `OUTBOX_RETENTION_DAYS` (default 7) after publishing by the hourly `OutboxRetention` sweep (`src/outbox/outbox-retention.service.ts`, 2026-09-30); `failed` rows are kept on purpose as dead letters, and `idempotency_keys` still has no sweep.
 3. **No visibility into failed events.** `last_error` is recorded, but no admin endpoint/metric/alert reads it (`AGENTS.md:525`). A failed OTP send is only discoverable by querying the table.
 4. **Redis is a hard boot dependency.** `REDIS_URL` required by Zod; connection failure aborts startup. No process-local fallback for the throttler (deliberate — `app.e2e-spec.ts` stubs `RedisService` because `onModuleInit` dials Redis).
 5. **SMS provider is a console stub** (`ConsoleSmsClient`) — `docs/todos/09` fast-follow. `OTP_PROVIDER=sms` in production would "send" SMS to the log.

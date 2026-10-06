@@ -27,11 +27,7 @@ import "yet-another-react-lightbox/styles.css";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
 
-/**
- * The subset of profile identity the header renders. Fed by the real
- * logged-in session (`/me` layout); the `following`/`follower` numbers stay
- * mock until the backend has that data (Phase C).
- */
+/** The subset of profile identity the header renders. Fed by the real logged-in session (`/me` layout), whose follow counts come from `GET /users/me/follow-counts`. */
 export interface ProfileUser {
   name: string;
   username: string;
@@ -238,15 +234,25 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
                         variant="outline"
-                        onClick={() => router.replace("/membership")}
+                        onClick={() => router.replace("/me/membership")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
                         Upgrade Account
                       </Button>
                     </div>
                     <div className="flex gap-4 mb-2">
-                      <p className="text-sm">{user.following} Following</p>
-                      <p className="text-sm">{user.follower} Followers</p>
+                      <Link
+                        href="/me/following"
+                        className="text-sm transition-colors hover:text-[#00a0e9]"
+                      >
+                        {user.following} Following
+                      </Link>
+                      <Link
+                        href="/me/followers"
+                        className="text-sm transition-colors hover:text-[#00a0e9]"
+                      >
+                        {user.follower} Followers
+                      </Link>
                     </div>
                     <p className="text-sm text-muted-foreground ">
                       Joined {user.joinDate}

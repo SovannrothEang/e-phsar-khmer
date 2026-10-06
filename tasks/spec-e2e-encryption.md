@@ -33,7 +33,7 @@
 **Web client — built, not wired up:**
 
 - `apps/web/lib/e2e/crypto/`: `primitives.ts` (X25519/Ed25519 via `@noble/curves`, the two KDFs, AES-256-GCM AEAD via `@noble/ciphers`), `double-ratchet.ts` (the ratchet state machine, spec-field-named), `x3dh.ts` (initiator/responder handshake, verifies the bundle signature before any DH work), `engine.ts` (composes both into the `RatchetEngine` interface).
-- `apps/web/lib/e2e/`: the reliability orchestration layer built *before* the real engine — `decrypt-message.ts` (idempotent-by-message-id, cross-tab-locked, transactionally persisted), `store.ts` (IndexedDB: sessions keyed by conversation, decrypted plaintext keyed by message id), `lock.ts` (Web Locks API). `stub-engine.ts` still exists for exercising this layer without real key material.
+- `apps/web/lib/e2e/`: the reliability orchestration layer built _before_ the real engine — `decrypt-message.ts` (idempotent-by-message-id, cross-tab-locked, transactionally persisted), `store.ts` (IndexedDB: sessions keyed by conversation, decrypted plaintext keyed by message id), `lock.ts` (Web Locks API). `stub-engine.ts` still exists for exercising this layer without real key material.
 - **Not built:** anything that sources `LocalKeyMaterial` — no key generation, no local private-key storage, no caller of `POST /chats/e2e/keys`. `createSignalEngine()` has no real caller yet. No wiring into `message-thread.tsx`/`conversation-list.tsx`. This is design §9's bootstrap flow, still entirely on paper.
 - `FilesModule`: chat images upload via `POST /files/sign` with `scope: 'chat'`, stored at `chat/{userId}/…`, bucket is **public** (README's own Known Gaps flags this as an existing exposure, unrelated to this spec).
 - No message-content reporting endpoint exists (`user_reports`/`listing_reports` exist; nothing reports a specific message). **This means E2E does not regress an existing moderation feature — there is none to regress**, which removes what would otherwise be the biggest non-crypto cost of this change.
@@ -88,48 +88,48 @@ Both live in the existing `chat` Postgres schema (`chatSchema.table(...)`, same 
 ```ts
 // apps/backend/src/db/schema/chat.schema.ts — additions
 
-export const userE2eIdentities = chatSchema.table('user_e2e_identities', {
-  userId: uuid('user_id')
+export const userE2eIdentities = chatSchema.table("user_e2e_identities", {
+  userId: uuid("user_id")
     .primaryKey()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  identityKey: text('identity_key').notNull(), // base64 X25519 public key (DH)
+    .references(() => users.id, { onDelete: "cascade" }),
+  identityKey: text("identity_key").notNull(), // base64 X25519 public key (DH)
   // base64 Ed25519 public key — signs signedPrekeyPublic. Separate from
   // identityKey per decision #9: X3DH needs the identity key to both DH
   // and sign, and @noble/curves doesn't expose the curve conversion
   // Signal's XEdDSA uses to make one key do both.
-  identitySigningKey: text('identity_signing_key').notNull(),
-  registrationId: integer('registration_id').notNull(), // Signal per-installation id
-  signedPrekeyId: integer('signed_prekey_id').notNull(),
-  signedPrekeyPublic: text('signed_prekey_public').notNull(), // base64
-  signedPrekeySignature: text('signed_prekey_signature').notNull(), // base64
-  signedPrekeyCreatedAt: timestamp('signed_prekey_created_at', {
+  identitySigningKey: text("identity_signing_key").notNull(),
+  registrationId: integer("registration_id").notNull(), // Signal per-installation id
+  signedPrekeyId: integer("signed_prekey_id").notNull(),
+  signedPrekeyPublic: text("signed_prekey_public").notNull(), // base64
+  signedPrekeySignature: text("signed_prekey_signature").notNull(), // base64
+  signedPrekeyCreatedAt: timestamp("signed_prekey_created_at", {
     withTimezone: true,
   }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
+  createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
 
 export const userE2eOneTimePrekeys = chatSchema.table(
-  'user_e2e_one_time_prekeys',
+  "user_e2e_one_time_prekeys",
   {
-    id: uuid('id').defaultRandom().primaryKey(),
-    userId: uuid('user_id')
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    prekeyId: integer('prekey_id').notNull(),
-    publicKey: text('public_key').notNull(), // base64
-    usedAt: timestamp('used_at', { withTimezone: true }), // null = available
-    createdAt: timestamp('created_at', { withTimezone: true })
+      .references(() => users.id, { onDelete: "cascade" }),
+    prekeyId: integer("prekey_id").notNull(),
+    publicKey: text("public_key").notNull(), // base64
+    usedAt: timestamp("used_at", { withTimezone: true }), // null = available
+    createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (t) => [
-    uniqueIndex('user_e2e_otp_user_prekey_uq').on(t.userId, t.prekeyId),
-    index('user_e2e_otp_available_idx')
+    uniqueIndex("user_e2e_otp_user_prekey_uq").on(t.userId, t.prekeyId),
+    index("user_e2e_otp_available_idx")
       .on(t.userId)
       .where(sql`used_at is null`),
   ],
@@ -261,7 +261,7 @@ belonging to (this account, this install)
 
 **The server never generates keys.** Any design where the backend touches private key material has already failed at end-to-end encryption — full stop, no exceptions considered.
 
-**Sharp edge, stated explicitly so it isn't rediscovered mid-implementation:** identity is per-*account*, not per-*device* (decision #2 — single device, v1). A second device logging in **overwrites** the server's identity record for that user (`onConflictDoUpdate` on `userId`, per the endpoint design above). This silently invalidates any session the first device had established with its contacts — their next message to this user triggers a fresh X3DH handshake against the new identity, because the old one no longer resolves. This is the single-device model working as designed, not a bug, but it is a real, visible behavior change for a user who logs into a second device, so client UX should say something (e.g. "signing in here starts fresh secure sessions with your contacts") rather than let it happen invisibly.
+**Sharp edge, stated explicitly so it isn't rediscovered mid-implementation:** identity is per-_account_, not per-_device_ (decision #2 — single device, v1). A second device logging in **overwrites** the server's identity record for that user (`onConflictDoUpdate` on `userId`, per the endpoint design above). This silently invalidates any session the first device had established with its contacts — their next message to this user triggers a fresh X3DH handshake against the new identity, because the old one no longer resolves. This is the single-device model working as designed, not a bug, but it is a real, visible behavior change for a user who logs into a second device, so client UX should say something (e.g. "signing in here starts fresh secure sessions with your contacts") rather than let it happen invisibly.
 
 **Fail-closed on missing recipient keys (decision #6):** if `GET .../keys/:userId/bundle` 404s (recipient's client hasn't bootstrapped yet), the sender's client refuses the E2E send with a clear error — no plaintext fallback, no silent queue-and-retry. Dev-stage, this is easy: every test client can be forced through the bootstrap flow above before it's usable at all, so the 404 case becomes rare by construction rather than something to design a fallback UX around.
 
@@ -307,32 +307,32 @@ Don't treat every unresolved constant the same way. Split them by whether the ri
 
 ## Resolved since first draft
 
-| # | Was | Now |
-|---|---|---|
-| ~~OQ-1~~ | Recipient has no registered E2E keys yet — queue-and-retry, or fall back to plaintext? | **Settled: fail closed, no fallback** (decision #6, design §9). Dev-stage forced-bootstrap-at-login makes the 404 case rare by construction. |
-| ~~OQ-2~~ | Exact `messages_body_length_max` replacement value | **Provisional 24000, real value gated on a pre-release measurement checklist** (decision #8, "Deciding the numeric parameters"). Not open-ended — has a concrete trigger to close it out. |
-| ~~OQ-3~~ | One-time prekey pool size and replenishment threshold | **Settled: 100 initial / replenish under 10**, Signal's own defaults adopted outright (decision #7). Protocol-mechanics constant, not npic-specific — no further research needed. |
-| ~~OQ-6~~ | Which crypto library — `@signalapp/libsignal-client` as planned? | **Rejected on implementation** — no official browser/WASM build exists. Resolved to a from-spec X3DH + Double Ratchet implementation over `@noble/curves`/`@noble/ciphers`/`@noble/hashes` (decision #1). |
-| ~~OQ-7~~ | Can one identity key both DH and sign, per the original schema (single `identityKey` column)? | **No** — resolved by splitting into `identityKey` (X25519) + `identitySigningKey` (Ed25519), decision #9, migration `0018`. |
+| #        | Was                                                                                           | Now                                                                                                                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~OQ-1~~ | Recipient has no registered E2E keys yet — queue-and-retry, or fall back to plaintext?        | **Settled: fail closed, no fallback** (decision #6, design §9). Dev-stage forced-bootstrap-at-login makes the 404 case rare by construction.                                                              |
+| ~~OQ-2~~ | Exact `messages_body_length_max` replacement value                                            | **Provisional 24000, real value gated on a pre-release measurement checklist** (decision #8, "Deciding the numeric parameters"). Not open-ended — has a concrete trigger to close it out.                 |
+| ~~OQ-3~~ | One-time prekey pool size and replenishment threshold                                         | **Settled: 100 initial / replenish under 10**, Signal's own defaults adopted outright (decision #7). Protocol-mechanics constant, not npic-specific — no further research needed.                         |
+| ~~OQ-6~~ | Which crypto library — `@signalapp/libsignal-client` as planned?                              | **Rejected on implementation** — no official browser/WASM build exists. Resolved to a from-spec X3DH + Double Ratchet implementation over `@noble/curves`/`@noble/ciphers`/`@noble/hashes` (decision #1). |
+| ~~OQ-7~~ | Can one identity key both DH and sign, per the original schema (single `identityKey` column)? | **No** — resolved by splitting into `identityKey` (X25519) + `identitySigningKey` (Ed25519), decision #9, migration `0018`.                                                                               |
 
 ## Open questions (genuinely undecided)
 
-| # | Question | Notes |
-|---|---|---|
-| OQ-4 | Web private-key storage (IndexedDB) is weaker than a native secure enclave | Accepted risk for the web client specifically, called out again in Risks — revisit if a native app ships and the web surface's threat model needs to match it. |
-| OQ-5 | Should `isE2e` ever become a per-conversation flag instead of per-message? | Only if the UI needs "this whole thread is secure" framing rather than per-bubble indicators. No backend blocker either way — the column exists per-message regardless. |
+| #    | Question                                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ-4 | Web private-key storage (IndexedDB) is weaker than a native secure enclave                    | Accepted risk for the web client specifically, called out again in Risks — revisit if a native app ships and the web surface's threat model needs to match it.                                                                                                                                                                                                                                  |
+| OQ-5 | Should `isE2e` ever become a per-conversation flag instead of per-message?                    | Only if the UI needs "this whole thread is secure" framing rather than per-bubble indicators. No backend blocker either way — the column exists per-message regardless.                                                                                                                                                                                                                         |
 | OQ-8 | The X3DH/Double Ratchet implementation has never been executed — no test runner in `apps/web` | Written carefully against the published spec and field-named for line-by-line auditability, but "reviewed by re-reading" is not "ran and passed." Needs either a minimal test runner added to `apps/web`, or a one-off manual encrypt→decrypt round-trip script, before this touches a real key. Not blocking further scaffolding work, but should block actually enabling E2E for a real user. |
-| OQ-9 | Where does `LocalKeyMaterial` come from? | `createSignalEngine()` needs a device's own identity/signing/signed-prekey/one-time-prekey material injected — nothing generates, persists, or registers it yet. This is design §9 made concrete: needs its own implementation pass (key generation, an IndexedDB store for private material distinct from `store.ts`'s ratchet-session store, and the `POST /chats/e2e/keys` caller). |
+| OQ-9 | Where does `LocalKeyMaterial` come from?                                                      | `createSignalEngine()` needs a device's own identity/signing/signed-prekey/one-time-prekey material injected — nothing generates, persists, or registers it yet. This is design §9 made concrete: needs its own implementation pass (key generation, an IndexedDB store for private material distinct from `store.ts`'s ratchet-session store, and the `POST /chats/e2e/keys` caller).          |
 
 ## Risks
 
-| Risk | Mitigation |
-|---|---|
-| Web client's private key lives in IndexedDB — extractable via XSS or physical device access to an unlocked browser profile | Documented, accepted for v1 (OQ-4). Standard mitigation (CSP hardening) applies but doesn't eliminate the gap; a native app closes it properly via platform keystore. |
-| One-time prekey exhaustion under high fanout (many people starting sessions with one popular seller account) | Pool size/replenish threshold now settled (100 / <10, decision #7) — `GET .../keys/me/prekey-count` drives client-side top-up before hitting zero; falling back to signed-prekey-only X3DH is a graceful degradation, not a hard failure. Revisit the 100/10 numbers only if a specific hot-account pattern measurably exhausts the pool faster than a client can top up. |
-| Skipped-message-key growth if a peer is offline a long time then reconnects | `double-ratchet.ts`'s `MAX_SKIP = 1000` bounds this directly (our own implementation now, not a library default) — a gap larger than that throws rather than allocating unboundedly. |
-| `messages_body_length_max` provisional value (24000) is wrong in either direction | Closed out by the pre-release measurement checklist (decision #8) — not left as an indefinite open question. Ship the provisional value now, replace it once the real ciphertext measurement exists. |
-| A future "report this message" feature gets built without realizing content is opaque past this point | Called out explicitly in Non-goals / server-gives-up section so it's not rediscovered mid-implementation of that future feature. |
-| Second-device login silently invalidates the first device's established sessions | Not a bug (single-device model, decision #2) but needs explicit client UX, not silence — called out in design §9. |
-| **The X3DH/Double Ratchet implementation is our own code, not a vetted library's** (decision #1 pivot) | Mitigated, not eliminated: implemented directly from the published, peer-reviewed spec rather than invented; field-named to match the spec for line-by-line audit; every cryptographic primitive (curve math, AEAD, KDFs) is delegated to audited libraries — only the protocol *sequencing* is ours. Still real residual risk versus a library with its own security audits and years of production traffic. OQ-8 (never executed) compounds this until closed. |
-| One-time prekey exhaustion via the bundle endpoint's block-check gap | **Fixed** — `getBundle` now checks `isBlockedEitherWay` before claiming a prekey, closing the enumeration/exhaustion vector a blocked user previously had. |
+| Risk                                                                                                                       | Mitigation                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web client's private key lives in IndexedDB — extractable via XSS or physical device access to an unlocked browser profile | Documented, accepted for v1 (OQ-4). Standard mitigation (CSP hardening) applies but doesn't eliminate the gap; a native app closes it properly via platform keystore.                                                                                                                                                                                                                                                                                            |
+| One-time prekey exhaustion under high fanout (many people starting sessions with one popular seller account)               | Pool size/replenish threshold now settled (100 / <10, decision #7) — `GET .../keys/me/prekey-count` drives client-side top-up before hitting zero; falling back to signed-prekey-only X3DH is a graceful degradation, not a hard failure. Revisit the 100/10 numbers only if a specific hot-account pattern measurably exhausts the pool faster than a client can top up.                                                                                        |
+| Skipped-message-key growth if a peer is offline a long time then reconnects                                                | `double-ratchet.ts`'s `MAX_SKIP = 1000` bounds this directly (our own implementation now, not a library default) — a gap larger than that throws rather than allocating unboundedly.                                                                                                                                                                                                                                                                             |
+| `messages_body_length_max` provisional value (24000) is wrong in either direction                                          | Closed out by the pre-release measurement checklist (decision #8) — not left as an indefinite open question. Ship the provisional value now, replace it once the real ciphertext measurement exists.                                                                                                                                                                                                                                                             |
+| A future "report this message" feature gets built without realizing content is opaque past this point                      | Called out explicitly in Non-goals / server-gives-up section so it's not rediscovered mid-implementation of that future feature.                                                                                                                                                                                                                                                                                                                                 |
+| Second-device login silently invalidates the first device's established sessions                                           | Not a bug (single-device model, decision #2) but needs explicit client UX, not silence — called out in design §9.                                                                                                                                                                                                                                                                                                                                                |
+| **The X3DH/Double Ratchet implementation is our own code, not a vetted library's** (decision #1 pivot)                     | Mitigated, not eliminated: implemented directly from the published, peer-reviewed spec rather than invented; field-named to match the spec for line-by-line audit; every cryptographic primitive (curve math, AEAD, KDFs) is delegated to audited libraries — only the protocol _sequencing_ is ours. Still real residual risk versus a library with its own security audits and years of production traffic. OQ-8 (never executed) compounds this until closed. |
+| One-time prekey exhaustion via the bundle endpoint's block-check gap                                                       | **Fixed** — `getBundle` now checks `isBlockedEitherWay` before claiming a prekey, closing the enumeration/exhaustion vector a blocked user previously had.                                                                                                                                                                                                                                                                                                       |

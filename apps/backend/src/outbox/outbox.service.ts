@@ -172,6 +172,35 @@ export class OutboxService {
       .where(eq(outboxEvents.id, eventId));
   }
 
+  /**
+   * Deletes up to `limit` `published` rows whose `published_at` is older than
+   * `olderThanDays`, returning how many went. Only `published` — a `failed`
+   * row is a dead letter an operator still needs to see (and `markFailed`
+   * never stamps `published_at`, so age isn't even defined for one).
+   *
+   * `skip locked` lets every instance sweep at once without queueing behind
+   * each other, same as `claim`. Deleting a row frees its `dedupe_key`; every
+   * keyed producer today keys on an id that only ever transitions once
+   * (an attempt's creation, a provider event's receipt, a transaction's one
+   * `succeeded` flip), so a freed key is never re-enqueued in practice.
+   */
+  async purgePublished(olderThanDays: number, limit: number): Promise<number> {
+    const rows = await this.db
+      .delete(outboxEvents)
+      .where(
+        sql`${outboxEvents.id} in (
+          select ${outboxEvents.id} from ${outboxEvents}
+          where ${outboxEvents.status} = 'published'
+            and ${outboxEvents.publishedAt} < now() - make_interval(days => ${olderThanDays})
+          order by ${outboxEvents.publishedAt}
+          for update skip locked
+          limit ${limit}
+        )`,
+      )
+      .returning({ id: outboxEvents.id });
+    return rows.length;
+  }
+
   private claim(where: SQL, limit: number): Promise<OutboxEventRow[]> {
     return this.db
       .update(outboxEvents)

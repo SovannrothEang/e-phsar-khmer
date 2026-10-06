@@ -1,190 +1,145 @@
-# Review
+# Review — Likes & Saved
 
-## Verdict
+**Verdict: approve.** No correctness defect was found in the likes/saves
+domain — confirmed by two independent adversarial reads (the stage-1 planner's
+written review and the stage-4 reviewer agent's report, whose deep pass raised
+five further findings). Everything fixable in scope was fixed and re-verified;
+the remainder is small, specific follow-up tickets. Nothing is committed or
+merged — the working tree is the review surface.
 
-**APPROVE WITH NOTES** — Spec-faithful, race-safe implementation with a clean
-register design freeze; only note-level hardening items and one outstanding
-manual-verification pass remain.
+**Provenance.** The stage-4 reviewer agent's report was received (snapshot
+23:33 ICT) and is folded in, including its deep pass. Its closing section was
+received: it confirmed the DELETE-side contract change is correctly recorded in
+`CLAUDE.md` and `changes.md`, and flagged one stale line in `changes.md`'s file
+table (fixed). Its F7 "currently RED" reading was a pre-fix snapshot — the same
+helper fix it prescribed landed before the message arrived, and the suite is
+green (32/32 suites, 373/373). Both reviews read a
+tree that moved during the night: a concurrent session is active in this
+checkout (its changes are noted where they touch this ship).
 
-## Evidence
+## Verdict history
 
-**Pipeline docs read**
+1. Stage-1 planner review → four findings; all fixed and re-verified (below).
+2. Stage-4 reviewer agent → "approve the feature — but do NOT call the gate
+   green until B1/B2 are cleared." **Both cleared** (below).
+3. Stage-4 deep pass → F2–F7 (below): **F2 and F7 fixed; F3/F5/F6 ticketed.**
+   The verdict is unchanged: **approve**.
 
-- `.pipeline/spec.md` (Decisions 1-10, edge cases, verification plan)
-- `.pipeline/changes.md` (documents the one deviation: normalization in the
-  action, not the form)
-- `.pipeline/test-results.md` (lint/build PASS; manual flows honestly marked
-  NOT executed)
+## Findings — all fixed and re-verified
 
-**Working tree inspected (read-only)**
+| #   | Severity                                   | Finding                                                                                                                                                                                                           | Resolution                                                                                                                                                                                                                                                     | Verification                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | High (regression on the most-visited page) | Mock cards (home Top Ads; non-UUID detail slugs) rendered live hearts: a signed-in visitor's click fired a real request → `ParseUUIDPipe` 400 → red "Validation failed" toast, where the old mock fake-succeeded. | Provider guard: non-UUID ids are inert — no request, no toast, no flip.                                                                                                                                                                                        | Browser: mock heart clicked on `/en` — no toast, no navigation, no state change. Reviewer independently re-checked (**covered**), with one accepted nuance: a _signed-out_ visitor clicking a mock heart now gets nothing rather than the sign-in bounce, because the UUID guard runs before the signed-in check — knowingly accepted: a demo surface should not drag anyone to sign-in. |
+| 2   | Medium (stale UI)                          | Unliking on `/me/likes` (or unsaving on `/me/saved`) left the row until a reload.                                                                                                                                 | Provider records the session's toggle-offs (`isToggledOff`, keyed `kind:id`); the panel filters on that — deliberately **not** on membership, since the seed sets fail soft to empty and a membership filter would blank the lists whenever that fetch failed. | Browser: unlike from `/me/likes` drops the row live; the empty state shows when it was the last row. Reviewer traced the rollback path and marked covered.                                                                                                                                                                                                                               |
+| 3   | Low (contract inconsistency)               | `DELETE`-side toggles asserted the listing exists → a stale unlike of a hard-deleted listing 404'd (error toast + rollback), against the repo's toggle idiom (`unfollowUser` never 404s).                         | The DELETE side no longer asserts existence; `POST` keeps it. Spec said "both verbs" — deviation recorded in `changes.md` and `CLAUDE.md`, implemented per the idiom.                                                                                          | API: DELETE on a non-existent listing → `200 {liked:false, likeCount:0}` / `{saved:false}`; unit tests lock the no-probe path. Reviewer marked covered.                                                                                                                                                                                                                                  |
+| 4   | Info (docs)                                | Neither new controller carried `@ApiTags` / `@ApiBearerAuth`.                                                                                                                                                     | Added to both.                                                                                                                                                                                                                                                 | build / lint green. Reviewer marked covered.                                                                                                                                                                                                                                                                                                                                             |
 
-- `apps/web/lib/phone.ts` — traced `normalizePhone` against every weird input:
-  `""`→`""`; `"+"`→`""` (digits empty); `"0"`→`""` (3 digits < 8);
-  `"0000000000"`→`+855000000000` (12 digits, passes); `"012 345 678"`→
-  `+85512345678`; `"+85512345678"`→passthrough; `"abcdefgh"`→`""`→action
-  returns "Invalid phone number". Algorithm matches spec Decision 3 exactly
-  (single leading `0` strip).
-- `apps/web/actions/otp.ts` — envelope parsing is a faithful copy of the
-  `login.ts` pattern (`res.json().catch(() => null)`, `!res.ok ||
-!body?.success`), plus a stricter `!body.data` guard; `setUserSession`
-  awaited before returning success (legal cookie write from a server action,
-  same as login.ts:47).
-- `apps/web/actions/register.ts` — zod gate kept, normalize before fetch,
-  `{ phone }` body only. Sends no `preferredLanguage` — correct, since
-  `RegisterDto` is `@IsIn(['en','km','zh'])` while web locales include
-  ko/id/vi (spec Decision 7 honored).
-- `apps/web/components/auth/OtpVerifyForm.tsx` — race analysis: `inFlightRef`
-  set synchronously before the await (single-threaded, so button/Enter/
-  auto-submit double-fire is impossible), `doneRef` blocks re-fire after
-  success navigation, `finally` resets both `inFlightRef` and `verifying`
-  (never stuck). Cooldown timer is a per-tick `setTimeout` with cleanup — no
-  interval leak; resend failure only toasts, does not restart cooldown (spec
-  edge case honored). Failure path clears input; catch path preserves it
-  (spec distinction honored).
-- `apps/web/components/auth/OtpPageClient.tsx` +
-  `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx` — client-side
-  `useSearchParams` (matches `category/[categorySlug]/page.tsx:21`
-  convention), `<Suspense>` wrapper, redirect-then-null on bad phone; build
-  listed `/[locale]/otp` as dynamic, consistent.
-- **Register design freeze verified**: whitespace-insensitive diff of
-  `git show HEAD:apps/web/components/auth/RegisterForm.tsx` vs working tree
-  shows the only semantic deltas are the `useRouter` import, the onSubmit body
-  (dead `name`/`username` construction from HEAD removed, new `register(value)`
-  wiring, `router.push({ pathname: "/otp", query: { phone: res.phone } })`),
-  and the toast copy. The JSX tree (container divs, FieldGroup, five
-  AppFields, both Buttons with identical className strings) and the
-  commented-out legacy block (lines 1-315) are unchanged — the 841-line diff
-  is genuinely the formatter, exactly as changes.md claims.
-- `apps/web/i18n/routing.ts:20` — `"/otp": {}` present; `git diff HEAD` on
-  the file is empty (net-zero confirmed).
-- **Backend contract**: `register.dto.ts:6` and `verify-otp.dto.ts:6` both
-  enforce `^\+?[1-9]\d{6,14}$`; `verify-otp.dto.ts:13` `@Length(4, 8)` on
-  token — 6-digit InputOTP output fits. `auth.controller.ts:33` confirms
-  `POST /auth/otp/request` exists. `idempotency.middleware.ts:35-38`
-  confirms POSTs without an `Idempotency-Key` header pass through — so
-  omitting the header (like `login.ts`) is consistent, not a bug.
-- **Hygiene**: grep of all five new/rewritten files found zero `any`-types
-  and zero secrets/env reads. `Button` `size="xs"` exists (`button.tsx:26`).
-  The `(user)` layout wraps the OTP page in NavBar/Footer as spec Decision 1
-  asserts. Old `OtpForm.tsx` untouched (absent from git status).
-  `git diff HEAD -- apps/backend` = 0 files.
+Integration item caught cross-session: the feed's listing rows now carry
+`sellerUsername` (the concurrent change), so `/users/me/likes|saves` resolve it
+with the same `leftJoin` — the cards on those pages are the feed's cards.
+Live-verified (`sellerUsername: "testtest001"` on a liked row).
 
-## Findings
+## Stage-4 deep pass — F2–F7
 
-1. **note — Garbage-tolerant phone normalization.** `apps/web/lib/phone.ts:18-22`:
-   `"0000000000"` normalizes to `+855000000000`, which _passes_ the backend
-   regex (OTP dispatched to a nonexistent number), and `"+0123456"` passes
-   the helper but is rejected by the backend's `[1-9]` anchor (surfaces as an
-   error toast — acceptable). Inherent to the spec's own Decision 3 algorithm
-   plus the frozen `min(8).max(10)` zod schema (`schemas/register.ts:6`,
-   untouched per non-goal). No security impact; tighten in a later pass if
-   SMS costs matter.
-2. **note — Hand-edited raw `+` in the URL double-prefixes.** A manually typed
-   `?phone=+855…` (unencoded `+`) is decoded as a leading space by
-   `useSearchParams`; `normalizePhone` trims it, sees no `+`, and produces
-   `+855855…` (wrong number). App-generated links always encode via the
-   router query object, so only hand-mangled URLs hit this. Hardening option:
-   treat digits already starting with `855` after local-strip, or compare
-   against the register-step value — file under follow-up, not blocking.
-3. **note — Register network failure has no user-visible toast.**
-   `RegisterForm.tsx:345-355` does not try/catch `register(value)`; if the
-   backend is unreachable the server action rejects and TanStack Form
-   swallows it into form error state (no crash, but no toast). `OtpVerifyForm`
-   got the defensive catch because the spec's edge-case list required it
-   there. Identical to the existing `login.ts`/`LoginForm` behavior —
-   consistent, optional hardening.
-4. **note — `required` on the visually-hidden OTP input.**
-   `OtpVerifyForm.tsx:154` passes `required` to `InputOTP`; if a form submit
-   ever fires with < 6 digits, native validation on the collapsed input can
-   produce a "not focusable" console warning instead of the old toast.
-   Practically unreachable (submit button disabled at `value.length !== 6`),
-   informational only.
-5. **note — Pipeline docs omit the pre-existing working-tree deletions.**
-   `apps/web/pnpm-lock.yaml` and `apps/web/pnpm-workspace.yaml` are
-   deleted-but-uncommitted in the working tree (intentional from the earlier
-   standalone-deps session, not this ship). Neither changes.md nor
-   test-results.md mentions them, and changes.md's "git status confirms"
-   framing could lead a committer to sweep them into this ship's commit with
-   `git add -A`. Call them out or commit them separately.
-6. **note — Spec deviation is an improvement.** Normalization living in
-   `actions/register.ts:21` with the E.164 value returned to the form
-   (`res.phone`) guarantees the register key and the verify key are
-   byte-identical by construction — strictly safer than the form normalizing
-   and the action re-normalizing independently. Deviation is documented in
-   changes.md. Accepted.
+- **F2 — MEDIUM-LOW, fixed.** Provider state is seeded once
+  (`useState(() => new Set(initialLiked))`) and the `(user)` layout survives
+  client-side navigations, so later `initialLiked`/`initialSaved` props were
+  ignored: an in-tab login/account switch kept the previous viewer's sets
+  (repro: A likes X → log out → log in as B without a hard reload → X's heart
+  shows filled for B). `<ReactionsProvider>` now carries
+  `key={user?.username ?? "anon"}` — a viewer change remounts it and reseeds
+  from the fresh server props. Verified by construction + type gates; the
+  in-tab login flow itself is not CDP-driven (it needs the real login UI).
+- **F7 — LOW (test quality), fixed.** The list queries are now the only place
+  the hide-deleted rule lives (the DELETE side no longer probes existence), so
+  two new specs compile their SQL with `PgDialect` and pin
+  `"status" <> $n` (param `'deleted'`) and the `(createdAt, id)` desc
+  tie-break for both lists. Reactions suite: **14/14**.
+- **F3 — LOW, ticketed.** The pending guard reads render-time state; two
+  clicks delivered in one tick could compute the same `next`. Idempotent
+  server-side, React flushes discrete events between physical clicks, and the
+  house's `FollowButton` has the same shape — hardening with a `useRef`
+  in-flight set is the ticket if it is ever observed.
+- **F5 — LOW, ticketed.** A listing with zero photos renders no `PostImage`,
+  so its detail page shows no like control (cards still work). The right fix
+  is a design decision for a photo-less listing's detail, not a flag flip.
+- **F6 — LOW, ticketed.** The id-set read is unbounded, unfiltered, and
+  fetched on every signed-in page (+1 round trip per navigation). The
+  unfiltered read is _deliberate_ (a restored listing's like stays lit);
+  filtering on `status != 'deleted'` and/or a cap is a scale ticket.
 
-## Follow-up tickets
+## Gate blockers (raised by the stage-4 reviewer; both cleared)
 
-1. **Manual OTP flow verification** (spec's verification plan, 6 flows listed
-   in `test-results.md`): run the 10-minute pass with backend under
-   `DEV_OTP_TOKEN` — register→OTP page with `+855…` param, wrong-code
-   toast+clear+retry, dev-token auto-login + `user_access_token` cookie + `/`
-   redirect, resend cooldown, no-`?phone` redirect, `/km/otp` locale route.
-   None were executed at runtime.
-2. **Phone validation hardening** — `apps/web/lib/phone.ts`: reject all-zero
-   digit runs and consider handling an `855`-prefixed local body; also decide
-   policy for hand-edited raw-`+` URLs (finding 2). Small, self-contained,
-   testable.
-3. **Failure-toast parity for register** — wrap the `register(value)` call in
-   `RegisterForm.tsx` onSubmit with a catch → `toast.error("Failed to send
-code. Please try again.")`, mirroring `OtpVerifyForm.tsx:64-66`. Apply the
-   same to `actions/login.ts`/`LoginForm.tsx` in one sweep if touching it.
-4. **Commit hygiene** — land the `apps/web/pnpm-lock.yaml` /
-   `apps/web/pnpm-workspace.yaml` deletions (or restore them) in a separate
-   commit so this ship's diff stays web-auth-scoped (finding 5).
+- **B1 — 14 `listings.service.spec` failures.** The concurrent session's
+  `findFeed` gained `.leftJoin(users, …)` while that spec's mock chain stopped
+  at `from → where → orderBy → limit`. Not the reactions code. **Cleared on
+  that session's side while this ship was in review** (confirmed from both
+  sides).
+- **B2 — no backend suite could start** (`TypeError:
+this._moduleMocker.clearMocksOnScope is not a function`).
+  `testEnvironment: "node"` resolved `jest-environment-node` from the workspace
+  hoist, which an `apps/mobile` install had left on the 29.x line. **Cleared by
+  pinning `"jest-environment-node": "^30.4.1"` in `apps/backend`
+  devDependencies** (the reviewer's diagnosis) + `pnpm install`. This
+  package.json + lock touch is the ship's one workspace-level change.
 
-## R1 addendum (2026-08-18)
+**Final gate on the settled tree:**
 
-Follow-up patch (Cambodia-local phone input) executed under a
-captain-approved plan (plan mode): exploration + independent design check
-both returned SOUND (zod 4.4.3 `.trim().regex` chaining verified;
-blur-gated error display verified in form-core 1.33.2; `^0\d{7,9}$`
-checked against the `utils/telecom.ts` prefix map; empty ripple surface —
-`registerSchema` consumed only by RegisterForm + actions/register, no web
-tests exist). Gates green. Full agent review not re-run for this ~10-line
-patch; captain's morning review is the gate. New follow-ups: telecom.ts
-Seatel prefix duplication; i18n pass for schema messages; optional vitest
-spec for phone helpers; optional `inputMode` via FormControlProps.
+```
+pnpm --filter backend test
+Test Suites: 32 passed, 32 total
+Tests:       373 passed, 373 total
+```
 
-## R2 addendum (2026-08-18)
+Backend build/lint clean · reactions suite 14/14 · full `next build` + web `tsc --noEmit` + lint
+clean · migration applied after a ledger check · browser pass (like from a
+card — fills and survives reload; `/me/likes` lists it; detail count seeds and
+moves with toggles; Save/Unsave from the detail and the ⋮ menu; `/me/saved`
+add/drop; signed-out real-heart click bounces to `/en/login` with the toast;
+signed-out **mock**-heart click is inert (the UUID guard, by design); live
+row-drop).
 
-Executed under captain-approved plan rev 2 (plan mode; two exploration
-passes + design check). Gates green (backend 159/159 tests, lint, build;
-web lint, build). LIVE smoke test verified the full backend contract
-including the two security invariants: verify requires a password (400
-without), and the conflict path ignores crafted replay payloads. The
-browser-side flows (LoginForm branch, sessionStorage handoff, OTP-page
-guards) are gate-verified but not browser-tested — flagged for the
-morning pass. API contract change: `/auth/otp/verify` now REQUIRES
-`password` — backend+web must deploy together (forbidNonWhitelisted).
-New follow-ups: 23505 retry in generateUniqueUsername consumers;
-UpdateProfileDto name length caps; phoneVerifiedAt never written;
-public otp/request SMS-abuse surface.
+## Checks performed (orchestrator)
 
-## Post-review follow-up resolved (2026-08-25): /me design restoration + real identity
+- **Route registration:** every new route is 3-segment with literals distinct
+  from all existing `:id/...` routes on `listings` and `users` — registration
+  order cannot shadow them.
+- **Idempotency:** `POST` rides `onConflictDoNothing` on the unique pair;
+  `DELETE` never 404s; the only 404 is a missing listing row on POST —
+  mirroring `findById`, which serves any status. Unit tests lock each branch,
+  and compiled-SQL tests pin the list filters.
+- **FK semantics:** both FKs CASCADE (user and listing), honoring
+  `AccountPurgeService` exactly as `user_follows` does.
+- **Provider state machine:** seeded once, remounted per viewer (F2);
+  optimistic flip + rollback; per-kind pending; `toggledOff` invariant =
+  `!membership` for session-touched edges only; UUID guard short-circuits mock
+  ids first.
+- **Lists:** exact totals + id tie-break, `status != 'deleted'` (pinned by
+  compiled SQL), batched photo hydration (three queries per page), dedupe
+  across "Load more", error state distinct from empty.
 
-Captain's morning-review catch: R4's /me change had replaced the designed
-Manage Ads page with a minimal account card ("why the /me change the
-'manage ads'?" — expected the tabbed design with Total Ads 0/5, Renews
-0/5, Active/Expired, No Result!/Sell your stuff per reference image).
-Resolved with an approved plan (plan mode): restored `page.tsx` →
-`<ManageAds />`; `me/layout.tsx` now gates on `getCurrentUser()` (redirect
-to `/[locale]/login`) and feeds the real session into `MyProfileHeader`
-via a narrowed `ProfileUser` prop (name/@username/avatar/cover/joined
-date; following/follower + Resume button stay mock — no backend data yet,
-Phase C). `SessionUser` gained `coverPhotoUrl`. The R4 account card is
-removed.
+## Follow-up tickets (small, non-blocking)
 
-Also fixed while E2E-testing: `userLogout()` redirected to bare `/login`,
-which 404s under `/ [locale]/` routing — now locale-aware
-(`getLocale()` + i18n `redirect`). THIS was introduced by R4 and never
-browser-tested until now.
+1. **Like/save notifications for the seller** — deliberately excluded; the
+   follow feature's `follow.created` is the shape it would take.
+2. **Mock-card hearts could be removed outright** — currently inert by guard;
+   a design decision for the demo surface.
+3. **Cross-tab reaction sync** — accepted limitation; lists refresh on
+   navigation/reload.
+4. **Pending-guard hardening (F3)** — a `useRef` in-flight set if a
+   same-tick double-fire is ever observed.
+5. **Zero-photo listing detail (F5)** — a design decision for where the like
+   control lives when there is no gallery.
+6. **Id-set read scale (F6)** — filter/cap the per-page `GET /users/me/reactions`
+   if account histories grow large.
 
-Verification: web lint 0 errors (1 pre-existing AdminLoginForm warning);
-web build PASS; full browser E2E 20/20 (fresh chromium, DEV_OTP_TOKEN,
-register → OTP → /me → design + identity markers → refresh → dropdown
-Sign out → /en/login → visitor chrome). E2E how-to notes recorded in
-tasks/todo.md (avatar trigger class `.ml-2`; Radix pointerdown for
-triggers, click for items; "Sell your stuff" (captain-confirmed text)).
-No new follow-ups; remaining work: Phase B (post-an-ad), Phase C
-(subpages/feed), following/follower backend.
+## What this review did not cover
+
+- Nothing pending from the reviewer: its closing section arrived and is folded
+  into the provenance note above (contract-change recording confirmed; the one
+  stale line it found in `changes.md` is fixed).
+- The in-tab login/account-switch flow as a browser test (fix F2 is the
+  standard remount idiom, verified by construction + type gates).
+- Anything outside the diff: the concurrent session's other changes and the
+  `apps/mobile` deps are flagged separately in `test-results.md` and the task
+  log.

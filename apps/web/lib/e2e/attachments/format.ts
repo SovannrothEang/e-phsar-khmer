@@ -56,7 +56,12 @@ export async function encryptFile(
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const sealed = new Uint8Array(
     await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv, additionalData: aad(attachmentId), tagLength: 128 },
+      {
+        name: "AES-GCM",
+        iv,
+        additionalData: aad(attachmentId),
+        tagLength: 128,
+      },
       cryptoKey,
       plaintext,
     ),
@@ -89,10 +94,7 @@ export async function decryptFile(
 ): Promise<Uint8Array<ArrayBuffer>> {
   if ((await sha256Base64(blob)) !== expectedHash)
     throw new AttachmentIntegrityError("attachment hash mismatch");
-  if (
-    blob.length < FILE_OVERHEAD ||
-    !HEADER.every((b, i) => blob[i] === b)
-  )
+  if (blob.length < FILE_OVERHEAD || !HEADER.every((b, i) => blob[i] === b))
     throw new AttachmentIntegrityError("unknown attachment format");
   const cryptoKey = await crypto.subtle.importKey(
     "raw",

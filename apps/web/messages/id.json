@@ -180,5 +180,28 @@
       "setDescription": "Minimal {count} karakter. Anda memerlukannya untuk membaca chat di perangkat baru. Kami tidak dapat memulihkannya.",
       "save": "Simpan kode sandi"
     }
+  },
+  "Search": {
+    "home": "Beranda",
+    "search": "Cari",
+    "placeholder": "Apa yang Anda cari...",
+    "allCategoriesOption": "Semua Kategori",
+    "resultsFor": "Hasil untuk “{q}”",
+    "allAds": "Semua iklan",
+    "resultCount": "{count, plural, =0 {Tidak ada iklan} other {# iklan}}",
+    "categories": "Kategori",
+    "allCategories": "Semua kategori",
+    "removeFilter": "Hapus {name}",
+    "loadMore": "Muat lebih banyak",
+    "loading": "Memuat…",
+    "loadMoreError": "Tidak dapat memuat iklan lainnya. Coba lagi.",
+    "emptyTitle": "Tidak ada iklan yang cocok dengan “{q}”",
+    "emptyTitleNoQuery": "Tidak ada iklan yang cocok dengan filter ini",
+    "emptyHint": "Coba kata kunci lain atau kurangi filter.",
+    "clearFilters": "Hapus filter",
+    "clearSearch": "Hapus pencarian",
+    "metaTitle": "{q} – Pencarian",
+    "metaTitleAll": "Cari iklan",
+    "fuzzyNotice": "Tidak ada hasil yang persis cocok untuk “{q}” — menampilkan iklan serupa."
   }
 }

@@ -93,7 +93,11 @@ const THREAD_MIN_W = 360;
 function getSidebarWidth(): number | null {
   try {
     const raw = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
-    return Number.isFinite(raw) && raw >= SIDEBAR_MIN_W ? raw : null;
+    // Stored values are per-browser and may predate the current bounds, so
+    // clamp on read too — an out-of-range width would starve the thread.
+    return Number.isFinite(raw) && raw >= SIDEBAR_MIN_W
+      ? Math.min(raw, SIDEBAR_MAX_W)
+      : null;
   } catch {
     return null;
   }
@@ -415,7 +419,9 @@ export function ChatWorkspace({
         ref={asideRef}
         style={
           sidebarWidth !== null
-            ? ({ "--chat-sidebar-w": `${sidebarWidth}px` } as React.CSSProperties)
+            ? ({
+                "--chat-sidebar-w": `${sidebarWidth}px`,
+              } as React.CSSProperties)
             : undefined
         }
         className={cn(
@@ -423,7 +429,9 @@ export function ChatWorkspace({
           sidebarCollapsed
             ? "md:w-16"
             : sidebarWidth !== null
-              ? "md:w-[var(--chat-sidebar-w)]"
+              ? // The max-width keeps THREAD_MIN_W (360px) for the thread
+                // when the window shrinks after a resize was saved.
+                "md:w-[var(--chat-sidebar-w)] md:max-w-[calc(100%-360px)]"
               : "md:w-[300px] lg:w-[340px]",
           threadOpen && "hidden md:flex",
         )}

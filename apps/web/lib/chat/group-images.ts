@@ -36,14 +36,11 @@ function shouldGroup(a: ThreadMessage, b: ThreadMessage): boolean {
   // Prefer groupId matching when both have it.
   if (a.groupId && b.groupId) return a.groupId === b.groupId;
   // Fallback: time-based proximity.
-  const gap =
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  const gap = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   return gap <= MAX_GAP_MS;
 }
 
-export function groupImageMessages(
-  messages: ThreadMessage[],
-): MessageNode[] {
+export function groupImageMessages(messages: ThreadMessage[]): MessageNode[] {
   const nodes: MessageNode[] = [];
   let i = 0;
 

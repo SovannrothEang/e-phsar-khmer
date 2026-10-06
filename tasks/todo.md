@@ -2946,3 +2946,2320 @@ no company/phone/email at all    rows: @nocontact  + exactly one divider
 - Screenshotted the captain's own example (the admin villa card) and read it back:
   the globe row, the divider, the phone row, the divider, then Message Seller — the
   empty mail row is gone.
+
+# SHIPPED — Search page (`/search?q=…`), real filters, per-category counts (2026-09-30)
+
+Spec: `.pipeline/spec-search.md` (user decisions O1–O5 recorded there; O4 flipped to
+"yes — per-category counts").
+
+**Backend** (`src/listings/`, migration `0031_listing_search`)
+
+- `q` is now tokenized (≤5 tokens), `%`/`_`/`\` escaped, and matched against title
+  **or description** (`keyword-search.ts`); trigram GIN indexes on both columns
+  (`pg_trgm`, installed into Supabase's `extensions` schema).
+- New `effective_price` stored generated column = the price after discount;
+  `minPrice`/`maxPrice` now filter on it (was: the original price), inverted range → 400.
+- New params: `sort=newest|price_asc|price_desc`, `postedWithin=today|week|month`
+  (today = since midnight Asia/Phnom_Penh, on `published_at`), `communeSlug`,
+  `deliveryFree`, `includeTotal`, `includeFacets`.
+- Sort-aware keyset cursor (`feed-cursor.ts`, `{s,v,id}`), values carried as Postgres
+  text so µs timestamps no longer skip rows; legacy `{createdAt,id}` still accepted.
+- `meta.facets` = per-category counts (and per-subcategory once a category is chosen),
+  computed over every filter **except** the category dimension.
+- Tests: 428/428 (35 suites), incl. 56 new; build + lint clean.
+
+**Web**
+
+- `lib/search-params.ts` — the one URL vocabulary + `parseFeedParams`; search,
+  category, subcategory and all-ads pages all forward the filter bar to the feed
+  (**the bar was UI-only before on every page**).
+- `/[locale]/search` page: header + count, sticky filter bar, category sidebar with
+  counts (chip rows on mobile), removable category/sub chips, load-more, empty state
+  (Clear filters / Clear search), `noindex`.
+- Header `SearchBar`: real categories (lazy), submit → `/search`, mirrors the URL there.
+- Location filter + More Filters now use the real geography (URL values are slugs).
+  More Filters gained Condition + Free delivery; keyword param is `q` everywhere;
+  "New Ads" removed and "Most Hit" hidden (views are never counted).
+- Subcategory bar (`LSPYCEHeader`): Location/Sort/Price/More swapped for the shared
+  filters, Condition wired to the URL; Year/Engine remain local-only (out of scope).
+- All Ads uses the real feed (was mock posts filtered in the browser).
+
+**Verification**
+
+- Live API sweep against the dev DB (27 checks): every sort pages through all 145
+  rows with no dups/gaps (limit 2 for ties), negotiable last, `q=%` literal, Khmer
+  keyword found, facet sums = total, picking a category leaves other counts unchanged,
+  `effective_price` == `applyDiscount` on 135 live rows + 8 edge fixtures (rolled back).
+- EXPLAIN: the trigram BitmapOr plan is usable; at 145 rows the planner prefers the
+  status index (expected on a tiny table).
+- Browser (headless Chromium over CDP, against the running dev stack): header search,
+  facet click/expand/highlight, chip removal, load-more to 145 in backend order,
+  empty state links, location picker (25 real provinces → districts → slug in URL),
+  category page price filter (20 → 11), cars-for-sale Condition chip (13 → 8),
+  all-ads `q`. 0 console errors. Dark mode checked.
+
+**Not done / notes**
+
+- `pnpm --filter web build` not run — a dev server was using `.next`; `tsc --noEmit`
+  and eslint on every touched file are clean.
+- Mobile (390px) pages scroll horizontally by ~395px — **pre-existing** (navbar + card
+  component; the category page has the identical overflow). The new chip rows scroll
+  inside their own containers.
+- Out of scope, per spec: relevance ranking, autocomplete, view counting ("Most Hit"),
+  Year/Engine chips, multi-attribute filters, saved searches, Khmer place names.
+
+# SHIPPED — Search round 2: correctness fixes, Best match, typo fallback, Year/Engine chips, i18n (2026-09-30)
+
+Follow-up to the search ship above, from the "what's left" review.
+
+**Correctness (backend `src/listings/`)**
+
+- **Date posted hid 23 listings.** `postedWithin` compared `published_at`, which seeded
+  rows never got (they skip the publish endpoint), so no date filter could match them.
+  Now `coalesce(published_at, created_at)`. Live: "This Month" = 145 (was 122).
+- **Expired ads never left the feed.** Nothing flips `status` to `expired` when
+  `expires_at` passes; the feed now requires `expires_at IS NULL OR expires_at > now()`
+  (`liveConditions()`, shared by page/total/facets). No row is past expiry today, so
+  counts are unchanged — this prevents the 30-day problem rather than fixing a
+  visible one.
+
+**Search quality**
+
+- `sort=relevance` ("Best match"): title contains phrase (+1), title starts with it
+  (+0.5), + `word_similarity(phrase, title)`; float8 score in the keyset cursor. The web
+  makes it the default whenever there is a keyword and hides it otherwise; choosing
+  another sort with a keyword is stored explicitly (`sort=latest-ads`).
+- **Typo fallback**: a first page with zero exact hits reruns with
+  `word_similarity(token, title) >= 0.4` for tokens of 4+ chars (pg_trgm's 0.6 default
+  misses "toyta"→"Toyota" at 0.5) and returns `meta.fuzzy`; the cursor's `f` flag keeps
+  later pages fuzzy, and a later exact page that runs dry never flips to fuzzy. The
+  search page shows "No exact matches for “q” — showing similar ads." Live: `hyundia`→
+  Hyundai Truck, `toyta`→Toyota Camry, `zzqqxxww`→0.
+
+**Filters**
+
+- Backend `yearMin`/`yearMax` (4-digit `attributes->>'year'` only, inverted → 400) and
+  `engineType`.
+- Subcategory bar: Year and Engine chips are now URL-driven (`year_min`, `year_max`,
+  `engine`). The Engine chip's options come from the `enginetypes` set — the old
+  hardcoded list offered "Gasoline", which no listing stores (they say "Petrol"). The
+  three dropdown chips are one theme-aware `ChipSelect` (the old ones were hardcoded
+  `bg-white`, broken in dark mode).
+
+**i18n**: the `Search` namespace is translated for km/zh/ko/id/vi (was English copies),
+plus the new `fuzzyNotice`.
+
+**Verification**
+
+- Backend: 448/448 tests (20 new), lint + tsc clean.
+- Live API (12 checks) against the dev DB/backend: all pass (month=145, total=live rule,
+  relevance ranks title matches first and pages 9/9 without dups, relevance without q =
+  newest, fuzzy on/off, year 2021–2023 = DB, Petrol, inverted year → 400).
+- Browser (13 checks, headless Chromium over CDP): Best match default order == backend
+  relevance order; sort list with/without keyword; fuzzy notice; Khmer page strings;
+  This Month 145; Year 2021 (13→2) and Year+Petrol (→1) on cars-for-sale match the API;
+  More Filters badge counts them; dark-mode dropdown. 0 console errors.
+
+**Still open**: `pnpm --filter web build` (dev server holds `.next`); autocomplete;
+zero-result logging; view counter / "Most Hit"; field_schema-driven filters; saved
+searches; `name_km` in the location picker; counts on browse pages; rate-limit split;
+currency; pre-existing mobile overflow.
+
+# SHIPPED — Review follow-ups: outbox retention, ledger amount rules, typed feed ordering (2026-09-30)
+
+From the two-axis review of the search-round-2 + ledger working tree.
+
+**Outbox retention (was: config only, no sweep)**
+
+- `OUTBOX_RETENTION_DAYS` was parsed but never read — `outbox_events` grew forever, and the
+  Bakong README claimed a sweep that did not exist (≈75 poll rows per pending KHQR attempt).
+- New `OutboxRetention` (`src/outbox/outbox-retention.service.ts`): hourly (+ once at boot)
+  on worker-enabled instances, deletes `published` rows older than the retention in batches of
+  1000 (`OutboxService.purgePublished`, `for update skip locked`, uses the existing partial
+  `outbox_events_published_at_idx`), max 50 batches per sweep, never throws; `<= 0` disables.
+- `failed` rows are kept as dead letters on purpose (`markFailed` never sets `published_at`).
+  Freed `dedupe_key`s are safe: every keyed producer keys on a once-only transition.
+
+**Ledger amounts**
+
+- `ledger-balance.ts` now rejects signed and zero amounts (direction lives in `entryType`;
+  -5/-5 and 0/0 used to pass as balanced) and amounts past 18 whole digits (`numeric(20,2)`).
+- DB backstop: `ledger_entries_amount_positive CHECK (amount > 0)` — migration
+  `0032_ledger_entries_amount_positive` **generated, not applied** to the shared dev DB.
+
+**Search code quality**
+
+- `FeedOrdering` union (`feed-cursor.ts`): relevance carries its score, so "relevance without a
+  score" is a type error — removed the runtime `requireScore` throw and `query.q!`;
+  `resolveFeedOrdering` (`keyword-search.ts`) is the one place the keyword fallback lives.
+- `MoreFilters` uses `defaultSortFor(false)` instead of a hardcoded `"latest-ads"`.
+- Docs: `spec-search.md` D5 amended to `coalesce(published_at, created_at)`; payment + Bakong
+  READMEs and `docs/notifications.md` updated.
+
+**Verification**: backend 473/473 (25 new), `tsc --noEmit` clean, eslint clean on touched files.
+
+**Left open**: apply `0032`; filter-bar i18n (sort labels + chips are English-only across the
+whole bar, not just the new ones); payment use-case/processor tests (blocked on ESM `effect`
+under Jest); `failed` outbox + `idempotency_keys` retention; no `payment.failed` event.
+# E2E chat could not decrypt — stale one-time prekeys after an identity rotation (2026-09-27)
+
+Reported as "why the message couldn't decrypt?". Root cause was in the key
+directory, not the ratchet: the crypto itself is sound (X3DH DH terms, AAD
+binding and the Double Ratchet were all checked term-by-term against the specs
+and verified self-consistent).
+
+## What changed
+
+- `apps/backend/src/chat/e2e/e2e-keys.service.ts` — `registerKeys` now reads the
+  stored `identityKey` **before** the upsert and, when the uploaded one differs
+  (a genuine rotation), deletes that user's **unused** one-time prekeys before
+  inserting the new batch. Previously the identity/signed prekey rotated but
+  every prekey insert conflicted on `(user_id, prekey_id)` and was silently
+  discarded by `onConflictDoNothing`, so the server kept handing out public keys
+  whose private halves no longer existed on any device — every sender derived a
+  different DH4 and could never decrypt.
+  - Guarded on the identity actually changing: the replenish path re-registers
+    the _same_ identity with a fresh batch, and purging there would wipe the
+    valid pool on every top-up. Claimed rows are never deleted (the claim query
+    filters `used_at is null`, so they are inert, and they keep the audit trail).
+- `apps/web/components/chat/message-thread.tsx` — a row that `isE2e` but has no
+  `e2eHeader` (or no body) is now rendered as "Couldn't decrypt this message"
+  instead of a permanent "Decrypting…". `use-decrypted-messages` can never
+  produce an outcome for those rows, so the placeholder was a permanent lie.
+  (Real case: the 5 rows written by the device-based E2E format, whose
+  ciphertext lives in `chat.message_envelopes` and leaves `e2e_header` NULL.)
+- `apps/backend/src/chat/e2e/e2e-keys.service.spec.ts` — two tests: a rotation
+  purges (and still inserts the new prekeys), a same-identity re-registration
+  does not touch the pool.
+
+## Data repair (dev DB)
+
+Deleted the 295 stale unused rows on the three accounts whose identity had
+rotated after their prekeys were generated — `18d78b3e` (98), `50275175` (97),
+`b83c7e30` (100). Rollback INSERTs were written to `/tmp/prekey-rollback.sql`
+before the delete. Accounts `3d875f4a` and `5abf1f7f` were untouched (their
+identity and prekey timestamps match — never rotated).
+
+The delete arms the client's own self-heal: `available` drops to 0, so
+`ensureRegistered`'s replenish branch (`available < REPLENISH_THRESHOLD`) fires
+on the next chat-page load and uploads a fresh batch from `nextPrekeyId` (101+)
+belonging to the _current_ identity. No client change was needed for this.
+
+## Verification
+
+- `pnpm --filter backend test` → **28 suites / 315 tests pass** (was 313; +2).
+- The new rotation test was proved to bite: with the purge neutered to
+  `const rotated = false`, it fails (`1 failed, 10 passed`); restored, 11 pass.
+- `pnpm --filter backend lint` clean · `pnpm --filter backend build` exit 0.
+- `pnpm --filter web lint` — 0 errors (1 pre-existing warning in
+  `AdminLoginForm.tsx`, untouched here).
+- `tsc --noEmit -p apps/web/tsconfig.json` — 1 error, in the **generated and
+  gitignored** `apps/web/.next/types/validator.ts`, referencing a
+  `/[locale]/(user)/chats` route that does not exist in the tree. Proved
+  pre-existing by stashing the web edit and reproducing the identical error.
+- Compiled `dist/.../e2e-keys.service.js` inspected: contains
+  `.delete(...userE2eOneTimePrekeys).where(and(eq(userId), isNull(usedAt)))`.
+- Live API probe (`GET /chats/e2e/keys/me/prekey-count`, read-only): affected
+  account `18d78b3e` → `available: 0` (replenish armed); healthy `5abf1f7f` →
+  `available: 100` (untouched).
+
+## Notes / left open
+
+- **`next build` was not run.** The web dev server holds `apps/web/.next`, and a
+  production build shares that directory; `tsc --noEmit` was used as the type
+  gate instead to avoid clobbering a running dev session. Worth running before
+  merge.
+- **The database is 3 migrations ahead of every ref in this repo** (30 applied,
+  `drizzle/migrations/` has 27). It carries a device-based E2E design that was
+  never committed — `chat.user_e2e_devices`, `chat.user_e2e_device_prekeys`,
+  `chat.message_envelopes`, and `messages.e2e_version` + `messages.sender_device_id`
+  (`git log --all -S user_e2e_devices` is empty). The extra columns are nullable
+  and therefore inert for the current code, and the 5 `e2e_version = 2` rows are
+  handled by the message-thread change above — but the drift itself is a
+  decision: land that branch properly, or drop the orphan tables.
+- **One residual race, not fixed:** there is a single signed-prekey slot (always
+  id 1), rotated in place. A bundle fetched _just before_ a rotation and sent
+  _just after_ still fails. Signal keeps a small set of retired signed prekeys
+  for exactly this window. Follow-up.
+- The end-to-end handshake (send a first message to a rotated account and watch
+  it decrypt with `oneTimePrekeyId >= 101`) still needs one real browser pass —
+  the replenish half of the repair completes on the client, not the server.
+
+---
+
+# Services family on the real post form — all 24 subcategories (2026-09-27)
+
+The Services category is the fifth family on the real surface and the cheapest
+opt-in yet: **no new form block was needed**, and no seed change either.
+
+## What changed
+
+- `apps/web/app/[locale]/(user)/post/(publish)/page.tsx` — the 24 Services
+  slugs added to `REAL_FORM_SUBCATEGORIES` (82 → **106** slug entries), with the
+  rationale comment inline. The whole family shares one form
+  (`spec-detail-seven.md` is 13 lines and says "they have the same form"), so
+  the ship is that one list.
+- Nothing else. Every one of the family's 8 declared keys (`photos` max 8 /
+  `title` / `description` / `location` / `address` / `contactName` /
+  `contactPhones` max 3 / `contactEmail`) already had a render block, and the
+  seeded `field_schema` already matched `spec-detail-seven.md` field-for-field.
+  `contactEmail` (`ListingPostForm.tsx:1212`) was the one key that could have
+  vanished silently; its block exists.
+- `CLAUDE.md` — the two family counts (82 → 106) and the "next candidates"
+  list, with Services removed from it.
+
+## Verification
+
+- **The slug list was proven, not eyeballed:** the array was parsed out of the
+  shipped file and compared against `GET /api/v1/categories/services` — all 24
+  DB slugs present, **106** slug-like entries total, zero duplicates. (The raw
+  regex also catches `"they have the same form"` ×2 and `"Negotiable"` from the
+  comment prose; 106 is after excluding those.)
+- **Data layer, all 24 in one call:** every Services subcategory in the DB
+  carries the identical 8-key schema, in the same order.
+- `web lint` ✓, `web build` ✓ (the type gate), `backend test` ✓ (28 suites /
+  315 tests; unchanged by this ship, run as the standing gate).
+- **Independent static pass, all 24:** the family was checked in 8 slices of 3
+  subcategories each, against the seed, the render-block inventory, the
+  attribute seed and the opt-in list. Every slice returned MATCH with no
+  findings — all 24 schemas byte-identical to the template, all 8 keys
+  renderable, zero attribute links, no unrenderable key. (Three of the eight
+  reports were lost to a delivery size cap and resent.)
+- **Browser E2E (headless chromium + CDP, real user session via the dev OTP
+  flow — user `Svc Verify` / +855 96 000 9977):**
+
+```
+OK   all 24 forms       rendered the REAL form, not the mock. Asserted per
+                        subcategory: the mock's unique "Your company (optional)"
+                        field absent, "Max: 0 / 8" present, no Price field.
+                        (23/24 in one sweep pass, "Science" re-checked alone —
+                        the sweep miss was my pointer not re-firing mouseenter,
+                        not the app.)
+OK   label set          Photos / Title* / Choose a category* / Description* /
+                        Location* / Address* / Name* / Phone Number* / Email
+                        — the 8 schema keys, no Price, no Type, no Condition
+OK   publish            posted end-to-end through the form →
+                        /en/post/90118361-2135-4a94-81e8-ce46e36ddfe1
+OK   detail page        price reads "Negotiable" (and no "$0" anywhere),
+                        breadcrumb Services › Accounting, specs grid carries
+                        Main Category + Category only (no attribute rows)
+OK   browse feed        /en/category/services/accounting-services — the card
+                        reads "Negotiable"; chips are Location / Sort / More
+                        Filters only (no Price chip, no Condition chip, which
+                        CATEGORY_HEADER_FLAGS.services already set)
+FAILURES: 0
+```
+
+## Notes / left open
+
+- **The family declares no price** (`spec-detail-seven.md` lists Photo / Title /
+  Description / Location / Address / Name / Phone / Email), so every Services ad
+  publishes with a NULL price and reads "Negotiable" — the behaviour the captain
+  chose on 2026-09-23 for `properties-wanted` / `agent-services` /
+  `home-and-land-others`. Services is now the largest no-price family (24).
+- **`company_name` in the `lib/post-ad.ts` mock is boilerplate, not design.**
+  The mock's Services entries carry it, but so does every other category's (146
+  occurrences against 145 mock subcategory entries — Jobs and Cars included),
+  and `spec-detail-seven.md` + the seed both omit it. Recorded so a future
+  reader does not "restore" a Company field to Services on the mock's say-so.
+- **`photos` is the only Services key with no `has("photos")` gate:** `ImageUpload`
+  renders unconditionally (`ListingPostForm.tsx:691`). Harmless here (all 24
+  declare `photos` max 8), but a future form that omits `photos` would still
+  show the dropzone at the max-8 fallback rather than vanishing.
+- **Servers/method:** the dev backend (:3000) and web (:3001) were already
+  running; the E2E used the documented CDP recipe. Two harness-only gotchas
+  found and fixed in the driver (not app defects): the post page's category rows
+  render the name with a letter badge (`SServices`), so text matching must read
+  an element's own text nodes, and panel buttons carry the same badge prefix
+  (`AAccounting`) — matched with an exact + one-leading-letter rule so
+  "Travel & Tourism" cannot match inside "Hospitality, Travel & Tourism".
+- **E2E debris:** one verification listing ("E2E Accounting Services
+  2026-09-27") and the test user above now live in the dev DB, left in place per
+  the existing convention (the jobs ship left two listings and two users).
+- **Adjacent hazard, inert today:** `types` _is_ listed in `ATTRIBUTE_SET_TITLES`,
+  so the first time an admin ticks a `types` row for a Services subcategory, a
+  Type grid appears on that subcategory's browse page — the same mechanism that
+  silently grew a Color grid on cars-for-sale (2026-09-16). No `types` row is
+  ticked for Services today, and no attribute row links any of the 24 slugs, so
+  none of these pages shows a grid now.
+
+---
+
+# Browse-surface fixes: Show More alignment + Job Type on the Jobs category page (2026-09-27)
+
+Two items from the captain, each with a screenshot.
+
+## 1. Show More bars are equal on the left and right
+
+- `components/category-layouts/SubcategoryGrid.tsx` — the tile grid's bar was
+  `w-full max-w-6xl`, so on the jobs page it measured **1152px inside a 1280px
+  grid: 64px short on each side**. `max-w-6xl` dropped; the bar now spans the
+  grid exactly.
+- `components/subcategory-layouts/OptionGrid.tsx` — the card was
+  `p-4 mb-2 pl-6` = **24px left / 16px right**, which offset the heading, the
+  grid and the bar together. Now `px-6 py-4 mb-2` → 24/24. The left edge is
+  deliberately unchanged, so nothing else on those pages moves.
+- These are the only two Show More bars in the app (verified by grep), and both
+  were measured live before and after:
+  `jobs: 64/64 inset → 0/0` · `cars-for-sale card: 24/16 → 24/24, bar 0/0 vs grid`.
+- **Services has no bar on purpose**: it has exactly 24 subcategories and the
+  grid's LIMIT is 24, so no row is hidden. A bar appears only when one is
+  (jobs: 36 tiles → 24 shown).
+
+## 2. Job Type on the Jobs _category_ page
+
+`app/[locale]/(user)/category/[categorySlug]/page.tsx` — the page now renders
+the same `jobtypes` `OptionGrid` its subcategory pages do, **below the tiles'
+Show More** (captain's note: "jobs in cambodia, [accounting, administration, …],
+and then Job Type (below 'show more' btn)"), so a visitor can filter by type
+_before_ choosing a job.
+
+- Rows are filtered to the ones ticked for the category's subcategories
+  (`subcategoryIds`; `jobtypes` is a managed set, so the ticks are the truth).
+- Renders for `jobs` only — another family would need its own decision about
+  which set belongs there.
+- The pick feeds the page's feed as `attrKey=jobType&attrValue=<name>` (the
+  generic filter the subcategory pages already use) and the grid **steps aside**
+  once applied — the subcategory grids' existing rule.
+- It **carries into the chosen job**: the tile links forward the current query,
+  and `SET_FIELD_KEYS.jobtypes` on the subcategory page resolves `ad_type` to
+  the same `jobType` predicate, so the feed stays filtered and the grid stays
+  stepped aside there too.
+- Side effect: the category page now takes `searchParams` (it was param-less).
+
+## Verification
+
+- `web lint` ✓, `web build` ✓ (type gate).
+- Browser (headless chromium, 1440px viewport), end to end:
+
+```
+OK   order           /en/category/jobs: Job Type heading sits BELOW the Show
+                     More bar; 7 tiles (Full-time … Other-Jobs)
+OK   filter          click Full-time → ?ad_type=full-time, the Job Type grid
+                     disappears, the tiles + Show More stay, feed = 5 cards
+OK   API control     jobs unfiltered 7 → jobType=Full-time 5 (matches the 5
+                     rendered) → jobType=Part-time 2      (discriminating)
+OK   carry-over      from the filtered page, click Accounting → lands on
+                     /category/jobs/accounting-jobs?ad_type=full-time,
+                     breadcrumb "Full-Time In Cambodia › Accounting in
+                     Cambodia", Job Type stepped aside there too, 4 cards
+FAILURES: 0
+```
+
+## Notes / left open
+
+- The mechanism is generic (`OptionGrid` + `attrKey`/`attrValue`), so putting a
+  set grid on another category's page is cheap — but _which_ set belongs there
+  is a per-family design decision; only jobs was asked for.
+- `SubcategoryGrid` is shared by every category page, so the bar fix applies
+  everywhere a bar can appear; today that is jobs alone.
+
+# Furniture & Decor family on the real post form — all 10 subcategories (2026-09-27)
+
+The sixth family on the real surface, and the second consecutive opt-in that
+needed **no new form block and no seed change** — the whole ship is the slug
+list. Unlike Services, this family has a split shape: **two of its ten forms
+declare `type`, the other eight do not.**
+
+## What changed
+
+- `apps/web/app/[locale]/(user)/post/(publish)/page.tsx` — the 10 Furniture &
+  Decor slugs added to `REAL_FORM_SUBCATEGORIES` (112 → **122** slug entries),
+  with the rationale comment inline. Every key the family declares (`photos`
+  max 8 / `title` / `price` / `discount` / `description` / `location` /
+  `address` / `deliveryFree` / the contact trio, plus `type` on two of them)
+  already had a render block.
+- **Nothing else in the code.** The `types` rows for `table-and-desks` (7) and
+  `chairs-and-sofas` (11) were already seeded _and already ticked_ in the live
+  DB, and no `types` row is ticked for the other eight — verified by SQL, not
+  assumed. `TEXT_TILE_SETS_BY_CATEGORY` already carried the furniture → `types`
+  text-tile exception, and `ListingSpecs.ATTR_KEYS` already carried `type`.
+- `CLAUDE.md` — the two family counts (112 → 122), the "next candidates" list
+  (furniture removed), the new latent-divergence note, and a **correction**:
+  the typeless-subcategory bullet called `beauty-and-healthcare-products` "the
+  first opted-in form with no `type` key at all", which was already untrue when
+  written — Home & Land's `properties-wanted` / `agent-services` /
+  `home-and-land-others` are typeless too and shipped 2026-09-23. It is now
+  stated as a dozen forms.
+
+## Why `type` is on exactly two of the ten
+
+The captain's mock (Type starred, directly under Title) and
+`spec-detail-nine.md` agree, and the DB agrees with both. The eight without it
+are the Wardrobes & Cabinets form — `spec-detail-nine.md:45` says so
+explicitly, pointing at `spec-detail-one.md:170-177` for the subcategory list.
+
+## Verification
+
+- **Data layer, all 10 in one query:** every furniture subcategory's
+  `field_schema` in the DB carries the expected keys, and `attributes` linked
+  to the family are `types` only — 7 rows for `table-and-desks`, 11 for
+  `chairs-and-sofas`, **zero for the other eight**.
+- **Slug list proven, not eyeballed:** the array was parsed out of the shipped
+  file — **122** slug entries, zero duplicates.
+- `web lint` ✓ (1 pre-existing warning, `AdminLoginForm.tsx`, untouched),
+  `web build` ✓ (the type gate).
+- **Independent static pass** — four read-only audit subagents, one per group
+  (Table & Desks, Chairs & Sofas, the eight no-Type forms, and the
+  browse/detail surfaces). Findings recorded below.
+- **Browser E2E (headless chromium + CDP, real user session via the dev OTP
+  flow — user `Furniture Verify` / +855 96 000 9966):**
+
+```
+OK   all 10 forms       rendered the REAL form; asserted per subcategory that
+                        Type is present on table-and-desks / chairs-and-sofas
+                        and ABSENT on the other eight, and that the required
+                        set is Title/Price/Description/Location/Address/
+                        Name/Phone (+Type on the two)
+OK   all 10 grids       a browse "Type" grid appears on exactly those two
+                        subcategory pages and nowhere else
+OK   category page      all 10 tiles visible, no Show More bar (the "5" entry
+                        is a per-page subcategory limit, not a cap here)
+OK   picker options     Table & Desks offers exactly the 7 ticked rows, and
+                        the furniture grid renders TEXT tiles (no image
+                        circle) — the declared exception, not a sniffed one
+OK   submit e2e         posted a real Table & Desks ad end to end (Type =
+                        Dining Table): attributes.type landed as
+                        {"type":"Dining Table"}, the create→publish redirect
+                        resolved to the detail page, and the specs grid read
+                        "Main Category Furniture & Decor | Category Table &
+                        Desks | Type Dining Table"
+OK   filter, discriminating   posted a SECOND listing with a different Type,
+                        then: unfiltered 2 → type=Dining Table 1 (the dining
+                        table) → type=Office Desk 1 (the office desk) →
+                        type=Sofa 0. The grid click sets ?ad_type=<slug>,
+                        resolves through SET_FIELD_KEYS.types to the `type`
+                        key, and the applied grid steps aside
+FAILURES: 0
+```
+
+## Independent static pass — findings
+
+Four read-only audit subagents (Table & Desks; Chairs & Sofas; the eight
+no-Type forms; browse/detail surfaces). All four eventually reported that the
+ship is sound — keys-vs-blocks complete, Type required _and_ enforced on both
+forms that declare it, payload/detail round-trip correct, zero slug collisions
+across all 146 subcategories. They found no blocking defect, and their three
+doc findings (CLAUDE.md still at 112, furniture still listed as a "next
+candidate", `photos` bullet still at 106) were fixed in this ship.
+
+**One real defect they surfaced, verified here in a browser before reporting:**
+the Type picker renders an **empty 24px icon gutter on all 7 rows**
+(measured: gutter 48px vs 12px on a clean control, 7/7 rows have the slot,
+0 have an image). Cause: `SearchPicker` sniffs its design from the rows
+(`withIcons = options.some(o => !!o.image)`, `ListingPostForm.tsx:192`) and the
+**shared `types` "other" row carries `/sub-img/books-sports-hobbies/brands/
+other.png`** — a bundled path `DbImage` correctly refuses — so every row gets a
+slot and none can fill it. `spec-detail-nine.md:4` says "no image as icon" for
+this form. This is the exact row-sniffing heuristic deliberately removed from
+`OptionGrid` on 2026-09-22 ("the design follows the set, never the load
+result"); it is still alive in the form, and it affects every Type picker whose
+scope includes the shared `other` row, not just furniture. **Fixed the same day, on the captain's call ("declare it per
+family"):** `TEXT_TILE_SETS_BY_CATEGORY` moved out of the subcategory page into
+`apps/web/lib/attribute-types.ts` — one design fact, two surfaces, one source —
+and `getListingFormConfig` now sets `image: null` on the options of any picker
+whose set the category declares text-only, so `SearchPicker`'s row sniff finds
+nothing to sniff and the slot disappears. No prop was threaded through the
+component and no call site changed. Verified after: furniture's Type picker
+**12px gutter, 0 slots** (was 48px, 7/7), Type still selects and still stores
+`Dining Table`, the browse grid is still text tiles, **and the control —
+computers' Type picker — kept its icon layout (17/17 rows, 48px)**, i.e. the
+declaration is per (category, set) and did not leak across families.
+`web lint` ✓ (same 1 pre-existing warning), `web build` ✓.
+
+Two pre-existing hazards also flagged, neither introduced by this ship and
+neither fixed: the subcategory browse bar's chips (`LSPYCEHeader`) hold their
+filters in local `useState` with **no router, Link or callback anywhere in the
+file**, so Location/Sort/Price/Condition/Year on every subcategory page only
+open a dropdown — they never filter (verified by grep, not a browser run); and
+`GET /attributes/:type` applies no `isActive` filter, so a deactivated row
+would still appear in a picker (already recorded in CLAUDE.md).
+
+## Notes / left open
+
+- **The dev DB is shared and another session is writing to it.** During this
+  ship a peer session posted furniture listings as `testtest001` (`Table 01` at
+  16:27, `test` in chairs-and-sofas at 16:39, plus fashion/beauty rows from
+  15:33). The discriminating filter numbers above (unfiltered 2 → Dining Table
+  1 → Office Desk 1 → Sofa 0) were exact when measured and still hold as
+  assertions, but the raw counts drift under a concurrent writer — re-query
+  before quoting a count rather than trusting one taken earlier.
+- **Two E2E listings are left in the dev DB** (`Furniture E2E dining table`
+  `d4dc26b3-d03a-424b-9bb0-a0e9f1142d92`, `Furniture E2E office desk`
+  `3f8424e0-bb0c-4ee0-b3bf-d57152929c84`) plus the `furnitureverify` user, in
+  the same shape the Services/Jobs/Fashion verification left theirs. They are
+  not in the seed's junk-title list, so `listings.seed.ts` will not remove
+  them — say the word and they go.
+- **The spec-vs-rows divergence is real but inert**, and deliberately not
+  "fixed": `spec-detail-nine.md` spells the two Type lists `Dining Tables` /
+  `Kids Desks` / `Kid's Chair & Seats` while the ticked `types` rows (and the
+  design mock data) read `Dining Table` / `Kids Desks` / `Kids Chairs&Seats`.
+  The rows win — the set is managed — and the mock agrees with the rows. Same
+  call as the Fashion & Beauty lists, recorded in CLAUDE.md's known gaps so it
+  is not "corrected" back.
+- The eight no-Type forms are byte-identical to each other and to
+  `commonListingFields`, so they inherit that inline-duplication follow-up
+  rather than adding a new one.
+
+# Books, Sports & Hobbies family on the real post form — all 7 subcategories (2026-09-27)
+
+## What changed
+
+- **One file**: `apps/web/app/[locale]/(user)/post/(publish)/page.tsx` — the
+  seven slugs appended to `REAL_FORM_SUBCATEGORIES` (**122 → 129**). No new
+  block, no new component, no backend or seed change: every key the family
+  declares already had a render block.
+- This is the catalogue's **mixed** family, and the only one where both shapes
+  sit inside a single category. Per `spec-detail-ten.md`:
+  `musical-instruments` is the Type+Condition form (13 keys: photos max 8 /
+  title / type / condition / price / discount / description / location /
+  address / deliveryFree / contact trio), while `fishing`, `hike-and-camping`,
+  `cds-dvds-vhs`, `books`, `sports-equipment` and `hobbies-others` share the
+  plain 11-field form with neither. The schema gating covers both shapes, so no
+  per-subcategory exception was needed — and none was added. The seeded
+  `field_schema` was already correct for all seven (verified against the live
+  API, not just the seed).
+- Docs: CLAUDE.md's counts moved 122 → 129 in both places, the "next
+  candidates" list is now just pets + foods, and the Jest suite count was
+  corrected (16 suites / 159 tests → **28 suites / 315 tests** — it had been
+  stale for several ships).
+
+## Verification
+
+- **Live browser, real publish, both shapes** (isolated headless chromium, CDP,
+  `/tmp/psa-cdp.mjs`, `booksverify` user via the dev OTP):
+  - `musical-instruments`: the form renders **Photos `Max: 0 / 8` → Title →
+    Choose a category → Type \* → Condition \* → Price → Discount → Free
+    Delivery → Description → Location → Address → map → Contact**, i.e. the
+    captain's mock order exactly. The Type picker opens with **11 rows**
+    (Guitars & Basses … Accessories, `Other - ផ្សេងៗ`). Filled + submitted →
+    detail page grid reads `Main Category | Category | Type | Guitars & Basses
+| Condition | New` — Type before Condition, the same order the form shows.
+  - `fishing`: **no Type trigger and no Condition button exist** (measured, not
+    assumed) → detail page grid has Main Category + Category and **no Type or
+    Condition row**.
+  - **DB truth** for the two E2E listings:
+    `{"type": "Guitars & Basses"}` + `condition='new'` for the instrument, and
+    `{}` + `condition=NULL` for the fishing rod — the schema gating writes
+    exactly the declared keys and nothing else.
+- **Browse side**: `/category/books-sports-and-hobbies/musical-instruments`
+  renders a **Type grid of 11 tiles**; clicking **Guitars & Basses**
+  (`?ad_type=guitars-and-basses`) filtered the feed to exactly the one listing
+  posted with that type — so `SET_FIELD_KEYS`/`resolveAttrKey` resolves to the
+  `type` key the form actually writes (not the legacy `bodyType` fallback).
+- **Gates**: `web lint` ✓ (same 1 pre-existing warning in
+  `AdminLoginForm.tsx`), `web build` ✓ (`EXIT=0`, compiled successfully),
+  `backend test` ✓ **28 suites / 315 tests**.
+
+## Notes / left open
+
+- **The Type icons render as empty circles, by design — not a defect and not
+  fixed here.** The 11 `types` rows carry bundled `/sub-img/books-sports-
+hobbies/brands/*.png` paths, which `DbImage` correctly refuses to render, so
+  the icon design carries an empty 24px slot instead: measured 24px
+  first-child on all 11 picker rows, 0 `<img>` in the 109px browse tiles. That is the captain's
+  2026-09-10 call ("leave it imageless") and matches computers/electronics;
+  furniture is the only family that was declared text-only, because there the
+  design mock itself draws no icons.
+- **Same `Traditional-instruments` divergence the Fashion & Furniture ships
+  recorded**: the admin-managed `types` row and the design mock
+  (`lib/post-ad.ts:6108`) both say `Traditional-instruments`; only
+  `spec-detail-ten.md` says "Traditional Instruments". The rows win (the set is
+  managed), the mock agrees with the rows, so the spec wording loses. Inert
+  while the set stays managed — but unlinking every `types` row would fall back
+  to the schema's inline list and start writing `Traditional Instruments`,
+  which no browse grid could then match.
+- **Two E2E listings and a `booksverify` user are left in the dev DB**
+  (`Books E2E instrument` `03321ba9-0b3a-4ab4-8ed1-f51543a39c08`,
+  `Fishing E2E rod` `9f7c78e9-2bd3-49df-a8dd-c241bd63bbb4`), the same shape the
+  earlier ships left theirs — say the word and they go.
+- **Operational hazard found the hard way, worth remembering: port 9333 is
+  shared.** A peer session was driving the same dev servers with its own
+  chromium on the same `--remote-debugging-port=9333`, so both browsers'
+  targets appeared in one `/json/list` and this run's first pass attached to
+  the **peer's tab** (`/en/post?probe=1`) — the fills landed on their page and
+  the form appeared to reset mid-run. Everything above was re-run on an
+  isolated browser (`:9335`, own profile). Use a private port, or select the
+  target by URL, whenever a peer session may be running.
+- **A peer session landed Pets and Foods in the same file while this ship was
+  verifying** (it was also the source of the `?probe=1` tab). At the time of
+  writing, the opt-in list holds **146 slugs — the whole catalogue** — so
+  CLAUDE.md's "129" and its "next candidates are … (pets, foods)" clause are
+  already superseded by their work and will need their update, not this ship's.
+  The `web build` / `backend test` runs above were taken on a tree that already
+  contained the peer's Books-adjacent edits (Pets included); Foods landed after
+  them, so its own verification belongs to that ship.
+
+---
+
+# Pets + Foods on the real post form — all 17 subcategories, and the catalogue is complete (2026-09-28)
+
+The last two families, shipped together because they are the same form twice:
+both are the bare 11-field `commonListingFields` shape, so — like Services,
+Furniture & Decor and Books before them — **no new form block and no seed
+change**. With this, **all 146 seeded subcategories of the catalogue run the
+real form** — the mock `DynamicForm` stays reachable only for a subcategory
+created through the admin UI afterwards (see the correction in the notes: it is
+not dead code).
+
+## What changed
+
+- `apps/web/app/[locale]/(user)/post/(publish)/page.tsx` — the 17 slugs
+  (7 pets + 10 foods) appended to `REAL_FORM_SUBCATEGORIES` (**129 → 146**),
+  with the rationale comment inline.
+- **Nothing else in the code.** Every one of the 11 keys both families declare
+  (`photos` max 8 / `title` / `price` / `discount` / `description` / `location`
+  / `address` / `deliveryFree` / the contact trio) already had a render block —
+  `deliveryFree` and `contactEmail` were the two that could have vanished
+  silently.
+- `CLAUDE.md` — the counts (129 → 146), the "next candidates are the last two
+  whole families (pets, foods)" clause retired in favour of the explicit "the
+  opt-in list is now the entire catalogue", the `photos` known-gap count
+  (122 → 146), the typeless-forms hazard bullet (a dozen → **29**), and a new
+  known-gap entry for the now-dead mock form.
+
+## Why the seed needed nothing
+
+`spec-detail-eleven.md` and `spec-detail-twelve.md` are 15 lines each, both
+ending with "…they have the same form", and both point at `spec-detail-one.md`
+for the subcategory list (`:194-202` = Pets' 7, `:203-214` = Foods' 10). The
+seed already matched: **all 17 seeded `fieldSchema` arrays are field-for-field
+identical to the module-level `commonListingFields` const** — proven by parsing
+`categories.seed.ts` with the TypeScript AST (key, type, required, max, label
+and options, in order), not by eye. The one named divergence is cosmetic:
+`spec-detail-twelve.md`'s header says "Meats" where `spec-detail-one.md` says
+"Meat"; the slug is `meat` and the live DB name is "Meat".
+
+## Verification
+
+- **Slug list proven, not eyeballed** — the array parsed straight out of the
+  shipped file: **146 entries, zero duplicates**, then set-compared against both
+  the seed (146 subcategory slugs) and the live API (`GET /categories` plus one
+  `/categories/:slug` per category → 12 categories / 146 subcategories):
+  **0 missing, 0 extra** — the list is exactly the catalogue.
+- **Live browser, real publish, both families** (isolated headless chromium +
+  raw CDP, `petsfoodsverify` user via the dev OTP):
+
+```
+OK   pets form        Pets > Dogs renders the REAL form: Photos "Max: 0 / 8"
+                      and exactly the 11 labels (Title*, Choose a category*,
+                      Price*, Discount, Free Delivery, Description*, Location*,
+                      Address*, Name*, Phone Number*, Email) — no Type, no
+                      Condition, no Brand/Model, no pickers. Matches the
+                      captain's mock field for field. The hover panel listed
+                      all 7 pets tiles.
+OK   foods form       Foods > Meat renders the identical form (same 11 labels,
+                      Max: 0 / 8); the hover panel opened with the foods tiles
+                      (Meat, Seafood, Fruits, Vegetables, Beverages …)
+OK   location         the 3-level cascade serves real geography (25 provinces
+                      → Phnom Penh's 14 districts → Chamkar Mon's 5 communes);
+                      contact Name/Phone prefill from the account also landed
+OK   publish pets     listing 64ec2094-7c41-46f7-b313-951300ac4ed0 → detail
+                      page (breadcrumb Pets > Dogs; specs grid Main Category
+                      Pets | Category Dogs). API: status active, price 25.00,
+                      condition NULL, deliveryFree true, attributes {},
+                      expiresAt +30d, province+district+commune all set
+OK   publish foods    listing 6a0fa820-1283-4f5b-94ef-45b8c6ac8570 → detail
+                      page reads $10.8 / $12 / 10%. API: status active,
+                      discountValue 10, discountType percent, attributes {},
+                      commune NULL (the script's click landed on a district
+                      row — province+district is a legal stop; the pets ad has
+                      all three levels)
+OK   feeds            categorySlug=pets → 1 (the dog ad), subcategorySlug=dogs
+                      → 1, categorySlug=foods → 1 (the meat ad),
+                      subcategorySlug=meat → 1
+OK   cards            /category/pets/dogs: "Free Delivery" + $25 + the full
+                      address; /category/foods/meat: -10% and $1.2 OFF badges
+                      over "$10.8 / $12"
+OK   no grids         neither subcategory page renders a Type / Condition /
+                      Brand / Model grid — both families declare none
+FAILURES: 0
+```
+
+- **Gates**: `web lint` ✓ (0 errors; the same 1 pre-existing
+  `AdminLoginForm.tsx` warning), `web build` ✓ (`EXIT=0`, compiled
+  successfully), `backend test` ✓ **28 suites / 315 tests**.
+
+## Notes / left open
+
+- **This ship and the Books ship shared one working tree.** The Books entry
+  above landed while this one was being verified (the peer session was also the
+  `?probe=1` tab that appeared in this run's `/json/list`), so the two counts
+  briefly disagreed — CLAUDE.md said 129 while the file on disk already held 146. This ship closed that gap in CLAUDE.md, and the gates were re-run after
+  every pets/foods edit.
+- **Independent audit pass (two read-only subagents, one per family).** Their
+  reports landed after the first draft of this entry. Both independently
+  re-derived and confirmed the load-bearing claims — the 17 schemas identical to
+  `commonListingFields` (parsed, not eyeballed), 146/146 set-diff run against
+  the **DB via SQL** as well as the API, **zero vanishing keys** (the form has 35
+  `has()`-gated keys plus the ungated `photos`, and all 11 keys of both families
+  are covered), **no picker keys at all** (so `pickLists` is `{}` and no
+  brand/bodyType/colour/year fetch fires for either family), slug uniqueness
+  across all 146, and both E2E listings row-for-row in the DB. They also found
+  the two real defects fixed above — the `CLAUDE.md:413` "129" and the
+  dead-code mischaracterisation — plus one nit taken as-is: `spec-detail-one.md`'s
+  Foods list closes at `:214`, so that reference now reads `:203-214`.
+- **CORRECTION, found by the two audit subagents after the first draft of this
+  entry: the mock post form is NOT dead code, and must not be "cleaned up".**
+  With 146/146 _seeded_ subcategories opted in, the `DynamicForm` branch is
+  reachable by any subcategory **created through the admin UI**:
+  `CreateSubcategoryDto`/`UpdateSubcategoryDto` carry no `field_schema` and the
+  seed is its only writer (`db/seed.ts`; `categories.service.ts` only reads it),
+  so such a row is served by the API with a NULL schema and a slug this
+  hardcoded list can never contain. Its submit is deliberately unwired, so
+  **an admin-created subcategory cannot publish an ad at all** — pre-existing,
+  but until now indistinguishable from the not-yet-opted-in families. Deleting
+  the branch would not fix that: the real form would render `fields: []`, i.e.
+  a photos-only form. A real fix is a product decision (let admins author
+  `field_schema`, or default one per new subcategory, plus a slug entry here).
+  Recorded in CLAUDE.md's known gaps with the do-not-delete warning.
+- **`apps/web/lib/subcategoryGroups.ts` (114 lines) has zero importers** and
+  stale slugs (`baby-and-kids-fashion`, `tables-and-desks`, `curtain-and-carpet`,
+  `parts-accessories` — none of them real). Found while checking which other
+  surfaces key off these categories; it is the cheapest dead code to delete.
+- **E2E debris left in the dev DB** (the same shape the earlier ships left
+  theirs): user `petsfoodsverify` (+855 96 0099 8877) and listings
+  `Pets E2E dog ad` `64ec2094-…`, `Foods E2E meat ad` `6a0fa820-…`. They are
+  not in `listings.seed.ts`'s junk-title list, so a re-seed will not remove
+  them — say the word and they go.
+- **Audit (c) sections: nothing in either family is broken by the opt-in.**
+  Browse surface clean (0 `attribute_options` rows link to any pets/foods
+  subcategory — DB-verified — so no grid can render, and the header flags carry
+  no Condition chip); detail page clean (both families store `attributes: {}`,
+  so `ListingSpecs` shows Main Category + Category only, and neither slug is in
+  `CONDITION_SUBCATEGORIES`); seeds clean (`db/seed.ts` writes `fieldSchema` in
+  `onConflictDoUpdate.set`, so a re-seed applies both schemas to an existing
+  DB). Their one inert finding is now recorded in CLAUDE.md rather than fixed in
+  code: `deliveryFree` is the single payload field that is **not** `has()`-gated
+  (`ListingPostForm.tsx:594`), so a form that does not declare it still POSTs
+  `deliveryFree: false` — harmless, but it contradicts the "payload fields are
+  gated the same way" rule.
+- **Two decisions left for the captain** (both written into CLAUDE.md's known
+  gaps, neither taken here): (1) delete the debris + switch `JUNK_TITLES` to a
+  pattern (`ILIKE '%E2E%'`) — **15 active test/E2E rows** are live, from every
+  ship since 2026-09-23, and the exact-title list is why they accumulate; (2) add
+  demo listings for the four families `DEMO_LISTINGS` does not cover (pets,
+  foods, services, books — the 23 existing rows are cars/phones/home-and-land +
+  one each for five others). Note the two interact: **Foods' only listing today
+  is this ship's own E2E row**, so deleting the debris empties that feed until
+  demo rows exist.
+
+# "Upgrade Account" did not redirect — the `/membership` route never existed (2026-09-28)
+
+## What changed
+
+- **Root cause: a link to a route that has no page is SILENT on this app — it
+  does not 404.** `MyProfileHeader.tsx:241` clicked `router.replace("/membership")`,
+  but no page existed at that URL. The only route that matched was the dynamic
+  catch-all `app/[locale]/(user)/[slug]/page.tsx` (listing detail / public
+  profile), which treated `"membership"` as a **username**, found no such mock
+  user, and returned `<div>Not found</div>`. Measured before the fix:
+  `GET /en/membership` → **HTTP 200**, `<title>User Not Found - Psakhmer</title>`.
+  So the click _did_ navigate — it just landed on a dead page that looks like
+  nothing happened. That is the general trap: **any single-segment URL with no
+  page silently renders "User Not Found" instead of 404**, so a broken link is
+  invisible to curl, to dev, and to the user.
+- **The page already existed, one directory over and orphaned:**
+  `app/[locale]/(user)/me/membership/page.tsx` (renders `<Membership />`, the
+  current-plan + "Upgrade Now" page) had **zero inbound links** and was not even
+  declared in `i18n/routing.ts`'s `pathnames`, while **13 references** — the
+  profile button, the public footer, the settings page ×4, the settings sidebar
+  ×4, and the breadcrumbs of `premium-account` / `premium-account/[category]` /
+  `checkout` — all pointed at `/membership`, which `pathnames` _does_ declare.
+- **Fix, as decided by the captain ("use `/me/membership` on both"): `/me/membership`
+  is the one canonical URL.** The page never had to move — it is back at
+  `app/[locale]/(user)/me/membership/page.tsx`, its committed location. What
+  changed: `i18n/routing.ts` now declares `"/me/membership"` in its `/me/*` block
+  and no longer declares `"/membership"`, and all 7 live references were
+  repointed — `MyProfileHeader.tsx:241` (the Upgrade Account button),
+  `Footer.tsx:98`, `Setting.tsx:175`, `SettingSidebar.tsx:168`, and the three
+  breadcrumbs (`premium-account`, `premium-account/[category]`, `checkout`).
+  (`checkout/page.tsx:40` still says `/profile/membership` inside the
+  commented-out first draft of that file — dead text, left alone.)
+- **A first pass had instead moved the page to
+  `(subscriptions)/membership/page.tsx`**, which fixed the button without
+  touching any caller. It was reverted the same session when the captain chose
+  `/me/membership`; the empty directory it left behind was removed.
+- **Two links in the captain's in-flight settings rework were already failing
+  the build**, which is what surfaced the choice: `Setting.tsx:175` and
+  `SettingSidebar.tsx:168` had been changed from `"/membership"` to
+  `"/me/membership"`, which next-intl's typed `pathnames` **reject** — so
+  `next build` was red before this change, and neither line could have been
+  committed as written. They now compile, because `"/me/membership"` is a
+  declared pathname.
+- **Accepted consequence: `/me/*` is login-gated, so the footer's Membership
+  link is no longer public.** A logged-out visitor clicking it is redirected to
+  `/en/login` (`me/layout.tsx:41`), where the old `/membership` route rendered
+  the page to anyone. Correct for an account page that shows _your_ plan; noted
+  because the footer link used to work anonymously. `/en/membership` is now
+  swallowed by the `[slug]` catch-all again ("User Not Found") — harmless, but
+  it is why nothing should be pointed back at it.
+
+## Verification
+
+- **End-to-end in a real browser, every entry point** (headless chromium + CDP,
+  a session minted read-only from an existing user row — no rows created):
+  - Upgrade Account on `/en/me` → `/en/me/membership`, client-side marker
+    survived (SPA nav, no full reload), page renders "Upgrade Now", no "Not found"
+  - Settings "Membership Information" row → `/en/me/membership`, same page
+  - Footer "Membership" link (logged in) → `/en/me/membership`, same page
+  - Footer equivalent **logged out** → `/en/login` — the accepted consequence
+    above, verified rather than assumed
+- Before/after diff, same request: `GET /en/membership` was
+  `<title>User Not Found - Psakhmer</title>` + body "Not found"; the route now
+  lives at `/en/me/membership` and renders the real page.
+- `pnpm --filter web lint` → 0 errors (1 pre-existing warning, untouched file).
+  `pnpm --filter web build` → passes;
+  `.next/app-path-routes-manifest.json` carries only `"/[locale]/me/membership"`,
+  and `i18n/routing.ts` declares only `"/me/membership"` (line 57).
+
+## Notes / left open
+
+- **`/billing-addresses` was the same shape and is already fixed** — it is worth
+  recording because the audit that found it is reusable: `Setting.tsx` and
+  `SettingSidebar.tsx` used to link to a pageless `/billing-addresses` while the
+  real pages sat at `me/billing-addresses*`. The settings rework repointed both
+  to `/me/billing-addresses`, so nothing is broken. **The leftover is
+  `i18n/routing.ts:76-77` — `"/billing-addresses"` and `"/billing-addresses/add"`
+  are still declared with no page behind them.** Nothing links there, so they are
+  inert, but they are exactly the drift that hid this bug: a `pathnames` key is
+  indistinguishable from a real route to every caller and to the type checker.
+  Deleting those two lines is the cleanup; it needs no other change.
+- **Why nothing caught this:** there is no web test framework and no CI, and the
+  type gate only covers the _typed_ href form — and even that only proves the
+  pathname is _declared_, not that a page exists. The button's plain-string
+  `router.replace("/membership")` type-checks fine against a declared-but-pageless
+  key; the same is true of `href="/membership"`. Only `page.tsx` on disk decides.
+  `pathnames` and the route tree can drift apart silently, so the audit that
+  found this (real routes = `find apps/web/app/'[locale]' -name page.tsx`, route
+  groups stripped, diffed against every `pathname:` / `href=` in the source) is
+  the check to re-run whenever a link is added.
+
+# /settings made real — profile, password, username, phone, delete + 90-day purge (2026-09-28)
+
+## What changed
+
+- **The `/settings` surface was 100% mock** (hardcoded "Thuch Sayi" / `@thuchsayi`
+  / `09666166394`, a `disabled` username + phone submit, a password form with no
+  handler, a dead `action="/"` sign-out, a Delete dialog whose Next did nothing)
+  **and had no auth gate at all**. It now runs on the real session.
+- **Backend — five new self-service routes on `UsersController`** (all JWT):
+  `PATCH /users/me/username`, `PATCH /users/me/password`,
+  `POST /users/me/phones/otp`, `POST /users/me/phones/otp/verify`,
+  `DELETE /users/me`. Errors are **400, never 401**, for a wrong password or OTP —
+  `userServerFetch` reads a 401 as an expired session, clears the cookies and
+  bounces the user to /login, which is the wrong answer to a typo.
+- **Phone activation goes through the OTP primitive, never the login chokepoint.**
+  `AuthService.verifyPhoneOtp` looks users up by `users.primaryPhone` and
+  _creates an account_ for an unknown number, so reusing it would have forked a
+  second account. The new flow calls `SupabaseService.signInWithOtp/verifyOtp`
+  directly, then in one transaction rewrites the user's primary `user_phones`
+  row in place (freeing the old number), sets `users.primaryPhone` and — for the
+  first time in this codebase — writes **`users.phoneVerifiedAt`**.
+- **`setPrimaryPhone` now syncs `users.primaryPhone`** in the same transaction.
+  It never did, and that column is a _login identifier_, so the phone list and
+  the login could drift apart.
+- **Delete = deactivate, then a real 90-day purge.** `DELETE /users/me` verifies
+  the password (bcrypt), then sets `status='deleted'` + `deletedAt` while
+  **keeping `primaryPhone` and the phone rows** — unlike `AdminService.deleteUser`,
+  which nulls them. That difference is load-bearing: it is what
+  `AuthService.findRecoverable()` matches on, so a self-deleted account comes
+  back when its owner signs in again within the window, and an **admin-deleted
+  account never does** (both writers now carry a comment saying so).
+- **`AccountPurgeService`** (new, `src/users/`) hard-deletes accounts past 90 days:
+  one statement per batch, `FOR UPDATE SKIP LOCKED` so instances claim disjoint
+  rows, `now()` from the database rather than the process clock, storage objects
+  cleaned best-effort after the commit. It sweeps once at boot and then on a
+  timer (`ACCOUNT_PURGE_ENABLED` / `ACCOUNT_PURGE_INTERVAL_MS`). Deliberately not
+  BullMQ — a data-retention obligation should not depend on Redis being up — and
+  not the outbox, whose trigger here is a _predicate_, not a per-row due date.
+  `onModuleDestroy` clears the interval (the existing `HeartbeatService` leaks
+  one), and it stays unarmed under `NODE_ENV=test`.
+- **`PATCH /users/me` can finally clear a field.** Every optional field was
+  typed non-nullable, so the location cascade could be filled but never emptied.
+  They now accept `null` (an explicit null clears; undefined still leaves alone),
+  `validateLocationHierarchy` refuses clearing a parent while keeping its child,
+  and `firstName`/`lastName`/`company` gained `@MaxLength` (an overflow used to
+  be a raw 22001 → 500). A duplicate email now answers 409 instead of 500.
+- **Web:** a new `settings/layout.tsx` gate (anonymous → /login, same shape as
+  `me/layout.tsx`), `getSettingsUser()` in `lib/auth/current-user.ts` (the full
+  `GET /users/me` row, wrapped in React `cache()` so the gate and the page share
+  one call), a new `actions/settings.ts`, and the row/rail/form components now
+  take `me`. The Delete dialog gained the password step the help page already
+  documented; Sign Out calls the real `userLogout()`; social rows read **"Add"**
+  as plain rows (no provider-linking flow exists, so there is nothing to click).
+- **Edit Profile** is prefilled and saves: names, gender, year of birth, email,
+  company, address, and a real province→district→commune cascade reusing
+  `components/post/LocationPicker.tsx` — restored from the stored ids by a new
+  `resolvePlaceSelection()` (the lookup endpoints are slug-keyed, so it walks
+  down from the province list). Phone is read-only here with a link to the
+  change-phone page, because editing it in place would bypass the OTP.
+- **Deleted the mock's 10-digit phone rule** — it rejected real numbers. A
+  Cambodian mobile is 9 _or_ 10 digits locally (`099990004` is valid), so the
+  form now gates on the same `normalizePhone()` predicate the action uses. The
+  browser walkthrough caught this; the mock's fake validation had hidden it.
+
+## Verification
+
+- `pnpm --filter backend lint` clean · `build` ok · **`test` 30 suites / 340
+  tests** (was 29/318). New specs cover username taken/normalised/23505, password
+  wrong-current + hash-less account, delete keeps the phone, `purgeDueAccounts`
+  (batches, no-op second call, storage cleanup, no interval armed under test),
+  phone verify writing `primaryPhone` + `phoneVerifiedAt`, and reactivation
+  reviving a self-deleted row while rejecting a non-matching password.
+- **Live API probe against the dev database** (throwaway account, then removed):
+  the full profile round-trips; a real province/district/commune saves; clearing
+  the province alone returns `400 INVALID_LOCATION_HIERARCHY` while clearing all
+  three nulls the columns; a username normalises to lowercase and another
+  account's handle returns `409 USERNAME_TAKEN`; a wrong current password gives
+  `400 INVALID_PASSWORD` and the right one changes the password (login with the
+  new one succeeds); the user's own number returns `409 PHONE_UNCHANGED`, a free
+  number accepts an OTP, a bad code gives `400 INVALID_OTP`, and the verified one
+  moves `primaryPhone`, stamps `phoneVerifiedAt`, leaves exactly one
+  `user_phones` row and becomes a working login identifier.
+- **Delete → reactivate → purge, against the live DB:** delete with a wrong
+  password is refused; with the right one the row goes `deleted` with the phone
+  kept and the pre-deletion token 401s; **signing in again revives it**
+  (`status=active`, `deletedAt` null); the **admin** delete then leaves it
+  unrecoverable (login → `INVALID_CREDENTIALS`, row still deleted) — the
+  `primaryPhone IS NOT NULL` marker doing exactly what it is there for; finally
+  a backdated `deleted_at` (91 days) was purged on a boot sweep, cascading its
+  phone row away, while three 68-day-old soft-deleted rows were left untouched.
+- **Browser walkthrough** (headless chromium + CDP against `next build && next
+start` on port 3005 — `next dev` renders blank there): anonymous
+  `/en/settings` → `/en/login`; the hub shows the real name, handle and
+  local-formatted phone, initials circle with no photo (no `<img>` emitted);
+  Edit Profile prefills, saves and survives a reload; the cascade picks
+  province → district → commune, saves all three ids, and comes back as
+  "Banteay Meanchey, Malai, Boeng Beng" after a reload; `Clear` persists three
+  nulls; a taken username surfaces "That username is already taken."; a wrong
+  current password surfaces "That password does not match." and the right one
+  changes it (a later login with the new one succeeds); the phone flow sends a
+  code, takes the 6 digits and moves the rail's number; the Delete dialog
+  deactivates and lands on `/en/login` with the old token 401ing.
+- `pnpm --filter web lint` 0 errors (1 pre-existing warning in an untouched
+  file) · `pnpm --filter web build` passes.
+
+## Notes / left open
+
+- **`pnpm --filter backend test:e2e` cannot run at all** — pre-existing: the e2e
+  jest config has no transform for `@nestjs/bullmq`'s ESM, so importing
+  `AppModule` dies with `SyntaxError: Unexpected token 'export'`. Unrelated to
+  this change (the import is in the committed `app.module.ts`), but it means the
+  Jest-hang check for the new interval had to be covered by the unit spec
+  instead of the e2e suite.
+- **The Supabase-side auth identity is not purged** — nothing links our row to
+  its id (`user_auth_providers.providerAccountId` is null on the phone path).
+- **A deactivated user's listings stay in the feed** for the 90 days: the feed
+  filters listing status, not owner. The dialog says "won't be visible to the
+  public", so that promise still isn't kept; the fix is a join condition.
+- **"Update this contact to your ads"** stays rendered but inert — no backend
+  field backs it, and wiring it rewrites contact info across the user's
+  published ads. Left as-is rather than faked.
+- Devices, Privacy and the Auto-Update-Profile-Picture switch stay mock, as
+  scoped.
+- **Billing Address now links to `/me/billing-addresses`** (the page that
+  exists) instead of the declared-but-pageless `/billing-addresses` — the dead
+  link the previous ship's notes flagged. Membership Information was left at
+  `/membership`, which is where that page actually lives. If the intent is
+  instead to move the billing pages up to `/billing-addresses`, that is the
+  other one-line fix.
+- Drive-by: `actions/login.ts` and `actions/otp.ts` compared `error.code` to
+  `"INVALID_CREDENTIALS"`, which can never match (the backend puts the HTTP
+  status name in `code` and the domain string in `message`), so users saw the
+  raw string. Both now match the message.
+
+# Ship: designed 404 page for the storefront (web) — 2026-09-28
+
+Request (verbatim): "check this out, when i input url randomly, it should show like the image.
+for example: /en/sgshhdsahdhshad" — with a khmer24 404 screenshot: the "sold out (or deleted)"
+headline, a 404 mascot, two links, and a "Find Product by Categories" tile grid.
+
+## What shipped
+
+- `components/not-found/NotFoundPage.tsx` — the body: headline, artwork, a blue
+  link to `/all-ads` and a dark link to `/`, a divider, then "Find Product by
+  Categories" as 12 tiles (2 rows of 6) fed by the existing `getAllCategories`
+  and rendered through `DbImage` with the home grid's `LayoutGrid` fallback.
+- `components/not-found/NotFoundIllustration.tsx` — original inline SVG: two
+  extruded grey "4"s (each two stroked paths, no font needed) with a blue
+  sad-faced mascot between them and a shirt reading `psakhmer`. Not a DB image,
+  so deliberately NOT through `DbImage`; no new asset file.
+- `app/[locale]/(user)/not-found.tsx` (new) + `app/[locale]/not-found.tsx`
+  (rewritten) — thin wrappers over that body. The `(user)` one is the point: it
+  sits inside `app/[locale]/(user)/layout.tsx`, so a dead URL keeps the navbar
+  and footer.
+- Four call sites switched from inline 200 `<div>`s to `notFound()`:
+  `(user)/[slug]/page.tsx`, `(user)/[slug]/about/page.tsx`,
+  `(user)/category/[categorySlug]/page.tsx` and
+  `.../[subcategorySlug]/page.tsx`. `Post-Detail.tsx` already called it.
+- Titles: the unknown-slug / unknown-post `generateMetadata` branches returned
+  `"User Not Found"` and `"Post Not Found - Psakhmer"`, which beat the boundary's
+  metadata (the page title won). Both now read `404 Not found` (captain,
+  2026-09-28 — the tab was asked for as "404 Not found"; it renders
+  `404 Not found - Psakhmer`, the site template's brand suffix, as on every
+  other page. Swap to `title: { absolute: "404 Not found" }` in the two
+  boundaries if the bare form is wanted).
+
+## Follow-up A: multi-segment URLs fell through (captain's report, 2026-09-28)
+
+Reported: `/en/testtest001/hshdahdhsad` and
+`/en/car-test-10-adid-53518e80-…/shshahsha` "not show yet". Both have **two**
+segments, and `[slug]/page.tsx` only ever matched one — so `/en/anything/at/all`
+matched no route at all and Next fell through to its **built-in** 404: status 404
+but no navbar, no footer, no design, and the tab reading
+`404: This page could not be found.` (confirmed in a browser — raw curl could not
+tell them apart, because a `notFound()` body is not SSR-inlined; see Follow-up B).
+
+Fix: **`app/[locale]/(user)/[...rest]/page.tsx`**, a catch-all that calls
+`notFound()`. It cannot shadow a real route — Next ranks a static segment above a
+dynamic one and both above a catch-all, so `/category/…`, `/me/…`, `/[slug]/about`
+and friends still win; it only sees what nothing else matched. Verified against a
+full route sweep: all 28 real routes kept their previous status (the 307s are the
+usual login-gated redirects), and `/en/a/b/c/d` (4 segments), the two reported
+URLs, and `/en/category` (declared in `pathnames` with no page behind it) now all
+render the designed page with chrome.
+
+## Follow-up B: the tab title reverted after hydration
+
+`document.title` read `Psakhmer, Buy and Sell Everything In Cambodia` on every 404
+whose page does not set a title of its own (`category/[categorySlug]`, its
+`[subcategorySlug]` child, `[slug]/about`, and the new catch-all) — while the
+**SSR** `<head>` had the right `404 Not found - Psakhmer`. Not a dev artifact:
+reproduced against `next build && next start` on :3005. Cause: the boundaries'
+`metadata` export is honoured when the server renders the boundary, but Next
+re-resolves metadata from the **matched route** on the client, and the page that
+threw `notFound()` is gone, so the layout's `title.default` wins.
+
+Fix: `components/not-found/NotFoundTitle.tsx` — a `"use client"` effect that sets
+`document.title` from inside the boundary, covering every 404ing route at once.
+Chosen over a `generateMetadata` per 404-able route, which would have to repeat
+each page's backend fetch just to learn it is going to 404 (`cache: "no-store"`,
+so no dedupe). It spells out the ` - Psakhmer` suffix the template in
+`app/[locale]/layout.tsx` adds — **change it in both places.**
+
+Also worth recording: **`notFound()` bodies are not SSR-inlined in production
+either**, not just in dev. Against `next start`, the 404 response's body is empty
+and the design renders after hydration; the status and `<head>` are correct
+throughout. So a 404 cannot be verified by grepping curl output — it needs a real
+browser.
+
+## Root cause found: the whole app was client-rendered
+
+Flipping to `notFound()` still returned **200** — `not-found.tsx` never ran.
+Cause: `components/client-theme-provider.tsx` wrapped the next-themes
+`ThemeProvider` in `next/dynamic(…, { ssr: false })`, and a single `ssr: false`
+dynamic in the tree makes React bail out to client-side rendering for the entire
+route. Every page shipped an empty `<body>` with
+`data-dgst="BAILOUT_TO_CLIENT_SIDE_RENDERING"`, so Next had already flushed a
+**200** and `notFound()` could never change it.
+
+Fix: the wrapper is now a plain re-export (next-themes 0.4.6 is SSR-safe and
+`theme-provider.tsx` already silences React 19's false-positive script-tag
+warning). This restores server rendering app-wide — `/en` SSR text went from
+~0 to ~4.5 KB — and is what makes the 404 status real.
+
+## Verified (browser + curl, against the running dev server on :3001)
+
+- **Status codes**: `/en/sgshhdsahdhshad`, `/en/category/nope`,
+  `/en/category/cars-and-vehicles/nope`, `/en/nonexistentuser/about` and
+  `/en/title-adid-<unknown-uuid>` were all **200 before, all 404 now**. `/en`,
+  `/en/all-ads`, `/en/category/cars-and-vehicles`,
+  `/en/category/cars-and-vehicles/cars-for-sale` and a real
+  `/en/<title>-adid-<uuid>` (id `53518e80-…)` all still 200 with their content.
+- **DOM probe** (headless chromium + CDP, port 9335): navbar ✓, footer ✓, h2 =
+  the mock's headline, h3 = "Find Product by Categories", the artwork SVG ✓,
+  both links with correct hrefs, **12** category tiles pointing at the right
+  `/en/category/<slug>` URLs, 0 broken images.
+- **Both themes**: screenshotted light and dark; next-themes still resolves and
+  applies `.dark`.
+- **Console**: no exceptions on `/en`, `/en/all-ads`, both category levels, the
+  404 and `/en/login`; only pre-existing `next/image` width/height warnings from
+  the footer payment icons.
+- **Admin surface** smoke-tested (`/wanderer/login` → 200, form SSRs) since it
+  shares the theme provider.
+- Gates: `pnpm --filter web lint` **0 errors** (1 pre-existing warning in an
+  untouched file); `pnpm --filter web build` **exit 0**, compiled successfully.
+
+## Notes / left open
+
+- **The `ssr: false` removal is the one change here with a blast radius beyond
+  404s** — it is the root-cause fix for the silent-200 problem, and the reason
+  every page now server-renders. Reverting it alone would put the app back on
+  client rendering and the 404s back to HTTP 200.
+- **`notFound()` bodies are not server-rendered in dev.** The shell comes back
+  with an empty `<body>` plus the RSC payload, and the boundary renders after
+  hydration. The status is correct and the browser shows the page; whether
+  production SSR-inlines it was not checked (a `next build` was run, but not a
+  `next start` alongside the running dev server).
+- **`/zzz/foo`** (an invalid locale segment) still gets Next's built-in 404,
+  not this page: `[locale]/layout.tsx` throws `notFound()` from above both
+  boundaries, and there is no root `app/not-found.tsx`. Covering it needs a
+  root boundary with its own `<html>`/`<body>` shell — a separate decision,
+  since this app renders two root layouts. Left as-is.
+- **Copy is hardcoded English**, per the captain's call — no `NotFound` i18n
+  namespace was added, so the page reads English on all six locales.
+- `components/ui/empty.tsx` (shadcn Empty primitives) exists but is unused; not
+  adopted here.
+- Pre-existing and untouched: `/en/login` has one broken static image, and the
+  footer carries stale "PSA-NPIC" copy.
+
+# Ship: follow / unfollow / followers / following — 2026-09-28
+
+## What changed
+
+**Backend**
+
+- `user_follows` (`src/db/schema/users.schema.ts`) — mirrors `user_blocks`:
+  unique pair index, reverse index on `following_id`, `follower_id <>
+following_id` CHECK, both FKs `ON DELETE CASCADE`. Migration
+  **`0027_add_user_follows`** (generated, then renamed from drizzle's
+  `0027_blue_whistler` to the descriptive convention, `meta/_journal.json` tag
+  updated to match).
+- `UsersService` gains `followUser` / `unfollowUser` / `isFollowing` /
+  `getFollowCounts` / `getPublicProfile` / `listFollowers` / `listFollowing`,
+  beside the block methods. **Both writes are idempotent**: `POST` rides
+  `onConflictDoNothing`, and `DELETE` deliberately does _not_ 404 on a missing
+  edge (unlike `unblockUser`) — the control is a toggle, so a double-tap has to
+  land on "not following", not an error toast.
+- Follow refuses with 403 when _either_ side has blocked the other, reusing
+  `isBlockedEitherWay` from `chat/blocks.util.ts` rather than duplicating it.
+- A genuinely new edge writes one `follow.created` notification; the
+  `.returning()` row gates it, so a replay cannot double-notify. `UsersModule`
+  now imports `NotificationsModule` (not `@Global()` by design, so that import
+  is the deliberate "this module now sends notifications" choice).
+- Routes: public `GET /users/by-username/:username`; JWT `GET/POST/DELETE
+/users/:id/follow`, `GET /users/:id/followers|following`, `GET
+/users/me/follow-counts`. `PublicProfile` is an explicit allow-list — no
+  phone, email, role or moderation state.
+
+**Web**
+
+- The public profile is now **real**: `/[slug]` and `/[slug]/about` resolve the
+  handle against real accounts via `lib/api/users.ts` and 404 otherwise.
+- `FollowButton` (new, client) owns the behaviour only — optimistic toggle,
+  rollback, sign-in bounce — and each surface keeps its own chrome. Wired into
+  `PublicProfileHeader` (the button was dead code: **no `onClick` at all**) and
+  `Profile-Sidebar` (was a `setTimeout` + toast that only _pretended_ to
+  follow).
+- The Following/Followers "links" were `<a href="">` — a page reload. They now
+  point at real routes.
+- `FollowListCard` + `FollowListSection` — one card serving both surfaces,
+  matching the mock: title, `Following | Followers` tabs (real links, so each
+  list is its own shareable URL), rows, and the muted-circle empty state.
+- New routes: `/[username]/followers|following` and `/me/followers|following`.
+- `/me` header counts are real (`GET /users/me/follow-counts`) — they were
+  hardcoded `1` / `2`. The public header's `Joined` line rendered a raw ISO
+  timestamp until the browser caught it; `toProfileUser` now emits the same
+  display format the `/me` header uses.
+- `About` now applies the 2026-09-24 "no data, no row" rule — real profiles
+  carry no phone/email/link/location, so those rows are omitted rather than
+  rendered empty. (A two-phone user also no longer prints as one concatenated
+  string.)
+
+## Verification
+
+- `pnpm --filter backend build` ✓, `lint` ✓ (0), `test` **30 suites / 349
+  tests** (was 340 — 9 new follow tests: self-follow 400, missing target 404,
+  blocked 403, notify-once, no-notify-on-replay, unfollow idempotency, count
+  column mapping, list ordering + `isFollowing`, soft-deleted row dropped).
+- `pnpm --filter web build` ✓ exit 0 (the type gate — this app has no
+  `check-types`), all four new routes registered; `lint` 0 errors (1
+  pre-existing warning in an untouched file).
+- **Live API** against the running backend, two real seeded users: follow →
+  `{following:true}`; re-follow → still `true` with **exactly one**
+  `follow.created` row; counts `{followers:0,following:1}`; the followers list
+  carries `isFollowing`; anonymous `GET /users/by-username/sokdara2` returns the
+  profile with no phone/email; self-follow → 400; anonymous follow → 401;
+  unknown handle → 404. Block rule verified: B blocks A → A's follow is **403
+  `Following unavailable`**, unblock → follow succeeds.
+- **Browser** (headless chromium, raw CDP): `/en/sokdara2` renders the real
+  account (h1 "Sok Dara", `@sokdara2`, "Joined 18 Aug 2026", real counts, links
+  to `/en/sokdara2/following|followers`). Clicking Follow moved the header
+  **0 → 1 Followers** and the button to "Following"; `/en/me/following` then
+  listed that account; unfollow returned both to 0. Screenshots taken in **light
+  and dark**; the card matches the mock in both. A row for your _own_ account
+  correctly renders no toggle.
+- Dev DB left as found — the verification follow was removed and the test
+  notification deleted.
+
+## Notes / left open
+
+- **The migration ledger needed a repair first, and this is the sharp edge.**
+  drizzle-orm 0.36.4's migrator compares **only the newest `created_at`** in
+  `drizzle.__drizzle_migrations` against each entry's `when`, with no per-hash
+  check. Because `0021`–`0026` were renumbered on the chat merge — applied under
+  their _branch-era_ timestamps — a plain `db:migrate` would have re-run `0023`–
+  `0026` and died on `CREATE TABLE "notifications"`. Repaired by syncing each
+  applied row's `created_at` to its journal `when`, keyed by content hash;
+  backup at `drizzle.__drizzle_migrations_backup_20260928`. **Any DB built from
+  the old branch ordering will drift the same way — check the watermark before
+  trusting `db:migrate`.**
+- **Mock-only profile URLs now 404 by design** (`/en/nenneang`, …) — the
+  intended consequence of making profiles real.
+- **Follower lists require a login.** Deliberate: it is what gives each row a
+  correct toggle without an N+1. If they should be public instead, it is a
+  one-line guard change and rows lose their follow state.
+- **The follow and its notification are not one transaction** (`notify()` uses
+  its own Drizzle client, so it cannot join the insert). A failure there 500s
+  while the follow persists; a retry cannot double-notify.
+- **The profile's Home tab still shows the mock empty feed** —
+  `components/profile/Home.tsx` ignores its `user` prop, so the owner's real ads
+  are not listed there yet. Out of scope for this ship.
+- **`lib/api/users.ts` sits beside the dead `lib/users.ts`**, which still
+  defines a competing `followers: string[]` model and is imported by nothing.
+
+---
+
+# Chat could not send images — the composer deleted its own draft (2026-09-28)
+
+Reported as "i cannot send image to one user to one user". Not a backend
+problem: `POST /files/sign` → Supabase `PUT` → `POST /chats/messages` were each
+proved working by direct API probe before any code was touched. The image never
+left the browser.
+
+## What changed
+
+- `apps/web/components/chat/composer.tsx` — `handleFile` set `accepted = true`
+  **inside** a `setStaged` updater and then read it on the next line. React runs
+  an updater during the next render, so `accepted` was still `false`: every
+  attach called `removeDraftImage()` on the draft it had just stored and
+  toasted "Maximum N images allowed." The draft was gone by send time, where
+  `dispatch` skipped it. The staged list now has an authoritative `stagedRef`;
+  every mutation goes through one `commitStaged` helper that writes ref and
+  state together, and the limit is a synchronous check-and-commit with no
+  `await` between them — the guarantee the in-updater check was reaching for.
+  `submit()` and `discardStaged()` moved onto the same helper so the ref cannot
+  drift.
+- `apps/web/hooks/use-chat-thread.ts` — a missing draft was `continue`d: no
+  request, no bubble, no toast. It now throws into the existing failure branch,
+  so a lost draft marks the bubble failed and toasts instead of vanishing.
+
+## Regression window
+
+`9a03cbf` (2026-09-23, "add groupId to message DTO") introduced the pattern.
+The dev DB's newest image message before this ship was 2026-09-24.
+
+## Verification
+
+- **Live browser** (headless chromium + CDP, session minted with `node:crypto`;
+  `Storage.prototype.setItem/removeItem` instrumented so every draft write and
+  delete is visible).
+  - Before: attach ×3 → `set` immediately followed by `remove` on the same
+    `chat-draft:…` key, plus a bogus "Maximum 5 images allowed." toast each
+    time; Send produced **zero** network calls.
+  - After: attach leaves the draft in storage, no toast; Send runs
+    OPTIONS + PUT to Supabase (200) and clears the draft only after sending.
+- **DB**: new row `5b5114a3` (`client_message_id …-img-0`) with `image_path`
+  and `image_url` set, in conversation `0b935ec3`.
+- **Limit guard re-proved after the refactor**: 5 files stage (attach button
+  disables), the 6th is refused with the toast, staged stays 5, and no stray
+  draft is left in storage.
+- `pnpm --filter web lint` → 0 errors (1 pre-existing warning,
+  `AdminLoginForm.tsx`, untouched). `npx tsc --noEmit -p apps/web/tsconfig.json`
+  → clean.
+
+## Notes / left open
+
+- **Text is unaffected, and images stay plaintext.** The E2E path covers text
+  only in v1 — `e2eHeader` + `imagePath` is a 400 — so this fix does not touch
+  the encrypt path.
+- **Prettier re-wrapped one unrelated JSX line** in `composer.tsx` (`<div
+key={s.key} …>`), from the repo's post-edit format hook.
+- **Three test image messages and their storage objects** were left in the dev
+  conversation `testtest001 ↔ abcabc` by this investigation
+  (`2cb952b5`, `f8afb2f7`, `5b5114a3`). Delete them if they should not stay.
+
+---
+
+# Ship: a seller's post history on the public profile — the grid was a hardcoded mock (2026-09-29)
+
+Reported (verbatim): "when i visit other user account, it cannot see there post history" — with a screenshot
+of `/en/testtest001` showing "No Result Found / You don't have any post right now".
+
+`testtest001` had **11 active listings** at the time. Two independent causes:
+
+1. **`components/profile/Home.tsx` was a mock that could never render a post for anyone.**
+   `export default function HomeProfile({}: { user: User })` destructured _nothing_ — it ignored the
+   profile it was rendered for and returned a fixed empty state. Every account read empty, always.
+2. **Nothing could ask for one seller's ads.** `findFeed` (`GET /listings`, `@Public`) hardcoded
+   `status='active'` with no owner filter. The only owner-scoped query, `findMine`
+   (`GET /listings/me/all`), is scoped to the _caller's_ JWT **and does not filter status** — reusing
+   it for a public page would have leaked drafts, which is why the feed was extended instead.
+
+## What shipped
+
+**Backend (additive; no migration, no route added).**
+
+- `QueryListingsDto.userId` (`@IsUUID()`) → `findFeed` pushes `eq(listings.userId, …)`. The feed's
+  unconditional `status='active'` is what makes it safe to expose anonymously: `userId` narrows the
+  feed, it can never widen what the feed may show.
+- `GET /categories?userId=` → `CategoriesService.listCategories(locale, userId?)`, scoped by an
+  `inArray(categories.id, <subquery over active listings>)`. Chosen over a new
+  `GET /listings/sellers/:id/categories` because this service already owns the aliased-translation
+  joins and the `reqName ?? enName ?? slug` fallback the strip's names and icons need.
+  _(The plan's stated reason — that a new listings route would be swallowed by `@Get(':id')` — is
+  wrong: `:id` matches one segment. The conclusion stands on the translation-join reason alone.)_
+- The param is read via `@Query('userId', new ParseUUIDPipe({ optional: true }))`, **not** a DTO —
+  see the gotcha below.
+
+**Web.**
+
+- `getListingsFeed` / `getAllCategories` gained `userId`; new `getSellerAdsBatch` mirrors `getAllAdsBatch`.
+- `HomeProfile` is now a real client feed: the first screen server-rendered, the rest appended from the
+  feed's own cursor by the same IntersectionObserver pattern `AllAdsFeed` uses. The bar's grid/list
+  toggle is live (its search/Filter/Location stay decorative — explicitly out of scope).
+- New `SellerCategories` — the strip, rendered only when the seller has **>1** category (one category is
+  not a choice). A tile sets `?category=` on the profile and stays on the seller rather than linking away
+  to `/category/<slug>`; re-tapping the applied tile clears it.
+- `[slug]/page.tsx` resolves `?category=` **against the seller's own categories**, so a stale or
+  hand-edited link falls back to the unfiltered feed instead of a filtered grid whose tile is not on the
+  page and which nothing could clear.
+
+## Verification
+
+- **Backend:** 30 suites / 353 tests pass (new: three `findFeed` seller-scope cases that compile the
+  WHERE clause and assert `"status"` + `'active'` survive and the id is bound as a param; three
+  controller cases for locale + scope forwarding). `lint` 0 problems, `build` clean.
+- **Web:** `tsc --noEmit` clean; `pnpm --filter web lint` 0 errors (1 pre-existing warning,
+  `AdminLoginForm.tsx`, untouched).
+- **API, against the live dev DB:**
+  - `?userId=testtest001&limit=24` → **11** items, `hasMore:false`; none is another seller's.
+  - `?userId=testtest001` on `/categories` → exactly its **5**; unscoped → **12** (unchanged).
+  - `?categorySlug=fashion-and-beauty` → 5; `jobs` → 1; unknown slug → `200` + `[]`; bad uuid → `400`.
+- **Draft exclusion, proved by mutation then restored:** flipped one of that seller's ads to `draft` →
+  feed **11 → 10** with the row absent and the strip **5 → 4** categories (dropping `services`), then
+  restored to `active` → **11** again. The dev DB has no non-active rows at all, so without this the
+  claim could only have been asserted, not shown.
+- **Live browser** (headless chromium + CDP, 1440×1000, light):
+
+  | Page                                          | Result                                                                                                |
+  | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+  | `/en/testtest001` (11 ads, 5 cats)            | **11 cards**, strip of 5, no empty state, old copy gone                                               |
+  | grid/list toggle                              | list view renders **11 full-width rows (1246px)**, trigger states flip                                |
+  | strip tile tap                                | URL → `?category=cars-and-vehicles`, feed narrows to **1**, strip keeps 5 with the active tile marked |
+  | `/en/hlandverify` (1 cat, 30 ads)             | **no strip**, and scrolling pages **24 → 30**                                                         |
+  | `/en/hlandverify?category=fashion-and-beauty` | **24 cards** — foreign slug ignored, no dead end                                                      |
+  | `/en/sokktest` (0 ads)                        | correct empty state, copy now **"No posts yet."**                                                     |
+  | `/en/admin` (74 ads, 8 cats)                  | 24 cards + 8-tile strip                                                                               |
+
+## Notes / left open
+
+- **A `@Query()` DTO on a route that had none silently narrows a public endpoint.** `main.ts` sets
+  `forbidNonWhitelisted: true` globally, so adding `@Query() query: ListCategoriesDto` to `GET /categories`
+  turned `?foo=1` (and a cache-buster) from **200 into 400** — a contract change on a public URL.
+  Caught by measuring it live (`?foo=1` → 400) and replaced with a named `@Query('userId', pipe)`, which
+  validates the one param the route reads while leaving every other key ignored exactly as before.
+- **`findById` (`GET /listings/:id`, `@Public`) applies no status filter**, so a draft is fully readable
+  by UUID. Pre-existing, out of scope here, but it is the same class of leak this ship took care to avoid
+  — and the profile is only draft-proof because it goes through `findFeed`.
+- **`expiresAt` is not enforced anywhere.** `publish()` sets it, nothing reads it, so a lapsed ad keeps
+  `status='active'` and keeps both its card and its strip tile. The comment in `categories.service.ts` says
+  so explicitly rather than claiming expiry is handled.
+- **Deliberately not refactored:** `HomeProfile`'s feed mechanics (observer + sentinel + dedupe) are a
+  ~60-line twin of `AllAdsFeed`'s, and `getSellerAdsBatch` is a 3-line twin of `getAllAdsBatch`.
+  Extracting a shared `CursorFeed` is the highest-value cleanup here, but it would edit a working,
+  verified All Ads surface for no user-visible gain. Left as a follow-up.
+- **The bar's search box, Filter and Location are still dead controls** directly above a live grid.
+  That was the approved scope (full filter-bar parity was offered and declined), but it is the obvious
+  next thing to wire — and when it is, note that the shared filter components rewrite the whole query
+  string, which would drop a bare `?category=`.
+- **`CategoryDto.subcategories` is unscoped** when `?userId=` is used: the rows are filtered, but every
+  active subcategory of each matched category still comes along. Harmless today (the strip renders
+  categories only); a half-scoped payload if anything else ever consumes it.
+- Test fixtures used (`testtest001`, `hlandverify`, `admin`, `sokktest`) are pre-existing dev accounts.
+  Nothing was created; the one status flip was restored in a `finally`.
+
+---
+
+# Ship: profile category strip — drill-down, one band, and the collapsed bar (2026-09-29, part 2)
+
+Follow-up to the part-1 ship above, from the captain's review of it:
+
+> "issues: [2], i want like this: [3]. so they are not seperate like we have now, and when i click car for
+> sale it show the subcategory [4], and dynamic the data listing without refresh page. and then i click car
+> for sale, it will show [5]"
+
+Three changes, plus one regression the screenshots exposed.
+
+## 1. The bar had collapsed to its own content width (a part-1 regression, visible in image 2)
+
+`<main className="max-w-7xl mx-auto">` was wrapped in `<Tabs>` last ship. The shadcn Tabs root is a **flex
+column**, and an auto inline margin on a flex item **cancels `stretch`** — so the bar sized to its own
+contents: **370px wide, centred**, inside a 1440px page. Measured: `main` 370, Tabs root 1248, the band
+beside it 1248. Dropped `max-w-7xl mx-auto` (the parent already centres and caps the page); both are now
+**1248 and aligned**. The original mock had the bar as a plain block child, where `mx-auto` behaved as
+intended — the flex parent is what broke it.
+
+## 2. Separate cards → one continuous band
+
+Each tile used to be its own `bg-card rounded` card with a `gap-2` gutter. Now one `overflow-hidden border
+bg-card` container holds a `grid-cols-6` list, tiles edge-to-edge with hairline `border-l` dividers. The
+divider is keyed on `i % 6 !== 0`, so a **wrapped row's first tile** sits clean against the container edge —
+verified in the DOM: the 2nd tile's left border is `1px solid`, the 7th's is `0px`.
+
+## 3. Two-level drill-down, client-side
+
+- **Backend:** `listCategories` now scopes the **subcategory** query too, with the same listings subquery.
+  It previously returned every active subcategory in the catalogue (146) nested under the seller's
+  categories — harmless for a strip that rendered the category level, but wrong, and the drill-down renders
+  exactly that level. Scoped: **46** for `admin`, unscoped: **146**, each matching the DB's own counts.
+- **Web:** `HomeProfile` owns `{category, subcategory}` beside `posts`/`cursor`; tapping fetches the next
+  slice from `getSellerAdsBatch` and swaps the grid. Tiles are real `<a href>`s (the same URL the drill
+  writes) with the plain click intercepted — so **middle-click and copied links work**, while a plain click
+  stays in place. The selection is mirrored with `history.replaceState`.
+- `SellerCategories.tsx` deleted (superseded — the strip is client state now, not a server fetch).
+
+## Verification
+
+- Backend 31 suites / 356 tests; new `categories.service.spec.ts` asserts **both** scopes exist, that each
+  filters on seller + `active`, and that the unscoped path issues no `listings` subquery at all (the guard
+  that protects `buildRealDetailData`, whose post-detail breadcrumb reads `subcategories`). `lint`/`build` clean.
+- Web `tsc --noEmit` clean; `lint` 0 errors (1 pre-existing warning, `AdminLoginForm.tsx`).
+- **API:** scoped subcategories per category match the DB exactly (cars 10, electronics 12, home-and-land 9,
+  jobs 1, fashion 1, furniture 1); unscoped still 146.
+- **Live browser** (CDP, 1440×1000), on `/en/admin` — and **"no refresh" was proved, not asserted**: a marker
+  set on `window` plus `performance.timeOrigin` were checked after every tap and **survived all of them**,
+  which a remount or reload cannot do.
+
+  | Step                                                        | Result                                                                                                                |
+  | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+  | root                                                        | 8 tiles, 24 cards, no breadcrumb                                                                                      |
+  | tap _Cars and Vehicles_                                     | `?category=cars-and-vehicles`, crumbs `admin › Cars and Vehicles`, **10 subcategory tiles**, 24 cards, **no refresh** |
+  | tap _Cars For Sale_                                         | both params, 3 crumbs, **8 cards**, applied tile marked, **no refresh**                                               |
+  | crumb _Cars and Vehicles_                                   | back to the category level, 24 cards, **no refresh**                                                                  |
+  | crumb _admin_                                               | back to root, 8 tiles, **no refresh**                                                                                 |
+  | **rapid taps** (_Bicycles_ then _Cars For Sale_, same tick) | final grid = **Cars For Sale**, 8 cards — the last tap wins                                                           |
+  | _Jobs_ (one subcategory)                                    | **no band**, breadcrumb still the way back, 3 cards                                                                   |
+  | list toggle after a drill                                   | **1246px rows** (a grid card is 300px)                                                                                |
+  | scroll after a drill                                        | 24 → **29** — the drilled cursor pages correctly                                                                      |
+  | deep link `?category=…&subcategory=…` reloaded              | 8 cards, 3 crumbs, applied tile marked                                                                                |
+
+- Band measured in the DOM: **1 container**, 10 tiles, 6 columns, tiles 208/207/207px — they tile
+  edge-to-edge within the 1248px band, i.e. no gaps.
+
+## Notes / left open
+
+- **The empty circles in the band are data, not a bug.** All 10 cars-and-vehicles subcategories carry
+  Supabase **Storage** URLs, but 9 of them now 400 (`bicycles`… `vehicles-others`; only `cars-for-sale`
+  returns 200). That is the known "the objects are gone" gap, and `DbImage` renders an empty circle for a
+  dead object by the captain's 2026-09-10 decision to leave the catalogue imageless — it never substitutes a
+  stand-in. They return the moment an admin uploads icons through the admin UI.
+- **Back/forward do not walk the drill levels** — `replaceState` writes no history entry, by design; the
+  breadcrumb is the navigation. The repo made the opposite call once (`OptionGrid`: "PUSH, not replace… Back
+  walks the drill-down back one choice at a time"), so this is a deliberate divergence, not an oversight: a
+  router push would be a server render, and `pushState` would restore the router tree rather than the grid,
+  leaving the strip and the listings disagreeing.
+- **`replaceState` must never be called from an effect on mount**: Next patches the method in the App
+  Router's own effect, and child effects run first, so an early call hits the native one with `data === null`,
+  wiping that entry's history state and leaving Back dead. The call lives in the click handler for that
+  reason.
+- **`HomeProfile` is keyed on `profile.id` alone.** Keying on the filter would let a `FollowButton`-triggered
+  `router.refresh()` remount the drill-down away if the page re-validated the category out of existence.
+- Still dead by decision: the bar's search box, Filter and Location. Note for whenever they are wired — the
+  shared filter components rewrite the whole query string, which would drop a bare `?category=`.
+- `HomeProfile`'s feed mechanics remain a twin of `AllAdsFeed`'s (observer + sentinel + dedupe). The
+  concurrency guard is now a single query key rather than a counter, which is the piece worth lifting if the
+  two are ever merged.
+
+---
+
+# Rebuild + correct: profile post history — three-row panel, right row rules (2026-10-02)
+
+**The earlier ship was reverted out of the working tree and this rebuilds it.** A targeted
+`git restore` of exactly the paths involved landed 2026-09-29 ~10:54 (no matching `reset`/`checkout`
+in the reflog, so it was a pathspec restore, not a branch operation). It had put `Home.tsx` back to
+the committed mock — `HomeProfile({}: { user: User })`, hardcoded "No Result Found" — so **every
+profile read empty again**, i.e. the original bug was back. `SellerCategoryStrip.tsx` was gone and
+the backend `?userId=` scoping was gone from both `listings` and `categories`. The captain confirmed
+the revert was **not deliberate**. Rebuilt from `tasks/todo.md` + the approved plan.
+
+## The corrections this ship adds
+
+**1. One panel, three rows.** The category row used to be a separate card with a gap below the bar.
+It is now the panel's third row: rows 1–2 (search/Filter, Location + grid/list toggle) in a padded
+div, then `border-t`, then the category row full-bleed — `bandWidth === panelWidth === 1248` and
+`borderTopWidth: 1px` measured in the DOM. The card lost its blanket `p-4` so the band can span it.
+
+**2. A row shows only when it has more than one option** — the captain's rule, applied per level.
+`options` resolves as: the selected category's subcategories → else the categories (when there is
+more than one) → else the single category's subcategories. Rendered iff `options.length > 1`.
+
+**3. A single-category seller keeps their subcategory row.** This is the case that was **unreachable
+before** and is the real fix here: with only one category there is no category choice, so the row
+that has a choice is the subcategory row. `hlandverify` — one category, **12** subcategories, 30 ads
+— previously got no row at all and no way to narrow anything; it now shows its 12 subcategories with
+no category row above them.
+
+## Verification
+
+- Backend 31 suites / **356 tests** (the `findFeed` seller-scope cases and the new
+  `categories.service.spec.ts` are both back: each scope filters on seller + `active`, the id is a
+  bound param, and the unscoped path issues no `listings` subquery — which is what protects
+  `buildRealDetailData`'s post-detail breadcrumb). `lint`/`build` clean. Web `tsc` clean, `lint` 0
+  errors (1 pre-existing warning).
+- **API:** scoped `admin` → **8** categories / **46** subcategories; unscoped → **12** / **146**;
+  `hlandverify` → 1 category with **12** subcategories. Contract intact: `?foo=1` → **200** (the
+  param is a named `@Query('userId', ParseUUIDPipe)`, not a DTO — `forbidNonWhitelisted` is global and
+  a DTO would have turned stray keys into 400s), and `?userId=bad` → **400**.
+- **Live browser** (CDP), "no refresh" **proved** with a `window` marker + `performance.timeOrigin`
+  surviving every tap:
+
+  | Case                                    | Result                                                                                |
+  | --------------------------------------- | ------------------------------------------------------------------------------------- |
+  | `admin` root                            | **8 category tiles with real icons**, no breadcrumb, 24 cards, band inside the panel  |
+  | → _Phones & Tablets_                    | row becomes its **5 subcategories**, crumb `admin › Phones & Tablets`, **no refresh** |
+  | → _Tablets_                             | 3 crumbs, 1 card, applied tile marked, **no refresh**                                 |
+  | **`hlandverify`** (1 category, 12 subs) | **no category row, 12 subcategory tiles shown** ← the corrected rule                  |
+  | `jobtester` (1 category, 1 sub)         | **no row at all**                                                                     |
+  | `admin` → _Jobs_ (1 sub)                | **no row**, breadcrumb `admin › Jobs` is the way back                                 |
+  | `admin` → _Cars and Vehicles_           | 10 tiles; list toggle → 1246px rows; scroll pages 24 → **29**                         |
+  | deep link `?category=…&subcategory=…`   | returns to the right level, applied tile marked                                       |
+
+- Screenshot checked against the reference: three rows in one panel, hairline above the category row,
+  category tiles rendering product imagery.
+
+## Notes / left open
+
+- **Category icons resolve; most subcategory icons do not.** All 12 category icons return 200, which
+  is why the category row matches the mock. But of `cars-and-vehicles`' 10 subcategories only
+  `cars-for-sale` resolves — the other 9 return **400** because their Storage objects are gone. By the
+  captain's 2026-09-10 decision a dead object renders an **empty circle**, never a stand-in, so
+  subcategory rows look sparse until an admin re-uploads icons. That is data, not code.
+- **If work goes missing again, check `tasks/todo.md` first** — the ship log survived the revert and
+  was what made this rebuild a transcription rather than a redesign. `git status` on the touched paths
+  is the tell: a path resting at HEAD while its ship log entry says otherwise means a restore.
+- Carried-forward fixes, all re-applied and each of which cost a cycle previously: no `mx-auto` on a
+  flex child (the Tabs root is a flex column, so an auto inline margin cancels `stretch` and collapses
+  the panel), `replaceState` only from the click handler (never an effect — on mount Next has not
+  patched it and an early call wipes the history entry), `cursor` cleared _before_ awaiting on a
+  drill-down, and `HomeProfile` keyed on `profile.id` alone.
+- Still dead by decision: the bar's search box, Filter and Location.
+
+---
+
+# Profile strip: clean row, breadcrumb only where it earns its place, Back walks the drill (2026-10-02, part 2)
+
+Three corrections from the captain's review of the rebuild above.
+
+## 1. No rules between the tiles
+
+Row 3 had a hairline `border-l` between every tile. Removed — the clean strip in the reference has
+no dividers, and the tiles' own spacing is what separates them. Measured after: `borderLeftWidth: 0`
+on every tile, at the root and after drilling.
+
+## 2. The breadcrumb stops once a subcategory is picked
+
+It appears when you tap a **category** (`test test 001 › Cars and Vehicles` — the state in the
+captain's screenshot) and disappears once you tap a **subcategory**: the row below is already
+filtered and the applied tile is marked, so the crumb was only repeating the tap back. Going back
+is the Back arrow (see 3); tapping the marked tile still steps up as a secondary affordance, which
+also covers a visitor who lands on a shared deep link.
+
+## 3. The browser Back arrow now walks the drill
+
+The drill used `history.replaceState`, so it deliberately left no history entry and Back skipped
+straight out of the profile — the captain asked for Back to work instead. Each pick now
+`pushState`s and a `popstate` listener replays whichever selection the browser restored into the
+URL (`mode: "none"`, so it does not push again). `history.length` went 2 → 3 → 4 across two picks
+and Back stepped root → 10 tiles → root.
+
+**The push still does not refetch.** Raw history goes through Next's router either way, but a
+history restore is served from the tree the router already holds; the network log during a tap shows
+only the server action `POST` plus image GETs — no RSC request, no document navigation — and the
+`window` marker plus `performance.timeOrigin` survived every step including both Backs.
+
+## Verification
+
+- Web `tsc --noEmit` clean; `lint` 0 errors (1 pre-existing warning). No backend change this round.
+- Live browser (CDP), `admin` (8 categories, 10 in cars-and-vehicles):
+
+  | Step                    | Result                                                                                         |
+  | ----------------------- | ---------------------------------------------------------------------------------------------- |
+  | root                    | 8 tiles, no breadcrumb, **0 dividers**                                                         |
+  | tap _Cars and Vehicles_ | breadcrumb `admin › Cars and Vehicles`, 10 tiles, 24 cards, `history.length` 3, **no refresh** |
+  | tap _Cars For Sale_     | **breadcrumb gone**, 8 cards, applied tile marked, `history.length` 4, **no refresh**          |
+  | **Back**                | `?category=cars-and-vehicles`, breadcrumb returns, 10 tiles, 24 cards, **no refresh**          |
+  | **Back again**          | root, no breadcrumb, 8 tiles, 24 cards, **no refresh**                                         |
+
+- Screenshot compared against the reference: no dividers, tiles reading as one clean strip.
+
+## Notes / left open
+
+- **A shared deep link to a subcategory has no in-page way to widen** other than tapping the marked
+  tile, because the crumb is hidden at that level and Back would leave the profile (it has no
+  history inside it on a cold load). The marked-tile toggle is what covers this; if that should be
+  something more explicit, it is a small addition.
+- Subcategory icons remain mostly dead Storage objects (9 of 10 in `cars-and-vehicles` return 400),
+  so subcategory rows still show empty circles. Captain's call in the review was to keep the design
+  as-is in that case. Data, not code.
+
+---
+
+# Profile category row adopts the homepage tile pattern (2026-10-02, part 3)
+
+> "you can check the design on homepage, that the design pattern i want to use there. not like this,
+> but this"
+
+The row's tiles were their own thing — a `bg-blue-50` circle on a padded tile that filled
+`bg-blue-50/60` on hover and when applied. That fill was the blue block the captain circled in the
+"not like this" screenshot. The homepage's **Browse By Category** tiles are a bare column: a
+`bg-blue-100` circle (hover `bg-blue-200`) over an `mt-4 text-sm leading-tight` label, with nothing
+behind them.
+
+## What changed
+
+**`components/common/CategoryTileBody.tsx` (new)** — the circle-over-label unit, shared by both
+surfaces rather than copied between them, so they cannot drift. It takes `name`/`icon` and an
+optional `active`; the two callers differ only in what wraps it (a category `Link` on the homepage,
+a drill-down anchor on a profile) and in whether the tile is the marked one.
+
+- `components/home/CategoryGrid.tsx` — its inner markup replaced with the shared body (its local
+  `CategoryIconFallback` moved into it). No change to its `Link` semantics.
+- `components/profile/SellerCategoryStrip.tsx` — adopts the same body **and** the homepage's grid
+  rhythm: `grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-x-8 gap-y-8 px-2`, instead of a fixed
+  `grid-cols-6`.
+
+**The marked state no longer draws a box.** It is carried by the tile itself — the circle deepens to
+`bg-blue-200` and the label turns brand blue — so applying a filter can never reintroduce the block
+the captain rejected.
+
+## Verification
+
+- Read off the live DOM on both surfaces and compared class-for-class:
+
+  |                    | homepage                                                                  | profile row                          |
+  | ------------------ | ------------------------------------------------------------------------- | ------------------------------------ |
+  | anchor             | `flex flex-col items-center text-center group`                            | bare column — no `bg-`, `px-`, `py-` |
+  | circle             | `h-16 w-16 … rounded-full transition bg-blue-100 group-hover:bg-blue-200` | **identical**                        |
+  | label              | `mt-4 text-sm leading-tight text-foreground`                              | **identical**                        |
+  | computed circle bg | `lab(92.0301 -2.24757 -11.6453)`                                          | **same value**                       |
+  | grid               | `grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-8`                         | same rhythm                          |
+
+- Marked tile measured after picking _Men's Fashion_ on `testtest001`: anchor background
+  `rgba(0, 0, 0, 0)` (**no box**), circle deepened to `lab(86.15 …)`, label `rgb(0, 160, 233)`.
+  At the category level no tile is marked, which is correct — nothing is filtered yet.
+- `testtest001` root renders its 5 categories (Cars and Vehicles, Jobs, Services, Fashion & Beauty,
+  Furniture & Decor) with icons, 0 dividers.
+- **Homepage re-checked after the extraction** — all 12 categories render with icons and labels; no
+  regression.
+- `tsc` clean, `lint` 0 errors (1 pre-existing warning). Backend untouched: 31 suites / 356 tests.
+
+## Notes / left open
+
+- Subcategory icons are still largely absent — `testtest001`'s fashion subcategories have **no icon
+  value at all**, so they render the `LayoutGrid` glyph in the circle, while `cars-and-vehicles`'
+  have dead Storage URLs and render an empty circle. Both are the documented design (the glyph for
+  no value, an empty circle for a missing object), not a fault in this change.
+
+---
+
+# Profile row: breadcrumb removed entirely, and no glyph stand-in (2026-10-02, part 4)
+
+> "[Image] I told you don't have to keep this... it no need, and why the car and vehicle category, has
+> no other subcategory? use this design pattern there, if no image keep it blank for now, you can keep
+> it blank somewhere else but why you can't do there?"
+
+## 1. The breadcrumb is gone, not just shortened
+
+Part 2 kept the crumb at the category level and hid it only once a subcategory was picked. That was
+the wrong call — the captain had already said it wasn't needed, and image 15 shows it still sitting
+above the row. Removed entirely: no `<nav>`, no crumb at any level. The applied tile is marked, the
+feed below is filtered by it, and going back is the Back arrow (each pick still pushes a history
+entry). The strip's `sellerName` prop went with it, out of `Home.tsx` and the page.
+
+## 2. No icon means an empty circle — the glyph fallback is gone
+
+`CategoryTileBody` used to draw a `LayoutGrid` glyph when a row had no icon **value**, while a row
+whose icon object was missing (dead Storage URL) rendered an empty circle. The captain's point: the
+blank case already worked elsewhere, so why not here. Both cases now render the same empty circle.
+
+This is also the rule the image surfaces already follow — a stand-in chosen by us would claim to be
+the category's image, and a row of them reads as a different design rather than as missing artwork.
+
+**The homepage is unaffected**: all 12 categories have icon URLs, so no glyph was ever drawn there.
+Measured after the change — 12 tiles, 12 with `<img>`, **0 with `<svg>`**.
+
+## 3. "Why has Cars and Vehicles no other subcategory?"
+
+Because the row is scoped to what the seller posted in, and `testtest001` had only one cars
+subcategory at the time — one option is not a choice, so the row hid itself. Confirmed with the
+captain that seller-scoped is what's wanted (a tile that can only lead nowhere is worse than no
+tile), so no change. The seller has since added a second cars subcategory (`bicycles`, "test 1"), and
+the row now correctly appears with both.
+
+## Verification
+
+- Web `tsc` clean; `lint` 0 errors (1 pre-existing warning). Backend untouched: 31 suites / 356 tests.
+- Live browser (CDP), each check read off the DOM:
+
+  | Check                                                            | Result                                                               |
+  | ---------------------------------------------------------------- | -------------------------------------------------------------------- |
+  | breadcrumb, root / category / subcategory                        | **absent at all three** (`nav[aria-label="Category"]` never present) |
+  | `testtest001` → Fashion & Beauty (5 subcats, **no icon values**) | 5 tiles, every circle `svg: 0, img: 0` — blank, no glyph             |
+  | pick a subcategory                                               | no crumb, applied tile marked, feed narrows                          |
+  | Back                                                             | returns to the category level, no crumb, correct feed                |
+  | `testtest001` → Cars and Vehicles (2 subcats)                    | row shows both, no crumb                                             |
+  | `testtest001` → Jobs (1 subcat `design`)                         | **row absent**, feed = that one ad                                   |
+  | homepage Browse By Category                                      | 12 tiles, 12 images, **0 glyphs** — unchanged                        |
+
+## Notes / left open
+
+- The `LayoutGrid`-in-circle fallback is gone from the shared tile, so a _category_ with no icon
+  would now render blank on the homepage too. None currently does (all 12 have icons), but if one
+  ever loses its icon the homepage will show an empty circle rather than the old glyph. That is the
+  captain's stated preference ("keep it blank for now"), recorded here so it is not "fixed" back.
+- `testtest001`'s category spread shifts as the captain tests — Cars and Vehicles went from 1 to 2
+  subcategories between two readings in this same session, so a row appearing/disappearing there is
+  data, not a regression. Check `GET /categories?userId=` before concluding anything.
+
+---
+
+# Profile row: it steps aside once a subcategory is chosen (2026-10-02, part 5)
+
+> "if i click bicycle, then this should not show. I don't click and click again to leave the
+> subcategory. I want this when i click, this third row is not show anymore if user want to go back,
+> then can use browsers back arrow instead."
+
+The row stayed visible after a subcategory was picked, with that tile marked and re-tapping it
+clearing the filter. That toggle was the wrong model: the row's job is done the moment a choice is
+made, and Back is the way out rather than a click-again gesture.
+
+## What changed
+
+- **The row disappears once a subcategory is picked** — `if (subcategory) return null`, alongside the
+  existing "fewer than two options" rule. Because the `border-t` hairline lives inside the component,
+  the panel closes cleanly with **no orphan rule** where the row used to be.
+- **The marked state is gone entirely**, not just hidden. With the row absent whenever a subcategory
+  is set, no tile can ever be marked — `activeSlug`, the toggle-off branch, `aria-current`, and the
+  `active` prop on the shared `CategoryTileBody` were all unreachable and have been removed. The
+  filtered feed is the feedback; there is no "you are here" marker and no trail.
+- The shared tile is now purely a circle and a label, identical on both surfaces.
+
+## Verification
+
+- Web `tsc` clean; `lint` 0 errors (1 pre-existing warning). Backend untouched: 31 suites / 356 tests.
+- Live browser (CDP), on `testtest001` (which has 2 cars subcategories: Cars For Sale, Bicycles):
+
+  | Step                    | Row        | Tiles                   | Hairline | Cards |
+  | ----------------------- | ---------- | ----------------------- | -------- | ----- |
+  | root                    | present    | 5 categories            | 1px      | 12    |
+  | tap _Cars and Vehicles_ | present    | Cars For Sale, Bicycles | 1px      | 2     |
+  | **tap _Bicycles_**      | **absent** | —                       | **null** | 1     |
+  | Back                    | present    | Cars For Sale, Bicycles | 1px      | 2     |
+  | Back again              | present    | 5 categories            | 1px      | 12    |
+
+- Single-category seller re-checked: `hlandverify` root shows its 12 subcategories (no category row);
+  picking _House For Sale_ removes the row too. `NO_REFRESH` held at every step.
+- Screenshot after the _Bicycles_ tap: the panel is just the two filter rows, no third row, no orphan
+  hairline, filtered feed below.
+
+## Notes / left open
+
+- With the toggle gone, a visitor who lands on a **shared deep link** (`?category=…&subcategory=…`)
+  has no in-page way back up — Back would leave the profile, since a cold load has no drill history
+  inside it. The captain's explicit instruction was Back-or-nothing, so this is as specified; worth
+  revisiting only if deep links get shared in practice.
+
+---
+
+# Fix: the seller card invented a handle from the contact name, so every profile link 404'd (2026-10-02, part 6)
+
+Reported: clicking another user showed the 404 page at `/en/qwerqwer`.
+
+## Root cause
+
+Reproduced against the dev DB. The listing **"Luk kmeng khoch"** is owned by the account **`qwer`**,
+but its `contact_name` column — free text the poster typed — holds **`"qwer qwer"`**.
+`toSellerView` (`apps/web/lib/api/categories.ts`) invented the seller's handle from it:
+
+```ts
+const name = l.contactName?.trim() || "Seller";
+const username = name.toLowerCase().replace(/[^a-z0-9]+/g, ""); // "qwer qwer" -> "qwerqwer"
+```
+
+That fabricated handle drove **both** halves of the seller card — the link target
+(`Profile-Sidebar`, `/[username]`) and the handle it printed (`@qwerqwer`). The link landed on a
+profile that does not exist, `getPublicProfile` returned null, and the page called `notFound()`.
+
+**It was never specific to `qwer`.** `contact_name` has no relationship to an account's handle, so
+every listing detail page linked to a made-up one; it appeared to work only when the poster happened
+to type something that slugified onto their real username.
+
+## The fix
+
+**Backend** — `ListingsService.findById` now carries the owner's handle:
+
+```ts
+.select({ listing: listings, sellerUsername: users.username })
+.from(listings)
+.leftJoin(users, eq(users.id, listings.userId))
+```
+
+`ListingWithPhotos` gained an **optional** `sellerUsername?: string | null`, deliberately optional so
+`update`/`publish`/`remove` — which return the row they wrote from their own queries — keep compiling
+untouched. A **left** join, so a soft-deleted owner does not make their listing unreadable.
+
+**Web** — `BackendListing` gained the field; `toSellerView` uses it and the fabrication is **gone**
+(handle `""` and `userlink` undefined when the server has none). `Profile-Sidebar` links to
+`/[username]` only when there is a real handle, and the `@handle` line follows the card's own
+existing "no data, no row" rule. The card's display name still comes from `contactName`, which is
+correct — that is the poster's chosen display name, not their identity.
+
+## Verification
+
+- Backend **359 tests** (3 new: the joined handle is returned; a gone owner yields `null` rather than
+  a missing key; a missing listing still throws), `lint`/`build` clean. Web `tsc` clean, `lint` 0
+  errors (1 pre-existing warning).
+- **API:** `GET /listings/<"Luk kmeng khoch">` → `contactName: "qwer qwer"` **and**
+  `sellerUsername: "qwer"`. `/users/by-username/qwer` → **200**; `/users/by-username/qwerqwer` →
+  **404** (the handle that used to be linked).
+- **Browser** (CDP), on that listing's detail page: the card renders `href: "/en/qwer"` and prints
+  **`@qwer`** (its `h2` still reads "qwer qwer", the contact name). Clicking it lands on `/en/qwer`
+  with **no 404**.
+- **Mock path re-checked** — `car-adid-1` → `/en/reahuhin`, `phone-adid-2` → `/en/nenneang`, both
+  still rendering through `getUserById` with their mock handles.
+
+## Notes / left open
+
+- **`ThreeDotPost`'s "View Profile" is a dead control on real listings** — it resolves the user
+  through the mock `@/lib/data` (`getUserById(post.userId)`), so a real UUID misses, `user` is
+  undefined, and the guarded `router.push` silently does nothing. A wrong-looking button rather than
+  a wrong link, but it is the same family of bug. Fixing it means the **feed** carrying every
+  seller's handle too — an extra join on every feed page — so it wants its own ticket rather than
+  riding along here.
+- The feed does **not** carry `sellerUsername` (only `findById` joins it), which is what keeps feed
+  queries unchanged; `BackendListing.sellerUsername` is documented as detail-only for that reason.
+
+---
+
+# The seller card now shows the seller's actual profile (2026-10-02, part 7)
+
+> "but why the user has profile, but in listing detail show no profile?"
+
+Part 6 fixed the _link_; this fixes what the card **shows**. The card was drawing a placeholder
+identity that read as a profile but was not one:
+
+|                       | the account actually has                 | the card showed                                  |
+| --------------------- | ---------------------------------------- | ------------------------------------------------ |
+| avatar                | an uploaded photo                        | a generated `ui-avatars` circle ("QQ")           |
+| member since          | `2026-08-31` (the account's `createdAt`) | **`Sep 29, 2026`** — the _listing's_ `createdAt` |
+| followers / following | 0 / 0                                    | 0 / 0 hardcoded                                  |
+
+So a seller who joined in August appeared to have joined the day they posted the ad, under a label
+that said "Members Since", and their uploaded photo never appeared anywhere on their own ad.
+
+## The fix
+
+`toSellerView` (`apps/web/lib/api/categories.ts`) is now async and resolves the account's real public
+profile through the one anonymous seller read — `getPublicProfile` →
+`GET /users/by-username/:username` (the existing helper in `lib/api/users.ts`; `GET /users/:id` is
+JWT-protected and cannot serve this). It needs the handle, which part 6 put on the listing, so the
+two changes compose: no handle, no extra fetch, and the card degrades to the old behaviour.
+
+Now taken from the profile: **avatar** (the uploaded photo, with the generated circle only as the
+fallback for an account that has none), **cover**, **members since** (the account's `createdAt`),
+**followers/following**. Still per-ad, from the listing: `contactPhones`/`contactEmail` (the numbers
+the poster chose for _this_ listing) and `company` (from `attributes`).
+
+## Verification
+
+- `tsc` clean, `lint` 0 errors (1 pre-existing warning). Backend untouched: 31 suites / 359 tests.
+- **Browser** (CDP) on "Luk kmeng khoch":
+
+  |               | before                                         | after                                                            |
+  | ------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
+  | avatar        | `ui-avatars.com/?name=qwer%20qwer` — generated | the uploaded Supabase `…20240314_050504.jpg`, `naturalWidth > 0` |
+  | members since | `Sep 29, 2026`                                 | **`Aug 31, 2026`**                                               |
+  | handle / href | `@qwer` / `/en/qwer`                           | unchanged                                                        |
+
+- Screenshot confirms: the seller's real photo in the blue header, `@qwer`, "Members Since Aug 31,
+  2026", Follow button.
+
+## Notes / left open
+
+- **The card's heading still leads with the listing's `contactName`** (`"qwer qwer"`), falling back
+  to the account name only when the ad has none. That is deliberate — it is the name the poster chose
+  for this ad, nothing was reported wrong with it, and switching it to the account name would change
+  what every listing shows. One line in `toSellerView` if the account name should win instead.
+- The extra `getPublicProfile` call is **one server-side request per detail render**, and only when
+  the listing carries a handle; a listing whose owner is gone skips it entirely.
+- Mock posts are untouched — they do not go through `buildRealDetailData` and still render their mock
+  sellers via `getUserById`.
+
+---
+
+# Followers / Following swap in place on a profile — no page refresh (2026-10-02, part 8)
+
+> "next in profile when i click follow or following don't need to refresh the page. `?tab=following`
+> or followers"
+
+The two counts were plain `<Link>`s to **their own routes** (`/[username]/following|followers`), so
+opening a list re-rendered the entire profile around it. They are now `?tab=` views of the profile
+itself, swapped in the browser.
+
+## How it works
+
+**The URL is the state.** There is no lifted state and no new parent wrapper, because both halves
+already have what they need: the counts push the param, the body reads it, and either can change the
+view without the other knowing.
+
+- `lib/profile-tab.ts` (new) — the one place that reads and writes `?tab=`, so the header and the
+  panel cannot disagree about the name or the URL shape. `pushProfileTab` uses raw `history`,
+  exactly as the category drill-down does: Next routes it through the router (so `useSearchParams`
+  consumers see the new URL) but restores the tree it already holds rather than refetching.
+- `PublicProfileHeader` — the counts are anchors to a **real** `?tab=` href (so middle-click and copy
+  still work) whose plain click is intercepted and pushed. Signed out they stay links to `/login`,
+  which is the bounce the old routes performed.
+- `ProfileTabBody` (new, client) — reads the param and renders either the existing `HomeProfile` or
+  the new `FollowListPanel`. Anything that is not `following`/`followers` — including a hand-edited
+  value — falls back to the feed rather than erroring.
+- `FollowListPanel` (new, client) — fetches one page through a new `loadFollowList` action, because
+  the lists are JWT-scoped by design and the browser has no cookies for the API. It distinguishes an
+  empty list from a failed one: saying "no followers" when the request never succeeded is worse than
+  saying nothing.
+- `FollowListCard` gained an **optional** `onSelectTab` (typed as a union, so a caller cannot render
+  tabs that neither link nor switch). With it the tabs are buttons; without it they stay links —
+  which is what keeps `/me/following|followers` byte-identical, since only the profile was in scope.
+- `/[username]/following|followers` are now **redirects** to the canonical `?tab=` URL, kept so links
+  already shared keep working; they still `notFound()` an unknown handle first.
+
+## Verification
+
+- `tsc` clean, `lint` 0 errors (1 pre-existing warning). No backend change: 31 suites / 359 tests.
+- **Browser** (CDP), signed in as `testtest001` via a minted token:
+
+  | Step                                       | Result                                                                          |
+  | ------------------------------------------ | ------------------------------------------------------------------------------- |
+  | feed                                       | `?` empty, no panel; the count's href is a real `/en/testtest001?tab=following` |
+  | click **Following**                        | `?tab=following`, panel renders 2 rows, **no refresh**                          |
+  | switch to **Followers**                    | `?tab=followers`, panel swaps, **no refresh**                                   |
+  | Back                                       | returns to `?tab=following`, **no refresh**                                     |
+  | `/me/following`                            | unchanged — its tabs are still `<a>` links                                      |
+  | `/en/testtest001/following` typed directly | redirects to `/en/testtest001?tab=following`                                    |
+  | signed out                                 | counts link to `/en/login`; a cold `?tab=` redirects to `/en/login`             |
+
+- **"No refresh" proved, not asserted**: a `window` marker plus `performance.timeOrigin` survived
+  every step, and the network log recorded **zero document or RSC requests** during both swaps —
+  the only traffic was the server action and images.
+
+## Notes / left open
+
+- Switching to a list unmounts `HomeProfile`, so returning to the feed shows its first screen again
+  rather than a drill-down the visitor had open. That is the cost of keeping the URL as the single
+  source of truth, and it is what a reload would give anyway.
+- The panel's own tabs push history like everything else, so a visitor can walk Forward/Back through
+  feed → following → followers.
+- `/me/following|followers` are deliberately **not** converted; the captain asked about the profile.
+  If the same treatment is wanted there, `FollowListCard` already supports it — `/me` would need the
+  same `?tab=` body, and its two routes would become redirects too.
+
+---
+
+# The account menu's items now go somewhere (2026-10-02, part 9)
+
+> "does this dropdown has no page to redirect to? why it can't do anything now?"
+
+It had pages — the items just weren't wired to them. Every entry except the profile row, the two
+navbar buttons and Sign out was a `DropdownMenuItem` with **no `href` and no `onClick`**: a styled
+`<div>` that looked like a link and did nothing. Likes, Saved, Subscriptions, Settings and the rest
+had all been reachable by typing the URL and by nothing else.
+
+## What changed
+
+- **`components/web/SocialBar.tsx`** — each entry is now a `<DropdownMenuItem asChild>` wrapping a
+  real `Link`, so these are anchors rather than buttons pretending to navigate: middle-click and
+  copy-address work, and the href is visible to anything that reads links. `asChild` hands the item's
+  own (already tailwind-merged) classes to the anchor, so the row layout is unchanged and the base
+  `px-1.5 py-1` is still overridden — the menu renders identically. Sign out stays an action, since
+  it is a POST, not a destination. The nine share one `ITEM` const instead of nine copies of the
+  same class string.
+- **Two routes could not have been linked to as they stood:**
+  - `/insight` has had a `page.tsx` for a while but was **never declared in `i18n/routing.ts`'s
+    `pathnames`** — the typed `Link`/`router` rejects an undeclared path, so no code could point at
+    it. Declared now. (The file is a declaration, not a check, in both directions: an entry with no
+    page type-checks, and a page with no entry cannot be linked.)
+  - **Resume (CV) had no page at all.** Per the captain's call it gets a stub — `/me/resume` plus
+    `components/profile/Resume.tsx`, which follows the empty-state pattern its siblings use
+    (`Liked-Ads.tsx`), so the entry works today and the URL and shape exist for when the feature is
+    designed.
+
+| Menu item        | Destination               |
+| ---------------- | ------------------------- |
+| My Ads           | `/me`                     |
+| Likes            | `/me/likes`               |
+| Saved            | `/me/saved`               |
+| Applied Jobs     | `/me/applied-jobs`        |
+| Job Applications | `/me/job-applications`    |
+| Resume (CV)      | `/me/resume` _(new stub)_ |
+| Subscriptions    | `/me/subscriptions`       |
+| Insight          | `/insight`                |
+| Settings         | `/settings`               |
+
+## Verification
+
+- `tsc` clean, `lint` 0 errors (1 pre-existing warning). No backend change: 31 suites / 359 tests.
+- **Browser** (CDP), signed in as `testtest001` via a minted token, menu opened with a real
+  `pointerdown` (Radix triggers ignore a synthetic click): every entry read back as
+  `<a href="/en/…">` with the destination above — **`tag: "A"` for all nine**, `Sign out` still a
+  `DIV`. Screenshot compared against the captain's: identical menu, no layout shift.
+- Clicking **Likes** navigated to `/en/me/likes`.
+- Each destination fetched directly and checked: `/en/me/resume`, `/en/insight`, `/en/settings`,
+  `/en/me/subscriptions` all render — none 404.
+
+## Notes / left open
+
+- **Resume (CV) is a stub.** It holds a URL and an empty state and nothing else; uploading a CV and
+  whatever an employer would see is a feature of its own. The menu entry is honest about that now
+  rather than inert.
+- The `/me/*` pages themselves are still mock-backed (a tracked known gap) — this change makes them
+  _reachable_, which is what was asked; it does not make them real.
+
+---
+
+# Removed the "Your Ad" badge from the listing detail's seller card (2026-10-05)
+
+> "wait, what do you mean 'your ads' here.... Remove it"
+
+`Profile-Sidebar` swapped its trailing control by ownership: the Follow button for everyone else,
+and a white "Your Ad" pill for the owner. The card is otherwise the _seller's_ identity block — the
+same avatar, handle and join date a stranger sees — so the badge sat in the Follow button's slot
+announcing a fact the visitor could not act on, on the one listing where they are the seller.
+
+It is gone, and the Follow button is not shown in its place, because you cannot follow yourself:
+on your own ad the blue header is now just the avatar, name, handle, join date and the ad's own
+contact details below it. `isOwnAd` stays — the contact/Messages section still uses it to hide the
+seller-contact actions from the owner.
+
+## Verification
+
+Signed in as `testtest001` via a minted token, both cases read out of the DOM:
+
+| Listing                         | "Your Ad" badge | Follow in header    |
+| ------------------------------- | --------------- | ------------------- |
+| `testtest001`'s own ("baby 01") | **absent**      | absent, as intended |
+| `qwer`'s ("Luk kmeng khoch")    | absent          | **present**         |
+
+Header text on the own ad reads just `test test 001 | @testtest001 | Members Since Sep 24, 2026`.
+
+`tsc` clean, `lint` 0 errors (1 pre-existing warning). Web-only change; backend untouched
+(31 suites / 359 tests).
+
+---
+
+# Likes and Saved go real — the like button and the Save button now persist (2026-10-05)
+
+> "make the like button and save work"
+
+Every heart and bookmark in the marketplace was client-side fiction: the card hearts and ⋮ Save
+flipped local `useState` behind a `setTimeout` toast, the detail row's Save button had **no handler
+at all**, the gallery's "0 Likes" control was dead, and `/me/likes` + `/me/saved` were empty-state
+placeholders. This ship makes them real end to end.
+
+## What changed
+
+- **Backend — a new `reactions` domain** (`src/reactions/`; tables `listing_likes` +
+  `listing_saves` in `db/schema/reactions.schema.ts`; migration `0028_acoustic_chat`). Mirrors
+  `user_follows`: unique pair index, reverse `listing_id` index, both FKs cascade. Toggles are
+  **idempotent both ways** — `POST` rides `onConflictDoNothing`, `DELETE` never 404s on a missing
+  edge (the toggle's end state is the contract, same as unfollow). The only 404 is a missing
+  listing row: toggling mirrors `findById`, which serves **any status**, so a control that renders
+  is never present-but-refused. Routes: `POST|DELETE /listings/:listingId/like` →
+  `{liked, likeCount}`; `…/save` → `{saved}`; `GET /users/me/likes|saves` (offset-paginated,
+  `status != 'deleted'`, newest edge first); `GET /users/me/reactions` (both id sets, one call).
+  `findById` now carries a computed `likeCount` (no counter column to drift).
+- **Web — one server-seeded provider.** `(user)/layout.tsx` reads both id sets once per signed-in
+  render and wraps the tree in `components/reactions/reactions-provider.tsx`; `useReactions()` is
+  the single source for every control. Toggles are optimistic with rollback-toast, disable while
+  pending (per listing, either kind), and bounce visitors to `/login` with a "Sign in to like/save"
+  toast. Wired real: grid + list hearts, the ⋮ Save/Unsave (menu stays open), the detail row's
+  Save, and the detail's "N Likes" (count seeded from the listing, updated by each toggle
+  response). `/me/likes` + `/me/saved` render the real listings in the existing card grid with a
+  Load more; the "No Result!" empty designs are kept exactly.
+
+## Verification
+
+- Backend: build ✔, lint ✔, **32 suites / 371 tests** — the new `reactions.service.spec.ts` locks
+  idempotency, the missing-edge delete, 404s, pagination math, and photo hydration.
+- Web: `next build` ✔ (the type gate), lint ✔ 0 errors (1 pre-existing warning).
+- Migration: ledger watermark checked first (only 0028 pending); applied; tables verified.
+- **Browser (CDP, minted session):** like from a card fills the heart and **survives reload**
+  (server-seeded, not just client state); `/me/likes` lists it; the detail count seeds "1 Like" →
+  unlike "0 Likes" → re-like "1 Like"; Save flips to Unsave and `/me/saved` lists it; unsave drops
+  it; the card ⋮ menu's Save flips in place and persists; a signed-out click bounces to
+  `/en/login` with the toast. One first-pass ✗ was the driver clicking a correctly-disabled
+  control mid-flight — not a product defect; the wait-aware re-run and the direct backend probes
+  both pass.
+
+## Review pass (same evening)
+
+The planner-stage review surfaced four real findings; all were fixed and re-verified:
+
+- Non-UUID (mock) listing ids are now **inert** in the provider — clicking a demo heart on the home
+  page used to fire a real request and show a validation error; it now does nothing at all.
+- A row toggled off drops out of `/me/likes` / `/me/saved` **live** (the panel filters on the
+  session's own toggle-offs, not on membership — the seed sets fail soft to empty, and a membership
+  filter would blank the lists whenever that fetch failed).
+- The `DELETE` side no longer 404s when the listing row is gone — the toggle's end state is the
+  contract (the `unfollow` idiom); `POST` keeps the existence check.
+- Both new controllers carry `@ApiTags` / `@ApiBearerAuth`.
+
+Re-ran after the fixes: backend build/lint + **12/12** reactions tests, web `tsc` + lint, and a
+browser pass (mock heart inert; unlike-on-the-list drops the row; DELETE of a gone listing →
+`200 {liked:false}`) — all green.
+
+Two gate blockers surfaced in the same window, neither in this ship's code, and both were cleared:
+a spec mismatch from a concurrent session's in-flight `findFeed` change (fixed on their side while
+this was in review), and a broken jest resolution introduced by the `apps/mobile` install — with
+`testEnvironment: "node"` the environment resolved from the workspace hoist at the 29.x line, whose
+`ModuleMocker` lacks `clearMocksOnScope`, so no suite could start. Fixed by pinning
+`jest-environment-node` in `apps/backend`. Final plain `pnpm --filter backend test`: **32/32 suites,
+373/373 tests** (32/32 suites — the stage-4 deep pass then added compiled-SQL tests pinning the
+list queries' `status != 'deleted'` filter and `(createdAt, id)` ordering, and keyed the reactions
+provider on the viewer so an in-tab login/account switch reseeds instead of carrying the previous
+viewer's sets; the reviewer's remaining three findings — same-tick pending guard, zero-photo
+detail like control, id-set read scale — are ticketed in `.pipeline/review.md`).
+
+## Notes / left open
+
+- **No notification on like/save** — deliberate; the follow feature's `follow.created` is the shape
+  if wanted later.
+- Mock cards (home Top Ads, non-UUID detail slugs) still render the hearts, but a non-UUID id is
+  inert — the provider ignores it, so a demo heart never fires a request or an error toast.
+- Counts stay on the detail control only; cards keep the count-less design.
+
+---
+
+# Card "…" menu: rows aligned, and View Profile actually goes somewhere (2026-10-05)
+
+Two reports on the card menu: the icons and labels don't line up, and View Profile does nothing.
+
+## 1. The rows were built two different ways
+
+`ThreeDotPost`'s four entries shared no shape. Save/Unsave was a `Toggle` inside a `p-0` item
+(12px of padding), while the other three were `<button>`s inside an item that already had its own
+padding plus the button's (18px) — so Save sat a few pixels left of everything else. And the icons
+were sized `scale-140` / `scale-150` / `scale-130` / `size={18}`, so every label started at its own x.
+
+All four now share one `ITEM` class and one `ICON` box. Measured in the open menu: every row is
+`rowLeft 607`, `iconLeft 619`, `iconW 18`, `labelLeft 649` — identical, where before they differed.
+
+## 2. "View Profile" resolved the seller from mock data
+
+`const user = getUserById(post.userId)` looks the id up in `@/lib/data` — the **mock** users array.
+On a real listing the id is a real UUID, so it missed, `user` was undefined, and the guarded
+`router.push` silently did nothing. A control that renders, looks live, and is inert.
+
+The fix is the one recorded when the seller card had the same class of bug: **the feed now carries
+the seller's handle.** `ListingsService.findFeed` joins `users` (left, so a deleted owner does not
+drop their listing out of the feed) and selects `getTableColumns(listings)` plus `sellerUsername` —
+`getTableColumns` rather than a `{ listing, ... }` shape so the cursor, the photo lookup and
+everything else below keep reading a plain listing row. `toCardPost` carries it onto `Post`, and the
+menu uses `post.sellerUsername ?? getUserById(...)?.username`, so **mock posts still work** through
+the old path while real ones use the join.
+
+The item is now rendered only when there is a handle to link to, rather than a row that can't lead
+anywhere.
+
+## Verification
+
+- Web `tsc` clean, `lint` 0 errors (1 pre-existing warning). Backend **build** clean.
+- **API:** `GET /listings?limit=4` returns `sellerUsername` on every row — `testtest001`, `qwer`,
+  `petsfoodsverify` — matching each listing's owner.
+- **Browser** (CDP, `/en/all-ads`): opened a real card's menu and read the geometry — all four rows
+  identical (above). Clicking **View Profile** navigated to `/en/testtest001`, the seller of that
+  card, with no 404. Screenshot confirms the alignment against the reported one.
+- Harness note for next time: the card trigger must be selected as the `button[aria-haspopup="menu"]`
+  **below the navbar** — there are 27 on this page and `querySelector` returns the navbar's
+  "All Categories" one, which is why the first attempts clicked nothing.
+
+## ⚠ Backend tests are down repo-wide — NOT from this change
+
+`pnpm --filter backend test` reports **32 suites failed, 0 tests** — every suite fails to _start_
+with `TypeError: this._moduleMocker.clearMocksOnScope is not a function`. The root lock resolves
+`jest`/`jest-runtime`/`jest-runner`/`jest-config` at **30.4.2** against `jest-mock`/`jest-util`/
+`jest-environment-node` at **30.4.1**, and that method only exists in the 30.4.2 mock. The suites
+that fail include `payment`, `users`, `brands` and `outbox` — nothing this change touches — and it
+coincides with `apps/mobile/` joining the workspace and a re-install. A peer session working in the
+same checkout independently reported the same thing and the same diagnosis.
+
+**Deliberately not fixed here:** it is a lockfile resolution question (align the jest-\* graph, or pin
+jest to 30.4.1) on a workspace this session does not own, and changing the root lock unilaterally is
+not mine to do. Flagged for whoever owns the mobile dependency work.
+
+## Update, same day: the spec harness, and a working runner
+
+Two corrections to the ⚠ note above.
+
+**The failing suite was mine, and is fixed.** A peer session pointed out that under a consistent jest
+runner the only red suite is `listings.service.spec.ts` — and it is red because of _this_ change:
+`findFeed` now calls `.leftJoin(users, …)`, which the spec's mock chains did not stub, so
+`this.db.select(...).from(...).leftJoin is not a function` took out all 14 of its tests. The three
+feed-chain builders (`listingsQuery`, and the two `captureWhere` helpers in the attribute-filter and
+seller-scope blocks) now expose the join hop, with `where` still reachable so the helpers describe a
+chain without one too. **My miss** — changing a query's shape means updating the mocks that stand in
+for it, and I had run the suites before that change and not since.
+
+**A runner that works while the lock is broken:** `(cd apps/backend && pnpm dlx jest@30.4.2)` — a
+fresh, internally consistent jest, which starts every suite. Result now: **32 suites / 371 tests, all
+passing**, `lint` and `build` clean.
+
+The root-lock skew itself (jest-runtime 30.4.2 vs jest-mock 30.4.1, from `apps/mobile/` joining the
+workspace) is still there and still not this session's to change. But the suite is green under the
+bypass, so the next backend change is not flying blind.
+
+Also noted from the same peer, so it is not double-done: they added the equivalent `leftJoin` to the
+reactions list queries (`/users/me/likes|saves`) so those pages' cards carry the seller handle like
+the feed's — separate files, no overlap.
+
+## Update 2: the jest skew is fixed workspace-wide — suite green on the plain command
+
+A peer session found the real cause and fixed it: `testEnvironment: "node"` makes jest resolve the
+environment **from the project root**, where the mobile install's hoist had left
+`jest-environment-node@29.7.0` — whose `ModuleMocker` has no `clearMocksOnScope`, which is what
+`jest-runtime@30.4.2` was calling. Their fix pins `jest-environment-node@^30.4.1` in
+`apps/backend/package.json` devDependencies and re-installs; that is the only workspace-level change
+from their side, and `apps/mobile`'s own lock alignment stays unowned.
+
+Verified here rather than taken on trust: **plain `pnpm --filter backend test` → 32 suites, 373 tests,
+all passing**, no `pnpm dlx` bypass needed. (371 at the moment of the fix; the stage-4 reviewer's deep
+pass added two compiled-SQL tests in `reactions.service.spec.ts`, pinning the list queries'
+deleted-filter and tie-break ordering.) The exact-patch story in the ⚠ note above (jest-mock
+30.4.1 vs 30.4.2) was the wrong granularity — the offending copy was a 29.x environment module hoisted
+from mobile — but the symptom and the suite it took down were as described.
+
+Re-checked after their reinstall, since that is exactly when a dependency change can move something
+else: web `tsc` clean, web `lint` 0 errors (1 pre-existing warning), backend `lint` and `build` clean.
+
+**The backend dev server was down** when I looked (the reinstall appears to have taken it with it) —
+restarted, `/health` returns `{"status":"ok","db":"up"}`.
+
+---
+
+# Grid heart red, list heart bottom-aligned (2026-10-06, captain's screenshots)
+
+> "heart why it blue, and two, it seem not right when the like btn in the middle — it should be like this"
+
+- **Why it was blue:** the grid card's liked heart kept the old mock's `fill-blue-500`, while the
+  list card, the detail row and the gallery were already red — the grid was the odd one out. It is
+  red now (`fill-red-500`, hover included), so every like control reads the same.
+- **The "middle" heart:** `ListCardPost`'s right column was `items-center`, so on a tall card the
+  heart floated mid-card. It is `items-end pb-3` now — bottom-right, sitting on the price row's
+  line, matching the reference screenshot.
+
+Verified on the running app with the CDP driver (liked a listing → the grid card screenshot shows
+the red heart; switched the all-ads list tab → the heart sits on the price line; unliked after, DB
+back to zero). `tsc` + lint clean. Screenshots: `/tmp/fix-grid.png`, `/tmp/fix-list.png`.
+
+**Hover, same day:** both card hearts get the reference's hover — the button fills with the
+sampled dark circle (`gray-500`, from the crop: `rgb(101,107,120)`) and the outline heart turns
+white. The list heart's old `hover:bg-muted` was nearly invisible, and the grid's red `group-hover`
+classes never fired at all (no `group` ancestor — dormant mock classes, now removed). Verified
+with zoomed hover captures: `/tmp/hover-grid.png`, `/tmp/hover-list.png`.
+
+**Card alignment, same day (captain's screenshot #6):** on cards without a condition line the
+price + heart row rode up — the header took its natural height and the leftover space fell below it,
+so neighbours in a row didn't share a price line. `CardHeader` is now `flex flex-1 flex-col
+items-stretch` and the price row carries `mt-auto`, pinning it to every card's bottom. Verified with
+per-row measurements — priceY and heartY are identical within every row (`maxDelta 0`), including
+rows that mix condition and no-condition cards — and a visual: `/tmp/align-mixed.png`.

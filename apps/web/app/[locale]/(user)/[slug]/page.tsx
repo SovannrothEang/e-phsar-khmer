@@ -1,11 +1,25 @@
 import PostDetail from "@/components/post/Post-Detail";
 import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
-import HomeProfile from "@/components/profile/Home";
-import { buildRealDetailData, getListingById } from "@/lib/api/categories";
+import ProfileTabBody from "@/components/profile/ProfileTabBody";
+import {
+  buildRealDetailData,
+  getAllCategories,
+  getListingById,
+  getListingsFeed,
+  toCardPost,
+} from "@/lib/api/categories";
+import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
 import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { redirect } from "@/i18n/routing";
+import { notFound } from "next/navigation";
 import { posts } from "@/lib/posts";
-import { users } from "@/lib/user";
+import {
+  displayName,
+  getFollowStatus,
+  getPublicProfile,
+  toProfileUser,
+} from "@/lib/api/users";
 import type { Metadata } from "next";
 
 const UUID_RE =
@@ -41,31 +55,39 @@ export async function generateMetadata({
         description: post.description || "Post Detail",
       };
     }
-    return {
-      title: "Post Not Found - Psakhmer",
-      description: "Post Detail",
-    };
+    return { title: "404 Not found" };
   }
 
   // Otherwise, treat as username
-  const user = users.find((u) => u.username === slug);
-  if (user) {
+  const profile = await getPublicProfile(slug);
+  if (profile) {
+    const name = displayName(profile);
     return {
-      title: `${user.name} - PsaKhmer`,
-      description: `View profile of ${user.name}`,
+      title: `${name} - PsaKhmer`,
+      description: `View profile of ${name}`,
     };
   }
-  return {
-    title: "User Not Found",
-  };
+  // Unknown slug — the not-found boundary renders the 404 page.
+  return { title: "404 Not found" };
 }
 
 export default async function SlugPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
+  // Both resolved against the seller's own tree below — a profile URL's
+  // `?category=`/`?subcategory=` is only meaningful if that seller actually
+  // posts there. They seed `HomeProfile`'s drill-down state, so a reload or a
+  // shared link lands on the same level rather than the right listings under
+  // the wrong row.
+  const rawCategory = typeof sp.category === "string" ? sp.category : undefined;
+  const rawSubcategory =
+    typeof sp.subcategory === "string" ? sp.subcategory : undefined;
 
   // Handle Post Detail — title-adid-XXX slugs resolve to mock posts; real
   // listing UUIDs render through the real detail template.
@@ -74,21 +96,88 @@ export default async function SlugPage({
     const viewer = await getCurrentUser();
     if (UUID_RE.test(actualId)) {
       const real = await buildRealDetailData(actualId, await getLocale());
-      if (real)
-        return <PostDetail id={actualId} real={real} viewerId={viewer?.id} />;
+      if (real) {
+        return (
+          <PostDetail
+            id={actualId}
+            real={real}
+            viewerId={viewer?.id}
+            sellerFollowing={
+              viewer ? await getFollowStatus(real.listing.userId) : false
+            }
+          />
+        );
+      }
     }
     return <PostDetail id={actualId} viewerId={viewer?.id} />;
   }
 
-  // Handle Public Profile
-  const user = users.find((u) => u.username === slug);
+  // Handle Public Profile — a real account, looked up by handle.
+  const profile = await getPublicProfile(slug);
+  if (!profile) notFound();
 
-  if (!user) return <div>Not found</div>;
+  const locale = await getLocale();
+  const user = toProfileUser(profile);
+  const viewer = await getCurrentUser();
+  const following = await getFollowStatus(profile.id);
+
+  // Follower lists need a session — that is what lets every row carry its
+  // viewer-relative `isFollowing` in one request. A `?tab=` link opened cold
+  // therefore bounces to sign-in, the same thing the routes it replaced did.
+  const listTab =
+    sp.tab === "following" || sp.tab === "followers" ? sp.tab : undefined;
+  if (listTab && !viewer) return redirect({ href: "/login", locale });
+
+  // The seller's own tree — both levels scoped to what they posted in. It
+  // drives the panel's category row, and it is what makes a foreign or stale
+  // `?category=`/`?subcategory=` fall back to the unfiltered feed instead of a
+  // filtered grid whose tile is not on the page and which nothing could clear.
+  const sellerCategories = (await getAllCategories(locale, profile.id)) ?? [];
+  const category =
+    rawCategory && sellerCategories.some((c) => c.slug === rawCategory)
+      ? rawCategory
+      : undefined;
+  // Validated inside the chosen category, not just anywhere in the tree — a
+  // `?category=cars&subcategory=phones` would otherwise render a breadcrumb
+  // that lies about where you are.
+  const subcategory = category
+    ? sellerCategories
+        .find((c) => c.slug === category)
+        ?.subcategories.find((s) => s.slug === rawSubcategory)?.slug
+    : undefined;
+
+  // The seller's post history, first screen only — `HomeProfile` fetches the
+  // next slice itself as the visitor drills. The feed is active-only and
+  // anonymous, so this needs no session and can never show a draft.
+  const feed = await getListingsFeed(
+    {
+      userId: profile.id,
+      categorySlug: category,
+      subcategorySlug: subcategory,
+      limit: ALL_ADS_PAGE_SIZE,
+    },
+    locale,
+  );
 
   return (
     <>
-      <PublicProfileHeader user={user} />
-      <HomeProfile user={user} />
+      <PublicProfileHeader
+        user={user}
+        viewerId={viewer?.id ?? null}
+        initialFollowing={following}
+      />
+      {/* The seller's ads, or one of their follow lists when `?tab=` says so.
+          That switch happens in the browser — this page never re-renders for
+          it — so the props here are the feed's first screen either way. */}
+      <ProfileTabBody
+        userId={profile.id}
+        viewerId={viewer?.id ?? null}
+        categories={sellerCategories}
+        initialSelection={{ category, subcategory }}
+        initialPosts={(feed?.items ?? []).map(toCardPost)}
+        initialCursor={feed?.nextCursor ?? null}
+        locale={locale}
+      />
     </>
   );
 }

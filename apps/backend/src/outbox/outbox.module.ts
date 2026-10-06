@@ -4,6 +4,7 @@ import { OutboxRegistry } from './outbox-registry.service';
 import { OutboxService } from './outbox.service';
 import { OutboxWakeupListener } from './outbox-wakeup.listener';
 import { OutboxWorker } from './outbox-worker.service';
+import { OutboxRetention } from './outbox-retention.service';
 
 /**
  * Transactional outbox + its Postgres-backed worker pool.
@@ -24,6 +25,7 @@ import { OutboxWorker } from './outbox-worker.service';
     OutboxDispatcher,
     OutboxWorker,
     OutboxWakeupListener,
+    OutboxRetention,
   ],
   exports: [OutboxService, OutboxRegistry, OutboxDispatcher, OutboxWorker],
 })

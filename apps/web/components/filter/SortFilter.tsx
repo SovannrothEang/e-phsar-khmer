@@ -12,61 +12,24 @@ import { IconCircleCheckFilled } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
-import type { Post } from "@/lib/posts";
+import {
+  SORT_OPTIONS,
+  SORT_PARAM,
+  defaultSortFor,
+  hasQueryParam,
+  parseSortParam,
+  sortOptionsFor,
+  type SortValue,
+} from "@/lib/search-params";
 
-export const SORT_PARAM = "sort";
-export const DEFAULT_SORT = "latest-ads";
+// Re-exported for existing importers; the source of truth is lib/search-params.
+export { SORT_OPTIONS, SORT_PARAM, parseSortParam };
+export type { SortValue };
 
-export const SORT_OPTIONS = [
-  { value: "latest-ads", label: "Latest Ads", adsLabel: "Latest Ads" },
-  { value: "new-ads", label: "New Ads", adsLabel: "New Ads" },
-  { value: "most-hit", label: "Most Hit Ads", adsLabel: "Most Hit Ads" },
-  {
-    value: "price-asc",
-    label: "Price: Low to High",
-    adsLabel: "Price: Low to High",
-  },
-  {
-    value: "price-desc",
-    label: "Price: High to Low",
-    adsLabel: "Price: High to Low",
-  },
-] as const;
-
-export type SortValue = (typeof SORT_OPTIONS)[number]["value"];
-
-export function parseSortParam(value: string | null): SortValue {
-  const found = SORT_OPTIONS.find((o) => o.value === value);
-  return found?.value ?? DEFAULT_SORT;
-}
-
-export function sortPosts(posts: Post[], sort: SortValue): Post[] {
-  const ads = [...posts];
-
-  switch (sort) {
-    case "new-ads":
-      return ads.sort((a, b) => b.createdat.getTime() - a.createdat.getTime());
-    case "most-hit":
-      return ads.sort((a, b) => Number(b.postId) - Number(a.postId));
-    // "Negotiable" listings have no numeric price to rank, so they sort LAST
-    // in both directions rather than first (a bare `a.price - b.price` would
-    // coerce null to 0 and float them to the top of price-asc).
-    case "price-asc":
-      return ads.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
-    case "price-desc":
-      return ads.sort(
-        (a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity),
-      );
-    case "latest-ads":
-    default:
-      return ads;
-  }
-}
-
-function SortLabel(sort: SortValue) {
-  if (sort === DEFAULT_SORT) return "Sort";
+function SortLabel(sort: SortValue, defaultSort: SortValue) {
+  if (sort === defaultSort) return "Sort";
   const option = SORT_OPTIONS.find((o) => o.value === sort);
-  return option ? `Sort :${option.adsLabel}` : "Sort";
+  return option ? `Sort :${option.label}` : "Sort";
 }
 
 export default function SortFilter() {
@@ -74,16 +37,20 @@ export default function SortFilter() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const sortParam = parseSortParam(searchParams.get(SORT_PARAM));
+  // With a keyword the default is "Best match"; without one, "Latest Ads".
+  const hasQuery = hasQueryParam(searchParams);
+  const defaultSort = defaultSortFor(hasQuery);
+  const options = sortOptionsFor(hasQuery);
+  const sortParam = parseSortParam(searchParams.get(SORT_PARAM), hasQuery);
   const [open, setOpen] = useState(false);
 
-  const hasActiveFilter = sortParam !== DEFAULT_SORT;
-  const adsLabel = SortLabel(sortParam);
+  const hasActiveFilter = sortParam !== defaultSort;
+  const adsLabel = SortLabel(sortParam, defaultSort);
 
   function pushSort(next: SortValue) {
     const params = new URLSearchParams(searchParams.toString());
 
-    if (next === DEFAULT_SORT) {
+    if (next === defaultSort) {
       params.delete(SORT_PARAM);
     } else {
       params.set(SORT_PARAM, next);
@@ -102,7 +69,7 @@ export default function SortFilter() {
   function removeFilter(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    pushSort(DEFAULT_SORT);
+    pushSort(defaultSort);
     setOpen(false);
   }
 
@@ -141,7 +108,7 @@ export default function SortFilter() {
         <p className="text-base text-foreground text-center pt-2 ">Sort</p>
         <ul className="">
           <div className="border-b border-gray-200" />
-          {SORT_OPTIONS.map((option) => {
+          {options.map((option) => {
             const isSelected = sortParam === option.value;
             return (
               <li key={option.value}>

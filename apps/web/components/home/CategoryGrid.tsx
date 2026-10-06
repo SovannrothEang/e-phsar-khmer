@@ -1,15 +1,7 @@
 import { Link } from "@/i18n/routing";
-import DbImage from "@/components/common/DbImage";
+import CategoryTileBody from "@/components/common/CategoryTileBody";
 import { API_URL } from "@/lib/api/client";
 import { getLocale, getTranslations } from "next-intl/server";
-import { LayoutGrid } from "lucide-react";
-
-/** The design follows the row, not the load result: a category with no icon
- *  value shows this glyph, while one that has an icon keeps the icon design —
- *  if its object is missing the circle is simply empty. */
-const CategoryIconFallback = () => (
-  <LayoutGrid className="h-8 w-8 text-blue-500/70" aria-hidden />
-);
 
 /**
  * Minimal slice of GET /api/v1/categories items. Deliberately local: the web
@@ -62,22 +54,7 @@ export default async function CategoryGrid() {
               }}
               className="flex flex-col items-center text-center group"
             >
-              <div className="w-16 h-16 flex items-center justify-center rounded-full bg-blue-100 group-hover:bg-blue-200 transition">
-                {category.icon ? (
-                  <DbImage
-                    src={category.icon}
-                    alt={category.name}
-                    width={120}
-                    height={120}
-                    className="object-contain"
-                  />
-                ) : (
-                  <CategoryIconFallback />
-                )}
-              </div>
-              <span className="mt-4 text-sm text-foreground leading-tight">
-                {category.name}
-              </span>
+              <CategoryTileBody name={category.name} icon={category.icon} />
             </Link>
           ))}
         </div>

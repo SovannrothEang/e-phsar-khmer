@@ -3,6 +3,7 @@ import * as React from "react";
 import { Lock, Globe } from "lucide-react";
 import SettingSidebar from "./SettingSidebar";
 import { Switch } from "@/components/ui/switch";
+import type { SettingsUser } from "@/lib/auth/current-user";
 
 interface PrivacyRowProps {
   title: string;
@@ -39,12 +40,12 @@ const PrivacyRow = ({ title, initialState = false }: PrivacyRowProps) => {
     </div>
   );
 };
-export default function AccountPrivacy() {
+export default function AccountPrivacy({ me }: { me?: SettingsUser | null }) {
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-6xl mx-auto  ">
         <div className="flex gap-5 ">
-          <SettingSidebar />
+          <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
               <div>

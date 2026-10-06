@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
+import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
@@ -10,19 +11,22 @@ import LSPCYEHeader, {
 // ─── Content & posts ─────────────────────────────────────────────────────────
 import SubcategoryContent from "@/components/subcategory-layouts/SubcategoryContent";
 import type { OptionRow } from "@/components/subcategory-layouts/SubcategoryContent";
-import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
-import { ListCardPost } from "@/components/ads/ListCardPost";
 import { ListCardSell } from "@/components/ads/ListCardSell";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
+import { FeedResults } from "@/components/search/FeedResults";
+import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 import {
   getBrandsForSubcategory,
+  getAttributeOptions,
   getCategoryWithSubcategories,
   getLinkedAttributeOptions,
   getListingsFeed,
   getModelsForBrand,
   toCardPost,
+  type ListingsFeedParams,
 } from "@/lib/api/categories";
+import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import type { Post } from "@/lib/posts";
 
 // ─── Bar chip flags: the design groups chips per main category; the vehicles
@@ -172,26 +176,25 @@ const IMAGE_TILE_SETS = new Set([
   "types",
 ]);
 // ─── The exception, by MAIN CATEGORY: Furniture & Decor draws its Type grid as
-//     bordered TEXT tiles. It is the only text-drawn slice of `types` in the
-//     mock — furniture's type rows carry no `image` key at all, while every
-//     other slice does. Keyed by category rather than by subcategory so a new
-//     Type link anywhere under furniture cannot silently re-grow icon circles.
-//     (Property's kind rows — Flat/House/Villa, Factory/Warehouse/… — are drawn
-//     with icons in the mock too, so Home & Land stays on the icon grid.) ─────
-const TEXT_TILE_SETS_BY_CATEGORY: Record<string, Set<string>> = {
-  "furniture-and-decor": new Set(["types"]),
-};
+//     bordered TEXT tiles (see `TEXT_TILE_SETS_BY_CATEGORY` in
+//     `lib/attribute-types.ts` for the declaration and the reasoning). It lives
+//     there rather than here because the post form's pickers obey the same
+//     declaration — one design fact, two surfaces, one source. ───────────────
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function SubcategoryPage({
   params,
   searchParams,
 }: {
   params: Promise<{ categorySlug: string; subcategorySlug: string }>;
-  searchParams: Promise<{
-    ad_field?: string;
-    ad_type?: string;
-    ad_model?: string;
-  }>;
+  // ad_field / ad_type / ad_model drive the brand/type/model drill-down; the
+  // rest are the shared filter-bar params (lib/search-params.ts).
+  searchParams: Promise<
+    {
+      ad_field?: string;
+      ad_type?: string;
+      ad_model?: string;
+    } & Record<string, string | string[] | undefined>
+  >;
 }) {
   const { categorySlug, subcategorySlug } = await params;
   const sp = await searchParams;
@@ -199,13 +202,13 @@ export default async function SubcategoryPage({
 
   // Single category fetch covers both sides: breadcrumb names + subcategory
   // identity (id/slug/name/icon). The backend localizes names via
-  // Accept-Language; failures degrade to a 404-free "Page not found".
+  // Accept-Language; an unknown slug is a real 404.
   const category = await getCategoryWithSubcategories(categorySlug, locale);
   const subcategory = category?.subcategories.find(
     (s) => s.slug === subcategorySlug,
   );
   if (!category || !subcategory) {
-    return <div>Page not found</div>;
+    notFound();
   }
 
   // Live option grids for every subcategory with linked data: brands + models
@@ -283,28 +286,30 @@ export default async function SubcategoryPage({
       ? sets.flatMap((s) => s.options).find((o) => o.slug === adType)?.name
       : undefined;
 
-  // Real active listings — every subcategory now runs the real feed; the
-  // grid/list toggle drives the two TabsContent views below.
-  const feedItems: Post[] = (
-    (
-      await getListingsFeed(
-        {
-          subcategorySlug,
-          brand: brandName,
-          bodyType: bodyTypeName,
-          attrKey,
-          attrValue: attrKey ? clickedOption?.name : undefined,
-        },
-        locale,
-      )
-    )?.items ?? []
-  ).map(toCardPost);
+  // Real active listings — every subcategory runs the real feed, narrowed by
+  // the drill-down (brand/type) and the filter bar's URL params.
+  const feedQuery: ListingsFeedParams = {
+    ...parseFeedParams(sp),
+    subcategorySlug,
+    brand: brandName,
+    bodyType: bodyTypeName,
+    attrKey,
+    attrValue: attrKey ? clickedOption?.name : undefined,
+  };
+  const feed = await getListingsFeed(feedQuery, locale);
+  const feedItems: Post[] = (feed?.items ?? []).map(toCardPost);
 
   // ── Header component ────────────────────────────────────────────────────────
   const headerFlags =
     SUBCATEGORY_HEADER_FLAGS[subcategory.slug] ??
     CATEGORY_HEADER_FLAGS[category.slug] ??
     DEFAULT_HEADER_FLAGS;
+  // Engine chip options are the real `enginetypes` names — exactly what the
+  // post form stores in attributes.engineType — never a hardcoded list.
+  const engineOptions =
+    headerFlags.engine !== false
+      ? (await getAttributeOptions("enginetypes")).map((row) => row.name)
+      : [];
 
   // ── Active filter label — display names when available (slug-derived
   //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
@@ -402,7 +407,11 @@ export default async function SubcategoryPage({
           containing block (same pattern as the category page). */}
       <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
         {/* Subcategory header */}
-        <LSPCYEHeader title={subcategory.name} {...headerFlags} />
+        <LSPCYEHeader
+          title={subcategory.name}
+          {...headerFlags}
+          engineOptions={engineOptions}
+        />
         {/* Main listing content (visible in both grid/list views — same as
             SubcategoryGrid on the category page) */}
         <div>
@@ -415,22 +424,15 @@ export default async function SubcategoryPage({
           />
         </div>
         {/* ── Post sections: grid/list views driven by the bar's toggle ── */}
-        <TabsContent value="grid" className="mt-2">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <GridCardSell />
-            {feedItems.map((post) => (
-              <GridCardPost key={post.postId} post={post} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="list" className="mt-2">
-          <>
-            <ListCardSell />
-            {feedItems.map((post) => (
-              <ListCardPost key={post.postId} post={post} />
-            ))}
-          </>
-        </TabsContent>
+        <FeedResults
+          key={feedQueryKey(feedQuery)}
+          initialPosts={feedItems}
+          initialCursor={feed?.nextCursor ?? null}
+          query={feedQuery}
+          locale={locale}
+          gridLead={<GridCardSell />}
+          listLead={<ListCardSell />}
+        />
       </Tabs>
     </main>
   );

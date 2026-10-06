@@ -62,7 +62,10 @@ async function fetchBlob(id: string): Promise<Uint8Array<ArrayBuffer>> {
   throw new Error("attachment link expired");
 }
 
-const inFlight = new Map<string, Promise<{ bytes: ArrayBuffer; mime: string }>>();
+const inFlight = new Map<
+  string,
+  Promise<{ bytes: ArrayBuffer; mime: string }>
+>();
 
 /** Decrypted bytes for one attachment, downloading at most once per device. */
 export function loadAttachment(

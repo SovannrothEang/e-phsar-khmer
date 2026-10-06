@@ -9,6 +9,7 @@ import { SocialBar } from "./SocialBar";
 import { SessionCacheGuard } from "./SessionCacheGuard";
 import LocalSelector from "../LocalSelector";
 import { useLocale } from "next-intl";
+import { Suspense } from "react";
 
 export type User = {
   username: string;
@@ -42,7 +43,11 @@ export function NavBar({ user }: { user: User | null }) {
               <ThemeSwitcher />
             </div>
           </div>
-          <SearchBar />
+          {/* SearchBar reads the URL (useSearchParams), which needs a
+              Suspense boundary so static pages can still prerender. */}
+          <Suspense fallback={<div className="flex-1 max-w-lg h-[42px]" />}>
+            <SearchBar />
+          </Suspense>
           <div
             className={
               isLoggedIn

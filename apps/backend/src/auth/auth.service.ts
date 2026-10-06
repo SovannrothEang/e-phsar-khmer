@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -28,6 +28,7 @@ import {
   buildUsernameBase,
   generateUniqueUsername,
 } from '../users/username.util';
+import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -76,12 +77,37 @@ export class AuthService {
       )
       .limit(1);
 
-    if (!user || !user.passwordHash) {
+    if (!user) {
+      // No active account matches, but the identifier may belong to one its
+      // owner deleted inside the recovery window — signing back in is how
+      // they undo that (the settings page promises it, and the account is
+      // still intact until AccountPurgeService runs).
+      const recoverable = await this.findRecoverable(dto.identifier);
+      if (!recoverable?.passwordHash) {
+        throw new UnauthorizedException('INVALID_CREDENTIALS');
+      }
+
+      const matches = await bcrypt.compare(
+        dto.password,
+        recoverable.passwordHash,
+      );
+      if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
+
+      const revived = await this.revive(recoverable.id);
+      const revivedTokens = this.issueTokens(revived);
+      return { ...revivedTokens, user: this.toPublicUser(revived) };
+    }
+
+    if (!user.passwordHash) {
       throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    // Unreachable while the lookup above filters deleted rows out, but kept as
+    // the guard it has always been: it is the only thing between a deleted
+    // account and a token if that filter is ever lifted. Recovery goes through
+    // findRecoverable() above, which is deliberate about which rows qualify.
     if (user.deletedAt) throw new UnauthorizedException('Account deactivated');
     if (user.status !== 'active')
       throw new UnauthorizedException('Account suspended');
@@ -121,12 +147,32 @@ export class AuthService {
       if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
+    // Same recovery window as the password path: a deleted account still
+    // answers to its phone, so this revives it instead of letting
+    // mirrorSupabaseUser create a second account for the same number. The
+    // password is still checked BEFORE the Supabase call, so a wrong one
+    // never burns an OTP attempt.
+    const recoverable = existing ? null : await this.findRecoverable(dto.phone);
+    if (recoverable?.passwordHash) {
+      const matches = await bcrypt.compare(
+        dto.password,
+        recoverable.passwordHash,
+      );
+      if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
+
     const { data, error } = await this.supabaseService.verifyOtp(
       dto.phone,
       dto.token,
     );
     if (error || !data.user)
       throw new UnauthorizedException('Invalid or expired OTP');
+
+    if (recoverable) {
+      const revived = await this.revive(recoverable.id);
+      const revivedTokens = this.issueTokens(revived);
+      return { ...revivedTokens, user: this.toPublicUser(revived) };
+    }
 
     if (completingBareAccount) {
       const updateData: Partial<typeof users.$inferInsert> = {
@@ -327,6 +373,58 @@ export class AuthService {
     if (!user || user.status !== 'active' || user.deletedAt)
       throw new UnauthorizedException('User not found');
     return this.issueTokens(user);
+  }
+
+  /**
+   * The account a sign-in should bring back: soft-deleted, inside the
+   * retention window, and still holding a phone number.
+   *
+   * That last condition is the whole distinction between the two ways an
+   * account becomes soft-deleted. `UsersService.deleteOwnAccount` keeps the
+   * phone — recovery has to be possible — while `AdminService.deleteUser`
+   * clears it. So "still has a phone" means the owner left on their own, and
+   * an account an admin removed can never be revived by signing in.
+   */
+  private async findRecoverable(identifier: string): Promise<UserRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(
+        and(
+          or(
+            eq(users.username, identifier),
+            eq(users.primaryPhone, identifier),
+          ),
+          isNotNull(users.deletedAt),
+          isNotNull(users.primaryPhone),
+          // The database's clock, not this process's — the same window the
+          // purge sweeper evaluates.
+          gt(
+            users.deletedAt,
+            sql`now() - make_interval(days => ${ACCOUNT_RETENTION_DAYS})`,
+          ),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  /** Clears the deletion. Idempotent — a concurrent sign-in may have won the race. */
+  private async revive(userId: string): Promise<UserRow> {
+    const [row] = await this.db
+      .update(users)
+      .set({ status: 'active', deletedAt: null })
+      .where(and(eq(users.id, userId), isNotNull(users.deletedAt)))
+      .returning();
+    if (row) return row;
+
+    const [current] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!current) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    return current;
   }
 
   private issueTokens(user: UserRow): AuthTokens {

@@ -33,10 +33,18 @@ function toFailure(err: unknown): ChatActionResult<never> {
       ...(err.details !== undefined ? { details: err.details } : {}),
     };
   }
-  return { ok: false, status: 0, code: "NETWORK_ERROR", message: "Network error" };
+  return {
+    ok: false,
+    status: 0,
+    code: "NETWORK_ERROR",
+    message: "Network error",
+  };
 }
 
-async function post<T>(path: string, body?: unknown): Promise<ChatActionResult<T>> {
+async function post<T>(
+  path: string,
+  body?: unknown,
+): Promise<ChatActionResult<T>> {
   try {
     const { data } = await userServerFetch<T>(path, {
       method: "POST",

@@ -7,7 +7,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -16,6 +16,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const where = `${request.method} ${request.originalUrl}`;
 
     if (exception instanceof BadRequestException) {
       const exceptionResponse = exception.getResponse();
@@ -26,6 +28,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         Array.isArray((exceptionResponse as { message: unknown }).message);
 
       if (isValidationError) {
+        this.logger.warn(
+          `${where} 400 Validation failed: ${JSON.stringify((exceptionResponse as { message: string[] }).message)}`,
+        );
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
           error: {
@@ -54,6 +59,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? (exceptionResponse as { code?: unknown; details?: unknown })
           : {};
 
+      // 4xx is the client's fault: one warn line. A 5xx thrown as an
+      // HttpException (InternalServerErrorException, a mapped payment
+      // failure) is ours, so it gets the stack like an unhandled error.
+      if (status >= 500) {
+        this.logger.error(`${where} ${status} ${message}`, exception.stack);
+      } else {
+        this.logger.warn(`${where} ${status} ${message}`);
+      }
+
       return response.status(status).json({
         success: false,
         error: {
@@ -68,7 +82,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     this.logger.error(
-      'Unhandled exception',
+      `${where} Unhandled exception`,
       exception instanceof Error ? exception.stack : String(exception),
     );
 

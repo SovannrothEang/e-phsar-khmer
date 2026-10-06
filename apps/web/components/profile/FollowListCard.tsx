@@ -1,0 +1,170 @@
+import type { ComponentProps } from "react";
+import Image from "next/image";
+import { UserCheck } from "lucide-react";
+import { Link } from "@/i18n/routing";
+import type { FollowRowUser, FollowSide } from "@/lib/api/users";
+import { FollowButton } from "./FollowButton";
+
+type Href = ComponentProps<typeof Link>["href"];
+
+type FollowListCardProps = {
+  /** Which tab is showing. The heading follows it. */
+  side: FollowSide;
+  items: FollowRowUser[];
+  /** Signed-in viewer; null renders the sign-in bounce on each toggle. */
+  viewerId: string | null;
+  /** True when the account has more rows than this page fetched. */
+  hasMore?: boolean;
+} & (
+  | {
+      /** The two tab destinations — `/me/...` or `/[username]/...`. */
+      hrefs: Record<FollowSide, Href>;
+      onSelectTab?: undefined;
+    }
+  | {
+      /**
+       * Swap lists in place instead of navigating — the profile's `?tab=`
+       * panel. A union rather than two optional props so a caller cannot
+       * render tabs that neither link nor switch.
+       */
+      onSelectTab: (side: FollowSide) => void;
+      hrefs?: undefined;
+    }
+);
+
+const TABS = [
+  { key: "following", label: "Following" },
+  { key: "followers", label: "Followers" },
+] as const;
+
+/**
+ * The followers/following panel, shared by both profile surfaces: the same
+ * card renders under `/me/*` and under a profile, so the two cannot drift.
+ *
+ * Its tabs are links by default — each list is its own shareable URL — and
+ * become buttons only for a caller that passes `onSelectTab`, which is how the
+ * profile swaps them under a `?tab=` URL without a navigation.
+ */
+export default function FollowListCard({
+  side,
+  hrefs,
+  onSelectTab,
+  items,
+  viewerId,
+  hasMore,
+}: FollowListCardProps) {
+  const label = side === "following" ? "Following" : "Followers";
+
+  const tabClass = (active: boolean) =>
+    `relative pb-3 text-sm font-medium transition-colors ${
+      active
+        ? "text-[#00a0e9] after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:rounded-full after:bg-[#00a0e9]"
+        : "text-muted-foreground hover:text-foreground"
+    }`;
+
+  return (
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
+      <div className="rounded-lg bg-card p-6 shadow-sm">
+        <h2 className="text-2xl font-bold text-foreground">{label}</h2>
+
+        <div className="mt-2 flex items-center gap-6 border-b border-border">
+          {TABS.map((tab) => {
+            const active = tab.key === side;
+            return onSelectTab ? (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => onSelectTab(tab.key)}
+                className={`cursor-pointer ${tabClass(active)}`}
+              >
+                {tab.label}
+              </button>
+            ) : (
+              <Link
+                key={tab.key}
+                href={hrefs[tab.key]}
+                className={tabClass(active)}
+              >
+                {tab.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {items.length === 0 ? (
+          <EmptyFollowState side={side} />
+        ) : (
+          <ul>
+            {items.map((u) => (
+              <li
+                key={u.userId}
+                className="flex items-center gap-3 border-b border-border/50 px-1 py-3 last:border-b-0 hover:bg-muted/40"
+              >
+                <Link
+                  href={{
+                    pathname: "/[username]",
+                    params: { username: u.username },
+                  }}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                  <Image
+                    src={u.avatar}
+                    alt={u.name}
+                    width={88}
+                    height={88}
+                    unoptimized
+                    className="h-11 w-11 shrink-0 rounded-full border border-border object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {u.name}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      @{u.username}
+                    </p>
+                  </div>
+                </Link>
+                <FollowButton
+                  key={u.userId}
+                  userId={u.userId}
+                  initialFollowing={u.isFollowing}
+                  viewerId={viewerId}
+                  variant="profile"
+                  className="h-8 shrink-0 rounded-full px-4 text-xs font-semibold"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {hasMore && (
+          <p className="pt-4 text-center text-xs text-muted-foreground">
+            Showing the most recent {items.length}.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The house empty state: muted circle, bold heading, one muted sentence. */
+function EmptyFollowState({ side }: { side: "following" | "followers" }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="flex h-40 w-40 items-center justify-center rounded-full bg-muted">
+        <UserCheck
+          className="h-20 w-20 text-muted-foreground"
+          strokeWidth={1.5}
+        />
+      </div>
+      <p className="mt-6 text-sm font-medium text-foreground">
+        {side === "following" ? "Not following anyone yet" : "No followers yet"}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {side === "following"
+          ? "Accounts you follow will show up here."
+          : "People who follow this account will show up here."}
+      </p>
+    </div>
+  );
+}

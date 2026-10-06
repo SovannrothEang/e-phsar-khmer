@@ -35,7 +35,9 @@ export async function createImageOutboxEntry(input: {
   files: File[];
 }): Promise<OutboxEntry> {
   if (input.files.length > ATTACHMENTS_PER_MESSAGE_MAX)
-    throw new Error(`At most ${ATTACHMENTS_PER_MESSAGE_MAX} images per message`);
+    throw new Error(
+      `At most ${ATTACHMENTS_PER_MESSAGE_MAX} images per message`,
+    );
 
   const attachments: OutboxEntry["attachments"] = [];
   for (const file of input.files) {

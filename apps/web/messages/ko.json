@@ -180,5 +180,28 @@
       "setDescription": "{count}자 이상. 새 기기에서 채팅을 읽을 때 필요합니다. 분실 시 복구할 수 없습니다.",
       "save": "암호 저장"
     }
+  },
+  "Search": {
+    "home": "홈",
+    "search": "검색",
+    "placeholder": "무엇을 찾고 계신가요...",
+    "allCategoriesOption": "모든 카테고리",
+    "resultsFor": "“{q}” 검색 결과",
+    "allAds": "모든 광고",
+    "resultCount": "{count, plural, =0 {광고 없음} other {광고 #개}}",
+    "categories": "카테고리",
+    "allCategories": "모든 카테고리",
+    "removeFilter": "{name} 제거",
+    "loadMore": "더 보기",
+    "loading": "불러오는 중…",
+    "loadMoreError": "광고를 더 불러오지 못했습니다. 다시 시도해 주세요.",
+    "emptyTitle": "“{q}”와(과) 일치하는 광고가 없습니다",
+    "emptyTitleNoQuery": "이 필터와 일치하는 광고가 없습니다",
+    "emptyHint": "다른 키워드를 사용하거나 필터를 줄여 보세요.",
+    "clearFilters": "필터 지우기",
+    "clearSearch": "검색 지우기",
+    "metaTitle": "{q} – 검색",
+    "metaTitleAll": "광고 검색",
+    "fuzzyNotice": "“{q}”와(과) 정확히 일치하는 결과가 없어 비슷한 광고를 보여 드립니다."
   }
 }

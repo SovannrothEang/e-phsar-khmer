@@ -1,12 +1,15 @@
 import SettingSidebar from "./SettingSidebar";
 import { Monitor, Smartphone, LogOut, Laptop } from "lucide-react";
+import { getSettingsUser } from "@/lib/auth/current-user";
 
-export default function DeviceSettings() {
+export default async function DeviceSettings() {
+  // The device list itself is still a mock; the rail shows the real account.
+  const me = await getSettingsUser();
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex gap-5">
-          <SettingSidebar />
+          <SettingSidebar me={me} />
 
           <main className="flex-1 space-y-6">
             <h1 className="text-xl font-bold text-foreground">Devices</h1>

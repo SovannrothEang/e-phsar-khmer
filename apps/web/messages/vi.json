@@ -180,5 +180,28 @@
       "setDescription": "Ít nhất {count} ký tự. Bạn cần nó để đọc trò chuyện trên thiết bị mới. Chúng tôi không thể khôi phục giúp bạn.",
       "save": "Lưu mã khóa"
     }
+  },
+  "Search": {
+    "home": "Trang chủ",
+    "search": "Tìm kiếm",
+    "placeholder": "Bạn đang tìm gì...",
+    "allCategoriesOption": "Tất cả danh mục",
+    "resultsFor": "Kết quả cho “{q}”",
+    "allAds": "Tất cả tin đăng",
+    "resultCount": "{count, plural, =0 {Không có tin đăng} other {# tin đăng}}",
+    "categories": "Danh mục",
+    "allCategories": "Tất cả danh mục",
+    "removeFilter": "Bỏ {name}",
+    "loadMore": "Tải thêm",
+    "loading": "Đang tải…",
+    "loadMoreError": "Không thể tải thêm tin đăng. Vui lòng thử lại.",
+    "emptyTitle": "Không có tin đăng nào khớp với “{q}”",
+    "emptyTitleNoQuery": "Không có tin đăng nào khớp với các bộ lọc này",
+    "emptyHint": "Hãy thử từ khóa khác hoặc bớt bộ lọc.",
+    "clearFilters": "Xóa bộ lọc",
+    "clearSearch": "Xóa tìm kiếm",
+    "metaTitle": "{q} – Tìm kiếm",
+    "metaTitleAll": "Tìm kiếm tin đăng",
+    "fuzzyNotice": "Không có kết quả khớp chính xác cho “{q}” — đang hiển thị tin đăng tương tự."
   }
 }

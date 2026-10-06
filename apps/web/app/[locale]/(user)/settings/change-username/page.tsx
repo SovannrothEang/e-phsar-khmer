@@ -1,11 +1,14 @@
 import ChangeUsername from "@/components/setting/Change-Username";
+import { getSettingsUser } from "@/lib/auth/current-user";
 
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Change Username - Psakhmer",
-  description: "Change Username - Psakhmer",
+  title: "Edit Username - Psakhmer",
+  description: "Edit Username - Psakhmer",
 };
-export default function ChangeUsernamePage() {
-  return <ChangeUsername />;
+
+export default async function ChangeUsernamePage() {
+  const me = await getSettingsUser();
+  return <ChangeUsername me={me} />;
 }

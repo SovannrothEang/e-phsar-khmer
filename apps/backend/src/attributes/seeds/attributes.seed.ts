@@ -396,7 +396,21 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     sortOrder: i,
   })),
 
-  // ---- accessories (phone set + fashion set; has image per spec two:52) ----
+  // ---- accessories (phone set + fashion jewellery set; has image per spec
+  //      two:52 / eight:64) ----
+  //      ONE set serving two families, kept apart by per-subcategory ticks —
+  //      the same shape `types` uses to serve seven families at once from one
+  //      80-row set, with `other` shared across all of them. **Captain's call,
+  //      2026-09-27: this is one set, not two.** A `fashion_accessories` split
+  //      was built and reverted the same day; the reason is worth keeping, so
+  //      nobody re-proposes it: the split was never required for correctness
+  //      (ticks already scope each form), the shared `other` it was blamed for
+  //      is exactly what `types` does across 14 subcategories, and the ordering
+  //      wrinkle it caused is solved here by giving `other` the global
+  //      last-place `sortOrder` (999) instead.
+  //      The trade being accepted: ONE mis-tick in the admin can put a phone
+  //      part (Chargers & Cables…) into the jewellery picker, because only the
+  //      ticks separate the two slices.
   ...[
     ['Accessory Kits', 'accessory-kits', 'phone-accessories'],
     ['Batteries', 'batteries', 'phone-accessories'],
@@ -407,7 +421,6 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     ['Memory Cards', 'memory-cards', 'phone-accessories'],
     ['Replacement Parts', 'replacement-parts', 'phone-accessories'],
     ['Screen Protectors', 'screen-protectors', 'phone-accessories'],
-    ['Other - ផ្សេងៗ', 'other', 'phone-accessories'],
     ['Rings', 'rings', 'fashion-accessories'],
     ['Necklaces', 'necklaces', 'fashion-accessories'],
     ['Earrings', 'earrings', 'fashion-accessories'],
@@ -423,6 +436,24 @@ export const ATTRIBUTE_SEEDS: AttributeSeed[] = [
     subcategories: [sub],
     sortOrder: i,
   })),
+
+  // The one shared `accessories` "Other", declared standalone because it
+  // belongs to BOTH slices at once (Phone Accessories' 10 rows and Fashion
+  // Accessories' 6 jewellery rows) — a mapped entry takes its slice-local index,
+  // which would drop it between Screen Protectors and Rings, i.e. FIRST in the
+  // jewellery list where the design puts it last. `dedupe()` unions
+  // subcategories across same-(type, slug) rows but keeps the FIRST
+  // declaration's order, so this has to be the only declaration and carry the
+  // global last-place 999 — the exact shape of the shared `types` "other" row at
+  // the end of this file.
+  {
+    type: 'accessories',
+    slug: 'other',
+    name: 'Other - ផ្សេងៗ',
+    category: null,
+    subcategories: ['phone-accessories', 'fashion-accessories'],
+    sortOrder: 999,
+  },
 
   // ---- jobtypes (has image per spec six:4) — every jobs subcategory shows
   //      the same Job Type grid (design: "each job subcategory has job type")

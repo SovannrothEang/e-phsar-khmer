@@ -34,6 +34,19 @@ import {
 let engineUserId: string | null = null;
 let enginePromise: Promise<RatchetEngine> | null = null;
 
+type EngineListener = (userId: string, engine: RatchetEngine) => void;
+const listeners = new Set<EngineListener>();
+
+/**
+ * Be told whenever an engine finishes bootstrapping. Returns the unsubscribe.
+ */
+export function subscribeE2eEngine(listener: EngineListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export class E2eBootstrapError extends Error {
   constructor(message: string) {
     super(message);
@@ -150,15 +163,26 @@ async function bootstrap(userId: string): Promise<RatchetEngine> {
 export function getE2eEngine(userId: string): Promise<RatchetEngine> {
   if (enginePromise && engineUserId === userId) return enginePromise;
   engineUserId = userId;
-  enginePromise = bootstrap(userId).catch((err) => {
-    // Allow a retry on the next call instead of caching the failure.
-    if (engineUserId === userId) {
-      engineUserId = null;
-      enginePromise = null;
-    }
-    throw err;
-  });
-  return enginePromise;
+  const attempt: Promise<RatchetEngine> = bootstrap(userId).then(
+    (engine) => {
+      // Announce success to every subscriber — a retry started by ANY caller
+      // (e.g. a send) must reach hooks whose own earlier attempt failed.
+      // Skipped if this attempt was superseded (user switch / reset).
+      if (enginePromise === attempt)
+        for (const listener of listeners) listener(userId, engine);
+      return engine;
+    },
+    (err: unknown) => {
+      // Allow a retry on the next call instead of caching the failure.
+      if (enginePromise === attempt) {
+        engineUserId = null;
+        enginePromise = null;
+      }
+      throw err;
+    },
+  );
+  enginePromise = attempt;
+  return attempt;
 }
 
 /** Drop the cached engine (e.g. on sign-out) so the next login re-bootstraps. */

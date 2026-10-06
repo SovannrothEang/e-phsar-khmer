@@ -1,64 +1,39 @@
 "use client";
 
-import { useMemo } from "react";
-import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IconLayoutGridFilled, IconListFilled } from "@tabler/icons-react";
 import AllAdsCategories from "./AllAdsCategories";
-import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
-import { ListCardPost } from "@/components/ads/ListCardPost";
 import { ListCardSell } from "@/components/ads/ListCardSell";
+import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
+import SortFilter from "@/components/filter/SortFilter";
+import PriceFilter from "@/components/filter/PriceFilter";
+import MoreFilters from "@/components/filter/MoreFilters";
+import { FeedResults } from "@/components/search/FeedResults";
+import type { ListingsFeedParams } from "@/lib/api/categories";
+import type { Post } from "@/lib/posts";
 
-// ─── Filter components ────────────────────────────────────────────────────────
-import {
-  LocationSelectorFilter,
-  filterPostsByLocation,
-  LOCATION_PRO_PARAM,
-  LOCATION_DIS_PARAM,
-} from "@/components/filter/LocationSelectorFilter";
-import SortFilter, {
-  SORT_PARAM,
-  parseSortParam,
-  sortPosts,
-} from "@/components/filter/SortFilter";
-import PriceFilter, {
-  filterPostsByPrice,
-  MAX_AD_PRICE_PARAM,
-  MIN_AD_PRICE_PARAM,
-  parsePriceParam,
-} from "@/components/filter/PriceFilter";
-import MoreFilters, {
-  KEYWORD_PARAM,
-  DATE_PARAM,
-  filterPostsByKeyword,
-  filterPostsByDate,
-  type DateValue,
-} from "@/components/filter/MoreFilters";
+interface AllAdsHeaderProps {
+  /** First page of the real feed, fetched by the page with `query`. */
+  posts: Post[];
+  nextCursor: string | null;
+  query: ListingsFeedParams;
+  locale: string;
+  /** Changes whenever the filters do, so the load-more state resets. */
+  feedKey: string;
+}
 
-import { posts } from "@/lib/posts";
-
-export default function AllAdsHeader() {
-  const searchParams = useSearchParams();
-
-  // ── Read all active params ─────────────────────────────────────────────────
-  const minPrice = parsePriceParam(searchParams.get(MIN_AD_PRICE_PARAM));
-  const maxPrice = parsePriceParam(searchParams.get(MAX_AD_PRICE_PARAM));
-  const sort = parseSortParam(searchParams.get(SORT_PARAM));
-  const proId = searchParams.get(LOCATION_PRO_PARAM) ?? undefined;
-  const disId = searchParams.get(LOCATION_DIS_PARAM) ?? undefined;
-  const keyword = searchParams.get(KEYWORD_PARAM) ?? "";
-  const date = (searchParams.get(DATE_PARAM) ?? "") as DateValue;
-
-  // ── Filter + sort pipeline ─────────────────────────────────────────────────
-  const filteredPosts = useMemo(() => {
-    const byKeyword = filterPostsByKeyword(posts, keyword);
-    const byDate = filterPostsByDate(byKeyword, date);
-    const byLocation = filterPostsByLocation(byDate, proId, disId);
-    const byPrice = filterPostsByPrice(byLocation, minPrice, maxPrice);
-    return sortPosts(byPrice, sort);
-  }, [keyword, date, proId, disId, minPrice, maxPrice, sort]);
-
+/**
+ * All Ads = the whole real feed, narrowed by the same URL filters as every
+ * other feed page (the page parses them with `parseFeedParams`).
+ */
+export default function AllAdsHeader({
+  posts,
+  nextCursor,
+  query,
+  locale,
+  feedKey,
+}: AllAdsHeaderProps) {
   return (
     <Tabs defaultValue="grid" className="max-w-7xl select-none bg-muted">
       {/* Header title */}
@@ -91,37 +66,27 @@ export default function AllAdsHeader() {
         <AllAdsCategories />
       </div>
 
-      {/* Grid view */}
-      <TabsContent value="grid" className="mt-4">
-        {filteredPosts.length === 0 ? (
-          <p className="py-12 text-center text-muted-foreground">
-            No ads match the selected filters.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <GridCardSell />
-            {filteredPosts.map((post) => (
-              <GridCardPost key={post.postId} post={post} />
-            ))}
-          </div>
-        )}
-      </TabsContent>
-
-      {/* List view */}
-      <TabsContent value="list" className="mt-4 space-y-4">
-        {filteredPosts.length === 0 ? (
-          <p className="py-12 text-center text-muted-foreground">
-            No ads match the selected filters.
-          </p>
-        ) : (
-          <>
-            <ListCardSell />
-            {filteredPosts.map((post) => (
-              <ListCardPost key={post.postId} post={post} />
-            ))}
-          </>
-        )}
-      </TabsContent>
+      {posts.length === 0 ? (
+        <>
+          {(["grid", "list"] as const).map((v) => (
+            <TabsContent key={v} value={v} className="mt-4">
+              <p className="py-12 text-center text-muted-foreground">
+                No ads match the selected filters.
+              </p>
+            </TabsContent>
+          ))}
+        </>
+      ) : (
+        <FeedResults
+          key={feedKey}
+          initialPosts={posts}
+          initialCursor={nextCursor}
+          query={query}
+          locale={locale}
+          gridLead={<GridCardSell />}
+          listLead={<ListCardSell />}
+        />
+      )}
     </Tabs>
   );
 }

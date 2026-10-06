@@ -54,11 +54,17 @@ export default () => {
       backoffMaxMs: env.OUTBOX_BACKOFF_MAX_MS,
       retentionDays: env.OUTBOX_RETENTION_DAYS,
     },
+    accounts: {
+      purgeEnabled: env.ACCOUNT_PURGE_ENABLED,
+      purgeIntervalMs: env.ACCOUNT_PURGE_INTERVAL_MS,
+    },
     queue: {
       host: env.QUEUE_HOST,
       port: env.QUEUE_PORT,
+      username: env.QUEUE_USERNAME,
       password: env.QUEUE_PASSWORD,
       db: env.QUEUE_DB,
+      tls: env.QUEUE_TLS,
       prefix: env.QUEUE_PREFIX,
     },
     payment: {
