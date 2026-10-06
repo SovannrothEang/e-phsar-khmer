@@ -27,8 +27,8 @@ const LatestAds = () => {
         <View className="flex-row items-center rounded-full bg-gray-100 dark:bg-gray-800 p-1 border border-gray-200/80 dark:border-gray-700">
           <TouchableOpacity
             className={`p-1.5 px-3 rounded-full flex-row items-center gap-1 ${
-              viewMode === "grid" 
-                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700" 
+              viewMode === "grid"
+                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700"
                 : "bg-transparent"
             }`}
             onPress={() => setViewMode("grid")}
@@ -42,8 +42,8 @@ const LatestAds = () => {
           </TouchableOpacity>
           <TouchableOpacity
             className={`p-1.5 px-3 rounded-full flex-row items-center gap-1 ${
-              viewMode === "list" 
-                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700" 
+              viewMode === "list"
+                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700"
                 : "bg-transparent"
             }`}
             onPress={() => setViewMode("list")}

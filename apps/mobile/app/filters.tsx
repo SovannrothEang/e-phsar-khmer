@@ -91,8 +91,9 @@ const SimpleDropdown = ({
       <TouchableOpacity
         onPress={() => !disabled && setVisible(true)}
         disabled={disabled}
-        className={`flex-row items-center justify-between rounded-lg border border-gray-200 px-4 py-3 ${disabled ? "bg-gray-100" : "bg-white"
-          }`}
+        className={`flex-row items-center justify-between rounded-lg border border-gray-200 px-4 py-3 ${
+          disabled ? "bg-gray-100" : "bg-white"
+        }`}
       >
         <View>
           {label && <Text className="text-xs text-gray-400">{label}</Text>}
@@ -166,27 +167,42 @@ export default function FiltersScreen() {
   const subCategoryId = params.subCategoryId as string;
 
   const [sort, setSort] = useState<string>((params.sort as string) || "");
-  const [dateRange, setDateRange] = useState<string>((params.dateRange as string) || "");
+  const [dateRange, setDateRange] = useState<string>(
+    (params.dateRange as string) || "",
+  );
   const [province, setProvince] = useState<Province | undefined>(
-    params.provinceId ? PROVINCES.find(p => p.id === params.provinceId) : undefined
+    params.provinceId
+      ? PROVINCES.find((p) => p.id === params.provinceId)
+      : undefined,
   );
   const [district, setDistrict] = useState<DropdownOption | undefined>(
-    params.districtId ? { id: params.districtId as string, name: params.districtName as string } : undefined
+    params.districtId
+      ? { id: params.districtId as string, name: params.districtName as string }
+      : undefined,
   );
   const [commune, setCommune] = useState<DropdownOption | undefined>(
-    params.communeId ? { id: params.communeId as string, name: params.communeName as string } : undefined
+    params.communeId
+      ? { id: params.communeId as string, name: params.communeName as string }
+      : undefined,
   );
   const [minPrice, setMinPrice] = useState((params.minPrice as string) || "");
   const [maxPrice, setMaxPrice] = useState((params.maxPrice as string) || "");
   const [year, setYear] = useState((params.year as string) || "");
-  const [condition, setCondition] = useState((params.condition as string) || "");
+  const [condition, setCondition] = useState(
+    (params.condition as string) || "",
+  );
   const [storage, setStorage] = useState((params.storage as string) || "");
   const [size, setSize] = useState((params.size as string) || "");
   const [type, setType] = useState((params.type as string) || "");
   const [salary, setSalary] = useState((params.salary as string) || "");
-  const [experience, setExperience] = useState((params.experience as string) || "");
+  const [experience, setExperience] = useState(
+    (params.experience as string) || "",
+  );
 
-  const activeFilters = useMemo(() => getFiltersForCategory(categoryId, subCategoryId), [categoryId, subCategoryId]);
+  const activeFilters = useMemo(
+    () => getFiltersForCategory(categoryId, subCategoryId),
+    [categoryId, subCategoryId],
+  );
 
   const districts = province ? getDistrictsForProvince(province.id) : [];
   const communes =
@@ -228,14 +244,14 @@ export default function FiltersScreen() {
     };
 
     // Remove undefined/empty values
-    Object.keys(filterParams).forEach(key => {
+    Object.keys(filterParams).forEach((key) => {
       if (!filterParams[key]) delete filterParams[key];
     });
 
     // Navigate back with params
     router.replace({
       pathname: `/(categories)/${categoryId}${subCategoryId ? `/${subCategoryId}` : ""}`,
-      params: { ...filterParams }
+      params: { ...filterParams },
     } as any);
   };
 
@@ -262,7 +278,9 @@ export default function FiltersScreen() {
 
   const isVisible = (label: string) => {
     if (!activeFilters) return true; // Show all if no config (default behavior)
-    return activeFilters.some(f => f.label.toLowerCase() === label.toLowerCase());
+    return activeFilters.some(
+      (f) => f.label.toLowerCase() === label.toLowerCase(),
+    );
   };
 
   return (
@@ -377,7 +395,9 @@ export default function FiltersScreen() {
           {/* Year */}
           {isVisible("Year") && (
             <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">Year</Text>
+              <Text className="mb-2 text-sm font-medium text-gray-700">
+                Year
+              </Text>
               <TextInput
                 placeholder="e.g., 2024"
                 value={year}
@@ -417,7 +437,9 @@ export default function FiltersScreen() {
           {/* Size */}
           {isVisible("Size") && (
             <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">Size</Text>
+              <Text className="mb-2 text-sm font-medium text-gray-700">
+                Size
+              </Text>
               <TextInput
                 placeholder="e.g., 100m²"
                 value={size}
@@ -443,7 +465,9 @@ export default function FiltersScreen() {
           {/* Salary */}
           {isVisible("Salary") && (
             <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">Salary</Text>
+              <Text className="mb-2 text-sm font-medium text-gray-700">
+                Salary
+              </Text>
               <TextInput
                 placeholder="e.g., $500-$1000"
                 value={salary}

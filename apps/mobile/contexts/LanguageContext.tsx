@@ -432,22 +432,49 @@ export const CATEGORY_TRANSLATIONS: Record<string, Record<string, string>> = {
   "financial-services": { en: "Financial Services", km: "សេវាហិរញ្ញវត្ថុ" },
   "travel-tourism": { en: "Travel & Tourism", km: "ការធ្វើដំណើរ និង ទេសចរណ៍" },
   "automotive-services": { en: "Automotive Services", km: "រថយន្ត" },
-  "advertising-media": { en: "Advertising & Media", km: "ការផ្សាយពាណិជ្ជកម្ម & ប្រព័ន្ធផ្សព្វផ្សាយ" },
+  "advertising-media": {
+    en: "Advertising & Media",
+    km: "ការផ្សាយពាណិជ្ជកម្ម & ប្រព័ន្ធផ្សព្វផ្សាយ",
+  },
   "wedding-decor": { en: "Wedding & Ceremony Decor", km: "សំអាងការ" },
-  "cleaning-housekeeper": { en: "Cleaning & Housekeeping", km: "សេវាសំអាត& មេផ្ទះ" },
-  "construction-architecture": { en: "Construction & Architecture", km: "សំណង់ ស្ថាបត្យកម្ម និងផ្នែកខាងក្នុង" },
-  "engineering-services": { en: "Engineering Services", km: "សេវាកម្មវិស្វកម្ម" },
+  "cleaning-housekeeper": {
+    en: "Cleaning & Housekeeping",
+    km: "សេវាសំអាត& មេផ្ទះ",
+  },
+  "construction-architecture": {
+    en: "Construction & Architecture",
+    km: "សំណង់ ស្ថាបត្យកម្ម និងផ្នែកខាងក្នុង",
+  },
+  "engineering-services": {
+    en: "Engineering Services",
+    km: "សេវាកម្មវិស្វកម្ម",
+  },
   "massage-spa": { en: "Massage & Spa", km: "ម៉ាសារ & ស្ប៉ា" },
-  "hospitality-tourism": { en: "Hospitality & Tourism", km: "បដិសណ្ឋារកិច្ច និង ទេសចរ" },
+  "hospitality-tourism": {
+    en: "Hospitality & Tourism",
+    km: "បដិសណ្ឋារកិច្ច និង ទេសចរ",
+  },
   "health-medical": { en: "Health & Medical", km: "សុខភាព វេជ្ជសាស្ត្រ & ឱសថ" },
   "it-telecom": { en: "IT & Telecommunication", km: "អាយធី & ទូរគមនាគមន៍" },
   "design-renovation": { en: "Design & Renovation", km: "រចនា និង កែកម្អ" },
   "legal-services": { en: "Legal Services", km: "សេវាច្បាប់" },
-  "transportation-services": { en: "Transportation Services", km: "សេវាកម្មដឹកជញ្ជូន" },
-  "plumbing-electrical": { en: "Plumbing & Electrical", km: "បំពង់ទឹក & អគ្គិសនី" },
-  "real-estate-services": { en: "Real Estate Services", km: "សេវាកម្មអចលនទ្រព្យ" },
+  "transportation-services": {
+    en: "Transportation Services",
+    km: "សេវាកម្មដឹកជញ្ជូន",
+  },
+  "plumbing-electrical": {
+    en: "Plumbing & Electrical",
+    km: "បំពង់ទឹក & អគ្គិសនី",
+  },
+  "real-estate-services": {
+    en: "Real Estate Services",
+    km: "សេវាកម្មអចលនទ្រព្យ",
+  },
   science: { en: "Science", km: "វិទ្យាសាស្ត្រ" },
-  "supply-logistics": { en: "Supply & Logistics", km: "ផ្គត់ផ្គង់ & ដឹកជញ្ជូន" },
+  "supply-logistics": {
+    en: "Supply & Logistics",
+    km: "ផ្គត់ផ្គង់ & ដឹកជញ្ជូន",
+  },
   "printing-publishing": { en: "Printing & Publishing", km: "បោះពុម្ពផ្សាយ" },
   "other-services": { en: "Other Services", km: "សេវាកម្មផ្សេងទៀត" },
   "fashion-beauty": {
@@ -526,7 +553,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
       const normName = defaultName.toLowerCase().trim();
       const matchedKey = Object.keys(CATEGORY_TRANSLATIONS).find(
         (key) =>
-          CATEGORY_TRANSLATIONS[key]?.en?.toLowerCase().trim() === normName
+          CATEGORY_TRANSLATIONS[key]?.en?.toLowerCase().trim() === normName,
       );
       if (matchedKey && CATEGORY_TRANSLATIONS[matchedKey]?.[language]) {
         return CATEGORY_TRANSLATIONS[matchedKey][language];

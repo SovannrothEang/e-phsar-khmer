@@ -43,7 +43,9 @@ export default function SearchScreen() {
     const normalizedQuery = query.toLowerCase();
 
     return SAMPLE_PRODUCTS.filter((product) => {
-      const matchesTitle = product.title.toLowerCase().includes(normalizedQuery);
+      const matchesTitle = product.title
+        .toLowerCase()
+        .includes(normalizedQuery);
       const matchesDesc =
         product.description?.toLowerCase().includes(normalizedQuery) || false;
       const matchesMainCat =
@@ -98,10 +100,7 @@ export default function SearchScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="ml-4 py-2"
-        >
+        <TouchableOpacity onPress={() => router.back()} className="ml-4 py-2">
           <Text className="text-primary font-bold text-base">Cancel</Text>
         </TouchableOpacity>
       </View>
@@ -134,11 +133,14 @@ export default function SearchScreen() {
             {/* Header info bar */}
             <View className="flex-row items-center justify-between px-4 py-3 bg-neutral-background/30 border-b border-neutral-border/10">
               <Text className="text-sm text-neutral-text-sub font-medium">
-                {filteredProducts.length} result{filteredProducts.length !== 1 ? "s" : ""} found
+                {filteredProducts.length} result
+                {filteredProducts.length !== 1 ? "s" : ""} found
               </Text>
               {filteredProducts.length > 0 && (
                 <TouchableOpacity
-                  onPress={() => setViewMode((prev) => (prev === "list" ? "grid" : "list"))}
+                  onPress={() =>
+                    setViewMode((prev) => (prev === "list" ? "grid" : "list"))
+                  }
                   className="p-1 rounded-md"
                 >
                   <Ionicons
@@ -159,13 +161,18 @@ export default function SearchScreen() {
                 /* No Results UI */
                 <View className="items-center justify-center p-8 mt-20">
                   <View className="w-20 h-20 bg-neutral-background rounded-full items-center justify-center mb-6">
-                    <Ionicons name="search-outline" size={40} color={Colors.text.muted} />
+                    <Ionicons
+                      name="search-outline"
+                      size={40}
+                      color={Colors.text.muted}
+                    />
                   </View>
                   <Text className="text-xl font-bold text-neutral-text-main text-center mb-2">
                     No results found for &quot;{query}&quot;
                   </Text>
                   <Text className="text-sm text-neutral-text-sub text-center px-8 leading-5">
-                    Check the spelling or try searching for something more general like &quot;iPhone&quot; or &quot;Car&quot;.
+                    Check the spelling or try searching for something more
+                    general like &quot;iPhone&quot; or &quot;Car&quot;.
                   </Text>
                 </View>
               ) : viewMode === "list" ? (

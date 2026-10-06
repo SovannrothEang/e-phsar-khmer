@@ -77,7 +77,7 @@ const SignUpScreen = () => {
             text: "Start Exploring",
             onPress: () => router.replace("/(tabs)"),
           },
-        ]
+        ],
       );
     }, 400);
   };
@@ -103,7 +103,7 @@ const SignUpScreen = () => {
             router.replace("/(tabs)");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -144,7 +144,8 @@ const SignUpScreen = () => {
             isDark ? "text-gray-300" : "text-neutral-text-sub"
           } text-sm leading-5 mb-6 px-2`}
         >
-          Create an account to post free ads, contact sellers, and manage your listings.
+          Create an account to post free ads, contact sellers, and manage your
+          listings.
         </Text>
 
         {/* Input Fields */}
@@ -162,8 +163,8 @@ const SignUpScreen = () => {
                 nameError
                   ? "text-red-500"
                   : isDark
-                  ? "text-gray-400"
-                  : "text-neutral-text-sub"
+                    ? "text-gray-400"
+                    : "text-neutral-text-sub"
               } text-xs mb-1 font-medium`}
             >
               Full Name
@@ -204,8 +205,8 @@ const SignUpScreen = () => {
                 phoneError
                   ? "text-red-500"
                   : isDark
-                  ? "text-gray-400"
-                  : "text-neutral-text-sub"
+                    ? "text-gray-400"
+                    : "text-neutral-text-sub"
               } text-xs mb-1 font-medium`}
             >
               Phone Number
@@ -247,8 +248,8 @@ const SignUpScreen = () => {
                 passwordError
                   ? "text-red-500"
                   : isDark
-                  ? "text-gray-400"
-                  : "text-neutral-text-sub"
+                    ? "text-gray-400"
+                    : "text-neutral-text-sub"
               }`}
             >
               Password
@@ -299,7 +300,9 @@ const SignUpScreen = () => {
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white font-bold text-base">Register Now</Text>
+              <Text className="text-white font-bold text-base">
+                Register Now
+              </Text>
             )}
           </TouchableOpacity>
 

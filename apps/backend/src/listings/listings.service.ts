@@ -29,7 +29,12 @@ import type {
   NewListing,
 } from '../db/schema/listings.schema';
 import { categories, subcategories } from '../db/schema/categories.schema';
-import { communes, districts, provinces, users } from '../db/schema/users.schema';
+import {
+  communes,
+  districts,
+  provinces,
+  users,
+} from '../db/schema/users.schema';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
 import type { QueryListingsDto } from './dto/query-listings.dto';

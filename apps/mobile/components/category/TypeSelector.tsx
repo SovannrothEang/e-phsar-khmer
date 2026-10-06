@@ -34,7 +34,7 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
   const filteredTypes = useMemo(() => {
     if (!searchQuery.trim()) return types;
     return types.filter((t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase())
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [types, searchQuery]);
 

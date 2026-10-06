@@ -18,7 +18,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
   if (viewMode === "grid") {
     return (
       <View className="w-1/2 p-1.5">
-        <View 
+        <View
           className="rounded-3xl overflow-hidden shadow-sm"
           style={{ height: total }}
         >
@@ -38,7 +38,10 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
               <Text className="mb-2 text-center text-base font-black text-white leading-5">
                 Want to see your ads here?
               </Text>
-              <Text className="text-center text-[11px] leading-4 text-white/90 font-medium" numberOfLines={3}>
+              <Text
+                className="text-center text-[11px] leading-4 text-white/90 font-medium"
+                numberOfLines={3}
+              >
                 Make extra cash by selling on psakhmer. It&apos;s quick & easy!
               </Text>
             </View>
@@ -62,7 +65,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
   // List view - full width
   return (
     <View className="px-4 py-2">
-      <View 
+      <View
         className="rounded-3xl overflow-hidden"
         style={{
           elevation: 4,
@@ -86,9 +89,10 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
               Want to see your ads here?
             </Text>
           </View>
-          
+
           <Text className="mb-4 text-xs leading-5 text-white/90 font-medium">
-            Turn your unused items into fast cash by posting a free ad on psakhmer in seconds.
+            Turn your unused items into fast cash by posting a free ad on
+            psakhmer in seconds.
           </Text>
 
           <TouchableOpacity

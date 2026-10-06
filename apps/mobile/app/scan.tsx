@@ -37,7 +37,7 @@ export default function ScanScreen() {
         toValue: 1,
         duration: 2500,
         useNativeDriver: true,
-      })
+      }),
     ).start();
   }, [animationValue]);
 
@@ -111,7 +111,7 @@ export default function ScanScreen() {
             style: "cancel",
           },
         ],
-        { cancelable: false }
+        { cancelable: false },
       );
     }
   };
@@ -126,13 +126,18 @@ export default function ScanScreen() {
     return (
       <View className="flex-1 bg-neutral-background justify-center items-center p-6">
         <View className="w-20 h-20 bg-primary/10 rounded-full items-center justify-center mb-6">
-          <Ionicons name="camera-outline" size={40} color={Colors.primary.DEFAULT} />
+          <Ionicons
+            name="camera-outline"
+            size={40}
+            color={Colors.primary.DEFAULT}
+          />
         </View>
         <Text className="text-2xl font-bold text-neutral-text-main text-center mb-2">
           Camera Access Required
         </Text>
         <Text className="text-sm text-neutral-text-sub text-center mb-8 px-4 leading-5">
-          We need permission to use the camera to scan product QR codes and load items instantly.
+          We need permission to use the camera to scan product QR codes and load
+          items instantly.
         </Text>
         <TouchableOpacity
           onPress={requestPermission}
@@ -146,7 +151,9 @@ export default function ScanScreen() {
           activeOpacity={0.6}
           className="px-6 py-3 w-full max-w-xs items-center"
         >
-          <Text className="text-neutral-text-sub font-semibold text-sm">Cancel</Text>
+          <Text className="text-neutral-text-sub font-semibold text-sm">
+            Cancel
+          </Text>
         </TouchableOpacity>
       </View>
     );
@@ -189,7 +196,11 @@ export default function ScanScreen() {
               onPress={() => setTorch((prev) => !prev)}
               className={`w-10 h-10 rounded-full items-center justify-center border border-white/10 ${torch ? "bg-primary" : "bg-black/40"}`}
             >
-              <Ionicons name={torch ? "flash" : "flash-off"} size={20} color="white" />
+              <Ionicons
+                name={torch ? "flash" : "flash-off"}
+                size={20}
+                color="white"
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -198,7 +209,12 @@ export default function ScanScreen() {
         <View className="flex-row items-center justify-center">
           <View style={styles.overlaySide} />
 
-          <View style={[styles.focusBox, { width: SCAN_CONTAINER_SIZE, height: SCAN_CONTAINER_SIZE }]}>
+          <View
+            style={[
+              styles.focusBox,
+              { width: SCAN_CONTAINER_SIZE, height: SCAN_CONTAINER_SIZE },
+            ]}
+          >
             {/* Custom focusing corner styles for high-end look */}
             <View style={[styles.corner, styles.topLeft]} />
             <View style={[styles.corner, styles.topRight]} />
@@ -234,7 +250,10 @@ export default function ScanScreen() {
             onPress={() => {
               const sample = SAMPLE_PRODUCTS[0];
               if (Platform.OS === "android") {
-                ToastAndroid.show(`Demo QR Scanned: ${sample.title}`, ToastAndroid.SHORT);
+                ToastAndroid.show(
+                  `Demo QR Scanned: ${sample.title}`,
+                  ToastAndroid.SHORT,
+                );
               }
               router.replace(`/(categories)/product/${sample.id}`);
             }}

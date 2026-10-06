@@ -70,7 +70,7 @@ const SellScreen = () => {
   const [images, setImages] = useState<string[]>([]);
   const [selectedMainCat, setSelectedMainCat] = useState<any>(CATEGORIES[0]);
   const [selectedSubCat, setSelectedSubCat] = useState<any>(
-    CATEGORIES[0]?.subs?.[0] || null
+    CATEGORIES[0]?.subs?.[0] || null,
   );
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
@@ -86,7 +86,8 @@ const SellScreen = () => {
   const [brand, setBrand] = useState("");
   const [modelName, setModelName] = useState("");
 
-  const isJob = selectedMainCat?.id === "jobs" || selectedMainCat?.name === "Jobs";
+  const isJob =
+    selectedMainCat?.id === "jobs" || selectedMainCat?.name === "Jobs";
 
   const [province, setProvince] = useState("Phnom Penh");
   const [district, setDistrict] = useState("Toul Kork");
@@ -147,7 +148,7 @@ const SellScreen = () => {
           text: "View Listing",
           onPress: () => router.push("/(tabs)"),
         },
-      ]
+      ],
     );
   };
 
@@ -164,7 +165,9 @@ const SellScreen = () => {
             setImages([]);
           }}
         >
-          <Text className="text-sm font-medium text-neutral-text-sub">Clear</Text>
+          <Text className="text-sm font-medium text-neutral-text-sub">
+            Clear
+          </Text>
         </TouchableOpacity>
 
         <Text className="text-base font-bold text-neutral-text-main">
@@ -187,7 +190,11 @@ const SellScreen = () => {
         <View className="mb-2 bg-white p-4">
           <View className="mb-3 flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <Ionicons name="camera" size={20} color={Colors.primary.DEFAULT} />
+              <Ionicons
+                name="camera"
+                size={20}
+                color={Colors.primary.DEFAULT}
+              />
               <Text className="ml-2 text-base font-bold text-neutral-text-main">
                 Upload Photos
               </Text>
@@ -205,7 +212,11 @@ const SellScreen = () => {
                 onPress={handleAddPhoto}
                 className="h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-primary/50 bg-primary/5"
               >
-                <Ionicons name="add-circle" size={32} color={Colors.primary.DEFAULT} />
+                <Ionicons
+                  name="add-circle"
+                  size={32}
+                  color={Colors.primary.DEFAULT}
+                />
                 <Text className="mt-1 text-[11px] font-semibold text-primary">
                   Add Photo
                 </Text>
@@ -213,9 +224,16 @@ const SellScreen = () => {
 
               {/* Render Selected Photos */}
               {images.map((imgUri, index) => (
-                <View key={index} className="relative h-24 w-24 rounded-xl overflow-hidden bg-neutral-border">
-                  <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
-                  
+                <View
+                  key={index}
+                  className="relative h-24 w-24 rounded-xl overflow-hidden bg-neutral-border"
+                >
+                  <Image
+                    source={{ uri: imgUri }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+
                   {/* Main / Cover Badge */}
                   {index === 0 && (
                     <View className="absolute bottom-0 left-0 right-0 bg-primary/90 py-0.5 items-center">
@@ -239,7 +257,11 @@ const SellScreen = () => {
 
           {/* Info Banner */}
           <View className="mt-3 flex-row items-center rounded-lg bg-sky-50 px-3 py-2 border border-sky-100">
-            <Ionicons name="information-circle" size={16} color={Colors.primary.DEFAULT} />
+            <Ionicons
+              name="information-circle"
+              size={16}
+              color={Colors.primary.DEFAULT}
+            />
             <Text className="ml-2 flex-1 text-xs text-sky-800">
               Ads with clear cover photos get up to 5x more buyer responses.
             </Text>
@@ -257,20 +279,34 @@ const SellScreen = () => {
           >
             <View className="flex-row items-center flex-1">
               <View className="h-9 w-9 rounded-lg bg-primary/10 items-center justify-center mr-3">
-                <Ionicons name="grid" size={20} color={Colors.primary.DEFAULT} />
+                <Ionicons
+                  name="grid"
+                  size={20}
+                  color={Colors.primary.DEFAULT}
+                />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-bold text-neutral-text-main" numberOfLines={1}>
+                <Text
+                  className="text-sm font-bold text-neutral-text-main"
+                  numberOfLines={1}
+                >
                   {selectedMainCat?.name || "Select Category"}
                 </Text>
                 {selectedSubCat && (
-                  <Text className="text-xs text-neutral-text-sub" numberOfLines={1}>
+                  <Text
+                    className="text-xs text-neutral-text-sub"
+                    numberOfLines={1}
+                  >
                     {selectedSubCat.name}
                   </Text>
                 )}
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.text.muted} />
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={Colors.text.muted}
+            />
           </TouchableOpacity>
         </View>
 
@@ -290,7 +326,11 @@ const SellScreen = () => {
               value={title}
               onChangeText={setTitle}
               maxLength={100}
-              placeholder={isJob ? "e.g. Accountant / Senior Sales Executive" : "e.g. iPhone 15 Pro Max 256GB Natural Titanium"}
+              placeholder={
+                isJob
+                  ? "e.g. Accountant / Senior Sales Executive"
+                  : "e.g. iPhone 15 Pro Max 256GB Natural Titanium"
+              }
               placeholderTextColor={Colors.text.muted}
               className="rounded-xl border border-neutral-border px-4 py-3 text-sm text-neutral-text-main bg-white"
             />
@@ -309,7 +349,9 @@ const SellScreen = () => {
                   onPress={() => setCurrency("USD")}
                   className={`px-3 py-1.5 rounded-lg ${currency === "USD" ? "bg-primary" : ""}`}
                 >
-                  <Text className={`text-xs font-bold ${currency === "USD" ? "text-white" : "text-neutral-text-sub"}`}>
+                  <Text
+                    className={`text-xs font-bold ${currency === "USD" ? "text-white" : "text-neutral-text-sub"}`}
+                  >
                     $ USD
                   </Text>
                 </TouchableOpacity>
@@ -317,7 +359,9 @@ const SellScreen = () => {
                   onPress={() => setCurrency("KHR")}
                   className={`px-3 py-1.5 rounded-lg ${currency === "KHR" ? "bg-primary" : ""}`}
                 >
-                  <Text className={`text-xs font-bold ${currency === "KHR" ? "text-white" : "text-neutral-text-sub"}`}>
+                  <Text
+                    className={`text-xs font-bold ${currency === "KHR" ? "text-white" : "text-neutral-text-sub"}`}
+                  >
                     ៛ KHR
                   </Text>
                 </TouchableOpacity>
@@ -330,7 +374,15 @@ const SellScreen = () => {
                   onChangeText={setPrice}
                   keyboardType="numeric"
                   editable={!isFree}
-                  placeholder={isFree ? "Negotiable / Unpaid" : isJob ? "e.g. 350" : currency === "USD" ? "0.00" : "0"}
+                  placeholder={
+                    isFree
+                      ? "Negotiable / Unpaid"
+                      : isJob
+                        ? "e.g. 350"
+                        : currency === "USD"
+                          ? "0.00"
+                          : "0"
+                  }
                   placeholderTextColor={Colors.text.muted}
                   className="rounded-xl border border-neutral-border px-4 py-3 text-base font-bold text-danger bg-white"
                 />
@@ -346,11 +398,17 @@ const SellScreen = () => {
                 onPress={() => setIsNegotiable(!isNegotiable)}
                 className="flex-row items-center"
               >
-                <View className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isNegotiable ? "bg-primary border-primary" : "border-neutral-border bg-white"}`}>
-                  {isNegotiable && <Ionicons name="checkmark" size={14} color="white" />}
+                <View
+                  className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isNegotiable ? "bg-primary border-primary" : "border-neutral-border bg-white"}`}
+                >
+                  {isNegotiable && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
                 </View>
                 <Text className="text-xs font-medium text-neutral-text-main">
-                  {isJob ? "Salary Negotiable (តម្លៃចរចា)" : "Negotiable (តម្លៃចរចា)"}
+                  {isJob
+                    ? "Salary Negotiable (តម្លៃចរចា)"
+                    : "Negotiable (តម្លៃចរចា)"}
                 </Text>
               </TouchableOpacity>
 
@@ -361,11 +419,17 @@ const SellScreen = () => {
                 }}
                 className="flex-row items-center"
               >
-                <View className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isFree ? "bg-emerald-500 border-emerald-500" : "border-neutral-border bg-white"}`}>
-                  {isFree && <Ionicons name="checkmark" size={14} color="white" />}
+                <View
+                  className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isFree ? "bg-emerald-500 border-emerald-500" : "border-neutral-border bg-white"}`}
+                >
+                  {isFree && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
                 </View>
                 <Text className="text-xs font-medium text-neutral-text-main">
-                  {isJob ? "Unpaid / Internship" : "Giveaway / Free (មិនគិតថ្លៃ)"}
+                  {isJob
+                    ? "Unpaid / Internship"
+                    : "Giveaway / Free (មិនគិតថ្លៃ)"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -381,7 +445,9 @@ const SellScreen = () => {
 
             {/* Job Type */}
             <View>
-              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">Employment Type</Text>
+              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">
+                Employment Type
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {JOB_TYPES.map((jt) => {
                   const isSelected = jobType === jt.id;
@@ -410,7 +476,9 @@ const SellScreen = () => {
 
             {/* Experience Level */}
             <View>
-              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">Required Experience</Text>
+              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">
+                Required Experience
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {EXPERIENCE_LEVELS.map((exp) => {
                   const isSelected = experienceLevel === exp.id;
@@ -445,7 +513,9 @@ const SellScreen = () => {
 
             {/* Condition Pills */}
             <View>
-              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">Condition</Text>
+              <Text className="mb-2 text-xs font-medium text-neutral-text-sub">
+                Condition
+              </Text>
               <View className="flex-row flex-wrap gap-2">
                 {CONDITIONS.map((cond) => {
                   const isSelected = condition === cond.id;
@@ -475,7 +545,9 @@ const SellScreen = () => {
             {/* Brand & Model Fields */}
             <View className="flex-row gap-3">
               <View className="flex-1">
-                <Text className="mb-1 text-xs font-medium text-neutral-text-sub">Brand</Text>
+                <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                  Brand
+                </Text>
                 <TextInput
                   value={brand}
                   onChangeText={setBrand}
@@ -485,7 +557,9 @@ const SellScreen = () => {
                 />
               </View>
               <View className="flex-1">
-                <Text className="mb-1 text-xs font-medium text-neutral-text-sub">Model</Text>
+                <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                  Model
+                </Text>
                 <TextInput
                   value={modelName}
                   onChangeText={setModelName}
@@ -521,7 +595,9 @@ const SellScreen = () => {
           {/* District & Commune */}
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">District / Khan</Text>
+              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                District / Khan
+              </Text>
               <TextInput
                 value={district}
                 onChangeText={setDistrict}
@@ -531,7 +607,9 @@ const SellScreen = () => {
               />
             </View>
             <View className="flex-1">
-              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">Commune / Sangkat</Text>
+              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                Commune / Sangkat
+              </Text>
               <TextInput
                 value={commune}
                 onChangeText={setCommune}
@@ -568,7 +646,11 @@ const SellScreen = () => {
                   onPress={() => handleRemovePhone(idx)}
                   className="p-2"
                 >
-                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color={Colors.danger}
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -651,7 +733,10 @@ const SellScreen = () => {
 
             <ScrollView className="flex-1 py-2">
               {CATEGORIES.map((cat) => (
-                <View key={cat.id} className="mb-2 border-b border-neutral-border/40 pb-2">
+                <View
+                  key={cat.id}
+                  className="mb-2 border-b border-neutral-border/40 pb-2"
+                >
                   <TouchableOpacity
                     onPress={() => {
                       setSelectedMainCat(cat);
@@ -660,13 +745,21 @@ const SellScreen = () => {
                     className="flex-row items-center justify-between py-2"
                   >
                     <View className="flex-row items-center">
-                      <Image source={cat.image} className="h-6 w-6 mr-3" resizeMode="contain" />
+                      <Image
+                        source={cat.image}
+                        className="h-6 w-6 mr-3"
+                        resizeMode="contain"
+                      />
                       <Text className="text-sm font-bold text-neutral-text-main">
                         {cat.name}
                       </Text>
                     </View>
                     {selectedMainCat?.id === cat.id && (
-                      <Ionicons name="checkmark-circle" size={20} color={Colors.primary.DEFAULT} />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={Colors.primary.DEFAULT}
+                      />
                     )}
                   </TouchableOpacity>
 
@@ -695,7 +788,11 @@ const SellScreen = () => {
                             {sub.name}
                           </Text>
                           {selectedSubCat?.id === sub.id && (
-                            <Ionicons name="checkmark" size={16} color={Colors.primary.DEFAULT} />
+                            <Ionicons
+                              name="checkmark"
+                              size={16}
+                              color={Colors.primary.DEFAULT}
+                            />
                           )}
                         </TouchableOpacity>
                       ))}
@@ -738,13 +835,19 @@ const SellScreen = () => {
                 >
                   <Text
                     className={`text-sm font-semibold ${
-                      province === prov ? "text-primary font-bold" : "text-neutral-text-main"
+                      province === prov
+                        ? "text-primary font-bold"
+                        : "text-neutral-text-main"
                     }`}
                   >
                     {prov}
                   </Text>
                   {province === prov && (
-                    <Ionicons name="checkmark" size={18} color={Colors.primary.DEFAULT} />
+                    <Ionicons
+                      name="checkmark"
+                      size={18}
+                      color={Colors.primary.DEFAULT}
+                    />
                   )}
                 </TouchableOpacity>
               ))}

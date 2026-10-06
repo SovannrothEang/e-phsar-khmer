@@ -17,15 +17,17 @@ import {
 
 const SignInScreen = () => {
   const router = useRouter();
-  const params = useLocalSearchParams<{ registered?: string; phone?: string }>();
+  const params = useLocalSearchParams<{
+    registered?: string;
+    phone?: string;
+  }>();
   const { login } = useAuth();
   const { isDark } = useTheme();
 
-  const isAlreadyRegistered =
-    params.registered === "true" || !!params.phone;
+  const isAlreadyRegistered = params.registered === "true" || !!params.phone;
 
   const [identifier, setIdentifier] = useState(
-    params.phone || (isAlreadyRegistered ? "015455758" : "")
+    params.phone || (isAlreadyRegistered ? "015455758" : ""),
   );
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -106,7 +108,7 @@ const SignInScreen = () => {
             router.replace("/(tabs)/account");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -126,7 +128,7 @@ const SignInScreen = () => {
             router.replace("/(tabs)/account");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -199,7 +201,8 @@ const SignInScreen = () => {
                 isDark ? "text-gray-200" : "text-neutral-text-main"
               } font-semibold text-base leading-6`}
             >
-              This phone number is already registered, please log in to your account.
+              This phone number is already registered, please log in to your
+              account.
             </Text>
           </View>
         )}
@@ -212,17 +215,15 @@ const SignInScreen = () => {
               isDark
                 ? "bg-gray-900 border-gray-800"
                 : "bg-neutral-surface border-neutral-border"
-            } rounded-xl p-3 border ${
-              identifierError ? "border-red-500" : ""
-            }`}
+            } rounded-xl p-3 border ${identifierError ? "border-red-500" : ""}`}
           >
             <Text
               className={`${
                 identifierError
                   ? "text-red-500"
                   : isDark
-                  ? "text-gray-400"
-                  : "text-neutral-text-sub"
+                    ? "text-gray-400"
+                    : "text-neutral-text-sub"
               } text-xs mb-1 font-medium`}
             >
               Phone Number or Username
@@ -257,17 +258,15 @@ const SignInScreen = () => {
               isDark
                 ? "bg-gray-900 border-gray-800"
                 : "bg-neutral-surface border-neutral-border"
-            } rounded-xl p-3 border ${
-              passwordError ? "border-red-500" : ""
-            }`}
+            } rounded-xl p-3 border ${passwordError ? "border-red-500" : ""}`}
           >
             <Text
               className={`text-xs mb-1 font-medium ${
                 passwordError
                   ? "text-red-500"
                   : isDark
-                  ? "text-gray-400"
-                  : "text-neutral-text-sub"
+                    ? "text-gray-400"
+                    : "text-neutral-text-sub"
               }`}
             >
               Password

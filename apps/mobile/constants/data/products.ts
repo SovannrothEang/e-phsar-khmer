@@ -201,9 +201,7 @@ export const SAMPLE_PRODUCTS: Product[] = [
     id: "6",
     title: "គ្រែស្ទាយ Luxury Blue Checkered Bed Frame & Mattress (King Size)",
     image: require("@/assets/images/furniture/blue-checkered-bed.jpg"),
-    images: [
-      require("@/assets/images/furniture/blue-checkered-bed.jpg"),
-    ],
+    images: [require("@/assets/images/furniture/blue-checkered-bed.jpg")],
     date: "Today",
     distance: "3.2KM",
     location: "BKK1",
@@ -231,9 +229,7 @@ export const SAMPLE_PRODUCTS: Product[] = [
     id: "7",
     title: "ឈុតសៀវភៅ Bestseller Novel Collection (4 Books Set)",
     image: require("@/assets/images/sports-hobbies/books.jpg"),
-    images: [
-      require("@/assets/images/sports-hobbies/books.jpg"),
-    ],
+    images: [require("@/assets/images/sports-hobbies/books.jpg")],
     date: "Today",
     distance: "1.5KM",
     location: "Toul Kouk",
@@ -261,9 +257,7 @@ export const SAMPLE_PRODUCTS: Product[] = [
     id: "8",
     title: "ឈុត ឌីស អាល់ប៊ុមចម្រៀង និង ភាពយន្ត Original CDs & DVDs Media",
     image: require("@/assets/images/sports-hobbies/cds-dvds-vhs.jpg"),
-    images: [
-      require("@/assets/images/sports-hobbies/cds-dvds-vhs.jpg"),
-    ],
+    images: [require("@/assets/images/sports-hobbies/cds-dvds-vhs.jpg")],
     date: "Yesterday",
     distance: "4.0KM",
     location: "BKK2",

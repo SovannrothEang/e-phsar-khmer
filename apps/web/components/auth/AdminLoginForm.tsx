@@ -8,11 +8,7 @@ import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  FieldDescription,
-  FieldGroup,
-  FieldSeparator,
-} from "@/components/ui/field";
+import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook, FaApple, FaTelegramPlane } from "react-icons/fa";
 import Link from "next/link";

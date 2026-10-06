@@ -94,7 +94,9 @@ const EditProfileScreen = () => {
     user?.name && user.name !== "DATA" && user.name !== "015455758"
       ? user.name
       : "Ban Sreypov";
-  const sanitizedUsername = user?.username ? user.username.replace("@", "") : "bansreypov";
+  const sanitizedUsername = user?.username
+    ? user.username.replace("@", "")
+    : "bansreypov";
   const sanitizedPhone = user?.phone || "015 455 758";
   const sanitizedEmail = user?.email || "bansreypov@gmail.com";
   const sanitizedLocation = user?.location || "Phnom Penh, Cambodia";
@@ -175,7 +177,7 @@ const EditProfileScreen = () => {
           style: "destructive",
           onPress: () => router.back(),
         },
-      ]
+      ],
     );
   };
 
@@ -323,7 +325,9 @@ const EditProfileScreen = () => {
                 className="flex-row items-center gap-1"
               >
                 <Text className="text-primary font-bold text-sm">
-                  {showAvatarPicker ? "Close Photo Options" : "Change Profile Photo"}
+                  {showAvatarPicker
+                    ? "Close Photo Options"
+                    : "Change Profile Photo"}
                 </Text>
                 <Ionicons
                   name={showAvatarPicker ? "chevron-up" : "chevron-down"}
@@ -520,8 +524,8 @@ const EditProfileScreen = () => {
                     accountType === "Normal account"
                       ? "bg-sky-50 dark:bg-sky-950/40 border-primary"
                       : isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-neutral-background border-neutral-border"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-neutral-background border-neutral-border"
                   }`}
                 >
                   <Ionicons
@@ -538,8 +542,8 @@ const EditProfileScreen = () => {
                       accountType === "Normal account"
                         ? "text-primary"
                         : isDark
-                        ? "text-gray-300"
-                        : "text-neutral-text-sub"
+                          ? "text-gray-300"
+                          : "text-neutral-text-sub"
                     }`}
                   >
                     Normal account
@@ -552,8 +556,8 @@ const EditProfileScreen = () => {
                     accountType === "Business Account"
                       ? "bg-purple-50 dark:bg-purple-950/40 border-purple-600"
                       : isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-neutral-background border-neutral-border"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-neutral-background border-neutral-border"
                   }`}
                 >
                   <Ionicons
@@ -568,8 +572,8 @@ const EditProfileScreen = () => {
                       accountType === "Business Account"
                         ? "text-purple-600 dark:text-purple-400"
                         : isDark
-                        ? "text-gray-300"
-                        : "text-neutral-text-sub"
+                          ? "text-gray-300"
+                          : "text-neutral-text-sub"
                     }`}
                   >
                     Business Account
@@ -679,8 +683,8 @@ const EditProfileScreen = () => {
                         isSelected
                           ? "bg-primary border-primary"
                           : isDark
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-neutral-background border-neutral-border"
+                            ? "bg-gray-800 border-gray-700"
+                            : "bg-neutral-background border-neutral-border"
                       }`}
                     >
                       <Ionicons
@@ -688,19 +692,21 @@ const EditProfileScreen = () => {
                           item === "Female"
                             ? "female"
                             : item === "Male"
-                            ? "male"
-                            : "transgender"
+                              ? "male"
+                              : "transgender"
                         }
                         size={15}
-                        color={isSelected ? "white" : isDark ? "#D1D5DB" : "#6B7280"}
+                        color={
+                          isSelected ? "white" : isDark ? "#D1D5DB" : "#6B7280"
+                        }
                       />
                       <Text
                         className={`text-xs font-semibold ${
                           isSelected
                             ? "text-white font-bold"
                             : isDark
-                            ? "text-gray-300"
-                            : "text-neutral-text-main"
+                              ? "text-gray-300"
+                              : "text-neutral-text-main"
                         }`}
                       >
                         {item}
@@ -796,7 +802,11 @@ const EditProfileScreen = () => {
                 Telegram Contact
               </Text>
               <View className="flex-row items-center gap-3">
-                <Ionicons name="paper-plane-outline" size={20} color="#0088CC" />
+                <Ionicons
+                  name="paper-plane-outline"
+                  size={20}
+                  color="#0088CC"
+                />
                 <Text className="text-sm font-bold text-sky-500">t.me/</Text>
                 <TextInput
                   value={telegram}
@@ -856,8 +866,8 @@ const EditProfileScreen = () => {
                           isSelected
                             ? "bg-primary border-primary"
                             : isDark
-                            ? "bg-gray-800 border-gray-700"
-                            : "bg-neutral-background border-neutral-border"
+                              ? "bg-gray-800 border-gray-700"
+                              : "bg-neutral-background border-neutral-border"
                         }`}
                       >
                         <Text
@@ -865,8 +875,8 @@ const EditProfileScreen = () => {
                             isSelected
                               ? "text-white font-bold"
                               : isDark
-                              ? "text-gray-300"
-                              : "text-neutral-text-sub"
+                                ? "text-gray-300"
+                                : "text-neutral-text-sub"
                           }`}
                         >
                           {city}
@@ -899,8 +909,8 @@ const EditProfileScreen = () => {
                     bio.length > MAX_BIO_LENGTH
                       ? "text-red-500 font-bold"
                       : isDark
-                      ? "text-gray-400"
-                      : "text-neutral-text-muted"
+                        ? "text-gray-400"
+                        : "text-neutral-text-muted"
                   }`}
                 >
                   {bio.length}/{MAX_BIO_LENGTH}

@@ -23,7 +23,6 @@ const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
   return (
     <View className="px-2 pt-2 pb-2 bg-gray-50">
       <View className="flex-row flex-wrap">
-
         {displayBrands.map((brand) => (
           <TouchableOpacity
             key={brand.id}
@@ -49,7 +48,7 @@ const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
         {/* Show More */}
         <TouchableOpacity
           className="w-1/5 items-center mb-2"
-          onPress={() => { }}
+          onPress={() => {}}
         >
           <View className="w-14 h-14 mb-2 rounded-full items-center justify-center">
             <Ionicons
@@ -58,7 +57,9 @@ const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
               color="gray"
             />
           </View>
-          <Text className="text-xs text-center text-gray-900">{t("seeAll")}</Text>
+          <Text className="text-xs text-center text-gray-900">
+            {t("seeAll")}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

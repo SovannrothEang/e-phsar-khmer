@@ -18,7 +18,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const { colorScheme, setColorScheme } = useColorScheme();
   const [theme, setThemeState] = useState<ThemeMode>(
-    colorScheme === "dark" ? "dark" : "light"
+    colorScheme === "dark" ? "dark" : "light",
   );
   const [isAutoTheme, setIsAutoTheme] = useState(false);
 
@@ -29,11 +29,13 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       setThemeState(newTheme);
       setColorScheme(newTheme);
 
-      const listener = Appearance.addChangeListener(({ colorScheme: nextScheme }) => {
-        const updated = nextScheme === "dark" ? "dark" : "light";
-        setThemeState(updated);
-        setColorScheme(updated);
-      });
+      const listener = Appearance.addChangeListener(
+        ({ colorScheme: nextScheme }) => {
+          const updated = nextScheme === "dark" ? "dark" : "light";
+          setThemeState(updated);
+          setColorScheme(updated);
+        },
+      );
       return () => listener.remove();
     }
   }, [isAutoTheme, setColorScheme]);

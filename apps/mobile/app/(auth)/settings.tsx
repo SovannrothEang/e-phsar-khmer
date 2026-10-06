@@ -326,8 +326,8 @@ const SettingsScreen = () => {
                       isSelected
                         ? "border-primary bg-primary/10"
                         : isDark
-                        ? "border-gray-800 bg-gray-800"
-                        : "border-neutral-border bg-neutral-background"
+                          ? "border-gray-800 bg-gray-800"
+                          : "border-neutral-border bg-neutral-background"
                     }`}
                   >
                     <View className="flex-row items-center gap-3">
@@ -511,7 +511,7 @@ const SettingsScreen = () => {
                 setNotifModalVisible(false);
                 Alert.alert(
                   "Saved",
-                  "Your notification preferences have been updated."
+                  "Your notification preferences have been updated.",
                 );
               }}
               className="bg-primary py-3.5 rounded-2xl items-center justify-center mt-2 shadow-sm"

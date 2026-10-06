@@ -207,7 +207,11 @@ const ProfileScreen = () => {
                     <View className="bg-neutral-surface rounded-lg overflow-hidden shadow-sm">
                       <View className="aspect-square relative">
                         <Image
-                          source={typeof item.image === "string" ? { uri: item.image } : item.image || undefined}
+                          source={
+                            typeof item.image === "string"
+                              ? { uri: item.image }
+                              : item.image || undefined
+                          }
                           className="w-full h-full"
                           resizeMode="cover"
                         />

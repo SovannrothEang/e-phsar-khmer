@@ -10,13 +10,7 @@ import { SAMPLE_PRODUCTS } from "@/constants/data/products";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -60,7 +54,11 @@ export default function CategoryScreen() {
     if (containerWidth <= 0) return;
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(contentOffsetX / containerWidth);
-    if (pageIndex !== currentPage && pageIndex >= 0 && pageIndex < subCategoryPages.length) {
+    if (
+      pageIndex !== currentPage &&
+      pageIndex >= 0 &&
+      pageIndex < subCategoryPages.length
+    ) {
       setCurrentPage(pageIndex);
     }
   };
@@ -115,7 +113,11 @@ export default function CategoryScreen() {
                 showsHorizontalScrollIndicator={false}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
-                contentContainerStyle={{ width: containerWidth ? containerWidth * subCategoryPages.length : "100%" }}
+                contentContainerStyle={{
+                  width: containerWidth
+                    ? containerWidth * subCategoryPages.length
+                    : "100%",
+                }}
               >
                 {subCategoryPages.map((pageSubs, pageIdx) => (
                   <View
@@ -138,7 +140,11 @@ export default function CategoryScreen() {
                               resizeMode="contain"
                             />
                           ) : sub.icon ? (
-                            <Ionicons name={sub.icon as any} size={27} color={sub.color || "#2563EB"} />
+                            <Ionicons
+                              name={sub.icon as any}
+                              size={27}
+                              color={sub.color || "#2563EB"}
+                            />
                           ) : null}
                         </View>
                         <Text

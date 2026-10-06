@@ -32,9 +32,18 @@ const FilterChips = ({
 
   const defaultFilters: FilterItem[] = [
     { key: "filters", label: t("filters"), icon: "options-outline" },
-    { key: "location", label: t("location"), icon: "location", hasDropdown: true },
+    {
+      key: "location",
+      label: t("location"),
+      icon: "location",
+      hasDropdown: true,
+    },
     { key: "sort", label: t("sort"), hasDropdown: true },
-    { key: isJobs ? "salary" : "price", label: isJobs ? t("salary") : t("price"), hasDropdown: true },
+    {
+      key: isJobs ? "salary" : "price",
+      label: isJobs ? t("salary") : t("price"),
+      hasDropdown: true,
+    },
   ];
 
   const items = filters || defaultFilters;
@@ -55,7 +64,8 @@ const FilterChips = ({
         contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
       >
         {items.map((filter, index) => {
-          const isLocation = filter.key === "location" || filter.label === t("location");
+          const isLocation =
+            filter.key === "location" || filter.label === t("location");
           const displayLabel =
             isLocation && selectedLocation ? selectedLocation : filter.label;
           const isSelected = isLocation && selectedLocation;

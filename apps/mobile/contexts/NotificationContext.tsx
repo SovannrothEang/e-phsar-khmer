@@ -51,7 +51,7 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
     category: "message",
     title: "New Message from Sokha Electronics",
     description:
-      "\"Yes, it is still available! You can come test it at Toul Kork anytime today.\"",
+      '"Yes, it is still available! You can come test it at Toul Kork anytime today."',
     timestamp: "45 mins ago",
     isRead: false,
     itemImage:
@@ -110,7 +110,7 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export const NotificationProvider = ({
@@ -118,8 +118,9 @@ export const NotificationProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [notifications, setNotifications] =
-    useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<AppNotification[]>(
+    INITIAL_NOTIFICATIONS,
+  );
   const [preferences, setPreferences] =
     useState<NotificationPreferences>(DEFAULT_PREFERENCES);
 
@@ -127,14 +128,14 @@ export const NotificationProvider = ({
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
     );
   };
 
   const markMultipleAsRead = (ids: string[]) => {
     const idSet = new Set(ids);
     setNotifications((prev) =>
-      prev.map((n) => (idSet.has(n.id) ? { ...n, isRead: true } : n))
+      prev.map((n) => (idSet.has(n.id) ? { ...n, isRead: true } : n)),
     );
   };
 
@@ -183,7 +184,7 @@ export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (!context) {
     throw new Error(
-      "useNotification must be used within a NotificationProvider"
+      "useNotification must be used within a NotificationProvider",
     );
   }
   return context;

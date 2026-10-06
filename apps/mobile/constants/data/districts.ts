@@ -155,7 +155,9 @@ export const DISTRICTS_BY_PROVINCE: Record<string, DistrictWithCommunes[]> = {
 };
 
 // Get districts for a province (returns empty array if not found)
-export function getDistrictsForProvince(provinceId: string): DistrictWithCommunes[] {
+export function getDistrictsForProvince(
+  provinceId: string,
+): DistrictWithCommunes[] {
   return DISTRICTS_BY_PROVINCE[provinceId] || [];
 }
 

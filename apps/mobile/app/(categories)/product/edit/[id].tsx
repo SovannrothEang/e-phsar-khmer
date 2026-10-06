@@ -67,11 +67,14 @@ const SAMPLE_IMAGE_POOL = [
 
 const EditProductScreen = () => {
   const { id } = useLocalSearchParams();
-  const existingProduct = SAMPLE_PRODUCTS.find((p) => p.id === id) || SAMPLE_PRODUCTS[0];
+  const existingProduct =
+    SAMPLE_PRODUCTS.find((p) => p.id === id) || SAMPLE_PRODUCTS[0];
 
   // Form State initialized with product data
   const initialImages = existingProduct.images
-    ? [existingProduct.image, ...existingProduct.images].filter((img): img is string => !!img)
+    ? [existingProduct.image, ...existingProduct.images].filter(
+        (img): img is string => !!img,
+      )
     : existingProduct.image
       ? [existingProduct.image]
       : [SAMPLE_IMAGE_POOL[0]];
@@ -79,30 +82,40 @@ const EditProductScreen = () => {
   const initialCategory =
     CATEGORIES.find(
       (c) =>
-        c.name.toLowerCase() === (existingProduct.mainCategory || "").toLowerCase() ||
-        (c.id === "jobs" && (existingProduct.mainCategory === "Jobs" || !!existingProduct.jobType))
+        c.name.toLowerCase() ===
+          (existingProduct.mainCategory || "").toLowerCase() ||
+        (c.id === "jobs" &&
+          (existingProduct.mainCategory === "Jobs" ||
+            !!existingProduct.jobType)),
     ) || CATEGORIES[0];
 
   const [images, setImages] = useState<string[]>(initialImages);
   const [selectedMainCat, setSelectedMainCat] = useState<any>(initialCategory);
   const [selectedSubCat, setSelectedSubCat] = useState<any>(
     initialCategory?.subs?.find(
-      (s: any) => s.name.toLowerCase() === (existingProduct.category || "").toLowerCase()
-    ) || initialCategory?.subs?.[0] || null
+      (s: any) =>
+        s.name.toLowerCase() === (existingProduct.category || "").toLowerCase(),
+    ) ||
+      initialCategory?.subs?.[0] ||
+      null,
   );
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const [title, setTitle] = useState(existingProduct.title);
-  const [price, setPrice] = useState(existingProduct.price ? existingProduct.price.toString() : "0");
+  const [price, setPrice] = useState(
+    existingProduct.price ? existingProduct.price.toString() : "0",
+  );
   const [currency, setCurrency] = useState<"USD" | "KHR">("USD");
   const [isNegotiable, setIsNegotiable] = useState(false);
   const [isFree, setIsFree] = useState(existingProduct.price === 0);
   const [isSold, setIsSold] = useState(false);
 
   const [condition, setCondition] = useState("like_new");
-  const [jobType, setJobType] = useState<string>(existingProduct.jobType || "Full-time");
+  const [jobType, setJobType] = useState<string>(
+    existingProduct.jobType || "Full-time",
+  );
   const [experienceLevel, setExperienceLevel] = useState<string>(
-    existingProduct.experienceLevel || "2Year+ Experience"
+    existingProduct.experienceLevel || "2Year+ Experience",
   );
 
   const isJob =
@@ -111,7 +124,9 @@ const EditProductScreen = () => {
     existingProduct.mainCategory === "Jobs" ||
     !!existingProduct.jobType;
 
-  const [province, setProvince] = useState(existingProduct.location || "Phnom Penh");
+  const [province, setProvince] = useState(
+    existingProduct.location || "Phnom Penh",
+  );
   const [district, setDistrict] = useState("Toul Kork");
   const [commune, setCommune] = useState("Boeung Kak 1");
   const [provinceModalVisible, setProvinceModalVisible] = useState(false);
@@ -119,13 +134,13 @@ const EditProductScreen = () => {
   const [phones, setPhones] = useState<string[]>(
     existingProduct.phones && existingProduct.phones.length > 0
       ? existingProduct.phones
-      : ["012 345 678"]
+      : ["012 345 678"],
   );
   const [telegram, setTelegram] = useState(
-    existingProduct.telegram?.[0] || "@seller_khmer24"
+    existingProduct.telegram?.[0] || "@seller_khmer24",
   );
   const [description, setDescription] = useState(
-    existingProduct.description || "Good condition, smooth user experience."
+    existingProduct.description || "Good condition, smooth user experience.",
   );
 
   // Handlers
@@ -174,7 +189,7 @@ const EditProductScreen = () => {
           text: "OK",
           onPress: () => router.back(),
         },
-      ]
+      ],
     );
   };
 
@@ -192,7 +207,7 @@ const EditProductScreen = () => {
             router.push("/(tabs)");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -208,7 +223,9 @@ const EditProductScreen = () => {
           className="flex-row items-center"
         >
           <Ionicons name="arrow-back" size={22} color={Colors.text.primary} />
-          <Text className="ml-1 text-sm font-medium text-neutral-text-main">Back</Text>
+          <Text className="ml-1 text-sm font-medium text-neutral-text-main">
+            Back
+          </Text>
         </TouchableOpacity>
 
         <Text className="text-base font-bold text-neutral-text-main">
@@ -234,7 +251,9 @@ const EditProductScreen = () => {
               Listing Status: {isSold ? "Marked as SOLD" : "ACTIVE"}
             </Text>
             <Text className="text-xs text-neutral-text-sub">
-              {isSold ? "This ad will not appear in search results" : "Visible to all buyers on Khmer24"}
+              {isSold
+                ? "This ad will not appear in search results"
+                : "Visible to all buyers on Khmer24"}
             </Text>
           </View>
 
@@ -246,7 +265,9 @@ const EditProductScreen = () => {
                 : "bg-emerald-50 border-emerald-500"
             }`}
           >
-            <Text className={`text-xs font-bold ${isSold ? "text-neutral-text-sub" : "text-emerald-700"}`}>
+            <Text
+              className={`text-xs font-bold ${isSold ? "text-neutral-text-sub" : "text-emerald-700"}`}
+            >
               {isSold ? "Re-activate" : "Mark as Sold"}
             </Text>
           </TouchableOpacity>
@@ -256,7 +277,11 @@ const EditProductScreen = () => {
         <View className="mb-2 bg-white p-4">
           <View className="mb-3 flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <Ionicons name="camera" size={20} color={Colors.primary.DEFAULT} />
+              <Ionicons
+                name="camera"
+                size={20}
+                color={Colors.primary.DEFAULT}
+              />
               <Text className="ml-2 text-base font-bold text-neutral-text-main">
                 Listing Photos
               </Text>
@@ -273,16 +298,27 @@ const EditProductScreen = () => {
                 onPress={handleAddPhoto}
                 className="h-24 w-24 items-center justify-center rounded-xl border-2 border-dashed border-primary/50 bg-primary/5"
               >
-                <Ionicons name="add-circle" size={32} color={Colors.primary.DEFAULT} />
+                <Ionicons
+                  name="add-circle"
+                  size={32}
+                  color={Colors.primary.DEFAULT}
+                />
                 <Text className="mt-1 text-[11px] font-semibold text-primary">
                   Add Photo
                 </Text>
               </TouchableOpacity>
 
               {images.map((imgUri, index) => (
-                <View key={index} className="relative h-24 w-24 rounded-xl overflow-hidden bg-neutral-border">
-                  <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
-                  
+                <View
+                  key={index}
+                  className="relative h-24 w-24 rounded-xl overflow-hidden bg-neutral-border"
+                >
+                  <Image
+                    source={{ uri: imgUri }}
+                    className="h-full w-full"
+                    resizeMode="cover"
+                  />
+
                   {index === 0 && (
                     <View className="absolute bottom-0 left-0 right-0 bg-primary/90 py-0.5 items-center">
                       <Text className="text-[9px] font-bold text-white uppercase tracking-wider">
@@ -314,20 +350,34 @@ const EditProductScreen = () => {
           >
             <View className="flex-row items-center flex-1">
               <View className="h-9 w-9 rounded-lg bg-primary/10 items-center justify-center mr-3">
-                <Ionicons name="grid" size={20} color={Colors.primary.DEFAULT} />
+                <Ionicons
+                  name="grid"
+                  size={20}
+                  color={Colors.primary.DEFAULT}
+                />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-bold text-neutral-text-main" numberOfLines={1}>
+                <Text
+                  className="text-sm font-bold text-neutral-text-main"
+                  numberOfLines={1}
+                >
                   {selectedMainCat?.name || "Select Category"}
                 </Text>
                 {selectedSubCat && (
-                  <Text className="text-xs text-neutral-text-sub" numberOfLines={1}>
+                  <Text
+                    className="text-xs text-neutral-text-sub"
+                    numberOfLines={1}
+                  >
                     {selectedSubCat.name}
                   </Text>
                 )}
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.text.muted} />
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={Colors.text.muted}
+            />
           </TouchableOpacity>
         </View>
 
@@ -346,7 +396,11 @@ const EditProductScreen = () => {
               value={title}
               onChangeText={setTitle}
               maxLength={100}
-              placeholder={isJob ? "e.g. Nail Salon Technician / Cashier" : "e.g. iPhone 15 Pro Max"}
+              placeholder={
+                isJob
+                  ? "e.g. Nail Salon Technician / Cashier"
+                  : "e.g. iPhone 15 Pro Max"
+              }
               placeholderTextColor={Colors.text.muted}
               className="rounded-xl border border-neutral-border px-4 py-3 text-sm text-neutral-text-main bg-white"
             />
@@ -363,7 +417,9 @@ const EditProductScreen = () => {
                   onPress={() => setCurrency("USD")}
                   className={`px-3 py-1.5 rounded-lg ${currency === "USD" ? "bg-primary" : ""}`}
                 >
-                  <Text className={`text-xs font-bold ${currency === "USD" ? "text-white" : "text-neutral-text-sub"}`}>
+                  <Text
+                    className={`text-xs font-bold ${currency === "USD" ? "text-white" : "text-neutral-text-sub"}`}
+                  >
                     $ USD
                   </Text>
                 </TouchableOpacity>
@@ -371,7 +427,9 @@ const EditProductScreen = () => {
                   onPress={() => setCurrency("KHR")}
                   className={`px-3 py-1.5 rounded-lg ${currency === "KHR" ? "bg-primary" : ""}`}
                 >
-                  <Text className={`text-xs font-bold ${currency === "KHR" ? "text-white" : "text-neutral-text-sub"}`}>
+                  <Text
+                    className={`text-xs font-bold ${currency === "KHR" ? "text-white" : "text-neutral-text-sub"}`}
+                  >
                     ៛ KHR
                   </Text>
                 </TouchableOpacity>
@@ -383,7 +441,9 @@ const EditProductScreen = () => {
                   onChangeText={setPrice}
                   keyboardType="numeric"
                   editable={!isFree}
-                  placeholder={isFree ? "Negotiable / Unpaid" : isJob ? "e.g. 250" : "0.00"}
+                  placeholder={
+                    isFree ? "Negotiable / Unpaid" : isJob ? "e.g. 250" : "0.00"
+                  }
                   placeholderTextColor={Colors.text.muted}
                   className="rounded-xl border border-neutral-border px-4 py-3 text-base font-bold text-danger bg-white"
                 />
@@ -395,11 +455,17 @@ const EditProductScreen = () => {
                 onPress={() => setIsNegotiable(!isNegotiable)}
                 className="flex-row items-center"
               >
-                <View className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isNegotiable ? "bg-primary border-primary" : "border-neutral-border bg-white"}`}>
-                  {isNegotiable && <Ionicons name="checkmark" size={14} color="white" />}
+                <View
+                  className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isNegotiable ? "bg-primary border-primary" : "border-neutral-border bg-white"}`}
+                >
+                  {isNegotiable && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
                 </View>
                 <Text className="text-xs font-medium text-neutral-text-main">
-                  {isJob ? "Salary Negotiable (តម្លៃចរចា)" : "Negotiable (តម្លៃចរចា)"}
+                  {isJob
+                    ? "Salary Negotiable (តម្លៃចរចា)"
+                    : "Negotiable (តម្លៃចរចា)"}
                 </Text>
               </TouchableOpacity>
 
@@ -410,8 +476,12 @@ const EditProductScreen = () => {
                 }}
                 className="flex-row items-center"
               >
-                <View className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isFree ? "bg-emerald-500 border-emerald-500" : "border-neutral-border bg-white"}`}>
-                  {isFree && <Ionicons name="checkmark" size={14} color="white" />}
+                <View
+                  className={`h-5 w-5 rounded border items-center justify-center mr-2 ${isFree ? "bg-emerald-500 border-emerald-500" : "border-neutral-border bg-white"}`}
+                >
+                  {isFree && (
+                    <Ionicons name="checkmark" size={14} color="white" />
+                  )}
                 </View>
                 <Text className="text-xs font-medium text-neutral-text-main">
                   {isJob ? "Unpaid / Volunteer" : "Giveaway / Free"}
@@ -537,7 +607,9 @@ const EditProductScreen = () => {
 
           <View className="flex-row gap-3">
             <View className="flex-1">
-              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">District</Text>
+              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                District
+              </Text>
               <TextInput
                 value={district}
                 onChangeText={setDistrict}
@@ -545,7 +617,9 @@ const EditProductScreen = () => {
               />
             </View>
             <View className="flex-1">
-              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">Commune</Text>
+              <Text className="mb-1 text-xs font-medium text-neutral-text-sub">
+                Commune
+              </Text>
               <TextInput
                 value={commune}
                 onChangeText={setCommune}
@@ -574,7 +648,11 @@ const EditProductScreen = () => {
               />
               {phones.length > 1 && (
                 <TouchableOpacity onPress={() => handleRemovePhone(idx)}>
-                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color={Colors.danger}
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -626,7 +704,9 @@ const EditProductScreen = () => {
             className="flex-row items-center justify-center rounded-xl bg-red-50 border border-red-200 py-3"
           >
             <Ionicons name="trash" size={18} color={Colors.danger} />
-            <Text className="ml-2 font-bold text-danger">Delete This Listing</Text>
+            <Text className="ml-2 font-bold text-danger">
+              Delete This Listing
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -663,7 +743,10 @@ const EditProductScreen = () => {
 
             <ScrollView className="flex-1 py-2">
               {CATEGORIES.map((cat) => (
-                <View key={cat.id} className="mb-2 border-b border-neutral-border/40 pb-2">
+                <View
+                  key={cat.id}
+                  className="mb-2 border-b border-neutral-border/40 pb-2"
+                >
                   <TouchableOpacity
                     onPress={() => {
                       setSelectedMainCat(cat);
@@ -672,13 +755,21 @@ const EditProductScreen = () => {
                     className="flex-row items-center justify-between py-2"
                   >
                     <View className="flex-row items-center">
-                      <Image source={cat.image} className="h-6 w-6 mr-3" resizeMode="contain" />
+                      <Image
+                        source={cat.image}
+                        className="h-6 w-6 mr-3"
+                        resizeMode="contain"
+                      />
                       <Text className="text-sm font-bold text-neutral-text-main">
                         {cat.name}
                       </Text>
                     </View>
                     {selectedMainCat?.id === cat.id && (
-                      <Ionicons name="checkmark-circle" size={20} color={Colors.primary.DEFAULT} />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color={Colors.primary.DEFAULT}
+                      />
                     )}
                   </TouchableOpacity>
 
@@ -706,7 +797,11 @@ const EditProductScreen = () => {
                             {sub.name}
                           </Text>
                           {selectedSubCat?.id === sub.id && (
-                            <Ionicons name="checkmark" size={16} color={Colors.primary.DEFAULT} />
+                            <Ionicons
+                              name="checkmark"
+                              size={16}
+                              color={Colors.primary.DEFAULT}
+                            />
                           )}
                         </TouchableOpacity>
                       ))}
@@ -749,13 +844,19 @@ const EditProductScreen = () => {
                 >
                   <Text
                     className={`text-sm font-semibold ${
-                      province === prov ? "text-primary font-bold" : "text-neutral-text-main"
+                      province === prov
+                        ? "text-primary font-bold"
+                        : "text-neutral-text-main"
                     }`}
                   >
                     {prov}
                   </Text>
                   {province === prov && (
-                    <Ionicons name="checkmark" size={18} color={Colors.primary.DEFAULT} />
+                    <Ionicons
+                      name="checkmark"
+                      size={18}
+                      color={Colors.primary.DEFAULT}
+                    />
                   )}
                 </TouchableOpacity>
               ))}

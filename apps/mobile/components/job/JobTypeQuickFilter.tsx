@@ -1,6 +1,12 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  ImageSourcePropType,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export interface JobTypeItem {
   id: string;
@@ -88,11 +94,14 @@ export default function JobTypeQuickFilter({
           >
             {/* Outer Circle Halo Container */}
             <View
-              className={`w-12 h-12 rounded-full items-center justify-center mb-1 ${item.outerBgClass} ${isSelected ? "ring-2 ring-sky-500" : ""
-                }`}
+              className={`w-12 h-12 rounded-full items-center justify-center mb-1 ${item.outerBgClass} ${
+                isSelected ? "ring-2 ring-sky-500" : ""
+              }`}
             >
               {/* Inner Circle Badge */}
-              <View className={`w-7 h-7 rounded-full items-center justify-center ${item.innerBgClass}`}>
+              <View
+                className={`w-7 h-7 rounded-full items-center justify-center ${item.innerBgClass}`}
+              >
                 {item.image ? (
                   <Image
                     source={item.image}
@@ -122,4 +131,3 @@ export default function JobTypeQuickFilter({
     </View>
   );
 }
-
