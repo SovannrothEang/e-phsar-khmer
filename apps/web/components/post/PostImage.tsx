@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import DbImage from "@/components/common/DbImage";
 import { Button } from "../ui/button";
 import { IconHeartPlus, IconShare3 } from "@tabler/icons-react";
+import { useReactions } from "@/components/reactions/reactions-provider";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
 import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
@@ -19,7 +20,7 @@ const MAX_THUMBS = 7;
 export default function PostImage({
   post,
 }: {
-  post: Pick<Post, "images" | "title" | "postId">;
+  post: Pick<Post, "images" | "title" | "postId" | "likeCount">;
 }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [open, setOpen] = useState(false);
@@ -34,19 +35,45 @@ export default function PostImage({
   const fullscreenRef = useRef<FullscreenRef>(null);
   const count = images.length;
 
+  const { isLiked, toggleLike, isPending, likeCount } = useReactions();
+  const listingId = String(post.postId);
+  // Seeded from the listing; each toggle response replaces it with the
+  // backend's fresh count, so the control never needs a refetch.
+  const likes = likeCount(listingId, post.likeCount ?? 0);
+
   const handleImageClick = (idx: number) => {
     setSelectedImage(idx);
     setLightboxIndex(idx);
     setOpen(true);
   };
 
+  // The like control — live count + toggle, shared by every gallery layout
+  // (the count===2 branch used to carry its own copy of this markup).
+  const likesButton = (
+    <Button
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleLike(listingId);
+      }}
+      disabled={isPending(listingId)}
+      className="bg-card text-sm font-medium px-2 py-1.5 h-10 w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
+    >
+      <IconHeartPlus
+        className={`scale-145 ${
+          isLiked(listingId) ? "fill-red-500 text-red-500" : "text-foreground"
+        }`}
+        stroke={2}
+      />
+      <p className="text-foreground pl-1 pt-0.5">
+        {likes} {likes === 1 ? "Like" : "Likes"}
+      </p>
+    </Button>
+  );
+
   // Overlay buttons — shown on main image
   const overlayButtons = (
     <div className="absolute top-3 right-3 flex gap-2 z-10">
-      <Button className="bg-card text-sm font-medium px-2 py-1.5 h-10 w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer">
-        <IconHeartPlus className="scale-145 text-foreground" stroke={2} />
-        <p className="text-foreground pl-1 pt-0.5">0 Likes</p>
-      </Button>
+      {likesButton}
       <Button
         onClick={(e) => {
           e.stopPropagation();
@@ -85,10 +112,7 @@ export default function PostImage({
         <div className="relative flex gap-0.5 aspect-[15/10] rounded-t-xs overflow-hidden">
           {/* overlay buttons always top right */}
           <div className="absolute top-3 right-3 flex gap-2 z-20">
-            <Button className="bg-card text-sm font-medium px-2 py-1.5 h-10 w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer">
-              <IconHeartPlus className="scale-145 text-foreground" stroke={2} />
-              <p className="text-foreground pl-1 pt-0.5">0 Likes</p>
-            </Button>
+            {likesButton}
 
             <Button
               onClick={(e) => {

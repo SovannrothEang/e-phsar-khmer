@@ -96,6 +96,14 @@ const CONDITION_SUBCATEGORIES = new Set([
 // `vehicleType` — same key as the rentals' "Vehicle Type"; label per design.
 const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   "parts-and-accessories": { vehicleType: "Type" },
+  // The `accessory` key prints "Accessory" on Phone Accessories and
+  // "Accessory Type" on Fashion Accessories (captain, 2026-09-27). Both
+  // subcategories read the SAME `accessories` set under the SAME key — only the
+  // label differs — so the label has to come from the subcategory's own
+  // `field_schema`, which is what the post form already reads via
+  // `config.labels`. This map is the detail page's equivalent, and it exists so
+  // the two surfaces cannot disagree about the same key.
+  "fashion-accessories": { accessory: "Accessory Type" },
 };
 
 /**

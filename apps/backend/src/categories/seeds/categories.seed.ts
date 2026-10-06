@@ -9370,9 +9370,22 @@ export const categoriesSeed: CategorySeed[] = [
             type: 'text',
             required: true,
           },
+          // Captain, 2026-09-27: this family's one non-"Type" picker — the
+          // design labels it **"Accessory Type"**. The key is `accessory` and
+          // the SET is `accessories` — the same key/set pairing Phones &
+          // Tablets' own Accessory field uses (one set, two families, kept
+          // apart by per-subcategory ticks; see the `accessories` block in
+          // attributes.seed.ts for why this is deliberately not a second set).
+          // Only the LABEL differs, and it comes from this file.
+          // What the key must NOT be is `type` (→ `types`): no `types` row is
+          // ticked for this subcategory and `types` is managed, so that would
+          // resolve to an EMPTY picker on a starred field and make the form
+          // unpublishable — the same trap Jobs' `jobType` rename fixed. The
+          // options below are inert while the set is managed; they document the
+          // design's 7-item list.
           {
-            key: 'type',
-            label: { en: 'Type' },
+            key: 'accessory',
+            label: { en: 'Accessory Type' },
             type: 'select',
             required: false,
             options: [

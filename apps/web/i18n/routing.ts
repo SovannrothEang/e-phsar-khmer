@@ -58,12 +58,17 @@ export const routing = defineRouting({
     "/me/billing-addresses": {},
     "/me/job-applications": {},
     "/me/likes": {},
+    "/me/membership": {},
     "/me/saved": {},
     "/me/subscriptions": {},
+    "/me/resume": {},
+    "/me/followers": {},
+    "/me/following": {},
 
     "/[username]": {},
     "/[username]/about": {},
-    "/membership": {},
+    "/[username]/followers": {},
+    "/[username]/following": {},
 
     "/premium-account": {},
 

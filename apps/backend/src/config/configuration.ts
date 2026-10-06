@@ -54,6 +54,10 @@ export default () => {
       backoffMaxMs: env.OUTBOX_BACKOFF_MAX_MS,
       retentionDays: env.OUTBOX_RETENTION_DAYS,
     },
+    accounts: {
+      purgeEnabled: env.ACCOUNT_PURGE_ENABLED,
+      purgeIntervalMs: env.ACCOUNT_PURGE_INTERVAL_MS,
+    },
     queue: {
       host: env.QUEUE_HOST,
       port: env.QUEUE_PORT,

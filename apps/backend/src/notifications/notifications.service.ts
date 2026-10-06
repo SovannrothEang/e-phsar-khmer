@@ -100,4 +100,31 @@ export class NotificationsService {
       .returning({ id: notifications.id });
     return { marked: rows.length };
   }
+
+  /**
+   * Deletes one notification, scoped to its owner — a foreign id matches no
+   * row and reports `{ deleted: 0 }` rather than 404, the same shape (and the
+   * same no-existence-oracle reasoning) as `markRead`'s `{ marked: 0 }`.
+   *
+   * A real DELETE, not a soft one: this table has no `deletedAt`, and the
+   * notification is a user-facing artifact — the durable record of whatever
+   * produced it lives in its own table (a payment, an outbox event), so
+   * dismissing the notice never destroys evidence.
+   */
+  async remove(userId: string, id: string): Promise<{ deleted: number }> {
+    const rows = await this.db
+      .delete(notifications)
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+    return { deleted: rows.length };
+  }
+
+  /** Deletes every notification this user owns. Same scoping as `remove`. */
+  async removeAll(userId: string): Promise<{ deleted: number }> {
+    const rows = await this.db
+      .delete(notifications)
+      .where(eq(notifications.userId, userId))
+      .returning({ id: notifications.id });
+    return { deleted: rows.length };
+  }
 }

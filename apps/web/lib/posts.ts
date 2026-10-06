@@ -1,6 +1,12 @@
 export type Post = {
   postId: number | string;
   userId: string;
+  /**
+   * The seller's handle, when the card came from the real feed (`GET /listings`
+   * joins it on). Mock posts have none — their seller comes from the mock
+   * `users` array. Surfaces must not invent one from the contact name.
+   */
+  sellerUsername?: string | null;
   title: string;
   images: string[];
   imageCount?: number;
@@ -45,8 +51,17 @@ export type Post = {
   disId: string;
   condition?: string;
   freeDelivery?: boolean;
-  /** Free-form location line (backend listings) — overrides proId/disId */
+  /**
+   * Location line for backend listings — overrides proId/disId. `toCardPost`
+   * fills it with the short `district, province` (`shortLocation`), never the
+   * address: the card has no room for it.
+   */
   location?: string;
+  /**
+   * Real listings only: the like count `GET /listings/:id` carries, seeding
+   * the detail page's "N Likes" control before the first toggle.
+   */
+  likeCount?: number;
 };
 export type Province = {
   proId: string;

@@ -424,7 +424,11 @@ export class AdminService {
         .limit(1);
       if (!user) throw new NotFoundException('User not found');
 
-      // Free globally-unique phone rows so identifiers can be reused.
+      // Free globally-unique phone rows so identifiers can be reused. Nulling
+      // `primaryPhone` here is also what marks this as an ADMIN deletion:
+      // AuthService.findRecoverable only revives a soft-deleted account that
+      // still has a phone, so an account removed this way can never be
+      // brought back by signing in. UsersService.deleteOwnAccount keeps it.
       await tx.delete(userPhones).where(eq(userPhones.userId, id));
       await tx
         .update(users)

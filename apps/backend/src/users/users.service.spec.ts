@@ -1,32 +1,74 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
 
-function makeDb() {
-  const db = {
+jest.mock('bcrypt');
+
+type MockDb = {
+  select: jest.Mock;
+  insert: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  transaction: jest.Mock;
+};
+
+function makeDb(): MockDb {
+  const db: MockDb = {
     select: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+    transaction: jest.fn(),
   };
+  // Runs the callback against the same mock, so a transactional method is
+  // exercised exactly like a non-transactional one.
+  db.transaction.mockImplementation((cb: (tx: MockDb) => unknown) => cb(db));
   return db;
 }
 
-function makeService(db: ReturnType<typeof makeDb>) {
+function makeService(
+  db: ReturnType<typeof makeDb>,
+  supabase: Record<string, jest.Mock> = {},
+  notifications: Record<string, jest.Mock> = {
+    notify: jest.fn().mockResolvedValue(undefined),
+  },
+) {
   const filesService = {
     removeByPublicUrl: jest.fn().mockResolvedValue(undefined),
   };
   const service = new UsersService(
     db as never,
-    {} as never,
+    supabase as never,
     {} as never,
     filesService as never,
+    notifications as never,
   );
   (service as unknown as { db: unknown }).db = db;
   return service;
+}
+
+/**
+ * A chainable query stub that is also awaitable, so one shape serves both
+ * `…where()` (awaited directly, as the count/hydrate queries are) and
+ * `…where().orderBy().limit().offset()` (the paged edge query).
+ */
+function chain<T>(result: T[]) {
+  const c: Record<string, unknown> = {};
+  const self = () => c;
+  c.from = self;
+  c.where = self;
+  c.orderBy = self;
+  c.limit = self;
+  c.offset = self;
+  c.returning = () => Promise.resolve(result);
+  c.then = (resolve: (value: T[]) => unknown) =>
+    Promise.resolve(result).then(resolve);
+  return c;
 }
 
 describe('UsersService phone management', () => {
@@ -790,6 +832,461 @@ describe('UsersService blocks', () => {
           createdAt,
         },
       ]);
+    });
+  });
+});
+
+describe('UsersService follows', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+  let notify: jest.Mock;
+
+  beforeEach(() => {
+    db = makeDb();
+    notify = jest.fn().mockResolvedValue(undefined);
+    service = makeService(db, {}, { notify });
+  });
+
+  describe('followUser', () => {
+    it('throws BadRequestException when following yourself', async () => {
+      await expect(service.followUser('u1', 'u1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the target is missing or soft-deleted', async () => {
+      db.select.mockReturnValue(chain([]));
+
+      await expect(service.followUser('u1', 'u2')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('refuses when either side has blocked the other', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ id: 'u2' }])) // target exists
+        .mockReturnValueOnce(chain([{ id: 'block-1' }])); // a block exists
+
+      await expect(service.followUser('u1', 'u2')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(db.insert).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+    });
+
+    it('notifies the followed user when the edge is new', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ id: 'u2' }]))
+        .mockReturnValueOnce(chain([]))
+        .mockReturnValueOnce(
+          chain([{ username: 'sokdara', firstName: 'Sok', lastName: 'Dara' }]),
+        );
+      db.insert.mockReturnValue({
+        values: () => ({
+          onConflictDoNothing: () => ({
+            returning: () => Promise.resolve([{ id: 'f1' }]),
+          }),
+        }),
+      });
+
+      await expect(service.followUser('u1', 'u2')).resolves.toEqual({
+        following: true,
+      });
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'u2',
+          type: 'follow.created',
+          title: 'Sok Dara started following you',
+        }),
+      );
+    });
+
+    it('does not notify again when the edge already existed', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ id: 'u2' }]))
+        .mockReturnValueOnce(chain([]));
+      // The unique pair index swallowed the insert, so nothing came back.
+      db.insert.mockReturnValue({
+        values: () => ({
+          onConflictDoNothing: () => ({
+            returning: () => Promise.resolve([]),
+          }),
+        }),
+      });
+
+      await expect(service.followUser('u1', 'u2')).resolves.toEqual({
+        following: true,
+      });
+      expect(notify).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('unfollowUser', () => {
+    it('resolves rather than 404s when the edge is already gone', async () => {
+      db.delete.mockReturnValue({ where: () => Promise.resolve([]) });
+
+      await expect(service.unfollowUser('u1', 'u2')).resolves.toEqual({
+        following: false,
+      });
+    });
+  });
+
+  describe('getFollowCounts', () => {
+    it('counts followers by following_id and following by follower_id', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ value: 3 }]))
+        .mockReturnValueOnce(chain([{ value: 5 }]));
+
+      await expect(service.getFollowCounts('u1')).resolves.toEqual({
+        followers: 3,
+        following: 5,
+      });
+    });
+  });
+
+  describe('listFollowers', () => {
+    it('returns the follower side of each edge, in edge order, flagged for the viewer', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ userId: 'u2' }, { userId: 'u3' }])) // edges
+        .mockReturnValueOnce(chain([{ value: 2 }])) // total
+        .mockReturnValueOnce(
+          chain([
+            {
+              id: 'u2',
+              username: 'dara',
+              firstName: null,
+              lastName: null,
+              profilePhotoUrl: null,
+            },
+            {
+              id: 'u3',
+              username: 'neang',
+              firstName: null,
+              lastName: null,
+              profilePhotoUrl: null,
+            },
+          ]),
+        ) // profiles
+        .mockReturnValueOnce(chain([{ id: 'u3' }])); // viewer already follows u3
+
+      const result = await service.listFollowers('u1', 'u9', {});
+
+      expect(result.data.map((u) => [u.username, u.isFollowing])).toEqual([
+        ['dara', false],
+        ['neang', true],
+      ]);
+      expect(result.meta).toMatchObject({ total: 2, hasMore: false, page: 1 });
+    });
+
+    it('drops a soft-deleted profile from the page', async () => {
+      db.select
+        .mockReturnValueOnce(chain([{ userId: 'u2' }, { userId: 'gone' }]))
+        .mockReturnValueOnce(chain([{ value: 2 }]))
+        .mockReturnValueOnce(
+          chain([
+            {
+              id: 'u2',
+              username: 'dara',
+              firstName: null,
+              lastName: null,
+              profilePhotoUrl: null,
+            },
+          ]),
+        ) // 'gone' was filtered out by the isNull(deletedAt) predicate
+        .mockReturnValueOnce(chain([]));
+
+      const result = await service.listFollowers('u1', 'u9', {});
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].username).toBe('dara');
+    });
+  });
+});
+
+describe('UsersService self-service account changes', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db, {
+      signInWithOtp: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      verifyOtp: jest.fn().mockResolvedValue({
+        data: { user: { id: 'supabase-id' } },
+        error: null,
+      }),
+    });
+  });
+
+  describe('changeUsername', () => {
+    it('lowercases the candidate before writing it', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([]) }),
+        }),
+      });
+      db.update.mockReturnValue({
+        set: (values: Record<string, unknown>) => ({
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser, ...values }]),
+          }),
+        }),
+      });
+
+      const result = await service.changeUsername('u1', {
+        username: 'Sok.Dara',
+      });
+
+      expect(result.username).toBe('sok.dara');
+    });
+
+    it('refuses a username another account already holds', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve([{ id: 'someone-else' }]),
+          }),
+        }),
+      });
+
+      await expect(
+        service.changeUsername('u1', { username: 'sokdara' }),
+      ).rejects.toThrow(ConflictException);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('maps the check-then-write race onto a 409', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([]) }),
+        }),
+      });
+      db.update.mockReturnValue({
+        set: () => ({
+          where: () => ({
+            returning: () =>
+              Promise.reject(
+                Object.assign(new Error('duplicate key'), {
+                  code: '23505',
+                  constraint_name: 'users_username_active_uq',
+                }),
+              ),
+          }),
+        }),
+      });
+
+      await expect(
+        service.changeUsername('u1', { username: 'sokdara' }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('changePassword', () => {
+    it('rejects a wrong current password and writes nothing', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
+          }),
+        }),
+      });
+
+      await expect(
+        service.changePassword('u1', {
+          currentPassword: 'wrong-pass',
+          newPassword: 'password123',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses an account that has no password yet', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve([{ id: 'u1', passwordHash: null }]),
+          }),
+        }),
+      });
+
+      await expect(
+        service.changePassword('u1', {
+          currentPassword: 'whatever',
+          newPassword: 'password123',
+        }),
+      ).rejects.toThrow('PASSWORD_NOT_SET');
+    });
+
+    it('stores a bcrypt hash of the new password', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$10$newhash');
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
+          }),
+        }),
+      });
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }));
+
+      await service.changePassword('u1', {
+        currentPassword: 'password123',
+        newPassword: 'password456',
+      });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('password456', 10);
+      expect(sets).toContainEqual(
+        expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
+      );
+    });
+  });
+
+  describe('deleteOwnAccount', () => {
+    it('soft-deletes but keeps the phone the recovery window matches on', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
+          }),
+        }),
+      });
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }));
+
+      await service.deleteOwnAccount('u1', { password: 'password123' });
+
+      const deletion = sets.find((values) => 'deletedAt' in values);
+      expect(deletion).toMatchObject({ status: 'deleted' });
+      expect(deletion?.deletedAt).toBeInstanceOf(Date);
+      // Nothing may null the identifiers: a null primaryPhone is what marks
+      // an ADMIN deletion, and only the sweeper is allowed to remove rows.
+      expect(sets).not.toContainEqual(
+        expect.objectContaining({ primaryPhone: null }),
+      );
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('rejects a wrong password without deactivating anything', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
+          }),
+        }),
+      });
+
+      await expect(
+        service.deleteOwnAccount('u1', { password: 'wrong-pass' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('verifyPhoneChangeOtp', () => {
+    it('rejects an invalid OTP without touching the account', async () => {
+      const service = makeService(db, {
+        verifyOtp: jest.fn().mockResolvedValue({
+          data: { user: null },
+          error: { message: 'invalid' },
+        }),
+      });
+
+      await expect(
+        service.verifyPhoneChangeOtp('u1', {
+          phone: '+85512345678',
+          token: '999999',
+        }),
+      ).rejects.toThrow('INVALID_OTP');
+      expect(db.transaction).not.toHaveBeenCalled();
+    });
+
+    it('moves the primary row onto the new number and stamps phoneVerifiedAt', async () => {
+      const PHONE = '+85512345678';
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: users.primaryPhone owner check, 2: user_phones owner check,
+        // 3: the current primary row, 4: findById after the transaction
+        const rows =
+          selectCall === 3
+            ? [{ id: 'p1' }]
+            : selectCall === 4
+              ? [{ ...fakeUser, primaryPhone: PHONE }]
+              : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }));
+      const inserted: Record<string, unknown>[] = [];
+      db.insert.mockImplementation(() => ({
+        values: (values: Record<string, unknown>) => {
+          inserted.push(values);
+          return { onConflictDoNothing: () => Promise.resolve([]) };
+        },
+      }));
+
+      const result = await service.verifyPhoneChangeOtp('u1', {
+        phone: PHONE,
+        token: '000000',
+      });
+
+      expect(result.primaryPhone).toBe(PHONE);
+      expect(sets).toContainEqual({ phone: PHONE });
+      const verified = sets.find((values) => 'phoneVerifiedAt' in values);
+      expect(verified).toMatchObject({ primaryPhone: PHONE });
+      expect(verified?.phoneVerifiedAt).toBeInstanceOf(Date);
+      expect(inserted).toContainEqual(
+        expect.objectContaining({ userId: 'u1', provider: 'phone' }),
+      );
+    });
+
+    it('refuses a number another account already owns', async () => {
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve([{ id: 'someone-else' }]),
+          }),
+        }),
+      });
+
+      await expect(
+        service.verifyPhoneChangeOtp('u1', {
+          phone: '+85512345678',
+          token: '000000',
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(db.transaction).not.toHaveBeenCalled();
     });
   });
 });

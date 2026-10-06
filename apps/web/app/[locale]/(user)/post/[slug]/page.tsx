@@ -2,6 +2,7 @@ import PostDetail from "@/components/post/Post-Detail";
 import { buildRealDetailData, getListingById } from "@/lib/api/categories";
 import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { getFollowStatus } from "@/lib/api/users";
 import { posts } from "@/lib/posts";
 import type { Metadata } from "next";
 
@@ -39,10 +40,7 @@ export async function generateMetadata({
       description: post.description || "Post Detail",
     };
   }
-  return {
-    title: "Post Not Found - Psakhmer",
-    description: "Post Detail",
-  };
+  return { title: "404 Not found" };
 }
 
 export default async function PostDetailPage({
@@ -57,8 +55,18 @@ export default async function PostDetailPage({
 
   if (UUID_RE.test(actualId)) {
     const real = await buildRealDetailData(actualId, locale);
-    if (real)
-      return <PostDetail id={actualId} real={real} viewerId={viewer?.id} />;
+    if (real) {
+      return (
+        <PostDetail
+          id={actualId}
+          real={real}
+          viewerId={viewer?.id}
+          sellerFollowing={
+            viewer ? await getFollowStatus(real.listing.userId) : false
+          }
+        />
+      );
+    }
   }
 
   return <PostDetail id={actualId} viewerId={viewer?.id} />;

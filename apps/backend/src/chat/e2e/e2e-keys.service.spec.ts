@@ -1,10 +1,17 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { E2eKeysService } from './e2e-keys.service';
+import { userE2eOneTimePrekeys } from '../../db/schema/chat.schema';
 import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
 
 function makeTx() {
   return {
+    // registerKeys reads the stored identityKey before upserting, to tell a
+    // rotation from a replay. Default = no prior row, so no purge.
+    select: jest.fn(() => limitQuery([])),
     insert: jest.fn(),
+    delete: jest.fn((..._args: unknown[]) => ({
+      where: (_predicate?: unknown) => Promise.resolve(undefined),
+    })),
   };
 }
 
@@ -140,6 +147,70 @@ describe('E2eKeysService.registerKeys', () => {
 
     expect(tx.insert).toHaveBeenCalledTimes(1); // identity only
     expect(result).toEqual({ accepted: 0 });
+  });
+
+  // Both chains hang off one `.values()` result, so the identity upsert and
+  // the prekey insert can share a single insert mock.
+  function captureInserts(
+    tx: ReturnType<typeof makeTx>,
+    otpBatches: unknown[],
+  ) {
+    tx.insert.mockImplementation(() => ({
+      values: (v: unknown) => ({
+        onConflictDoUpdate: () => Promise.resolve(undefined),
+        onConflictDoNothing: () => {
+          otpBatches.push(v);
+          return Promise.resolve(undefined);
+        },
+      }),
+    }));
+  }
+
+  it('purges unused prekeys when the identity rotates', async () => {
+    const tx = makeTx();
+    const db = makeDb(tx);
+    const service = new E2eKeysService(db as never);
+
+    // A different identityKey means the client bootstrapped fresh key
+    // material and is re-uploading prekey ids 1..N with NEW public keys —
+    // every one of which would otherwise be discarded by the insert's
+    // onConflictDoNothing, leaving a pool nobody can decrypt against.
+    tx.select.mockReturnValue(limitQuery([{ identityKey: 'stale-idkey' }]));
+    const whereArgs: unknown[] = [];
+    tx.delete.mockImplementation(() => ({
+      where: (pred: unknown) => {
+        whereArgs.push(pred);
+        return Promise.resolve(undefined);
+      },
+    }));
+    const otpBatches: unknown[] = [];
+    captureInserts(tx, otpBatches);
+
+    const result = await service.registerKeys('u1', baseDto());
+
+    expect(tx.delete.mock.calls[0][0]).toBe(userE2eOneTimePrekeys);
+    expect(whereArgs).toHaveLength(1);
+    // The purge must not cost the caller its new prekeys.
+    expect(otpBatches).toHaveLength(1);
+    expect(result).toEqual({ accepted: 1 });
+  });
+
+  it('keeps the pool when the same identity re-registers (retry or replenish)', async () => {
+    const tx = makeTx();
+    const db = makeDb(tx);
+    const service = new E2eKeysService(db as never);
+
+    // Same identityKey as the stored row: a retried registration, or the
+    // steady-state replenish re-uploading an unchanged identity with a fresh
+    // batch. Purging here would wipe the valid pool on every top-up.
+    tx.select.mockReturnValue(limitQuery([{ identityKey: 'idkey' }]));
+    const otpBatches: unknown[] = [];
+    captureInserts(tx, otpBatches);
+
+    await service.registerKeys('u1', baseDto());
+
+    expect(tx.delete).not.toHaveBeenCalled();
+    expect(otpBatches).toHaveLength(1);
   });
 });
 

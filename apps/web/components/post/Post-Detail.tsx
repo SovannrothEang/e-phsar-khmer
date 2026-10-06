@@ -26,7 +26,7 @@ import type { BackendListing } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
 import type { ListingContext } from "@/types/chat";
-import { applyDiscount } from "@/lib/utils";
+import { applyDiscount, shortLocation } from "@/lib/utils";
 
 /**
  * Real-listing data slotted into this template. The page (RSC) builds this from
@@ -79,6 +79,8 @@ function toPostView(l: BackendListing): Post {
     proId: "",
     disId: "",
     freeDelivery: l.deliveryFree,
+    // Seeds the "N Likes" control; toggle responses update it from there.
+    likeCount: l.likeCount ?? 0,
   };
 }
 
@@ -107,12 +109,15 @@ export default function PostDetail({
   id,
   real,
   viewerId,
+  sellerFollowing = false,
 }: {
   id: string;
   real?: RealDetailData;
   /** Signed-in viewer's id, if any — lets the sidebar tell "your ad" apart
    *  from a stranger's and hide seller-contact actions accordingly. */
   viewerId?: string | null;
+  /** Whether that viewer already follows the seller — seeds the sidebar toggle. */
+  sellerFollowing?: boolean;
 }) {
   const isReal = !!real;
   const post = isReal ? toPostView(real.listing) : getPostById(id);
@@ -138,8 +143,15 @@ export default function PostDetail({
   const displayId = isReal
     ? real.listing.id.slice(0, 8).toUpperCase()
     : post.postId;
+  // Two forms of the same value, in two places: the ID row carries the card's
+  // short `district, province`, while the contact block below spells the whole
+  // location out with the street address on its own line (see ContactUser).
+  const fullLocation = isReal
+    ? (real.listing.location ?? undefined)
+    : undefined;
+  const addressLine = isReal ? (real.listing.address ?? undefined) : undefined;
   const locationLine = isReal
-    ? [real.listing.location, real.listing.address].filter(Boolean).join(", ")
+    ? (shortLocation(real.listing.location) ?? "")
     : [district?.name, province?.name].filter(Boolean).join(", ");
 
   // The pin the seller dropped when posting (numeric columns arrive as strings).
@@ -313,7 +325,8 @@ export default function PostDetail({
                   district={district}
                   province={province}
                   coords={coords}
-                  locationLine={isReal ? locationLine : undefined}
+                  locationLine={isReal ? fullLocation : undefined}
+                  addressLine={addressLine}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
                 <ThreeButton post={post} />
@@ -353,6 +366,7 @@ export default function PostDetail({
                 listingId={listingContext ? listingContext.id : undefined}
                 listing={listingContext}
                 viewerId={viewerId}
+                initialFollowing={sellerFollowing}
               />
             </div>
           </aside>

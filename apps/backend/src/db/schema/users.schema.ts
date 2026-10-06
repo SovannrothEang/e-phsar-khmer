@@ -203,6 +203,35 @@ export const userBlocks = pgTable(
   ],
 );
 
+/**
+ * One directional follow edge. Mirrors `user_blocks` exactly — a unique pair
+ * index in the canonical direction, a plain index on the reverse (the unique
+ * index cannot serve "who follows me"), and a CHECK against self-follow.
+ * Both FKs cascade: `AccountPurgeService` hard-deletes `users` rows and relies
+ * on every FK into `users` taking its rows with it.
+ */
+export const userFollows = pgTable(
+  'user_follows',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followingId: uuid('following_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('user_follows_pair_uq').on(t.followerId, t.followingId),
+    // Reverse-direction lookups: "who follows me"
+    index('user_follows_following_id_idx').on(t.followingId),
+    check('user_follows_not_self', sql`follower_id <> following_id`),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
@@ -218,3 +247,5 @@ export type UserAuthProviderRow = typeof userAuthProviders.$inferSelect;
 export type NewUserAuthProvider = typeof userAuthProviders.$inferInsert;
 export type UserBlockRow = typeof userBlocks.$inferSelect;
 export type NewUserBlock = typeof userBlocks.$inferInsert;
+export type UserFollowRow = typeof userFollows.$inferSelect;
+export type NewUserFollow = typeof userFollows.$inferInsert;

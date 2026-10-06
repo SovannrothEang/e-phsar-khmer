@@ -20,6 +20,7 @@ import {
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
+import { ReactionsService } from '../reactions/reactions.service';
 import type { DbClient } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import type {
@@ -28,7 +29,7 @@ import type {
   NewListing,
 } from '../db/schema/listings.schema';
 import { categories, subcategories } from '../db/schema/categories.schema';
-import { communes, districts, provinces } from '../db/schema/users.schema';
+import { communes, districts, provinces, users } from '../db/schema/users.schema';
 import type { CreateListingDto } from './dto/create-listing.dto';
 import type { UpdateListingDto } from './dto/update-listing.dto';
 import type { QueryListingsDto } from './dto/query-listings.dto';
@@ -48,6 +49,20 @@ import {
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
+  /**
+   * The owner's handle, so a client can link to their profile.
+   *
+   * Optional because only `findById` resolves it: the mutation paths
+   * (`update`/`publish`/`remove`) return the row they wrote from their own
+   * queries and have no use for it.
+   */
+  sellerUsername?: string | null;
+  /**
+   * How many users liked this listing — resolved by `findById` only (same
+   * reasoning as `sellerUsername`), so the detail page's "N Likes" control
+   * starts truthful. Counted on read; there is no counter column to drift.
+   */
+  likeCount?: number;
 }
 
 export interface FeedFacet {
@@ -75,6 +90,7 @@ export class ListingsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly filesService: FilesService,
+    private readonly reactionsService: ReactionsService,
   ) {}
 
   async create(
@@ -237,20 +253,34 @@ export class ListingsService {
   }
 
   async findById(id: string): Promise<ListingWithPhotos> {
-    const [listing] = await this.db
-      .select()
+    // The owner's handle travels with the listing so a client never has to
+    // guess it — the detail page's seller card used to derive one from the
+    // free-text `contactName`, which is unrelated to the account and produced
+    // links to profiles that do not exist. Left join: a soft-deleted owner
+    // must not make their listing unreadable.
+    const [row] = await this.db
+      .select({ listing: listings, sellerUsername: users.username })
       .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
       .where(eq(listings.id, id))
       .limit(1);
-    if (!listing) throw new NotFoundException('Listing not found');
+    if (!row) throw new NotFoundException('Listing not found');
 
-    const photos = await this.db
-      .select()
-      .from(listingPhotos)
-      .where(eq(listingPhotos.listingId, listing.id))
-      .orderBy(listingPhotos.sort);
+    const [photos, likeCount] = await Promise.all([
+      this.db
+        .select()
+        .from(listingPhotos)
+        .where(eq(listingPhotos.listingId, row.listing.id))
+        .orderBy(listingPhotos.sort),
+      this.reactionsService.countLikes(row.listing.id),
+    ]);
 
-    return { ...listing, photos };
+    return {
+      ...row.listing,
+      photos,
+      sellerUsername: row.sellerUsername ?? null,
+      likeCount,
+    };
   }
 
   async findFeed(
@@ -300,6 +330,7 @@ export class ListingsService {
         ...this.feedConditions(query, { fuzzy }),
       ];
       const full = [...common, ...this.categoryConditions(resolved)];
+      if (query.userId) full.push(eq(listings.userId, query.userId));
       const pageWhere = cursor
         ? [...full, cursorPredicate(cursor, ordering)]
         : full;
@@ -308,8 +339,10 @@ export class ListingsService {
           .select({
             ...getTableColumns(listings),
             sortKey: sortKeyExpr(ordering),
+            sellerUsername: users.username,
           })
           .from(listings)
+          .leftJoin(users, eq(users.id, listings.userId))
           .where(and(...pageWhere))
           .orderBy(...orderByFor(ordering))
           .limit(limit + 1),
