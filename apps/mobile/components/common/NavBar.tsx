@@ -76,8 +76,8 @@ const NavBar: React.FC<NavBarProps> = ({
         </TouchableOpacity>
 
         {/* QR Code Action Button */}
-        <TouchableOpacity 
-          className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center border border-gray-200/60 dark:border-gray-700/60" 
+        <TouchableOpacity
+          className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center border border-gray-200/60 dark:border-gray-700/60"
           onPress={onQRCodePress}
           activeOpacity={0.7}
         >
@@ -85,8 +85,8 @@ const NavBar: React.FC<NavBarProps> = ({
         </TouchableOpacity>
 
         {/* Search Action Button */}
-        <TouchableOpacity 
-          className="w-10 h-10 rounded-full bg-sky-50 dark:bg-sky-950/40 items-center justify-center border border-sky-100 dark:border-sky-900/60" 
+        <TouchableOpacity
+          className="w-10 h-10 rounded-full bg-sky-50 dark:bg-sky-950/40 items-center justify-center border border-sky-100 dark:border-sky-900/60"
           onPress={onSearchPress}
           activeOpacity={0.7}
         >

@@ -17,7 +17,7 @@ const SellTabBarButton = ({ onPress, label }: any) => (
     onPress={onPress}
     activeOpacity={0.85}
   >
-    <View 
+    <View
       className="w-[68px] h-[68px] rounded-full items-center justify-center p-1 bg-white dark:bg-gray-900"
       style={{
         elevation: 8,
@@ -94,10 +94,10 @@ const TabsLayout = () => {
         options={{
           title: t("home"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "home" : "home-outline"} 
-              size={22} 
-              color={color} 
+            <Ionicons
+              name={focused ? "home" : "home-outline"}
+              size={22}
+              color={color}
             />
           ),
         }}
@@ -119,10 +119,10 @@ const TabsLayout = () => {
             lineHeight: 16,
           },
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "notifications" : "notifications-outline"} 
-              size={24} 
-              color={color} 
+            <Ionicons
+              name={focused ? "notifications" : "notifications-outline"}
+              size={24}
+              color={color}
             />
           ),
         }}
@@ -132,7 +132,9 @@ const TabsLayout = () => {
         listeners={({ navigation }) => createProtectedTabListener(navigation)}
         options={{
           title: t("sell"),
-          tabBarButton: (props) => <SellTabBarButton {...props} label={t("sell")} />,
+          tabBarButton: (props) => (
+            <SellTabBarButton {...props} label={t("sell")} />
+          ),
           tabBarLabel: () => null,
         }}
       />
@@ -142,10 +144,12 @@ const TabsLayout = () => {
         options={{
           title: t("chat"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} 
-              size={22} 
-              color={color} 
+            <Ionicons
+              name={
+                focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"
+              }
+              size={22}
+              color={color}
             />
           ),
         }}
@@ -172,10 +176,10 @@ const TabsLayout = () => {
                     }
               }
             >
-              <Ionicons 
-                name={focused ? "person" : "person-outline"} 
-                size={19} 
-                color={focused ? "#0284C7" : color} 
+              <Ionicons
+                name={focused ? "person" : "person-outline"}
+                size={19}
+                color={focused ? "#0284C7" : color}
               />
             </View>
           ),

@@ -1,4 +1,3 @@
-
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
@@ -15,8 +14,8 @@ const NearbySection = () => {
 
   return (
     <View className="pt-4 pb-2">
-      <LinearGradient 
-        colors={["#38BDF8", "#818CF8", "#F8FAFC"]} 
+      <LinearGradient
+        colors={["#38BDF8", "#818CF8", "#F8FAFC"]}
         locations={[0, 0.45, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -25,11 +24,7 @@ const NearbySection = () => {
         <View className="flex-row items-center justify-between mb-4 px-2">
           <View className="flex-row items-center">
             <View className="w-10 h-10 bg-white/90 dark:bg-gray-800/90 rounded-2xl items-center justify-center shadow-md border border-white/80">
-              <Ionicons
-                name="location-sharp"
-                size={22}
-                color="#0EA5E9"
-              />
+              <Ionicons name="location-sharp" size={22} color="#0EA5E9" />
             </View>
             <View className="ml-3">
               <Text className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
@@ -44,12 +39,12 @@ const NearbySection = () => {
 
         <View
           className="w-full h-64 rounded-3xl overflow-hidden bg-white/30 border border-white/60 relative"
-          style={{ 
-            elevation: 10, 
-            shadowColor: "#0284C7", 
-            shadowOffset: { width: 0, height: 6 }, 
-            shadowOpacity: 0.15, 
-            shadowRadius: 16 
+          style={{
+            elevation: 10,
+            shadowColor: "#0284C7",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.15,
+            shadowRadius: 16,
           }}
         >
           <Image

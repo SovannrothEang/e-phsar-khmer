@@ -49,7 +49,7 @@ const NotificationScreen = () => {
 
   const toggleSelectNotification = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -79,7 +79,7 @@ const NotificationScreen = () => {
             setIsEditMode(false);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -121,7 +121,7 @@ const NotificationScreen = () => {
             setSelectedIds([]);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -337,8 +337,8 @@ const NotificationScreen = () => {
                     isActive
                       ? "bg-primary border-primary"
                       : isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-neutral-background border-neutral-border"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-neutral-background border-neutral-border"
                   }`}
                 >
                   <Text
@@ -346,8 +346,8 @@ const NotificationScreen = () => {
                       isActive
                         ? "text-white"
                         : isDark
-                        ? "text-gray-300"
-                        : "text-neutral-text-sub"
+                          ? "text-gray-300"
+                          : "text-neutral-text-sub"
                     }`}
                   >
                     {tab.label}
@@ -392,8 +392,8 @@ const NotificationScreen = () => {
                 isDark ? "text-gray-400" : "text-neutral-text-sub"
               }`}
             >
-              You're all caught up! Updates regarding price drops, saved ads, and
-              chats will appear here.
+              You&apos;re all caught up! Updates regarding price drops, saved
+              ads, and chats will appear here.
             </Text>
           </View>
         ) : (
@@ -411,13 +411,13 @@ const NotificationScreen = () => {
                     ? isSelected
                       ? "bg-sky-950/40 border-gray-800"
                       : item.isRead
-                      ? "bg-gray-950 border-gray-800/80"
-                      : "bg-gray-900 border-gray-800"
+                        ? "bg-gray-950 border-gray-800/80"
+                        : "bg-gray-900 border-gray-800"
                     : isSelected
-                    ? "bg-sky-100/60 border-neutral-border/70"
-                    : item.isRead
-                    ? "bg-white border-neutral-border/60"
-                    : "bg-sky-50/70 border-neutral-border/80"
+                      ? "bg-sky-100/60 border-neutral-border/70"
+                      : item.isRead
+                        ? "bg-white border-neutral-border/60"
+                        : "bg-sky-50/70 border-neutral-border/80"
                 }`}
               >
                 {/* Selection Checkbox in Edit Mode */}
@@ -427,7 +427,11 @@ const NotificationScreen = () => {
                       name={isSelected ? "checkbox" : "square-outline"}
                       size={22}
                       color={
-                        isSelected ? Colors.primary.DEFAULT : isDark ? "#6B7280" : "#9CA3AF"
+                        isSelected
+                          ? Colors.primary.DEFAULT
+                          : isDark
+                            ? "#6B7280"
+                            : "#9CA3AF"
                       }
                     />
                   </View>
@@ -454,8 +458,8 @@ const NotificationScreen = () => {
                             ? "font-medium text-gray-300"
                             : "font-semibold text-neutral-text-main"
                           : isDark
-                          ? "font-bold text-white"
-                          : "font-bold text-neutral-text-main"
+                            ? "font-bold text-white"
+                            : "font-bold text-neutral-text-main"
                       }`}
                       numberOfLines={1}
                     >
@@ -608,7 +612,8 @@ const NotificationScreen = () => {
                 {
                   key: "chatMessages",
                   title: "Chat & Buyer Inquiries",
-                  subtitle: "Instant alerts for new messages from buyers/sellers",
+                  subtitle:
+                    "Instant alerts for new messages from buyers/sellers",
                   icon: "chatbubbles",
                 },
                 {
@@ -692,7 +697,7 @@ const NotificationScreen = () => {
                 setShowSettingsModal(false);
                 Alert.alert(
                   "Preferences Saved",
-                  "Your notification settings have been updated."
+                  "Your notification settings have been updated.",
                 );
               }}
               className="bg-primary py-3.5 rounded-2xl items-center justify-center mt-2 shadow-sm"

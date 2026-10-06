@@ -4,13 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import {
-  ScrollView,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 
 const ThemeScreen = () => {
   const router = useRouter();
@@ -59,8 +53,8 @@ const ThemeScreen = () => {
                 theme === "light"
                   ? "border-primary"
                   : isDark
-                  ? "border-gray-800"
-                  : "border-transparent"
+                    ? "border-gray-800"
+                    : "border-transparent"
               }`}
               style={{
                 elevation: theme === "light" ? 4 : 1,
@@ -79,8 +73,8 @@ const ThemeScreen = () => {
                   theme === "light"
                     ? "border-primary bg-primary"
                     : isDark
-                    ? "border-gray-600 bg-transparent"
-                    : "border-gray-400 bg-transparent"
+                      ? "border-gray-600 bg-transparent"
+                      : "border-gray-400 bg-transparent"
                 }`}
               >
                 {theme === "light" && (
@@ -109,8 +103,8 @@ const ThemeScreen = () => {
                 theme === "dark"
                   ? "border-primary"
                   : isDark
-                  ? "border-gray-800"
-                  : "border-transparent"
+                    ? "border-gray-800"
+                    : "border-transparent"
               }`}
               style={{
                 elevation: theme === "dark" ? 4 : 1,
@@ -129,8 +123,8 @@ const ThemeScreen = () => {
                   theme === "dark"
                     ? "border-primary bg-primary"
                     : isDark
-                    ? "border-gray-600 bg-transparent"
-                    : "border-gray-400 bg-transparent"
+                      ? "border-gray-600 bg-transparent"
+                      : "border-gray-400 bg-transparent"
                 }`}
               >
                 {theme === "dark" && (

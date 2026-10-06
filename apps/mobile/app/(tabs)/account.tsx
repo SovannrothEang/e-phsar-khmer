@@ -76,7 +76,9 @@ const AccountScreen = () => {
   const { t } = useLanguage();
   const { isDark } = useTheme();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [likedHighlights, setLikedHighlights] = useState<Record<string, boolean>>({});
+  const [likedHighlights, setLikedHighlights] = useState<
+    Record<string, boolean>
+  >({});
 
   const displayName =
     user?.name && user.name !== "DATA" && user.name !== "015455758"
@@ -134,7 +136,9 @@ const AccountScreen = () => {
           name: isGmailOrSreypov ? "Ban Sreypov" : authPhone.trim(),
           username: "bansreypov",
           phone: "015 455 758",
-          email: authPhone.includes("@") ? authPhone.trim() : "bansreypov@gmail.com",
+          email: authPhone.includes("@")
+            ? authPhone.trim()
+            : "bansreypov@gmail.com",
           accountType: "Normal account",
           avatar: "",
           isVerified: true,
@@ -193,7 +197,7 @@ const AccountScreen = () => {
             });
           },
         },
-      ]
+      ],
     );
   };
 
@@ -217,7 +221,7 @@ const AccountScreen = () => {
             });
           },
         },
-      ]
+      ],
     );
   };
 
@@ -430,7 +434,13 @@ const AccountScreen = () => {
                     onPress={() => router.push("/(auth)/edit-profile")}
                     style={{ flex: 1, justifyContent: "center" }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 5,
+                      }}
+                    >
                       <Text
                         style={{
                           fontSize: 18,
@@ -472,7 +482,7 @@ const AccountScreen = () => {
                   onPress={() =>
                     Alert.alert(
                       "Business Account",
-                      "Upgrade to Business Account to post unlimited ads and receive verified merchant badges."
+                      "Upgrade to Business Account to post unlimited ads and receive verified merchant badges.",
                     )
                   }
                   activeOpacity={0.85}
@@ -533,7 +543,10 @@ const AccountScreen = () => {
                 {/* Active ads */}
                 <TouchableOpacity
                   onPress={() =>
-                    Alert.alert("Active Ads", "You currently have 0 active ads.")
+                    Alert.alert(
+                      "Active Ads",
+                      "You currently have 0 active ads.",
+                    )
                   }
                   className="items-center flex-1"
                 >
@@ -595,7 +608,7 @@ const AccountScreen = () => {
                   onPress={() =>
                     Alert.alert(
                       "Subscription",
-                      "Manage your marketplace subscriptions"
+                      "Manage your marketplace subscriptions",
                     )
                   }
                 >
@@ -713,7 +726,7 @@ const AccountScreen = () => {
                   onPress={() =>
                     Alert.alert(
                       "Buy bus ticket",
-                      "Book bus tickets across Cambodia"
+                      "Book bus tickets across Cambodia",
                     )
                   }
                 >
@@ -756,7 +769,7 @@ const AccountScreen = () => {
                   onPress={() =>
                     Alert.alert(
                       "Loan Calculator",
-                      "Calculate monthly loan installments"
+                      "Calculate monthly loan installments",
                     )
                   }
                 >
@@ -856,7 +869,9 @@ const AccountScreen = () => {
                         className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/35 items-center justify-center"
                       >
                         <Ionicons
-                          name={likedHighlights[item.id] ? "heart" : "heart-outline"}
+                          name={
+                            likedHighlights[item.id] ? "heart" : "heart-outline"
+                          }
                           size={16}
                           color={likedHighlights[item.id] ? "#EF4444" : "white"}
                         />
@@ -882,7 +897,11 @@ const AccountScreen = () => {
                         {item.title}
                       </Text>
                       <View className="flex-row items-center gap-1 mt-1">
-                        <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+                        <Ionicons
+                          name="time-outline"
+                          size={12}
+                          color="#9CA3AF"
+                        />
                         <Text
                           numberOfLines={1}
                           className="text-[11px] text-gray-500 dark:text-gray-400"
@@ -912,11 +931,7 @@ const AccountScreen = () => {
                 onPress={handleEditProfile}
                 className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 py-4 rounded-2xl flex-row items-center justify-center gap-2.5 shadow-2xs"
               >
-                <Ionicons
-                  name="create-outline"
-                  size={20}
-                  color="#0EA5E9"
-                />
+                <Ionicons name="create-outline" size={20} color="#0EA5E9" />
                 <Text className="text-gray-900 dark:text-white font-bold text-base">
                   Edit Profile Details
                 </Text>
@@ -991,11 +1006,7 @@ const AccountScreen = () => {
                 activeOpacity={0.8}
                 className="flex-1 bg-neutral-surface py-3.5 px-3 rounded-xl border border-neutral-border flex-row items-center justify-center gap-2 shadow-xs"
               >
-                <Ionicons
-                  name="person"
-                  size={18}
-                  color={Colors.text.primary}
-                />
+                <Ionicons name="person" size={18} color={Colors.text.primary} />
                 <Text className="text-neutral-text-main font-bold text-sm">
                   Use Passkey
                 </Text>
@@ -1101,8 +1112,8 @@ const AccountScreen = () => {
                     authMode === "login"
                       ? "bg-secondary-orange border-secondary-orange"
                       : isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-neutral-background border-neutral-border"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-neutral-background border-neutral-border"
                   }`}
                 >
                   <Text
@@ -1110,8 +1121,8 @@ const AccountScreen = () => {
                       authMode === "login"
                         ? "text-white"
                         : isDark
-                        ? "text-gray-300"
-                        : "text-neutral-text-main"
+                          ? "text-gray-300"
+                          : "text-neutral-text-main"
                     }`}
                   >
                     Login
@@ -1127,8 +1138,8 @@ const AccountScreen = () => {
                     authMode === "register"
                       ? "bg-secondary-orange border-secondary-orange"
                       : isDark
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-neutral-background border-neutral-border"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-neutral-background border-neutral-border"
                   }`}
                 >
                   <Text
@@ -1136,8 +1147,8 @@ const AccountScreen = () => {
                       authMode === "register"
                         ? "text-white"
                         : isDark
-                        ? "text-gray-300"
-                        : "text-neutral-text-main"
+                          ? "text-gray-300"
+                          : "text-neutral-text-main"
                     }`}
                   >
                     Register
@@ -1219,7 +1230,9 @@ const AccountScreen = () => {
                         if (val.trim()) setAuthError("");
                       }}
                       placeholder="015455758 or bansreypov@gmail.com"
-                      placeholderTextColor={isDark ? "#6B7280" : Colors.text.muted}
+                      placeholderTextColor={
+                        isDark ? "#6B7280" : Colors.text.muted
+                      }
                       className={`text-base font-medium p-0 ${
                         isDark ? "text-white" : "text-neutral-text-main"
                       }`}
@@ -1249,7 +1262,9 @@ const AccountScreen = () => {
                           if (val.length >= 4) setAuthError("");
                         }}
                         placeholder="Enter password"
-                        placeholderTextColor={isDark ? "#6B7280" : Colors.text.muted}
+                        placeholderTextColor={
+                          isDark ? "#6B7280" : Colors.text.muted
+                        }
                         secureTextEntry={!showAuthPassword}
                         className={`flex-1 text-base font-medium p-0 ${
                           isDark ? "text-white" : "text-neutral-text-main"
@@ -1259,7 +1274,9 @@ const AccountScreen = () => {
                         onPress={() => setShowAuthPassword(!showAuthPassword)}
                       >
                         <Ionicons
-                          name={showAuthPassword ? "eye-off-outline" : "eye-outline"}
+                          name={
+                            showAuthPassword ? "eye-off-outline" : "eye-outline"
+                          }
                           size={20}
                           color={isDark ? "#9CA3AF" : Colors.text.muted}
                         />
@@ -1317,7 +1334,9 @@ const AccountScreen = () => {
                         if (val.trim()) setAuthError("");
                       }}
                       placeholder="e.g. Sokha Chan"
-                      placeholderTextColor={isDark ? "#6B7280" : Colors.text.muted}
+                      placeholderTextColor={
+                        isDark ? "#6B7280" : Colors.text.muted
+                      }
                       className={`text-base font-medium p-0 ${
                         isDark ? "text-white" : "text-neutral-text-main"
                       }`}
@@ -1345,7 +1364,9 @@ const AccountScreen = () => {
                         if (val.trim()) setAuthError("");
                       }}
                       placeholder="012 345 678"
-                      placeholderTextColor={isDark ? "#6B7280" : Colors.text.muted}
+                      placeholderTextColor={
+                        isDark ? "#6B7280" : Colors.text.muted
+                      }
                       keyboardType="phone-pad"
                       className={`text-base font-medium p-0 ${
                         isDark ? "text-white" : "text-neutral-text-main"
@@ -1375,7 +1396,9 @@ const AccountScreen = () => {
                           if (val.length >= 4) setAuthError("");
                         }}
                         placeholder="At least 4 characters"
-                        placeholderTextColor={isDark ? "#6B7280" : Colors.text.muted}
+                        placeholderTextColor={
+                          isDark ? "#6B7280" : Colors.text.muted
+                        }
                         secureTextEntry={!showAuthPassword}
                         className={`flex-1 text-base font-medium p-0 ${
                           isDark ? "text-white" : "text-neutral-text-main"
@@ -1385,7 +1408,9 @@ const AccountScreen = () => {
                         onPress={() => setShowAuthPassword(!showAuthPassword)}
                       >
                         <Ionicons
-                          name={showAuthPassword ? "eye-off-outline" : "eye-outline"}
+                          name={
+                            showAuthPassword ? "eye-off-outline" : "eye-outline"
+                          }
                           size={20}
                           color={isDark ? "#9CA3AF" : Colors.text.muted}
                         />

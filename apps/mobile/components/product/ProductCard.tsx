@@ -23,7 +23,7 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
   const renderImageBadges = () => (
     <>
       {/* Favorite Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         className="absolute right-2.5 top-2.5 rounded-full bg-black/50 p-2 shadow-sm border border-white/20"
         activeOpacity={0.7}
         onPress={(e) => {
@@ -142,7 +142,10 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
             </View>
 
             {/* Condition / Info */}
-            <Text className="text-xs text-gray-400 dark:text-gray-500" numberOfLines={1}>
+            <Text
+              className="text-xs text-gray-400 dark:text-gray-500"
+              numberOfLines={1}
+            >
               {getSecondaryInfo()}
             </Text>
 
@@ -184,7 +187,7 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
     >
       <View
         className="overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"
-        style={{ 
+        style={{
           height: total,
           elevation: 3,
           shadowColor: "#0F172A",

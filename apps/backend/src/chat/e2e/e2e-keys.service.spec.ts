@@ -9,8 +9,8 @@ function makeTx() {
     // rotation from a replay. Default = no prior row, so no purge.
     select: jest.fn(() => limitQuery([])),
     insert: jest.fn(),
-    delete: jest.fn((..._args: unknown[]) => ({
-      where: (_predicate?: unknown) => Promise.resolve(undefined),
+    delete: jest.fn(() => ({
+      where: () => Promise.resolve(undefined),
     })),
   };
 }

@@ -26,17 +26,18 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  if (!types || types.length === 0) return null;
-
   // Show first 4 types + "Show More" = 5 items per row
-  const displayTypes = types.slice(0, 4);
-
   const filteredTypes = useMemo(() => {
+    if (!types) return [];
     if (!searchQuery.trim()) return types;
     return types.filter((t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase())
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }, [types, searchQuery]);
+
+  if (!types || types.length === 0) return null;
+
+  const displayTypes = types.slice(0, 4);
 
   const handleSelectType = (id: string) => {
     setModalVisible(false);

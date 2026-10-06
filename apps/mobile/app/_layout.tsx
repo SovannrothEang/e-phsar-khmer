@@ -23,27 +23,27 @@ export default function RootLayout() {
           <AuthProvider>
             <NotificationProvider>
               <QueryClientProvider client={queryClient}>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(categories)" />
-              <Stack.Screen name="filters" />
-              <Stack.Screen
-                name="scan"
-                options={{
-                  presentation: "modal",
-                  animation: "slide_from_bottom",
-                  gestureEnabled: true,
-                }}
-              />
-              <Stack.Screen
-                name="search"
-                options={{
-                  animation: "fade_from_bottom",
-                }}
-              />
-            </Stack>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(categories)" />
+                  <Stack.Screen name="filters" />
+                  <Stack.Screen
+                    name="scan"
+                    options={{
+                      presentation: "modal",
+                      animation: "slide_from_bottom",
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="search"
+                    options={{
+                      animation: "fade_from_bottom",
+                    }}
+                  />
+                </Stack>
               </QueryClientProvider>
             </NotificationProvider>
           </AuthProvider>

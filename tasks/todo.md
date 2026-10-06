@@ -3101,6 +3101,7 @@ From the two-axis review of the search-round-2 + ledger working tree.
 **Left open**: apply `0032`; filter-bar i18n (sort labels + chips are English-only across the
 whole bar, not just the new ones); payment use-case/processor tests (blocked on ESM `effect`
 under Jest); `failed` outbox + `idempotency_keys` retention; no `payment.failed` event.
+
 # E2E chat could not decrypt — stale one-time prekeys after an identity rotation (2026-09-27)
 
 Reported as "why the message couldn't decrypt?". Root cause was in the key

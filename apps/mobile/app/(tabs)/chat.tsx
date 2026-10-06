@@ -171,9 +171,12 @@ const ChatScreen = () => {
     image?: string;
   }>();
 
-  const [conversations, setConversations] =
-    useState<Conversation[]>(INITIAL_CONVERSATIONS);
-  const [activeTab, setActiveTab] = useState<"all" | "buying" | "selling">("all");
+  const [conversations, setConversations] = useState<Conversation[]>(
+    INITIAL_CONVERSATIONS,
+  );
+  const [activeTab, setActiveTab] = useState<"all" | "buying" | "selling">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
 
@@ -185,7 +188,8 @@ const ChatScreen = () => {
   useEffect(() => {
     if (params.sellerName || params.title) {
       const existing = conversations.find(
-        (c) => c.sellerName === params.sellerName || c.itemTitle === params.title
+        (c) =>
+          c.sellerName === params.sellerName || c.itemTitle === params.title,
       );
       if (existing) {
         setSelectedConv(existing);
@@ -229,13 +233,13 @@ const ChatScreen = () => {
 
   const totalUnread = conversations.reduce(
     (acc, curr) => acc + curr.unreadCount,
-    0
+    0,
   );
 
   const handleOpenConversation = (conv: Conversation) => {
     // Mark as read
     setConversations((prev) =>
-      prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c))
+      prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c)),
     );
     setSelectedConv({ ...conv, unreadCount: 0 });
   };
@@ -263,7 +267,7 @@ const ChatScreen = () => {
 
     setSelectedConv(updatedConv);
     setConversations((prev) =>
-      prev.map((c) => (c.id === selectedConv.id ? updatedConv : c))
+      prev.map((c) => (c.id === selectedConv.id ? updatedConv : c)),
     );
     setInputText("");
 
@@ -284,7 +288,8 @@ const ChatScreen = () => {
       };
 
       setSelectedConv((prevSelected) => {
-        if (!prevSelected || prevSelected.id !== updatedConv.id) return prevSelected;
+        if (!prevSelected || prevSelected.id !== updatedConv.id)
+          return prevSelected;
         const autoUpdated = {
           ...prevSelected,
           lastMessage: replyText,
@@ -292,7 +297,7 @@ const ChatScreen = () => {
           messages: [...prevSelected.messages, replyMsg],
         };
         setConversations((prevList) =>
-          prevList.map((c) => (c.id === autoUpdated.id ? autoUpdated : c))
+          prevList.map((c) => (c.id === autoUpdated.id ? autoUpdated : c)),
         );
         return autoUpdated;
       });
@@ -313,7 +318,9 @@ const ChatScreen = () => {
           </Text>
           {totalUnread > 0 && (
             <View className="bg-secondary-orange px-2 py-0.5 rounded-full">
-              <Text className="text-white text-xs font-bold">{totalUnread} new</Text>
+              <Text className="text-white text-xs font-bold">
+                {totalUnread} new
+              </Text>
             </View>
           )}
         </View>
@@ -334,7 +341,9 @@ const ChatScreen = () => {
           className="flex-row items-center bg-white/20 px-3 py-1.5 rounded-full"
         >
           <Ionicons name="add-circle" size={16} color="white" />
-          <Text className="text-white font-bold text-xs ml-1">New Demo Chat</Text>
+          <Text className="text-white font-bold text-xs ml-1">
+            New Demo Chat
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -352,7 +361,11 @@ const ChatScreen = () => {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={16} color={Colors.text.muted} />
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={Colors.text.muted}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -514,11 +527,16 @@ const ChatScreen = () => {
                     className="w-10 h-10 rounded-full border border-white/40 mr-2.5"
                   />
                   <View className="flex-1">
-                    <Text className="text-white font-bold text-base" numberOfLines={1}>
+                    <Text
+                      className="text-white font-bold text-base"
+                      numberOfLines={1}
+                    >
                       {selectedConv.sellerName}
                     </Text>
                     <Text className="text-sky-100 text-[11px]">
-                      {selectedConv.isOnline ? "Online Now • Usually replies in ~5 mins" : "Offline"}
+                      {selectedConv.isOnline
+                        ? "Online Now • Usually replies in ~5 mins"
+                        : "Offline"}
                     </Text>
                   </View>
                 </View>
@@ -541,7 +559,10 @@ const ChatScreen = () => {
                   className="w-12 h-12 rounded-lg mr-3 bg-neutral-background border border-neutral-border"
                 />
                 <View className="flex-1 mr-2">
-                  <Text className="text-xs font-bold text-neutral-text-main" numberOfLines={1}>
+                  <Text
+                    className="text-xs font-bold text-neutral-text-main"
+                    numberOfLines={1}
+                  >
                     {selectedConv.itemTitle}
                   </Text>
                   <Text className="text-sm font-bold text-danger">
@@ -551,7 +572,7 @@ const ChatScreen = () => {
                 <TouchableOpacity
                   onPress={() => {
                     const found = SAMPLE_PRODUCTS.find(
-                      (p) => p.title === selectedConv.itemTitle
+                      (p) => p.title === selectedConv.itemTitle,
                     );
                     setSelectedConv(null);
                     if (found) {
@@ -560,7 +581,9 @@ const ChatScreen = () => {
                   }}
                   className="bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-200"
                 >
-                  <Text className="text-xs font-bold text-primary">View Item</Text>
+                  <Text className="text-xs font-bold text-primary">
+                    View Item
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -576,7 +599,8 @@ const ChatScreen = () => {
                 <View className="bg-amber-50 p-3 rounded-xl border border-amber-200 mb-4 items-center">
                   <Ionicons name="shield-checkmark" size={20} color="#D97706" />
                   <Text className="text-amber-800 text-[11px] text-center font-medium mt-1">
-                    Safety Tip: Inspect item carefully & test functionality in person before making payment.
+                    Safety Tip: Inspect item carefully & test functionality in
+                    person before making payment.
                   </Text>
                 </View>
 
@@ -611,7 +635,11 @@ const ChatScreen = () => {
                             {msg.timestamp}
                           </Text>
                           {isMe && (
-                            <Ionicons name="checkmark-done" size={14} color="#7DD3FC" />
+                            <Ionicons
+                              name="checkmark-done"
+                              size={14}
+                              color="#7DD3FC"
+                            />
                           )}
                         </View>
                       </View>
@@ -666,7 +694,11 @@ const ChatScreen = () => {
                   }
                   className="p-2 rounded-full bg-neutral-background"
                 >
-                  <Ionicons name="camera" size={22} color={Colors.primary.DEFAULT} />
+                  <Ionicons
+                    name="camera"
+                    size={22}
+                    color={Colors.primary.DEFAULT}
+                  />
                 </TouchableOpacity>
 
                 <TextInput

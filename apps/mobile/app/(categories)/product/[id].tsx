@@ -169,7 +169,7 @@ const ProductDetailScreen = () => {
               onScroll={(e) => {
                 const slide = Math.ceil(
                   e.nativeEvent.contentOffset.x /
-                  e.nativeEvent.layoutMeasurement.width,
+                    e.nativeEvent.layoutMeasurement.width,
                 );
                 if (slide !== activeImageIndex) setActiveImageIndex(slide);
               }}
@@ -229,7 +229,11 @@ const ProductDetailScreen = () => {
               onPress={() => router.push(`/product/edit/${product.id}`)}
               className="flex-row items-center bg-primary/10 px-3 py-1 rounded-full border border-primary/20"
             >
-              <Ionicons name="create" size={14} color={Colors.primary.DEFAULT} />
+              <Ionicons
+                name="create"
+                size={14}
+                color={Colors.primary.DEFAULT}
+              />
               <Text className="ml-1 text-xs font-bold text-primary">Edit</Text>
             </TouchableOpacity>
           </View>
@@ -248,7 +252,11 @@ const ProductDetailScreen = () => {
               onPress={() => router.push(`/product/edit/${product.id}`)}
               className="flex-1 flex-row items-center justify-center bg-neutral-background py-2 rounded-lg border border-neutral-border"
             >
-              <Ionicons name="create-outline" size={16} color={Colors.text.primary} />
+              <Ionicons
+                name="create-outline"
+                size={16}
+                color={Colors.text.primary}
+              />
               <Text className="ml-1.5 text-xs font-bold text-neutral-text-main">
                 Edit Listing
               </Text>
@@ -258,17 +266,30 @@ const ProductDetailScreen = () => {
               onPress={() => Alert.alert("Success", "Listing marked as SOLD!")}
               className="flex-1 flex-row items-center justify-center bg-neutral-background py-2 rounded-lg border border-neutral-border"
             >
-              <Ionicons name="checkmark-circle-outline" size={16} color={Colors.primary.DEFAULT} />
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={16}
+                color={Colors.primary.DEFAULT}
+              />
               <Text className="ml-1.5 text-xs font-bold text-neutral-text-main">
                 Mark as Sold
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => Alert.alert("Bumped!", "Your ad has been renewed to top of search!")}
+              onPress={() =>
+                Alert.alert(
+                  "Bumped!",
+                  "Your ad has been renewed to top of search!",
+                )
+              }
               className="flex-1 flex-row items-center justify-center bg-orange-50 py-2 rounded-lg border border-orange-200"
             >
-              <Ionicons name="arrow-up-circle-outline" size={16} color={Colors.secondary.orange} />
+              <Ionicons
+                name="arrow-up-circle-outline"
+                size={16}
+                color={Colors.secondary.orange}
+              />
               <Text className="ml-1.5 text-xs font-bold text-secondary-orange">
                 Bump Ad
               </Text>
@@ -305,7 +326,9 @@ const ProductDetailScreen = () => {
             {product.jobType && (
               <View className="flex-row">
                 <Text className="w-32 text-neutral-text-sub">Job Type:</Text>
-                <Text className="flex-1 text-primary font-bold">{product.jobType}</Text>
+                <Text className="flex-1 text-primary font-bold">
+                  {product.jobType}
+                </Text>
               </View>
             )}
             {product.experienceLevel && (
@@ -474,7 +497,7 @@ const ProductDetailScreen = () => {
               source={require("@/assets/images/map_placeholder.png")}
               className="absolute w-full h-full opacity-50"
               resizeMode="cover"
-              onError={(e) => { }}
+              onError={(e) => {}}
             />
             <TouchableOpacity
               onPress={() =>
@@ -668,19 +691,33 @@ const ProductDetailScreen = () => {
             {/* Profile Actions */}
             <View className="mt-4 flex-row gap-3 pt-3 border-t border-neutral-border/40">
               <TouchableOpacity
-                onPress={() => router.push(`/user/${product.seller?.name || "1"}`)}
+                onPress={() =>
+                  router.push(`/user/${product.seller?.name || "1"}`)
+                }
                 className="flex-1 bg-primary/10 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5"
                 activeOpacity={0.7}
               >
-                <Ionicons name="person-outline" size={16} color={Colors.primary.DEFAULT} />
-                <Text className="text-primary font-semibold text-xs">View Profile</Text>
+                <Ionicons
+                  name="person-outline"
+                  size={16}
+                  color={Colors.primary.DEFAULT}
+                />
+                <Text className="text-primary font-semibold text-xs">
+                  View Profile
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="flex-1 bg-neutral-surface border border-primary/40 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5"
                 activeOpacity={0.7}
               >
-                <Ionicons name="person-add-outline" size={16} color={Colors.primary.DEFAULT} />
-                <Text className="text-primary font-semibold text-xs">Follow Seller</Text>
+                <Ionicons
+                  name="person-add-outline"
+                  size={16}
+                  color={Colors.primary.DEFAULT}
+                />
+                <Text className="text-primary font-semibold text-xs">
+                  Follow Seller
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -799,7 +836,9 @@ const ProductDetailScreen = () => {
                       {/* Small Image 2 */}
                       <View className="flex-1 bg-neutral-background">
                         <Image
-                          source={getImageSource(allImages[2] || allImages[1] || allImages[0])}
+                          source={getImageSource(
+                            allImages[2] || allImages[1] || allImages[0],
+                          )}
                           className="w-full h-full"
                           resizeMode="cover"
                         />
@@ -807,7 +846,9 @@ const ProductDetailScreen = () => {
                       {/* Small Image 3 */}
                       <View className="flex-1 bg-neutral-background relative">
                         <Image
-                          source={getImageSource(allImages[3] || allImages[2] || allImages[0])}
+                          source={getImageSource(
+                            allImages[3] || allImages[2] || allImages[0],
+                          )}
                           className="w-full h-full"
                           resizeMode="cover"
                         />
