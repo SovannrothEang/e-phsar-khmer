@@ -418,6 +418,7 @@ describe('ListingsService.findFeed search + facets', () => {
       'where',
       'orderBy',
       'limit',
+      'leftJoin',
       'innerJoin',
       'groupBy',
     ]) {
