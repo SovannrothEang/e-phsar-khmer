@@ -392,8 +392,8 @@ const NotificationScreen = () => {
                 isDark ? "text-gray-400" : "text-neutral-text-sub"
               }`}
             >
-              You&apos;re all caught up! Updates regarding price drops, saved ads,
-              and chats will appear here.
+              You&apos;re all caught up! Updates regarding price drops, saved
+              ads, and chats will appear here.
             </Text>
           </View>
         ) : (
