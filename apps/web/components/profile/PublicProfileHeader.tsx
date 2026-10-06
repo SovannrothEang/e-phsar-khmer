@@ -1,18 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { User } from "@/lib/user";
+import {
+  profileTabHref,
+  pushProfileTab,
+  readProfileTab,
+} from "@/lib/profile-tab";
+import type { ProfileTab } from "@/lib/profile-tab";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PhoneCall,
   Mail,
   House,
   Info,
-  Plus,
   Calendar,
   CircleCheckBig,
   Globe,
@@ -23,12 +28,43 @@ import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
 import { ThreeDotProfile } from "./ThreeDotProfile";
+import { FollowButton } from "./FollowButton";
 import { Separator } from "@/components/ui/separator";
 
-export default function PublicProfileHeader({ user }: { user: User }) {
+export default function PublicProfileHeader({
+  user,
+  viewerId,
+  initialFollowing = false,
+}: {
+  user: User;
+  /** Signed-in viewer, or null/omitted when anonymous. */
+  viewerId?: string | null;
+  /** Whether that viewer already follows this profile. */
+  initialFollowing?: boolean;
+}) {
   const pathname = usePathname();
+  const activeList = readProfileTab(useSearchParams());
 
   const tab = pathname.includes("/about") ? "about" : "home";
+
+  /**
+   * Open a follower/following list under the header without leaving the page.
+   *
+   * These counts used to link to their own routes, so every click re-rendered
+   * the whole profile. A plain click now swaps the list in place; a modified
+   * one (new tab, download) is left to the browser, which is why the element
+   * is still an anchor with a real, shareable href.
+   */
+  const openList = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    list: ProfileTab,
+  ) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    pushProfileTab(list);
+  };
 
   const [open, setOpen] = useState(false);
   const [activeImage, setActiveImage] = useState("");
@@ -104,18 +140,50 @@ export default function PublicProfileHeader({ user }: { user: User }) {
                 </p>
 
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>
-                    <strong className="text-foreground font-semibold">
-                      <a href="">{user.following}</a>
-                    </strong>{" "}
-                    Following
-                  </span>
-                  <span>
-                    <strong className="text-foreground font-semibold">
-                      <a href="">{user.follower}</a>
-                    </strong>{" "}
-                    Followers
-                  </span>
+                  {(
+                    [
+                      {
+                        list: "following",
+                        value: user.following,
+                        label: "Following",
+                      },
+                      {
+                        list: "followers",
+                        value: user.follower,
+                        label: "Followers",
+                      },
+                    ] as const
+                  ).map(({ list, value, label }) => {
+                    const active = activeList === list;
+                    const className = `transition-colors hover:text-foreground ${
+                      active ? "text-[#00a0e9]" : ""
+                    }`;
+                    const body = (
+                      <>
+                        <strong className="text-foreground font-semibold">
+                          {value}
+                        </strong>{" "}
+                        {label}
+                      </>
+                    );
+                    // The lists need a session, so an anonymous visitor gets
+                    // the sign-in bounce the old routes performed.
+                    return viewerId ? (
+                      <a
+                        key={list}
+                        href={profileTabHref(pathname, list)}
+                        onClick={(event) => openList(event, list)}
+                        aria-current={active ? "page" : undefined}
+                        className={className}
+                      >
+                        {body}
+                      </a>
+                    ) : (
+                      <Link key={list} href="/login" className={className}>
+                        {body}
+                      </Link>
+                    );
+                  })}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1">
@@ -154,27 +222,42 @@ export default function PublicProfileHeader({ user }: { user: User }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0 pt-1">
-                <Button className="rounded-full bg-card hover:bg-card/80 text-foreground px-5 h-9 text-sm font-semibold shadow-sm">
-                  <Plus className="mr-1 h-4 w-4" /> Follow
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => (window.location.href = `tel:${user.phone}`)}
-                  className="rounded-full border-muted-foreground/30 text-[#00a5e4] h-9 w-9"
-                >
-                  <PhoneCall className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() =>
-                    (window.location.href = `mailto:${user.email}`)
-                  }
-                  className="rounded-full border-muted-foreground/30 text-[#00a5e4] h-9 w-9"
-                >
-                  <Mail className="h-4 w-4" />
-                </Button>
+                <FollowButton
+                  key={user.userId}
+                  userId={user.userId}
+                  initialFollowing={initialFollowing}
+                  viewerId={viewerId}
+                  variant="profile"
+                  className="rounded-full bg-card hover:bg-card/80 text-foreground px-5 h-9 text-sm font-semibold shadow-sm"
+                />
+                {/* Each contact button renders only when the profile actually
+                    carries that detail: a real profile exposes neither a phone
+                    nor an email, and a button whose only outcome is
+                    `tel:undefined` is worse than no button. */}
+                {user.phone?.[0] && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      (window.location.href = `tel:${user.phone?.[0]}`)
+                    }
+                    className="rounded-full border-muted-foreground/30 text-[#00a5e4] h-9 w-9"
+                  >
+                    <PhoneCall className="h-4 w-4" />
+                  </Button>
+                )}
+                {user.email && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      (window.location.href = `mailto:${user.email}`)
+                    }
+                    className="rounded-full border-muted-foreground/30 text-[#00a5e4] h-9 w-9"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                )}
                 <ThreeDotProfile user={user} />
               </div>
             </div>

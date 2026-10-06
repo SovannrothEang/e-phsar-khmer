@@ -80,7 +80,7 @@ export default function OptionGrid({
   };
 
   return (
-    <div className="bg-card rounded p-4 mb-2 pl-6">
+    <div className="bg-card rounded px-6 py-4 mb-2">
       {title && <h2 className="text-base font-bold mb-4">{title}</h2>}
       <div
         className={

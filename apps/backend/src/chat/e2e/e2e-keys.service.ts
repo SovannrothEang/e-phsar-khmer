@@ -30,12 +30,26 @@ export class E2eKeysService {
    * device's sessions, by design: spec decision #2 / design §9) and inserts
    * any one-time prekeys not already present. Public material only —
    * nothing here ever sees a private key.
+   *
+   * When the identity actually rotates, the previous generation's unused
+   * one-time prekeys are dropped first — see the purge below for why the
+   * insert's own conflict handling cannot cover that case.
    */
   async registerKeys(
     userId: string,
     dto: RegisterE2eKeysDto,
   ): Promise<{ accepted: number }> {
     await this.db.transaction(async (tx) => {
+      // Read the stored identityKey BEFORE the upsert. It is the only thing
+      // that separates a *replayed* registration (same identity — the
+      // onConflictDoNothing below is correct for it) from a *rotation* (a
+      // brand-new identity), and the two need opposite treatment for prekeys.
+      const [existing] = await tx
+        .select({ identityKey: userE2eIdentities.identityKey })
+        .from(userE2eIdentities)
+        .where(eq(userE2eIdentities.userId, userId))
+        .limit(1);
+
       await tx
         .insert(userE2eIdentities)
         .values({
@@ -61,6 +75,33 @@ export class E2eKeysService {
             updatedAt: sql`now()`,
           },
         });
+
+      // A rotation replaces the client's whole prekey store, and the fresh
+      // prekeys reuse ids 1..N — so every one of them would conflict below
+      // and be silently discarded, leaving the pool full of public keys
+      // whose private halves no longer exist on any device (every sender
+      // handed one derives a different DH4 and can never decrypt).
+      //
+      // Only *unused* rows are dropped: a claimed row can never be served
+      // again (getBundle filters `used_at is null`), so it is inert, and
+      // keeping it preserves the audit trail.
+      //
+      // Guarded on the identity actually changing: the replenish path
+      // re-registers the SAME identity with a fresh batch, and purging
+      // there would wipe valid keys on every top-up.
+      const rotated =
+        existing !== undefined && existing.identityKey !== dto.identityKey;
+
+      if (rotated) {
+        await tx
+          .delete(userE2eOneTimePrekeys)
+          .where(
+            and(
+              eq(userE2eOneTimePrekeys.userId, userId),
+              isNull(userE2eOneTimePrekeys.usedAt),
+            ),
+          );
+      }
 
       if (dto.oneTimePrekeys.length > 0) {
         await tx

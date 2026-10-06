@@ -16,7 +16,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,14 +31,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
+import { useReactions } from "@/components/reactions/reactions-provider";
 
 export function ListCardPost({ post }: { post: Post }) {
   // See GridCardPost — a "Negotiable" listing has no price to subtract from.
   const discountAmount =
     post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const reactions = useReactions();
+  const listingId = String(post.postId);
   // No photo at all, or a stored photo missing from storage → empty area (the
   // DB is the only image source: no static stand-in, no broken <img>).
   const photo = post.images[0];
@@ -123,31 +123,22 @@ export function ListCardPost({ post }: { post: Post }) {
                   className="p-0"
                 >
                   <Toggle
-                    pressed={isSaved}
-                    onPressedChange={(value) => {
-                      toast.promise(
-                        new Promise((resolve) =>
-                          setTimeout(
-                            () => resolve(value ? "Saved" : "Removed"),
-                            800,
-                          ),
-                        ),
-                        {
-                          loading: "Loading...",
-                          success: (d) => `${d} successfully`,
-                          error: "Error",
-                          position: "top-right",
-                        },
-                      );
-                      setIsSaved(value);
-                    }}
+                    pressed={reactions.isSaved(listingId)}
+                    onPressedChange={() => reactions.toggleSave(listingId)}
+                    disabled={reactions.isPending(listingId)}
                     className="flex w-full items-center justify-start gap-3 px-3 py-2 text-sm transition-colors data-[state=on]:text-blue-500 hover:bg-muted outline-none border-none rounded-sm"
                   >
                     <BookmarkIcon
                       size={15}
-                      className={isSaved ? "fill-blue-500 text-blue-500" : ""}
+                      className={
+                        reactions.isSaved(listingId)
+                          ? "fill-blue-500 text-blue-500"
+                          : ""
+                      }
                     />
-                    <span>{isSaved ? "Unsave" : "Save"}</span>
+                    <span>
+                      {reactions.isSaved(listingId) ? "Unsave" : "Save"}
+                    </span>
                   </Toggle>
                 </DropdownMenuItem>
 
@@ -228,36 +219,23 @@ export function ListCardPost({ post }: { post: Post }) {
           </div>
         </div>
 
-        {/* ── RIGHT: Heart — vertically centered, outside text area ── */}
-        <div className="flex items-center pr-4 z-20">
+        {/* ── RIGHT: Heart — bottom-aligned with the price row (captain,
+            2026-10-06: centered, it floated mid-card on tall cards) ── */}
+        <div className="flex items-end pb-3 pr-4 z-20">
           <button
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              const willLike = !isLiked;
-              toast.promise(
-                new Promise((resolve) =>
-                  setTimeout(
-                    () => resolve(willLike ? "Liked" : "Unliked"),
-                    800,
-                  ),
-                ),
-                {
-                  loading: "Processing...",
-                  success: (msg) => `${msg} successfully`,
-                  error: "Error",
-                  position: "top-right",
-                },
-              );
-              setIsLiked(willLike);
+              reactions.toggleLike(listingId);
             }}
-            className="p-1.5 rounded-full hover:bg-muted transition-colors outline-none cursor-pointer"
+            disabled={reactions.isPending(listingId)}
+            className="group/heart p-1.5 rounded-full hover:bg-gray-500 transition-colors outline-none cursor-pointer"
           >
             <HeartIcon
               className={`h-5 w-5 transition-transform ${
-                isLiked
+                reactions.isLiked(listingId)
                   ? "fill-red-500 text-red-500 scale-110"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground group-hover/heart:text-white"
               }`}
             />
           </button>

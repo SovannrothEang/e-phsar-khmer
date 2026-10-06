@@ -60,7 +60,9 @@ export async function requestLoginOtp(
   }> | null;
 
   if (!res.ok || !body?.success) {
-    const code = body?.error?.code ?? body?.error?.message;
+    // Same contract as actions/login.ts: the domain string rides in `message`,
+    // while `code` is only the HTTP status name.
+    const code = body?.error?.message ?? body?.error?.code;
     return {
       success: false,
       error:

@@ -157,6 +157,174 @@ const REAL_FORM_SUBCATEGORIES = [
   "translations-interpretation",
   "travel-agents-ticket-sales",
   "jobs-others",
+  // Services — all 24 subcategories, opted in 2026-09-27. **No new block was
+  // needed**: the family's 8 keys (photos max 8 / title / description /
+  // location / address / the contact trio) are every one already renderable —
+  // `contactEmail` was the only one that could have vanished silently, and its
+  // block is there. spec-detail-seven.md (13 lines — "they have the same
+  // form") and the seed agree field-for-field, so unlike Jobs there was no
+  // rename or divergence to resolve. The family declares **no price**: these
+  // listings publish with a NULL price and read "Negotiable" on the cards and
+  // the detail page, exactly like the three Home & Land forms that declare
+  // none. `lib/post-ad.ts`'s Services mock carries a `company_name` payload
+  // field, but that is the mock's generic boilerplate — 146 occurrences
+  // against 145 mock subcategory entries, i.e. one per subcategory of every
+  // category, Jobs and Cars included — never Services design intent.
+  "accounting-services",
+  "financial-services",
+  "travel-and-tourism",
+  "automotive-services",
+  "advertising-and-media",
+  "bridal-services",
+  "cleaning-and-maid-services",
+  "construction-arch-and-interiors",
+  "education-training-services",
+  "engineering-services",
+  "insurance-services",
+  "massage-and-spa",
+  "hospitality-travel-and-tourism",
+  "health-medical-and-pharma",
+  "it-and-telecom",
+  "interior-design-and-renovation",
+  "legal-services",
+  "movers-and-logistics",
+  "plumbing-and-electrical",
+  "property-and-real-estate",
+  "science-services",
+  "supply-chain-and-logistics",
+  "printing-and-publishing",
+  "other-services",
+  // Fashion & Beauty — all 6 subcategories, opted in 2026-09-27. Five of the
+  // six declare `type` (the same block the computers/electronics/property forms
+  // use), so most of this family is the usual schema-gated opt-in.
+  //
+  // Two things made it NOT a copy-paste of Services:
+  //  1. `fashion-accessories`' picker reuses the **`accessory`** block — the
+  //     same key and the same `accessories` set Phone Accessories reads — and
+  //     only its LABEL differs: its own `field_schema` says **"Accessory Type"**
+  //     (captain, 2026-09-27), which the block already picks up from
+  //     `config.labels`. So no new block was needed for it either. What the key
+  //     must NOT be is `type` (→ `types`): NO `types` row is ticked for this
+  //     subcategory and `types` is managed, so it would have rendered an EMPTY
+  //     picker on a starred field — the same unpublishable-form trap Jobs hit
+  //     with `jobType`.
+  //     (A separate `fashion_accessories` set, keyed `accessoryType`, was built
+  //     the same day and reverted — captain's call to keep ONE set. See the
+  //     `accessories` block in attributes.seed.ts before re-proposing it.)
+  //  2. `beauty-and-healthcare-products` declares **no type at all** — the
+  //     family's one form without it, per the captain and spec-detail-eight.
+  //     Nothing special handles that: the schema gating simply skips the block.
+  // Also note the type lists are admin-managed data, not seed literals —
+  // spec-detail-eight spells the men's/kids options "Men's Accessories" and
+  // "Baby & Kids Clothing" while the `types` set (and the design mock data in
+  // `lib/post-ad.ts`) say "Men Accessories"/"Kid Clothing". The design mock
+  // agrees with the ticked rows, so the rows stand and the spec-detail wording
+  // loses — the same mock-wins rule as apartment-for-rent's dropped `facing`.
+  "womens-fashion",
+  "mens-fashion",
+  "baby-and-kids",
+  "travel-and-luggage",
+  "fashion-accessories",
+  "beauty-and-healthcare-products",
+  // Furniture & Decor — all 10 subcategories, opted in 2026-09-27.
+  //
+  // Like the 2026-09-23 Home & Land batch and Services, this one needed **no
+  // new block and no new code at all**: every key the family declares — photos
+  // / title / price / discount / description / location / address /
+  // deliveryFree / the contact trio, plus `type` on two of them — already had a
+  // render block, so the ship is the slug list alone.
+  //
+  // **Only `table-and-desks` and `chairs-and-sofas` declare `type`** (captain's
+  // mock, matching spec-detail-nine.md); the other 8 are the same 11-field form
+  // with no Type at all. `wardrobe-and-cabinets` and the seven below it are
+  // therefore the no-Type shape, not the Type one — do not add a `type` key to
+  // them: `types` is a managed set and no row is ticked for those eight, so a
+  // Type field there would render an EMPTY picker (and, starred, make the form
+  // unpublishable — the Jobs `jobType` trap).
+  //
+  // Where Type DOES render, its options come from the admin-managed `types`
+  // rows ticked for that subcategory, not from the schema's inline `options`:
+  // the rows (and the design mock data in `lib/post-ad.ts`) read "Dining Table"
+  // / "Kids Desks" / "Kids Chairs&Seats" while spec-detail-nine.md spells them
+  // "Dining Tables" / "Kid's Desks" / "Kid's Chair & Seats". The rows agree
+  // with the design, so the rows stand and the spec wording loses — the same
+  // mock-wins rule as apartment-for-rent's dropped `facing` and the Fashion &
+  // Beauty type lists.
+  "table-and-desks",
+  "chairs-and-sofas",
+  "wardrobe-and-cabinets",
+  "shelves-and-drawers",
+  "beds-and-mattresses",
+  "curtains-and-carpets",
+  "other-furniture",
+  "kitchenware",
+  "household-items",
+  "handicrafts-paintings",
+  // Books, Sports & Hobbies — all 7 subcategories, opted in 2026-09-27.
+  //
+  // The slug list is the whole ship again — every key this family declares
+  // already had a render block, so no new code was needed. What makes it worth
+  // a comment is that it is the catalogue's **mixed** family, and the only one
+  // where both shapes sit inside a single category: per spec-detail-ten.md,
+  // `musical-instruments` is the Type+Condition form (13 keys) while the six
+  // below it share the plain 11-field form with neither. The schema gating does
+  // all of that work, so nothing here needs a per-subcategory exception — but
+  // **do not add `type` or `condition` to the six**: `types` is a managed set
+  // with no row ticked for any of them and no inline fallback, so a Type field
+  // there would render an EMPTY picker (and, starred, make the form
+  // unpublishable — the Jobs `jobType` trap), while a Condition field would put
+  // a row on their detail pages that their forms can never fill.
+  //
+  // `musical-instruments`' Type options come from the admin-managed `types`
+  // rows ticked for it (11: the spec's 10 + the shared `other`), not from the
+  // schema's inline `options` — and the two disagree on one name: the row reads
+  // **"Traditional-instruments"** where spec-detail-ten.md writes "Traditional
+  // Instruments". The rows agree with the design mock (`lib/post-ad.ts:6108`),
+  // so the rows stand and the spec wording loses — the same mock-wins rule as
+  // apartment-for-rent's dropped `facing` and the Fashion & Beauty / Furniture
+  // type lists. Its Condition row was already in
+  // `ListingSpecs.CONDITION_SUBCATEGORIES`, so the published grid needed no
+  // change either.
+  "musical-instruments",
+  "fishing",
+  "hike-and-camping",
+  "cds-dvds-vhs",
+  "books",
+  "sports-equipment",
+  "hobbies-others",
+  // Pets — all 7 subcategories, opted in 2026-09-28. **No new block and no new
+  // code**: the family's 11 keys ARE `commonListingFields`, and all 7 seeded
+  // `fieldSchema` arrays match that const field-for-field (key, type, required,
+  // max, label, options — proven by parsing the seed, not by eye).
+  // spec-detail-eleven.md is 15 lines and says "they have the same form",
+  // pointing at spec-detail-one.md:194-202 for the seven. `deliveryFree` and
+  // `contactEmail` were the two keys that could have vanished silently; both
+  // blocks exist (ListingPostForm.tsx:1093, :1212).
+  "dogs",
+  "cats",
+  "birds",
+  "fish",
+  "pet-food",
+  "pet-accessories",
+  "other-pets",
+  // Foods — all 10 subcategories, opted in 2026-09-28, the same shape as Pets
+  // and the catalogue's last un-opted family. spec-detail-twelve.md is again 15
+  // lines ("they have the same form") and points at spec-detail-one.md:203-214
+  // for the ten; its header says "Meats" where spec-detail-one says "Meat",
+  // which is cosmetic — the slug, the seed and the form all agree. With this
+  // list every seeded subcategory in the catalogue runs the real form. The mock
+  // `DynamicForm` below is NOT dead code: a subcategory created through the
+  // admin UI later (no `field_schema`, so no entry here) still lands on it.
+  "meat",
+  "seafood",
+  "fruits",
+  "vegetables",
+  "beverages",
+  "grocery",
+  "bread-and-bakery",
+  "beer-and-wine",
+  "rice-and-cereal",
+  "other-foods",
 ];
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────

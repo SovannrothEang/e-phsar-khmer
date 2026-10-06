@@ -179,7 +179,7 @@ export default function CheckoutPage() {
           </Link>
           <ChevronRight size={16} className="block text-gray-500" />
           <Link
-            href={{ pathname: "/membership" }}
+            href={{ pathname: "/me/membership" }}
             className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
           >
             <span className="text-foreground  group-hover:text-gray-300 pl-1.5">

@@ -1,5 +1,6 @@
 import {
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -46,5 +47,20 @@ export class NotificationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.notificationsService.markRead(user.id, id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete one of my notifications' })
+  remove(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.notificationsService.remove(user.id, id);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete all my notifications' })
+  removeAll(@CurrentUser() user: RequestUser) {
+    return this.notificationsService.removeAll(user.id);
   }
 }

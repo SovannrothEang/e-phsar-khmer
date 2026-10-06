@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, inArray } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
@@ -9,6 +9,7 @@ import {
   categoryTranslations,
   subcategoryTranslations,
 } from '../db/schema/categories.schema';
+import { listings } from '../db/schema/listings.schema';
 import type { SupportedLocale } from './locale.util';
 
 export type { SupportedLocale };
@@ -43,9 +44,33 @@ export interface CategoryDto {
 export class CategoriesService {
   constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
 
-  async listCategories(locale: SupportedLocale): Promise<CategoryDto[]> {
+  async listCategories(
+    locale: SupportedLocale,
+    userId?: string,
+  ): Promise<CategoryDto[]> {
     const reqCatTr = alias(categoryTranslations, 'req_cat_tr');
     const enCatTr = alias(categoryTranslations, 'en_cat_tr');
+
+    // Scoped to a seller (the profile's category strip) each list is exactly
+    // what they have an ACTIVE listing in — a draft or a soft-deleted ad earns
+    // no tile. Status only: `expiresAt` is not enforced anywhere yet, so a
+    // lapsed ad still marked `active` counts here, exactly as it still shows in
+    // the feed. Everything else about the read is unchanged: same joins, same
+    // order, same name fallback.
+    const catConditions = [eq(categories.isActive, true)];
+    if (userId) {
+      catConditions.push(
+        inArray(
+          categories.id,
+          this.db
+            .select({ categoryId: listings.categoryId })
+            .from(listings)
+            .where(
+              and(eq(listings.userId, userId), eq(listings.status, 'active')),
+            ),
+        ),
+      );
+    }
 
     const catRows = await this.db
       .select({
@@ -67,11 +92,31 @@ export class CategoriesService {
         enCatTr,
         and(eq(enCatTr.categoryId, categories.id), eq(enCatTr.locale, 'en')),
       )
-      .where(eq(categories.isActive, true))
+      .where(and(...catConditions))
       .orderBy(asc(categories.sortOrder));
 
     const reqSubTr = alias(subcategoryTranslations, 'req_sub_tr');
     const enSubTr = alias(subcategoryTranslations, 'en_sub_tr');
+
+    // This scan runs regardless, so leaving it unscoped would hang every
+    // active subcategory in the catalogue (146) off the seller's categories.
+    // Harmless for a strip that renders the category level — but the profile's
+    // drill-down renders exactly this level, and a 1-category seller shows it
+    // without ever showing the category row.
+    const subConditions = [eq(subcategories.isActive, true)];
+    if (userId) {
+      subConditions.push(
+        inArray(
+          subcategories.id,
+          this.db
+            .select({ subcategoryId: listings.subcategoryId })
+            .from(listings)
+            .where(
+              and(eq(listings.userId, userId), eq(listings.status, 'active')),
+            ),
+        ),
+      );
+    }
 
     const subRows = await this.db
       .select({
@@ -96,7 +141,7 @@ export class CategoriesService {
           eq(enSubTr.locale, 'en'),
         ),
       )
-      .where(eq(subcategories.isActive, true))
+      .where(and(...subConditions))
       .orderBy(asc(subcategories.sortOrder));
 
     return catRows.map((row) => ({

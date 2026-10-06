@@ -95,7 +95,7 @@ export default function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/membership" className="hover:underline">
+                  <Link href="/me/membership" className="hover:underline">
                     Membership
                   </Link>
                 </li>

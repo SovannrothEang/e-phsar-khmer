@@ -1,7 +1,7 @@
 name: Deploy
 
 # prod is the release branch: every push runs the full CI gate, then applies
-# migrations, then ships the backend to Vercel. Each step only runs if the
+# migrations, then ships the backend and web projects to Vercel. Each step only runs if the
 # previous one passed, so a red CI or a failed migration never deploys.
 #
 # Vercel's own git integration must NOT also deploy prod (see the `git` block
@@ -52,7 +52,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: pnpm --filter backend db:migrate
 
-  deploy:
+  deploy_backend:
     name: deploy backend to Vercel
     needs: migrate
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID || secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,15 +74,15 @@ jobs:
           cache: pnpm
 
       - name: Pull Vercel project settings and env
-        run: npx --yes vercel@latest pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@latest pull --yes --project="$VERCEL_PROJECT_ID" --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
-        run: npx --yes vercel@latest build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@latest build --prod --project="$VERCEL_PROJECT_ID" --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy
         id: deploy
         run: |
-          url=$(npx --yes vercel@latest deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(npx --yes vercel@latest deploy --prebuilt --prod --project="$VERCEL_PROJECT_ID" --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
       # The build can succeed while the app crashes on boot (e.g. a missing
@@ -91,7 +91,7 @@ jobs:
       # Vercel's deployment protection and would answer 401.
       - name: Smoke test
         env:
-          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://phsar-backend.sovannroth.xyz' }}
+          PRODUCTION_URL: ${{ vars.BACKEND_PRODUCTION_URL }}
         run: |
           for i in 1 2 3 4 5; do
             status=$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)
@@ -100,4 +100,54 @@ jobs:
             sleep 10
           done
           echo "::error::/health never returned 200. Roll back with 'vercel rollback' or from the Vercel dashboard."
+          exit 1
+
+  deploy_web:
+    name: deploy web to Vercel
+    needs: deploy_backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Pull Vercel project settings and env
+        run: npx --yes vercel@latest pull --yes --project="$VERCEL_PROJECT_ID" --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: npx --yes vercel@latest build --prod --project="$VERCEL_PROJECT_ID" --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url=$(npx --yes vercel@latest deploy --prebuilt --prod --project="$VERCEL_PROJECT_ID" --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test web
+        env:
+          PRODUCTION_URL: ${{ vars.WEB_PRODUCTION_URL }}
+        run: |
+          if [ -z "$PRODUCTION_URL" ]; then
+            echo "::error::WEB_PRODUCTION_URL is required in the production environment."
+            exit 1
+          fi
+          for i in 1 2 3 4 5; do
+            status=$(curl -L -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL" || true)
+            echo "attempt $i: web -> $status"
+            [ "$status" = "200" ] && exit 0
+            sleep 10
+          done
+          echo "::error::web production URL never returned 200."
           exit 1

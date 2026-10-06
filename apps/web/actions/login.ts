@@ -32,7 +32,11 @@ export async function login(unsafeData: z.infer<typeof loginSchema>) {
   } | null;
 
   if (!res.ok || !body?.success || !body.data) {
-    const code = body?.error?.code ?? body?.error?.message;
+    // The backend sends the HTTP status name in `code` ("UNAUTHORIZED") and the
+    // domain string in `message` ("INVALID_CREDENTIALS") — matching the code
+    // here could never be true, so the raw "INVALID_CREDENTIALS" leaked to the
+    // user. Match the message.
+    const code = body?.error?.message ?? body?.error?.code;
     return {
       success: false,
       error:

@@ -5,8 +5,12 @@ import {
 import { getLocale } from "next-intl/server";
 import { redirect } from "@/i18n/routing";
 import { getCurrentUser, type SessionUser } from "@/lib/auth/current-user";
+import { getMyFollowCounts } from "@/lib/api/users";
 
-function toProfileUser(me: SessionUser): ProfileUser {
+function toProfileUser(
+  me: SessionUser,
+  counts: { followers: number; following: number } | null,
+): ProfileUser {
   const name =
     [me.firstName, me.lastName].filter(Boolean).join(" ").trim() ||
     me.username ||
@@ -24,9 +28,10 @@ function toProfileUser(me: SessionUser): ProfileUser {
     username: me.username ?? "",
     avatar,
     cover: me.coverPhotoUrl ?? "",
-    // No following/follower data on the backend yet — Phase C.
-    following: 1,
-    follower: 2,
+    // Real counts. A failed fetch degrades to 0 rather than to a made-up
+    // number — a wrong count is worse than a missing one.
+    following: counts?.following ?? 0,
+    follower: counts?.followers ?? 0,
     joinDate,
   };
 }
@@ -40,9 +45,11 @@ export default async function MyProfileLayout({
   const locale = await getLocale();
   if (!me) return redirect({ href: "/login", locale });
 
+  const counts = await getMyFollowCounts();
+
   return (
     <>
-      <MyProfileHeader user={toProfileUser(me)} isOwnProfile />
+      <MyProfileHeader user={toProfileUser(me, counts)} isOwnProfile />
       {children}
     </>
   );

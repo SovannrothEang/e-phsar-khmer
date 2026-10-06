@@ -37,19 +37,29 @@ export default function DbImage({
   unoptimized = true,
   ...props
 }: ImageProps & { fallback?: ReactNode }) {
-  const [failed, setFailed] = useState(false);
+  // The failure is remembered per `src`, not as a plain boolean: a boolean
+  // latch survives a src change, so an edit dialog that opened on a dead
+  // object would keep showing the empty slot after a successful re-upload
+  // (the new object never even gets a request). Keyed by src, a new value
+  // retries once, while the same failing src stays failed — no retry loop.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const srcKey = typeof src === "string" ? src : null;
 
-  if (failed || typeof src !== "string" || !isStorageObjectUrl(src)) {
+  if (
+    (srcKey !== null && failedSrc === srcKey) ||
+    srcKey === null ||
+    !isStorageObjectUrl(srcKey)
+  ) {
     return <>{fallback}</>;
   }
 
   return (
     <Image
       {...props}
-      src={src}
+      src={srcKey}
       alt={alt}
       unoptimized={unoptimized}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(srcKey)}
     />
   );
 }

@@ -23,6 +23,7 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { ListingsModule } from './listings/listings.module';
+import { ReactionsModule } from './reactions/reactions.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
@@ -79,6 +80,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CategoriesModule,
     LocationsModule,
     ListingsModule,
+    ReactionsModule,
     BrandsModule,
     FilesModule,
     HealthModule,

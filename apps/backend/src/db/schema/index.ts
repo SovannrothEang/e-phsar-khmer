@@ -10,4 +10,5 @@ export * from './chat.pg-schema';
 export * from './chat.schema';
 export * from './outbox.schema';
 export * from './notifications.schema';
+export * from './reactions.schema';
 export * from '../../payment/entity';

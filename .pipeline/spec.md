@@ -1,266 +1,326 @@
-# OTP verification page after phone registration (web)
+# Likes & Saved — make the like button and save work
 
 ## Context
 
-After a user fills the register form and submits, the flow must continue to a
-6-digit OTP verification screen that confirms the phone number. The backend
-already implements phone-OTP auth (`POST /auth/register` sends the OTP,
-`POST /auth/otp/verify` creates the user and returns tokens). This change is
-web-only. Mockup-level wiring is approved: real backend calls with graceful
-error handling, no new product surfaces beyond the OTP page.
+Captain request (2026-10-05): "make the like button and save work."
 
-## Current state
+Likes and Saved are the last mock-backed user-facing surfaces. The account menu
+reaches `/me/likes` and `/me/saved` with real links (2026-10-02 ship, "The
+account menu's items now go somewhere"), but the controls behind them never
+persisted anything — the ship log closed with "the `/me/*` pages themselves are
+still mock-backed ... it does not make them real." This change makes them real:
+real like/save edges, real toggles on every surface that shows the control, and
+real list pages.
 
-- Register page `apps/web/app/[locale]/(user)/(auth)/register/page.tsx` renders
-  `RegisterForm` (`apps/web/components/auth/RegisterForm.tsx`), a TanStack Form
-  (`useAppForm`) + zod form. Its submit calls `register()` from
-  `apps/web/actions/register.ts`, which is a mock: it zod-parses and returns
-  `{ success: true }` with no API call. On success the form resets and shows a
-  toast that dumps the payload as JSON (RegisterForm.tsx:363-373).
-- No OTP page/route exists. `components/auth/OtpForm.tsx` is an unused mock
-  component (Telegram copy, `expectedOtp` prop, imported nowhere).
-- `input-otp@^1.4.2` is ALREADY a dependency (`apps/web/package.json:24`) and
-  the shadcn primitive `components/ui/input-otp.tsx` exists. Using it adds no
-  dependency.
-- Backend endpoints (`apps/backend/src/auth/auth.controller.ts`):
-  - `POST /auth/register` `{ phone }` → `{ otpSent: true }` (line 26)
-  - `POST /auth/otp/request` `{ phone }` → `{ otpSent: true }` (line 33) — resend
-  - `POST /auth/otp/verify` `{ phone, token }` →
-    `{ accessToken, refreshToken, expiresIn, user }` (line 40)
-  - Envelope `{ success, data }`; errors `{ success:false, error:{code,message} }`.
-  - Phone must match `^\+?[1-9]\d{6,14}$` (leading `0` rejected — the web form
-    collects local `0XXXXXXXXX` numbers, so normalization is required).
-  - Dev bypass: when `DEV_OTP_TOKEN` env is set, no SMS is sent and only that
-    fixed token verifies (`common/supabase/supabase.service.ts:45-59`).
-- User session: `setUserSession()` (`apps/web/lib/auth/session.ts:55-59`) sets
-  `user_access_token`/`user_refresh_token` httpOnly cookies from a server
-  action; `actions/login.ts:22-47` is the plain-fetch + envelope-unwrap pattern
-  to copy.
-- Routing: `apps/web/proxy.ts` guards only `/wanderer/dashboard/**`; all
-  `/[locale]/*` routes are public. Locale-aware navigation comes from
-  `@/i18n/routing` (`Link`, `useRouter`); route names must be registered in the
-  `pathnames` map (`apps/web/i18n/routing.ts:9-88`) or typed hrefs fail to
-  compile.
-- Auth pages are hardcoded English (no next-intl keys exist for login/register);
-  `messages/*.json` only contain `HomePage` and `Card` namespaces.
+This is a coder-stage spec: it is intentionally concrete enough that the edits
+follow directly from it. Every existing-code claim cites `file:line`.
+
+## Current state (evidence)
+
+Web — all likes/saves are client-side mock, no backend call anywhere:
+
+- `apps/web/components/ads/GridCardPost.tsx:20` — `isLiked` useState; the heart
+  (`:140-171`) toggles local state and fires an `setTimeout` fake toast.
+- `apps/web/components/ads/ListCardPost.tsx:41-42` — `isLiked` + `isSaved`
+  useState; heart (`:233-263`) and the ⋮ menu Save toggle (`:120-152`) do the
+  same fake-toast dance.
+- `apps/web/components/Card/ThreeDotPost.tsx:25` — `isSaved` useState; Save /
+  Unsave toggle at `:63-90` (this menu renders on GridCardPost cards,
+  `GridCardPost.tsx:76`).
+- `apps/web/components/post/ThreeButton.tsx:18-24` — the detail page's Save
+  button has **no `onClick` at all**; Report (`:25-34`) and Share (`:35-41`)
+  already work. Rendered from `Post-Detail.tsx:330`.
+- `apps/web/components/post/PostImage.tsx:44-60, 87-102` — the gallery overlay's
+  "0 Likes" control is inert (no handler) though styled as a button.
+- `apps/web/components/profile/Liked-Ads.tsx`, `Saved-Ads.tsx` — static
+  "No Result!" empty states only; wrapped by
+  `apps/web/app/[locale]/(user)/me/likes/page.tsx` and `me/saved/page.tsx`.
+- The menu links exist: `apps/web/components/web/SocialBar.tsx:140-161`.
+
+Backend — no likes/saves code exists at all (grep for `user_likes`,
+`listing_likes`, `saves` under `apps/backend/src` returns nothing).
+
+House patterns to mirror (all verified):
+
+- `user_follows` edge table: `apps/backend/src/db/schema/users.schema.ts:206-233`
+  — uuid PK, both FKs `onDelete: 'cascade'`, unique pair index, reverse index,
+  `createdAt`. The cascade note there is load-bearing: `AccountPurgeService`
+  hard-deletes users and depends on every inbound FK taking its rows along.
+- Toggle service idioms: `apps/backend/src/users/users.service.ts:564-639` —
+  idempotent insert via `onConflictDoNothing(...).returning(...)`, delete that
+  never 404s on a missing edge ("the toggle's end state is the whole contract"),
+  `count()` for counts.
+- Offset pagination: `users.service.ts:716-760` (follow lists) and
+  `listings.service.ts:338-402` (`findMine`) — `count(*)` + page/pageSize,
+  meta `{ nextCursor: null, hasMore, limit, total, page, pageSize }`.
+- Listing row shape the web adapts with `toCardPost`
+  (`apps/web/lib/api/categories.ts:401-436`): `ListingWithPhotos` rows
+  (`listings.service.ts:36-46`) with `photos: ListingPhotoRow[]`; the feed's
+  batch photo load is `batchLoadPhotos` (`listings.service.ts:329-333`).
+- Detail row: `listings.service.ts:214-239` (`findById`) — left-joins the
+  owner's username, **no status filter** (serves any status, incl. `deleted`).
+- Server-rendered initial state + optimistic toggle + sign-in bounce:
+  `apps/web/components/profile/FollowButton.tsx` and `actions/follows.ts`
+  (`userServerFetch`, `{ success, error? }` mutation shape).
+- `(user)/layout.tsx` already resolves the viewer server-side via
+  `getUserProfile()` (`actions/user.ts:48-63`) — the natural host for the
+  one-shot reaction-state read.
+- The pipeline's previous run archived at `.pipeline/archive/2026-09-24/`.
 
 ## Goal
 
-1. Register submit fires the real `POST /auth/register` (sends OTP), then
-   redirects to the new OTP page carrying the phone number. Register page
-   DESIGN is untouched — only submit wiring changes.
-2. A new public, locale-prefixed OTP page at `/{locale}/otp?phone=...` with a
-   shadcn-style 6-box input (one digit per box), auto-advance/backspace/paste,
-   auto-submit at 6 digits, resend with cooldown, and real
-   `POST /auth/otp/verify` that logs the user in on success (same session
-   cookies as `actions/login.ts`).
+1. A signed-in user can like / unlike a listing from every surface that shows
+   the control, and save / unsave likewise; state persists across reloads.
+2. `/me/likes` and `/me/saved` list the real liked / saved listings, newest
+   first, paginated, with today's empty states kept for the empty case.
+3. The listing detail's "N Likes" control is live: correct count, toggles the
+   like.
+4. Anonymous visitors get the sign-in bounce (toast + `/login`), no other
+   change.
 
-## Non-goals
+## Non-goals (explicitly excluded, captain-approved)
 
-- No backend changes of any kind.
-- No change to register page layout, fields, or validation schema
-  (`schemas/register.ts` stays as-is).
-- No consumption of firstName/lastName/password by the backend (the backend
-  phone-OTP flow does not accept them; they remain collected-but-unused, same
-  as today).
-- No i18n message keys (auth surface is hardcoded English today; translating it
-  is a separate ticket covering all auth pages).
-- No changes to the orphaned `components/auth/OtpForm.tsx` (left untouched).
-- No new dependencies.
+- No notification to the seller on like/save (candidate follow-up; note it).
+- No admin-dashboard surfaces for likes/saves.
+- No counts shown anywhere except the detail's control (cards keep their
+  count-less design).
+- No changes to follow/block/chat/subscription semantics.
 
-## Decisions
+## Design decisions
 
-1. **Route: `/[locale]/(user)/(auth)/otp/page.tsx`** — lives beside
-   login/register in the `(auth)` group (NavBar/Footer from the `(user)`
-   layout, consistent with register). Register `"/otp": {}` in
-   `i18n/routing.ts` `pathnames` (required for typed hrefs; matches how
-   `/register` is registered at routing.ts:19). Public by default — proxy only
-   guards `/wanderer/dashboard/**`.
-2. **Phone transport: URL query param** `?phone=<E.164>` — stateless, survives
-   refresh, matches the `useSearchParams()` convention
-   (`category/[categorySlug]/page.tsx:21`). The register submit normalizes the
-   phone once and passes the SAME normalized value to the OTP page, so register
-   and verify keys always match. Missing/invalid phone on the OTP page →
-   `router.replace("/register")`.
-3. **Phone normalization: new helper `apps/web/lib/phone.ts`** —
-   `normalizePhone(raw: string): string`: trim; strip everything except digits
-   and a leading `+`; if it starts with `+` keep as-is; else drop a leading `0`
-   and prefix `+855` (Cambodian local format, matches the zod `min(8).max(10)`
-   local-number assumption); return `""` if the result has fewer than 8 digits.
-   Shared by the register action and the OTP page so both produce identical
-   E.164 values. The zod schema is NOT touched (design freeze).
-4. **OTP input: reuse `@/components/ui/input-otp`** — `input-otp` is already
-   installed (package.json:24), so this violates the no-dependency constraint
-   none; it is the shadcn-style primitive and provides the required UX for
-   free: one digit per box, auto-advance, backspace navigation, full-code
-   paste, fake-caret. Render ONE `InputOTPGroup` with 6 `InputOTPSlot`s (no
-   3+3 separator — single row of 6 boxes, simple and clean). Model the
-   component on `components/auth/OtpForm.tsx` (Card + Field + FieldLabel) but
-   with SMS copy instead of Telegram. Fallback (only if the captain later wants
-   the dependency dropped): hand-rolled 6-ref `<input maxLength={1}
-inputMode="numeric">` row implementing auto-advance, backspace-to-previous,
-   paste-splitting, auto-submit — behavior contract is identical.
-5. **Auto-submit**: `useEffect` fires verify when `value.length === 6` and not
-   already verifying; the explicit Verify button remains (disabled +
-   "Verifying…" while pending) as the accessible fallback.
-6. **Resend: real `POST /auth/otp/request` + 60s client-side cooldown** — the
-   endpoint exists precisely for this. Cooldown starts on page mount (the OTP
-   was just sent by register) and restarts on each resend; button shows the
-   remaining seconds, disabled during cooldown.
-7. **Verify wiring: real API + auto-login** — new server action calls
-   `POST /auth/otp/verify`; on success `setUserSession({accessToken,
-refreshToken})` (mirrors `actions/login.ts:47`), then the client toasts
-   success and `router.push("/")` (mirrors LoginForm.tsx:40-43). On failure:
-   toast the backend `error.message` (fallback "Invalid or expired code"),
-   clear the boxes, allow retry. Do NOT send `preferredLanguage` (backend
-   allows only en/km/zh; web locales include ko/id/vi — sending it would 400).
-8. **Register submit wiring (minimal diff)** — `actions/register.ts` gains the
-   real `POST /auth/register` call (plain fetch + envelope unwrap, copying
-   `actions/login.ts:22-43`); it keeps returning `{ success, error? }`.
-   `RegisterForm.tsx` onSubmit changes only: normalize phone via
-   `normalizePhone`, call `register({ phone: normalized })`, on success replace
-   the JSON-dump toast with a plain "Code sent" toast and
-   `router.push({ pathname: "/otp", query: { phone: normalized } })` using
-   `useRouter` from `@/i18n/routing`. Keep `form.reset()`. No JSX/layout edits.
-9. **i18n: no new keys** — all auth pages are hardcoded English today
-   (RegisterForm, LoginForm, OtpForm); the OTP page follows suit for
-   consistency. Translating the auth surface is a separate cross-page ticket.
-10. **Styling: existing primitives only** — Card/CardHeader/CardContent/
-    CardFooter, Field/FieldLabel/FieldDescription, Button, InputOTP from
-    `@/components/ui/*`; `cn` from `@/lib/utils`; orange submit button
-    (`bg-orange-500 hover:bg-orange-600 text-white h-10 w-full`) matching
-    login/register; centered `max-w-md` card on the page.
+1. **Two edge tables, mirroring the follow graph exactly** — `listing_likes`
+   and `listing_saves`. One table per relation matches `user_follows` /
+   `user_blocks`; a shared table with a `kind` discriminator would be a new
+   pattern for no gain. Both FKs cascade so account purge and listing hard
+   delete stay correct.
+2. **Idempotent both ways, delete never 404s.** `POST` rides
+   `onConflictDoNothing`; `DELETE` on a missing edge returns the same
+   `{ liked: false }` the toggle's end state means — a double-tap must land on
+   "not liked", never an error toast (the unfollow contract,
+   `users.service.ts:600-618`).
+3. **Visibility rule.** Toggling requires only that the listing row exists
+   (404 otherwise) — deliberately mirroring `findById`
+   (`listings.service.ts:214-239`), which serves any status, so the control is
+   never present-but-refused on a detail page. The two list queries filter
+   `status != 'deleted'` (a removed ad must not appear in "my likes"); the
+   id-set call is unfiltered (it only lights up buttons for rendered cards).
+4. **`likeCount` is computed, never denormalized.** A `count()` on the indexed
+   `listing_id`; no counter column to drift (psa-npic has no counter columns;
+   the follow counts are computed the same way, `users.service.ts:641-656`).
+5. **One batched hydration call.** `GET /users/me/reactions` returns both id
+   arrays; cards read a client context seeded server-side. This is the
+   batch-lookup pattern (no N+1, no per-card request) and keeps the initial
+   state truthful on first paint — the same "server-rendered state,
+   authoritative until the first click" contract FollowButton documents.
+6. **Own listings may be liked/saved.** No self-check: the follow feature's
+   self-check exists so nobody follows themselves, but the hearts render on
+   every card including your own ads, and a refusal rule would need UI to hide
+   the control. Harmless; documented in the spec tests.
 
-## Implementation plan
+## Backend plan
 
-1. **NEW `apps/web/lib/phone.ts`** — `normalizePhone(raw: string): string`
-   per Decision 3. Pure function, no deps.
-2. **NEW `apps/web/actions/otp.ts`** (`"use server"`) — copy the fetch pattern
-   from `actions/login.ts`:
-   - `requestOtp(phone: string): Promise<{ success: boolean; error?: string }>`
-     → `POST ${API_URL}/auth/otp/request` body `{ phone }`.
-   - `verifyOtp(phone: string, token: string): Promise<
-{ success: true; user: { id: string; username: string | null; role: string } } |
-{ success: false; error: string }>` → `POST ${API_URL}/auth/otp/verify`;
-     on success call `setUserSession({ accessToken, refreshToken })`. Import
-     `API_URL` from `@/lib/api/client`, `setUserSession` from
-     `@/lib/auth/session`. Parse the envelope defensively
-     (`res.json().catch(() => null)`), exactly like login.ts:28-43.
-3. **MODIFY `apps/web/actions/register.ts`** — keep the zod safeParse gate;
-   normalize the phone with `normalizePhone`; `POST ${API_URL}/auth/register`
-   body `{ phone }`; return `{ success: false, error }` on !res.ok (map
-   error.message), `{ success: true }` on `{ otpSent: true }`.
-4. **NEW `apps/web/components/auth/OtpVerifyForm.tsx`** (`"use client"`) —
-   props `{ phone: string }`. State: `value` (6-digit string), `verifying`
-   (boolean), `cooldown` (number, starts 60), `resending` (boolean).
-   `useEffect` countdown timer (1s interval, cleaned up). Verify handler
-   shared by auto-submit effect and the button (guards: length 6, not already
-   verifying). Resend handler: `requestOtp(phone)`, restart cooldown, toast.
-   Structure modeled on `components/auth/OtpForm.tsx` (Card, Field,
-   FieldLabel, back-arrow Button linking to `/register` via `Link` from
-   `@/i18n/routing`): title "Verify your phone", description "We sent a
-   6-digit code via SMS to {phone}. Enter the code to finish creating your
-   account.", one `InputOTPGroup` of 6 slots (h-12 w-12 boxes), Resend button
-   beside the label, full-width orange Verify button, muted "Wrong number? Go
-   back to register" link. No `any` (strict lint).
-5. **NEW `apps/web/app/[locale]/(user)/(auth)/otp/page.tsx`** — server
-   component; `metadata` title "Verify your phone"; renders a centered wrapper
-   (`container mx-auto my-6 px-4` — register sits inside NavBar/Footer, so a
-   lighter wrapper matches RegisterForm) around a small client shim
-   `OtpPageClient` that reads `useSearchParams().get("phone")`, normalizes +
-   validates it (`normalizePhone`, length ≥ 8), and renders `OtpVerifyForm` —
-   or `router.replace("/register")` when absent/invalid. (SearchParams access
-   must be client-side per the existing convention; wrap the shim in
-   `<Suspense>` if Next requires it for `useSearchParams` during static
-   prerender.)
-6. **MODIFY `apps/web/components/auth/RegisterForm.tsx`** — only the
-   `onSubmit` body: add `useRouter` from `@/i18n/routing`; normalize phone;
-   call the updated `register({ phone: normalized })`; on success
-   `toast.success("Code sent to your phone.")` + `router.push({ pathname:
-"/otp", query: { phone: normalized } })`; on failure
-   `toast.error(result.error ?? "Failed to send code.")`. Remove the
-   JSON.stringify toast description. Zero JSX changes.
-7. **MODIFY `apps/web/i18n/routing.ts`** — add `"/otp": {}` to `pathnames`
-   beside `/register` (line 19).
+### Data model — new `apps/backend/src/db/schema/reactions.schema.ts`
 
-## Edge cases the implementation must handle
+```ts
+export const listingLikes = pgTable(
+  "listing_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    listingId: uuid("listing_id")
+      .notNull()
+      .references(() => listings.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex("listing_likes_pair_uq").on(t.userId, t.listingId),
+    index("listing_likes_listing_id_idx").on(t.listingId),
+  ],
+);
+```
 
-- Phone missing, empty, or non-normalizable on `/otp` → redirect to
-  `/register` (no crash, no dead UI).
-- Phone containing `+` in the URL — always `encodeURIComponent` when building
-  the link; `useSearchParams` decodes automatically.
-- Verify 401/400 (wrong or expired code) → toast backend message, clear input,
-  allow retry; never leave `verifying` stuck (finally-block reset).
-- Network failure / backend down → toast "Failed to verify. Please try again.";
-  input preserved for retry.
-- Double-submit: Verify button disabled while `verifying`; auto-submit effect
-  must not re-fire while verifying or after success navigation.
-- Resend during cooldown impossible (button disabled + countdown label);
-  resend failure shows toast but does NOT restart cooldown.
-- Pasting fewer/more than 6 digits: input-otp truncates to 6 — no manual
-  handling needed; non-digit input is filtered by the component.
-- Leading-zero local numbers (`0123456789`) and spaced input
-  (`012 345 678`) both normalize to `+855…`-style E.164 before any API call.
-- Dev flow: backend must run with `DEV_OTP_TOKEN` set; then any phone works
-  and the fixed token verifies (document in the report, not in UI copy).
+`listing_saves` is identical (`listing_saves_pair_uq`,
+`listing_saves_listing_id_idx`). Types `ListingLikeRow` / `NewListingLike` /
+`ListingSaveRow` / `NewListingSave`. Re-export from `db/schema/index.ts`
+(one line, alongside the other domains). Migration: `db:generate` → the next
+`0028_*` file.
 
-## Verification plan
+### API contract (new `apps/backend/src/reactions/`)
 
-- `pnpm --filter web lint` — clean.
-- `pnpm --filter web build` — clean (this is the web type gate; catches the
-  typed-href requirement for `/otp`).
-- Manual (dev, backend with `DEV_OTP_TOKEN` set): register → OTP page → wrong
-  code error → dev token auto-login → `/` with `user_access_token` cookie;
-  resend cooldown; no-`?phone` redirect; `/km/otp` locale route works.
-- Backend untouched: `git status` shows no `apps/backend/**` changes.
+All routes require JWT (global guard; nothing `@Public()`). Envelope/timing
+unchanged. Module registered in `app.module.ts`; two controllers in the module
+mirroring the attributes module's split:
+
+**`ListingReactionsController` — `@Controller('listings')`**
+
+| Route                    | Returns                               |
+| ------------------------ | ------------------------------------- |
+| `POST :listingId/like`   | `{ liked: true, likeCount: number }`  |
+| `DELETE :listingId/like` | `{ liked: false, likeCount: number }` |
+| `POST :listingId/save`   | `{ saved: true }`                     |
+| `DELETE :listingId/save` | `{ saved: false }`                    |
+
+- `:listingId` via `ParseUUIDPipe` (house style, `users.controller.ts:221-237`).
+- 404 `Listing not found` when the listing row does not exist (both verbs,
+  both entities). No other rejections.
+- `likeCount` is the count **after** the write, so the button's count is
+  driven by the response and never needs a refetch.
+
+**`MeReactionsController` — `@Controller('users')`**
+
+| Route              | Returns                                                                    |
+| ------------------ | -------------------------------------------------------------------------- |
+| `GET me/likes`     | `PaginatedResponse<ListingWithPhotos>` — liked listings, newest edge first |
+| `GET me/saves`     | same, for saves                                                            |
+| `GET me/reactions` | `{ liked: string[], saved: string[] }` — batched card hydration            |
+
+- Lists paginate with `ListReactionsDto` (`page` / `pageSize`, mirroring
+  `dto/list-follows.dto.ts`), ordered `desc(edge.createdAt), desc(edge.id)`
+  (id tie-break so page boundaries never repeat/skip), `status != 'deleted'`,
+  rows in the exact feed shape (photos batch-loaded) so the web adapts them
+  with the existing `toCardPost`.
+- The word "me" routes are three-segment paths; they cannot collide with
+  `UsersController`'s two-segment `me/*` or three-segment `:id/*` routes.
+
+**Service** (`ReactionsService`): `likeListing(userId, listingId)`,
+`unlikeListing`, `saveListing`, `unsaveListing`, `getReactionIds(userId)`,
+`listLikedListings(userId, query)`, `listSavedListings(userId, query)`,
+`countLikes(listingId)`. A shared private `assertListingExists(listingId)`
+does the 404 check once.
+
+**Detail count.** `ListingsService.findById` gains `likeCount` on its return
+(`ListingWithPhotos` gets an optional `likeCount?: number`): the module injects
+`ReactionsService` (ListingsModule imports ReactionsModule, which exports the
+service — no cycle: the reactions module never imports listings). Computed via
+`countLikes` in the existing query path.
+
+### Backend files
+
+- **New:** `src/db/schema/reactions.schema.ts`, `src/reactions/reactions.module.ts`,
+  `src/reactions/reactions.service.ts`, `src/reactions/reactions.controller.ts`
+  (both controllers, or split into two files if cleaner),
+  `src/reactions/dto/list-reactions.dto.ts`,
+  `src/reactions/reactions.service.spec.ts`,
+  `drizzle/migrations/0028_*.sql` (generated).
+- **Edit:** `src/db/schema/index.ts` (+1 export), `src/app.module.ts`
+  (import + register), `src/listings/listings.module.ts` (import
+  ReactionsModule), `src/listings/listings.service.ts` (inject
+  ReactionsService; `likeCount` in `findById`).
+
+## Web plan
+
+### State flow
+
+```
+(user)/layout.tsx (server)
+  ├─ getUserProfile() → viewer (already there)
+  ├─ viewer ? getMyReactionIds() : { liked: [], saved: [] }   (fail-soft to empty)
+  └─ <ReactionsProvider signedIn initialLiked initialSaved> {children} </...>
+        └── context: isLiked(id) / isSaved(id) / toggleLike(id) / toggleSave(id)
+              ├─ optimistic flip + rollback on failure, disabled while pending
+              ├─ signed-out click → toast "Sign in to like/save" + router.push("/login")
+              └─ failures: toast.error (house FollowButton behavior)
+```
+
+Cards and buttons consume the context — no per-card fetches, no prop
+threading through pages.
+
+### Web files
+
+- **New** `apps/web/lib/api/reactions.ts` (server-only): `getMyReactionIds()`
+  → `{ liked: string[]; saved: string[] }` (fail-soft empty),
+  `getMyReactionPage(side, page, pageSize)` → `{ items: Post[]; total; hasMore }`
+  via `userServerFetch` + `toCardPost`.
+- **New** `apps/web/actions/reactions.ts` (`"use server"`): `likeListing`,
+  `unlikeListing`, `saveListing`, `unsaveListing` → `{ success, error?, liked?,
+saved?, likeCount? }`; `loadMyReactionPage(side, page)` for the panels.
+  Mirrors `actions/follows.ts` (ApiError → message, no revalidatePath — the
+  caller owns refresh).
+- **New** `apps/web/components/reactions/reactions-provider.tsx` (client):
+  context + `useReactions()` hook; optimistic state seeded from props; exposes
+  `signedIn` so controls can bounce.
+- **Edit** `app/[locale]/(user)/layout.tsx`: fetch ids when the viewer exists;
+  wrap `{children}`.
+- **Edit** `components/ads/GridCardPost.tsx`: heart reads `isLiked(post.postId)`;
+  click → `toggleLike` (keep styling/bad behaviors; no fake toast).
+- **Edit** `components/ads/ListCardPost.tsx`: heart + ⋮ Save read/toggle via
+  context.
+- **Edit** `components/Card/ThreeDotPost.tsx`: Save/Unsave reads/toggles via
+  context (its label already follows the pressed state).
+- **Edit** `components/post/ThreeButton.tsx`: Save button gets the real
+  toggle; `disabled` while pending.
+- **Edit** `components/post/PostImage.tsx`: "N Likes" reads the count
+  (initial from the listing payload, updated from the toggle response) and
+  toggles the like; heart fills when liked.
+- **Edit** `components/post/Post-Detail.tsx` (+ `lib/api/categories.ts` +
+  `lib/posts.ts`): carry `likeCount` from `BackendListing` into the detail
+  render (`RealDetailData.listing`); `Post` gains optional `likeCount`.
+- **Edit** `components/profile/Liked-Ads.tsx` / `Saved-Ads.tsx`: accept items;
+  render the listing grid (reuse `GridCardPost`; the grid treatment the other
+  real feeds use) + a "Load more" affordance mirroring `FollowListPanel`'s
+  pagination; **keep the existing empty-state markup exactly** as the empty
+  branch.
+- **Edit** `app/[locale]/(user)/me/likes/page.tsx` / `me/saved/page.tsx`:
+  fetch page 1 server-side (`getMyReactionPage`), pass to the component.
+
+Strings stay hardcoded English like the rest of these components
+("Save", "Unsave", "Sign in to like", …) — no i18n keys exist for this family
+and none are added.
+
+## Edge cases
+
+- **Double-tap / retry:** POST and DELETE are idempotent; a failed toggle
+  rolls the optimistic state back and toasts.
+- **Anonymous:** controls render; click → toast + `/login` bounce (provider's
+  `signedIn`).
+- **Deleted listing:** toggles still resolve if the row exists (mirrors the
+  detail page serving any status); lists hide `deleted`; ids/count unfiltered.
+- **Own listings:** likable (documented above).
+- **Stale client state:** the provider is authoritative within a page session;
+  server-rendered lists/counts refresh on navigation/reload. No cross-tab
+  sync (out of scope).
+- **Expired/draft listings reached by URL:** toggle works; they appear in
+  lists (not `deleted`).
+- **A like on a listing whose owner is soft-deleted:** unaffected (no user
+  join involved in cards you like).
+
+## Testing strategy
+
+- **New unit suite** `src/reactions/reactions.service.spec.ts` (mirror
+  `users.service.spec.ts` style): like is idempotent (double insert → one
+  row, one count); unlike on a missing edge does not throw; toggle on a
+  missing listing 404s; `getReactionIds` returns both arrays; list queries
+  paginate (page boundaries with the id tie-break) and drop `deleted`
+  listings; `countLikes` counts edges.
+- **Gates:** `pnpm --filter backend build`, `lint`, `test`;
+  `pnpm --filter web build` (the type gate), `lint`.
+- **Browser (CDP recipe in CLAUDE.md + memory):** signed in as a test user —
+  like from a grid card (heart fills, survives reload); unlike (empties);
+  save from the ⋮ menu and from the detail row; `/me/saved` lists it; remove
+  it from `/me/saved`'s card and the list drops it; detail "N Likes" counts
+  and toggles; signed-out click bounces to `/login`.
+
+## Migration notes
+
+`pnpm --filter backend db:generate` → `0028_*` (drizzle-kit, existing
+workflow). Before `db:migrate`, check the dev DB's ledger watermark — the
+2026-09-28 repair (`__drizzle_migrations_backup_20260928`) exists because the
+migrator compares only the newest `created_at`; renumbered branch-era
+migrations can re-run. Apply, then confirm `listing_likes` / `listing_saves`
+exist before browser verification.
 
 ## Open questions
 
-None blocking. One flag for the captain: the "hand-roll, no input-otp"
-constraint was premised on the package being absent — it is already installed
-(package.json:24) with a shadcn primitive in the tree, so the spec reuses it
-(zero dependency change). If the dependency should still be avoided, the coder
-falls back to the hand-rolled 6-box input with the identical behavior contract
-(Decision 4).
+None.
 
----
+## Out of scope / noted for later
 
-## Revision R1 (2026-08-18): Cambodia-local phone input (captain-approved plan)
-
-Decision change: the register input accepts ONLY local `0XXXXXXXXX`
-(leading 0 mandatory; `^0\d{7,9}$`). `+855…` and no-leading-0 input are
-invalid ("Invalid phone number."). Option A locked: wire/DB stay E.164 —
-the system "makes up" the Cambodian number via the existing
-`normalizePhone`. OTP page displays the local form (`formatPhoneLocal`).
-Full approved plan: `~/.claude/plans/dynamic-kindling-platypus.md`.
-
----
-
-## Revision R2 (2026-08-18): phone+password→OTP login; password/names/username at registration (approved plan rev 2)
-
-Captain decisions: phone input is local `0XXXXXXXXX` only, no exception
-frontend-wide; login form is correct as-is — phone + password always both
-required, OTP comes AFTER backend password validation; registration must
-set a password; usernames auto-generated unique at insert (names-based);
-login-mode rejects unknown phones. Backend extended: VerifyOtpDto gains
-required `password` + optional names (insert-only extras; conflict path
-never overwrites), new `POST /auth/otp/login` (password-gated OTP send),
-`RequestOtpDto` hygiene rider. Web: sessionStorage handoff for
-password/names (never URL), login submit branch for phone identifiers,
-OTP page mount-guard + mode-aware back navigation. Full approved plan:
-`~/.claude/plans/dynamic-kindling-platypus.md`.
-
----
-
-## Revision R4 (2026-08-19): user account mode — Phase A (identity)
-
-Captain: "after login … we can use as user account … right now it like visitor
-mode." Phase A approved: web reads the USER session and renders identity.
-
-- `userServerFetch` (user-side twin of the admin client, transparent
-  refresh on 401, ApiError on failure).
-- `getCurrentUser()` fail-soft server helper (anonymous fast-path: no
-  tokens → null, zero backend calls).
-- `(user)/layout.tsx` session-aware → NavBar real identity; SocialBar real
-  avatar/name/username + real logout (`userLogout`); `/me` real account
-  card. Guest navbar unchanged. Phase B (post-an-ad) deferred by captain.
+- Like/save notifications to the seller (the follow feature's
+  `follow.created` is the shape it would take).
+- Admin dashboard views/counts for likes/saves.
+- Like/save counts on cards (design shows none).
+- Cross-tab realtime sync of reaction state.

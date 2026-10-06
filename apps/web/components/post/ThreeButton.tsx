@@ -9,18 +9,31 @@ import ShareModal from "../share/ShareModel";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import { ReportPost } from "../report/ReportPost";
+import { useReactions } from "@/components/reactions/reactions-provider";
 export function ThreeButton({ post }: { post: Post }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const reactions = useReactions();
+  const listingId = String(post.postId);
+  const saved = reactions.isSaved(listingId);
   return (
     <>
       <div className="flex gap-2 mt-4">
-        <Button className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer">
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            reactions.toggleSave(listingId);
+          }}
+          disabled={reactions.isPending(listingId)}
+          className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer"
+        >
           <IconBookmark
-            className="scale-150 mr-2 text-foreground"
+            className={`scale-150 mr-2 ${
+              saved ? "fill-blue-500 text-blue-500" : "text-foreground"
+            }`}
             strokeWidth={1.5}
           />{" "}
-          Save
+          {saved ? "Unsave" : "Save"}
         </Button>
         <Button
           onClick={() => setReportOpen(true)}

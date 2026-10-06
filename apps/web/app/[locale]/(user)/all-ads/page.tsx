@@ -1,26 +1,34 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
-import HighLightAds from "@/components/ads/HighLightAds";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import AdsPhoto from "@/components/ads/AdsPhoto";
 import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
-import AllAdsHeader from "@/components/all-ads/AllAdsHeader";
 import { getLocale } from "next-intl/server";
-import {
-  getListingsFeed,
-  toCardPost,
-  type ListingsFeedParams,
-} from "@/lib/api/categories";
-import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
+import AllAdsCategories from "@/components/all-ads/AllAdsCategories";
+import AllAdsFeed from "@/components/all-ads/AllAdsFeed";
+import { getListingsFeed, toCardPost } from "@/lib/api/categories";
+import { ALL_ADS_PAGE_SIZE, parseAllAdsFilters } from "@/lib/all-ads";
 
 export default async function AllAdsPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const sp = await searchParams;
   const locale = await getLocale();
-  const query: ListingsFeedParams = parseFeedParams(await searchParams);
-  const feed = await getListingsFeed(query, locale);
+  const filters = parseAllAdsFilters((key) => {
+    const value = sp[key];
+    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+  });
+
+  // The whole active catalogue, first screen only — AllAdsFeed appends the
+  // rest from the feed's own cursor as the visitor reaches the bottom. There
+  // are no highlight/top-ad blocks here: nothing in the data model backs one,
+  // and the mock `AdsPhoto`/`HighLightAds` strips map every mock post, so they
+  // can never sit in a real branch.
+  const feed = await getListingsFeed(
+    { ...filters, limit: ALL_ADS_PAGE_SIZE },
+    locale,
+  );
 
   return (
     <main className="min-h-screen flex flex-col bg-muted">
@@ -68,21 +76,17 @@ export default async function AllAdsPage({
         </div>
       </div>
       <div className="max-w-7xl mx-auto w-full pb-2">
-        <AllAdsHeader
-          posts={(feed?.items ?? []).map(toCardPost)}
-          nextCursor={feed?.nextCursor ?? null}
-          query={query}
+        {/* Keyed on the filters: a filter change re-renders this page, and the
+            key makes the accumulated screens reset with the new first one. */}
+        <AllAdsFeed
+          key={JSON.stringify(filters)}
+          initialPosts={(feed?.items ?? []).map(toCardPost)}
+          initialCursor={feed?.nextCursor ?? null}
+          filters={filters}
           locale={locale}
-          feedKey={feedQueryKey(query)}
-        />
-        {/* <CategoryGridSmall />
-        <NormalAd />
-        <NormalAd /> */}
-        {/* <NormalAd /> */}
-        <AdsPhoto />
-        <HighLightAds />
-        <AdsPhoto />
-        <HighLightAds />
+        >
+          <AllAdsCategories />
+        </AllAdsFeed>
       </div>
     </main>
   );
