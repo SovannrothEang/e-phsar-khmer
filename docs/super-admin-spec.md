@@ -5,11 +5,12 @@
 
 ## 1. Goals
 
-1. Make `super_admin` materially different from `admin`.
+1. Make `super_admin` an explicit extension of `admin`.
 2. Protect the organization from privilege escalation and administrative lockout.
-3. Make the web dashboard reflect responsibility without relying on the UI for security.
-4. Establish an auditable seam for future permissions and workspace settings.
-5. Preserve the existing response envelope, JWT shape, modular monolith, and PostgreSQL source of truth.
+3. Add platform advertisement ads without confusing them with user-owned marketplace listings.
+4. Make the web dashboard reflect responsibility without relying on the UI for security.
+5. Establish an auditable seam for future permissions and workspace settings.
+6. Preserve the existing response envelope, JWT shape, modular monolith, and PostgreSQL source of truth.
 
 ## 2. Non-goals
 
@@ -25,10 +26,10 @@
 ```text
 user         Marketplace and account features.
 admin        Routine operations and moderation.
-super_admin  Administrative governance, global settings, recovery, and audit.
+super_admin  All admin responsibilities plus team/role management and advertisement ads.
 ```
 
-`super_admin` is not automatically allowed to bypass validation, transactions, audit logging, or resource ownership rules.
+`super_admin` inherits all `admin` permissions. It additionally owns team/role management and platform advertisement ads. It is not automatically allowed to bypass validation, transactions, audit logging, or resource ownership rules.
 
 ## 4. Authorization rules
 
@@ -53,7 +54,46 @@ Existing admin areas remain available to both roles unless a later decision narr
 
 The first release does not split these operational areas into many permissions. The distinction is enforced on high-risk actions, not every read.
 
-### 4.3 Workspace settings
+### 4.3 Advertisement ads
+
+Advertisement ads are platform-owned promotional content. They are not the same as marketplace user's `listings` and should not be added as a flag on that table.
+
+Initial lifecycle:
+
+```text
+draft -> scheduled -> active -> paused -> archived
+                         \-> expired
+```
+
+Initial conceptual fields:
+
+```text
+id
+title
+description/content
+creative_image_url or creative_asset_reference
+destination_url
+placement
+status
+starts_at
+ends_at
+created_by
+updated_by
+created_at
+updated_at
+```
+
+Rules:
+
+- only `super_admin` may create, update, publish, pause, schedule, or archive an advertisement ad;
+- every transition validates dates, placement, content, and target URL;
+- an active ad must have a valid schedule;
+- an ad cannot be published without previewable content;
+- every mutation creates an audit event;
+- regular admins may receive read-only visibility only if operations require it;
+- campaign billing and analytics are out of scope until explicitly approved.
+
+### 4.4 Workspace settings
 
 Workspace settings are global, typed, versioned configuration. Each setting has:
 
@@ -117,12 +157,17 @@ GET    /api/v1/admin/workspace-settings
 POST   /api/v1/admin/workspace-settings/:key/drafts
 POST   /api/v1/admin/workspace-settings/:key/publish
 POST   /api/v1/admin/workspace-settings/:key/rollback
+POST   /api/v1/admin/advertisement-ads
+PATCH  /api/v1/admin/advertisement-ads/:id
+POST   /api/v1/admin/advertisement-ads/:id/publish
+POST   /api/v1/admin/advertisement-ads/:id/pause
+POST   /api/v1/admin/advertisement-ads/:id/archive
 ```
 
 Exact route names may change during implementation, but the contract must preserve:
 
 - `@Roles('admin', 'super_admin')` for ordinary admin reads;
-- `@Roles('super_admin')` for governance mutations;
+- `@Roles('super_admin')` for team/role and advertisement-ad mutations;
 - request actor propagation;
 - the repository response envelope;
 - typed DTO validation;
@@ -184,10 +229,10 @@ Admin navigation:
 Super-admin navigation adds:
 
 - Team/admin accounts
-- Audit log
-- Workspace settings
-- Governance alerts
-- Recovery/security controls
+- Advertisement Ads
+- Audit log for team and advertisement changes
+
+Workspace Settings remains a later capability and should not be presented as a committed first-release feature until its scope is approved.
 
 Shared routes may be reused, but controls must be disabled/hidden consistently with the backend policy.
 
@@ -223,6 +268,16 @@ For privileged actions:
 - 403/error responses produce an actionable toast;
 - successful mutation refreshes the table and dashboard state;
 - no raw secret is rendered in the UI.
+
+### Advertisement ads
+
+- regular admins cannot create, update, publish, pause, schedule, or archive advertisement ads;
+- super admins can create and edit a draft advertisement ad;
+- an advertisement ad cannot publish without valid content, placement, and schedule;
+- scheduled ads activate only inside their configured window;
+- paused, expired, or archived ads do not render on public advertisement surfaces;
+- advertisement ads are stored separately from user marketplace listings;
+- advertisement lifecycle mutations create audit events.
 
 ## 8. Backwards compatibility
 

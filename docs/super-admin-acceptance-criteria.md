@@ -8,8 +8,9 @@
 - [ ] A user with role `user` cannot render or call admin dashboard functionality.
 - [ ] A user with role `admin` can perform ordinary operational admin work.
 - [ ] A user with role `admin` cannot open Team management.
-- [ ] A user with role `admin` cannot publish workspace settings.
-- [ ] A user with role `super_admin` can access Team, Audit Log, and Workspace Settings.
+- [ ] A user with role `admin` cannot manage team roles.
+- [ ] A user with role `admin` cannot manage advertisement ads.
+- [ ] A user with role `super_admin` can access all admin areas plus Team, Advertisement Ads, and relevant audit history.
 - [ ] Backend authorization remains correct when navigation links and buttons are bypassed.
 
 ## B. Administrative identity safety
@@ -49,7 +50,18 @@
 - [ ] Super admins can filter and paginate audit history.
 - [ ] Regular admins cannot read unrestricted privileged audit history.
 
-## F. Workspace settings
+## F. Advertisement ads
+
+- [ ] Advertisement ads are stored separately from user marketplace listings.
+- [ ] Only `super_admin` can create, edit, publish, schedule, pause, or archive advertisement ads.
+- [ ] Draft ads can be saved without being publicly active.
+- [ ] Publish rejects missing/invalid content, creative, placement, or schedule.
+- [ ] Scheduled ads activate only within their configured window.
+- [ ] Paused, expired, or archived ads do not render publicly.
+- [ ] Every advertisement lifecycle mutation creates an audit event.
+- [ ] The first release does not introduce campaign billing or analytics unless explicitly approved.
+
+## G. Workspace settings
 
 - [ ] Unknown setting keys are rejected.
 - [ ] Invalid types, ranges, and dependencies are rejected before publish.
@@ -61,7 +73,7 @@
 - [ ] No raw integration secret is returned to the browser or stored in workspace settings.
 - [ ] Integration settings expose only masked status, rotation metadata, and controlled health checks.
 
-## G. Quality gates
+## H. Quality gates
 
 - [ ] Backend unit/service/controller tests pass.
 - [ ] Web lint passes with no new errors.

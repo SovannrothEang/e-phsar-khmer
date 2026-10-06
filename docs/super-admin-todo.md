@@ -7,8 +7,9 @@
 
 - [ ] Decide the minimum number of active break-glass super admins.
 - [ ] Decide whether role changes invalidate access tokens immediately.
-- [ ] Select the first workspace-setting groups.
-- [ ] Select high-impact settings that require re-authentication.
+- [ ] Decide whether advertisement ads are internal promotions or paid campaigns.
+- [ ] Select the first advertisement placements and lifecycle states.
+- [ ] Select high-impact actions that require re-authentication.
 - [ ] Select the initial audit action allowlist.
 
 ## Phase 1 — Authorization hardening
@@ -41,7 +42,18 @@
 - [ ] Add the super-admin Audit Log page.
 - [ ] Ensure audit events cannot be edited/deleted through the application.
 
-## Phase 4 — Workspace settings
+## Phase 4 — Advertisement ads
+
+- [ ] Define advertisement placements and lifecycle states.
+- [ ] Add advertisement ads schema/migration separate from `listings`.
+- [ ] Add typed DTOs for draft, update, publish, pause, schedule, and archive.
+- [ ] Add super-admin-only advertisement-ad endpoints.
+- [ ] Add preview and schedule validation.
+- [ ] Add Advertisement Ads dashboard page.
+- [ ] Add audit events for advertisement lifecycle changes.
+- [ ] Add public read/render integration only after the placement contract is approved.
+
+## Phase 5 — Workspace settings
 
 - [ ] Define the first setting-key registry and value schemas.
 - [ ] Add versioned settings storage and migration.
@@ -53,7 +65,7 @@
 - [ ] Add re-authentication for high-impact settings.
 - [ ] Mask integration secrets and keep secret values outside PostgreSQL/UI.
 
-## Phase 5 — Session and operational verification
+## Phase 6 — Session and operational verification
 
 - [ ] Implement the selected role-change session policy.
 - [ ] Test old access and refresh tokens after demotion.

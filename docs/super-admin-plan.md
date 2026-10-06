@@ -6,11 +6,14 @@
 
 ## Decision
 
-Keep `super_admin` as a first-class role, but define it as the platform's **governance and recovery role** rather than a duplicate of `admin`.
+Keep `super_admin` as a first-class role that **inherits the complete admin responsibility** and extends it with two additional platform responsibilities:
+
+1. **Team and role management**
+2. **Advertisement ads management**
 
 - `user` uses marketplace and account features.
 - `admin` performs daily marketplace operations.
-- `super_admin` manages administrative authority, global workspace policy, high-impact configuration, recovery, and audit visibility.
+- `super_admin` performs all admin operations, manages the admin team and roles, and manages platform advertisement ads.
 
 This is an evolutionary change inside the existing modular monolith. It does not require microservices, CQRS, Kafka, or a general-purpose policy engine.
 
@@ -28,10 +31,11 @@ The boundary is incomplete:
 
 - All admin controllers currently admit both `admin` and `super_admin`.
 - The dashboard mostly differs through sidebar visibility.
+- The Team page exists, but its role-management boundary needs hardening.
+- There is no dedicated advertisement-ads feature or super-admin-only API boundary.
 - There is no last-super-admin protection.
 - There is no self-demotion/self-delete protection.
 - There is no admin audit log.
-- There is no workspace settings control plane.
 - Role changes do not have an explicit session invalidation policy.
 
 ## Target operating model
@@ -54,17 +58,15 @@ Admins may not:
 - remove the final active super admin;
 - bypass audit or approval rules.
 
-### Super admin owns governance
+### Super admin extends admin
 
-Super admins may:
+Super admins inherit all admin permissions and may additionally:
 
 - create, update, suspend, and demote admin accounts;
 - manage the super-admin team subject to break-glass protections;
-- publish workspace identity and marketplace policy;
-- activate production-impacting payment/subscription changes;
-- manage feature flags, maintenance mode, operational limits, and integrations;
+- create, update, publish, pause, schedule, and archive platform advertisement ads;
 - review all privileged audit events;
-- execute recovery actions.
+- execute team and role recovery actions.
 
 Super-admin actions must still be explicit, validated, transactional where consistency matters, and auditable.
 
@@ -72,18 +74,32 @@ Super-admin actions must still be explicit, validated, transactional where consi
 
 The web application should share components and layout primitives, but expose different responsibilities:
 
-| Area               | Admin                                             | Super admin                                             |
-| ------------------ | ------------------------------------------------- | ------------------------------------------------------- |
-| Dashboard          | Operational KPIs and assigned work                | KPIs plus governance alerts and privileged activity     |
-| Users              | User support, moderation, suspension under policy | Admin identity and recovery controls                    |
-| Listings/reports   | Routine moderation and resolution                 | Escalation review and audit history                     |
-| Catalog/attributes | Routine editing                                   | Structural/high-blast-radius approval or override       |
-| Subscriptions      | Draft and operate routine plans/subscriptions     | Publish pricing/provider changes and emergency rollback |
-| Team               | Hidden or read-only request path                  | Full administrative identity management                 |
-| Audit/security     | Relevant operational history only                 | Full privileged history and recovery events             |
-| Workspace settings | View/propose                                      | Change, publish, schedule, and rollback                 |
+| Area               | Admin                                       | Super admin                                             |
+| ------------------ | ------------------------------------------- | ------------------------------------------------------- |
+| Dashboard          | Operational KPIs and assigned work          | Same admin dashboard plus super-admin controls          |
+| Users              | User support and moderation                 | Same admin operations plus team/admin identity controls |
+| Listings/reports   | Routine moderation and resolution           | Same admin operations plus advertisement ads management |
+| Catalog/attributes | Routine editing                             | Same admin operations                                   |
+| Subscriptions      | Routine subscription operations             | Same admin operations                                   |
+| Payments           | Existing admin payment responsibility       | Same admin operations                                   |
+| Team and roles     | No access to role governance                | Full administrative identity management                 |
+| Advertisement ads  | No access unless explicitly delegated later | Create, edit, publish, pause, schedule, and remove      |
+| Audit/security     | Relevant operational history only           | Full privileged history and role/advertisement history  |
 
 The sidebar is presentation only. The NestJS API and application services remain the security boundary.
+
+### Advertisement ads versus user listings
+
+The existing user listing lifecycle (`listings`) belongs to marketplace users and should not be overloaded with platform advertising. Advertisement ads are a separate responsibility and should have their own domain model:
+
+- owner: the platform/workspace, not a marketplace user;
+- lifecycle: draft → scheduled → active → paused/expired/archived;
+- placement: a defined surface;
+- scheduling: start/end time;
+- creative: controlled image/link/content references;
+- audit: actor and before/after state for every privileged mutation.
+
+The first implementation must confirm whether these are internal platform promotions or paid campaigns. Until then, design a neutral platform-ad lifecycle and do not add billing, impressions, clicks, or budgets.
 
 ## Workspace settings
 
@@ -126,14 +142,23 @@ Raw secrets must never be stored in or returned by the dashboard. Store secret m
 - Write the audit record in the same transaction as role/status/settings mutations.
 - Add super-admin audit views with filtering and pagination.
 
-### Phase 4 — Add workspace settings
+### Phase 4 — Add advertisement ads management
+
+- Define the advertisement-ad entity and lifecycle separately from user listings.
+- Add super-admin-only create/update/publish/pause/archive endpoints.
+- Add the Advertisement Ads dashboard page.
+- Add scheduling, placement, preview, and validation.
+- Add audit events for every lifecycle transition.
+- Add read-only operational visibility for admins only if the business needs it.
+
+### Phase 5 — Add workspace settings only if needed
 
 - Add typed settings storage with versioning.
 - Add draft/propose, validate, review, publish, and rollback behavior.
 - Require re-authentication for high-impact changes.
 - Add cache invalidation and operational health feedback.
 
-### Phase 5 — Split permissions only when evidence requires it
+### Phase 6 — Split permissions only when evidence requires it
 
 - Keep broad operational admin access initially.
 - Add named permissions or scoped roles only when the team has distinct operator jobs.
@@ -157,6 +182,7 @@ If the organization later needs support, moderation, catalog, finance, or compli
 
 1. How many active break-glass super admins are required?
 2. Should role changes revoke all active sessions immediately?
-3. Which workspace settings are in the first release?
-4. Which actions require re-authentication?
-5. Which three privileged actions must be audited on day one?
+3. Are advertisement ads internal platform promotions or paid campaigns?
+4. Which advertisement placements and lifecycle states are required first?
+5. Which actions require re-authentication?
+6. Which three privileged actions must be audited on day one?
