@@ -1091,15 +1091,15 @@ describe('UsersService self-service account changes', () => {
         from: () => ({
           where: () => ({
             limit: () =>
-              Promise.resolve([{ id: 'u1', passwordHash: 'stored-hash' }]),
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
           }),
         }),
       });
 
       await expect(
         service.changePassword('u1', {
-          currentPassword: 'wrong-one',
-          newPassword: 'brand-new-password',
+          currentPassword: 'wrong-pass',
+          newPassword: 'password123',
         }),
       ).rejects.toThrow(BadRequestException);
       expect(db.update).not.toHaveBeenCalled();
@@ -1117,19 +1117,19 @@ describe('UsersService self-service account changes', () => {
       await expect(
         service.changePassword('u1', {
           currentPassword: 'whatever',
-          newPassword: 'brand-new-password',
+          newPassword: 'password123',
         }),
       ).rejects.toThrow('PASSWORD_NOT_SET');
     });
 
     it('stores a bcrypt hash of the new password', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$10$newhash');
       db.select.mockReturnValue({
         from: () => ({
           where: () => ({
             limit: () =>
-              Promise.resolve([{ id: 'u1', passwordHash: 'stored-hash' }]),
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
           }),
         }),
       });
@@ -1142,13 +1142,13 @@ describe('UsersService self-service account changes', () => {
       }));
 
       await service.changePassword('u1', {
-        currentPassword: 'current-password',
-        newPassword: 'brand-new-password',
+        currentPassword: 'password123',
+        newPassword: 'password456',
       });
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('brand-new-password', 10);
+      expect(bcrypt.hash).toHaveBeenCalledWith('password456', 10);
       expect(sets).toContainEqual(
-        expect.objectContaining({ passwordHash: 'new-hash' }),
+        expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
       );
     });
   });
@@ -1160,7 +1160,7 @@ describe('UsersService self-service account changes', () => {
         from: () => ({
           where: () => ({
             limit: () =>
-              Promise.resolve([{ id: 'u1', passwordHash: 'stored-hash' }]),
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
           }),
         }),
       });
@@ -1172,7 +1172,7 @@ describe('UsersService self-service account changes', () => {
         },
       }));
 
-      await service.deleteOwnAccount('u1', { password: 'current-password' });
+      await service.deleteOwnAccount('u1', { password: 'password123' });
 
       const deletion = sets.find((values) => 'deletedAt' in values);
       expect(deletion).toMatchObject({ status: 'deleted' });
@@ -1191,13 +1191,13 @@ describe('UsersService self-service account changes', () => {
         from: () => ({
           where: () => ({
             limit: () =>
-              Promise.resolve([{ id: 'u1', passwordHash: 'stored-hash' }]),
+              Promise.resolve([{ id: 'u1', passwordHash: '$2b$10$hash' }]),
           }),
         }),
       });
 
       await expect(
-        service.deleteOwnAccount('u1', { password: 'wrong-one' }),
+        service.deleteOwnAccount('u1', { password: 'wrong-pass' }),
       ).rejects.toThrow(BadRequestException);
       expect(db.update).not.toHaveBeenCalled();
     });
