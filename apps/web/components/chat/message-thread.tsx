@@ -44,6 +44,7 @@ import type {
 
 /** How long the opening loading block may wait on decryption. */
 const DECRYPT_REVEAL_TIMEOUT_MS = 10_000;
+const E2E_RELOAD_ATTEMPTED_KEY = "chat:e2e-reload-attempted";
 
 /**
  * An encrypted-attachment message's plaintext is JSON (caption + per-file
@@ -98,6 +99,16 @@ export function MessageThread({
     void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
   }, [queryClient]);
 
+  const reloadAfterE2eUnavailable = useCallback(() => {
+    try {
+      if (sessionStorage.getItem(E2E_RELOAD_ATTEMPTED_KEY) === "1") return;
+      sessionStorage.setItem(E2E_RELOAD_ATTEMPTED_KEY, "1");
+    } catch {
+      // If sessionStorage is unavailable, still honor the requested reload.
+    }
+    window.location.reload();
+  }, []);
+
   const onSendError = useCallback(
     (message: string, status: number) => {
       // 429: POST /chats/messages is capped at 30/60s server-side (an
@@ -116,6 +127,7 @@ export function MessageThread({
       }
       if (message === "E2E_UNAVAILABLE") {
         toast.error(t("errors.e2eUnavailable"));
+        reloadAfterE2eUnavailable();
         return;
       }
       // Block state is cached (see `withPeer` in chat-workspace); a 403 means
@@ -130,7 +142,7 @@ export function MessageThread({
           : message || t("errors.sendFailed"),
       );
     },
-    [t, queryClient, peer.id],
+    [t, queryClient, peer.id, reloadAfterE2eUnavailable],
   );
 
   const thread = useChatThread({
@@ -162,6 +174,15 @@ export function MessageThread({
   // we render a neutral placeholder, never the raw ciphertext.
   const e2eEngine = useE2eEngine(viewerId);
   const decrypted = useDecryptedMessages(messages, e2eEngine);
+
+  useEffect(() => {
+    if (!e2eEngine) return;
+    try {
+      sessionStorage.removeItem(E2E_RELOAD_ATTEMPTED_KEY);
+    } catch {
+      // Private browsing/storage restrictions do not block E2E itself.
+    }
+  }, [e2eEngine]);
 
   // Server E2E rows with no decrypt outcome yet (engine bootstrapping, or
   // the batch is still running).
