@@ -93,8 +93,12 @@ jobs:
         env:
           PRODUCTION_URL: ${{ vars.BACKEND_PRODUCTION_URL }}
         run: |
+          if [ -z "$PRODUCTION_URL" ]; then
+            echo "::error::BACKEND_PRODUCTION_URL is required in the production environment."
+            exit 1
+          fi
           for i in 1 2 3 4 5; do
-            status=$(curl -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)
+            status=$(curl -L -s -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/health" || true)
             echo "attempt $i: /health -> $status"
             [ "$status" = "200" ] && exit 0
             sleep 10
