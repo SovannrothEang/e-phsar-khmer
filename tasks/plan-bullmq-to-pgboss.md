@@ -6,13 +6,13 @@ Status: **proposal, nothing implemented.** Written 2026-10-14 from a read-throug
 
 Redis serves three unrelated jobs. pg-boss can replace the first two only.
 
-| #   | Role                                                       | Where                                                                                                        | pg-boss replaces it?                                |
-| --- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| 1   | BullMQ `payments` queue (3 job kinds, concurrency 5)       | `payment.module.ts`, `processors/payment.processor.ts`, 3 `*-outbox-handler.ts`                              | Yes                                                 |
-| 2   | BullMQ `chat-maintenance` hourly attachment cleanup        | `chat-maintenance.processor.ts`                                                                              | Yes                                                 |
-| 3   | Chat realtime fan-out (Redis pub/sub, 2 ioredis conns)     | `chat-pubsub.service.ts`                                                                                     | **No** — not a queue; see §5                        |
-| —   | Throttler, idempotency, outbox, account purge, last-seen   | all in-memory or Postgres already                                                                            | n/a                                                 |
-| —   | `redis` npm package (v6.2.1)                               | no importer anywhere in `src/`                                                                               | dead dependency, remove regardless                  |
+| #   | Role                                                     | Where                                                                           | pg-boss replaces it?               |
+| --- | -------------------------------------------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | BullMQ `payments` queue (3 job kinds, concurrency 5)     | `payment.module.ts`, `processors/payment.processor.ts`, 3 `*-outbox-handler.ts` | Yes                                |
+| 2   | BullMQ `chat-maintenance` hourly attachment cleanup      | `chat-maintenance.processor.ts`                                                 | Yes                                |
+| 3   | Chat realtime fan-out (Redis pub/sub, 2 ioredis conns)   | `chat-pubsub.service.ts`                                                        | **No** — not a queue; see §5       |
+| —   | Throttler, idempotency, outbox, account purge, last-seen | all in-memory or Postgres already                                               | n/a                                |
+| —   | `redis` npm package (v6.2.1)                             | no importer anywhere in `src/`                                                  | dead dependency, remove regardless |
 
 **Structural finding:** the payment path is already `Postgres outbox (SKIP LOCKED, lease, backoff, dedupe_key) → BullMQ → PaymentProcessor`. The three outbox handlers do nothing but `queue.add()`. BullMQ is therefore a _second_ durable queue stacked on a first one, contributing: a bounded worker pool (5), per-job retry/backoff, and delayed jobs (Bakong poll loop). Swapping it for pg-boss keeps that shape (two Postgres queues in series); §6 Phase 5 is the way to remove the redundancy later.
 
@@ -20,15 +20,15 @@ Redis serves three unrelated jobs. pg-boss can replace the first two only.
 
 Harness: Node 22, `bullmq@6.3.14` vs `pg-boss@12.38.0`, local Docker (Redis 7 without AOF, Postgres 16, PgBouncer in transaction mode as a stand-in for Supabase's pooler). "+60 ms RTT" = a TCP proxy adding 30 ms each way, to imitate a cloud hop. Shape mirrors the app: 2 queues + 2 workers idle, payments concurrency 5, 150 jobs at 10/s for latency, 1000-job burst, 20 delayed jobs (3 s), 3-attempt retry.
 
-| Config                                          | idle load        | pickup p50 / p95 (no added latency) | pickup p50 (+60 ms RTT) | burst (jobs/s) | ops per job     | delayed-job lateness p50 |
-| ----------------------------------------------- | ---------------- | ----------------------------------- | ----------------------- | -------------- | --------------- | ------------------------ |
-| **BullMQ**                                      | 4 cmds/s, 6 conns | 4 / 6 ms                            | 155 ms                  | 1650           | **34 Redis cmds** | 42 ms                    |
-| pg-boss **defaults** (batch 1, conc 5, poll 2s) | 4 tx/s, 9 conns  | 7.9 s / 13.9 s (**can't keep up**)  | —                       | **2.6**        | 1.9 tx          | 2.0 s                    |
-| pg-boss batched, poll 2 s                       | 3 tx/s, 5 conns  | 1.0 s / 1.9 s                       | 1.09 s                  | 294            | 0.8 tx          | 1.3 s                    |
-| pg-boss batched, poll 0.5 s                     | 5 tx/s, 2 conns  | 272 / 504 ms                        | 359 ms                  | 484            | 0.7 tx          | 0.29 s                   |
-| pg-boss batched, **LISTEN/NOTIFY** + poll 0.5 s | 4 tx/s, 13 conns | **8 / 10 ms**                       | **160 ms**              | 516            | 1.1 tx          | 0.45 s                   |
-| pg-boss batch 1 / conc 5, NOTIFY + poll 0.5 s   | 7 tx/s, 17 conns | 9 / 12 ms                           | 159 ms                  | **13**         | 4.4 tx          | 1.5 s                    |
-| pg-boss via PgBouncer (tx mode), batched poll 2 s | 2 tx/s, 3 conns | 1.0 s / 1.9 s                       | 1.07 s                  | 303 (1000/1000)| 0.9 tx          | 1.3 s                    |
+| Config                                            | idle load         | pickup p50 / p95 (no added latency) | pickup p50 (+60 ms RTT) | burst (jobs/s)  | ops per job       | delayed-job lateness p50 |
+| ------------------------------------------------- | ----------------- | ----------------------------------- | ----------------------- | --------------- | ----------------- | ------------------------ |
+| **BullMQ**                                        | 4 cmds/s, 6 conns | 4 / 6 ms                            | 155 ms                  | 1650            | **34 Redis cmds** | 42 ms                    |
+| pg-boss **defaults** (batch 1, conc 5, poll 2s)   | 4 tx/s, 9 conns   | 7.9 s / 13.9 s (**can't keep up**)  | —                       | **2.6**         | 1.9 tx            | 2.0 s                    |
+| pg-boss batched, poll 2 s                         | 3 tx/s, 5 conns   | 1.0 s / 1.9 s                       | 1.09 s                  | 294             | 0.8 tx            | 1.3 s                    |
+| pg-boss batched, poll 0.5 s                       | 5 tx/s, 2 conns   | 272 / 504 ms                        | 359 ms                  | 484             | 0.7 tx            | 0.29 s                   |
+| pg-boss batched, **LISTEN/NOTIFY** + poll 0.5 s   | 4 tx/s, 13 conns  | **8 / 10 ms**                       | **160 ms**              | 516             | 1.1 tx            | 0.45 s                   |
+| pg-boss batch 1 / conc 5, NOTIFY + poll 0.5 s     | 7 tx/s, 17 conns  | 9 / 12 ms                           | 159 ms                  | **13**          | 4.4 tx            | 1.5 s                    |
+| pg-boss via PgBouncer (tx mode), batched poll 2 s | 2 tx/s, 3 conns   | 1.0 s / 1.9 s                       | 1.07 s                  | 303 (1000/1000) | 0.9 tx            | 1.3 s                    |
 
 Correctness checks, identical on both: sending the same id three times ran the handler once; a 3-attempt retry ran exactly 3 times. Retry spacing differs (BullMQ 1 s, 2 s; pg-boss ≈2 s, 4 s for the same base, poll-aligned).
 
@@ -55,18 +55,18 @@ Trade-offs vs. staying on BullMQ: you lose ~4 ms push latency (recover it with N
 
 ## 4. Mapping
 
-| BullMQ today                                                      | pg-boss                                                                                                         | Gotcha                                                                                                      |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| one `payments` queue, `job.name` switch                           | three queues: `payments.process-attempt`, `payments.process-provider-event`, `payments.poll-attempt` (+ `payments.dead-letter`) | queue-name charset to confirm in the spike                                                                  |
-| `attempts: 3`                                                     | `retryLimit: 2`                                                                                                 | off-by-one: BullMQ counts tries, pg-boss counts retries                                                     |
-| exponential `delay: 5000`                                         | `retryDelay: 5, retryBackoff: true, retryDelayMax`                                                              | spacing differs and is poll-aligned (measured)                                                              |
-| `add(..., { jobId })` (idempotent)                                | `send(queue, data, { id })` — duplicate id is a no-op (measured)                                                | id must be a UUID: `paymentAttemptId`, `paymentProviderEventId`, outbox `event.id` all are                  |
-| `add(..., { delay: intervalMs })`                                 | `startAfter` (seconds, round **up**)                                                                            | lateness = poll interval (0.3–1.5 s measured)                                                               |
-| `@OnWorkerEvent('failed')` + `attemptsMade < attempts` guard      | catch in the handler on last attempt (`retryCount >= retryLimit`) **and** a worker on `payments.dead-letter`    | crash/expiry never reaches the handler; the DLQ worker is the backstop. `expireInSeconds` default is 15 min — set it above the slowest gateway call |
-| `@Processor(queue, { concurrency })`                              | `work(queue, { localConcurrency, batchSize, pollingIntervalSeconds, ... })`                                     | see §2: never leave defaults. A thrown error in a batch fails the whole batch                               |
-| `upsertJobScheduler({ every: 1h })`                               | `schedule('chat.attachments-cleanup', '0 * * * *')`                                                             | cron granularity; dedup across instances is built in                                                        |
-| `BullModule.forRootAsync` (Redis host/port/tls/prefix)            | `PgBossService` (connection string, `schema`, `max`, `supervise`/`schedule` flags)                              | mirror `OUTBOX_WORKER_ENABLED` so an API-only instance doesn't supervise                                    |
-| graceful close                                                    | `boss.stop({ graceful: true, timeout })` in `OnApplicationShutdown`                                             |                                                                                                             |
+| BullMQ today                                                 | pg-boss                                                                                                                         | Gotcha                                                                                                                                              |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| one `payments` queue, `job.name` switch                      | three queues: `payments.process-attempt`, `payments.process-provider-event`, `payments.poll-attempt` (+ `payments.dead-letter`) | queue-name charset to confirm in the spike                                                                                                          |
+| `attempts: 3`                                                | `retryLimit: 2`                                                                                                                 | off-by-one: BullMQ counts tries, pg-boss counts retries                                                                                             |
+| exponential `delay: 5000`                                    | `retryDelay: 5, retryBackoff: true, retryDelayMax`                                                                              | spacing differs and is poll-aligned (measured)                                                                                                      |
+| `add(..., { jobId })` (idempotent)                           | `send(queue, data, { id })` — duplicate id is a no-op (measured)                                                                | id must be a UUID: `paymentAttemptId`, `paymentProviderEventId`, outbox `event.id` all are                                                          |
+| `add(..., { delay: intervalMs })`                            | `startAfter` (seconds, round **up**)                                                                                            | lateness = poll interval (0.3–1.5 s measured)                                                                                                       |
+| `@OnWorkerEvent('failed')` + `attemptsMade < attempts` guard | catch in the handler on last attempt (`retryCount >= retryLimit`) **and** a worker on `payments.dead-letter`                    | crash/expiry never reaches the handler; the DLQ worker is the backstop. `expireInSeconds` default is 15 min — set it above the slowest gateway call |
+| `@Processor(queue, { concurrency })`                         | `work(queue, { localConcurrency, batchSize, pollingIntervalSeconds, ... })`                                                     | see §2: never leave defaults. A thrown error in a batch fails the whole batch                                                                       |
+| `upsertJobScheduler({ every: 1h })`                          | `schedule('chat.attachments-cleanup', '0 * * * *')`                                                                             | cron granularity; dedup across instances is built in                                                                                                |
+| `BullModule.forRootAsync` (Redis host/port/tls/prefix)       | `PgBossService` (connection string, `schema`, `max`, `supervise`/`schedule` flags)                                              | mirror `OUTBOX_WORKER_ENABLED` so an API-only instance doesn't supervise                                                                            |
+| graceful close                                               | `boss.stop({ graceful: true, timeout })` in `OnApplicationShutdown`                                                             |                                                                                                                                                     |
 
 ## 5. Chat pub/sub (the part pg-boss cannot do)
 
@@ -118,12 +118,12 @@ Chat cleanup does **not** get three adapters: `cleanupOrphans` is a predicate-ba
 
 ### Drivers
 
-| Driver    | Durable | New dep | Poll-loop delay                 | Concurrency isolation        | Use                                                         |
-| --------- | ------- | ------- | ------------------------------- | ---------------------------- | ----------------------------------------------------------- |
-| `bullmq`  | yes     | no      | native                          | worker pool (5)              | current default                                             |
-| `memory`  | **no**  | no      | `setTimeout`                    | in-process limiter (5)       | tests/dev only; **refuse to boot when `NODE_ENV=production`** |
-| `pgboss`  | yes     | pg-boss | `startAfter`                    | `localConcurrency`           | candidate replacement (§2–§4)                               |
-| `outbox`  | yes     | no      | needs `availableAt` on enqueue  | outbox worker (sequential/batch) | cheapest durable option; the existing Postgres outbox runs the job itself |
+| Driver   | Durable | New dep | Poll-loop delay                | Concurrency isolation            | Use                                                                       |
+| -------- | ------- | ------- | ------------------------------ | -------------------------------- | ------------------------------------------------------------------------- |
+| `bullmq` | yes     | no      | native                         | worker pool (5)                  | current default                                                           |
+| `memory` | **no**  | no      | `setTimeout`                   | in-process limiter (5)           | tests/dev only; **refuse to boot when `NODE_ENV=production`**             |
+| `pgboss` | yes     | pg-boss | `startAfter`                   | `localConcurrency`               | candidate replacement (§2–§4)                                             |
+| `outbox` | yes     | no      | needs `availableAt` on enqueue | outbox worker (sequential/batch) | cheapest durable option; the existing Postgres outbox runs the job itself |
 
 **Why `memory` is test-only:** the outbox marks a row `published` as soon as `publish()` returns. If the container restarts (every Vercel deploy/scale event) the in-memory job is gone, the outbox will not resend it, and the payment attempt sits pending forever. It is safe for exercising the flow, not for real payments.
 

@@ -181,8 +181,7 @@ export const subscriptionPurchases = pgTable(
     status: subscriptionPurchaseStatusEnum('status')
       .default('pending')
       .notNull(),
-    amountUsd: numeric('amount_usd', { precision: 10, scale: 2 })
-      .notNull(),
+    amountUsd: numeric('amount_usd', { precision: 10, scale: 2 }).notNull(),
     creditUsd: numeric('credit_usd', { precision: 10, scale: 2 })
       .default('0')
       .notNull(),
@@ -221,5 +220,4 @@ export type SubscriptionPlanRow = typeof subscriptionPlans.$inferSelect;
 export type SubscriptionPackageRow = typeof subscriptionPackages.$inferSelect;
 export type SubscriptionTermRow = typeof subscriptionTerms.$inferSelect;
 export type UserSubscriptionRow = typeof userSubscriptions.$inferSelect;
-export type SubscriptionPurchaseRow =
-  typeof subscriptionPurchases.$inferSelect;
+export type SubscriptionPurchaseRow = typeof subscriptionPurchases.$inferSelect;

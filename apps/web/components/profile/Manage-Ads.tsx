@@ -16,30 +16,43 @@ import type { Post } from "@/lib/posts";
 
 type Tab = "active" | "expired";
 
+interface TabState {
+  tab: Tab;
+  items: Post[];
+  page: number;
+  hasMore: boolean;
+  error: string | null;
+}
+
 export default function ManageAds() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("active");
-  // `items === null` = the current tab is still loading.
-  const [items, setItems] = useState<Post[] | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  // What the last fetch returned, tagged with the tab it belongs to. A result
+  // for another tab counts as "still loading" — derived at render, so the
+  // effect never has to reset state synchronously when the tab changes.
+  const [loaded, setLoaded] = useState<TabState | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanEntitlements | null>(null);
   const [counts, setCounts] = useState<Partial<Record<Tab, number>>>({});
 
+  const current = loaded?.tab === activeTab ? loaded : null;
+  const items = current?.items ?? null;
+  const error = current?.error ?? null;
+  const hasMore = current?.hasMore ?? false;
+
   useEffect(() => {
     let cancelled = false;
-    setItems(null);
-    setError(null);
-    setPage(1);
 
     void (async () => {
       const result = await loadMyAds(activeTab, 1);
       if (cancelled) return;
-      setItems(result.items);
-      setHasMore(result.hasMore);
-      setError(result.error ?? null);
+      setLoaded({
+        tab: activeTab,
+        items: result.items,
+        page: 1,
+        hasMore: result.hasMore,
+        error: result.error ?? null,
+      });
       setCounts((c) => ({ ...c, ...result.counts }));
       if (result.plan) setPlan(result.plan);
     })();
@@ -50,28 +63,29 @@ export default function ManageAds() {
   }, [activeTab]);
 
   const loadMore = () => {
-    if (loadingMore) return;
+    if (loadingMore || !current) return;
     setLoadingMore(true);
     const tab = activeTab;
-    const next = page + 1;
+    const next = current.page + 1;
 
     void (async () => {
       const result = await loadMyAds(tab, next);
       setLoadingMore(false);
-      if (tab !== activeTab) return;
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setItems((current) => {
-        const seen = new Set((current ?? []).map((p) => p.postId));
-        return [
-          ...(current ?? []),
-          ...result.items.filter((p) => !seen.has(p.postId)),
-        ];
+      setLoaded((prev) => {
+        // The user switched tabs while this page was in flight.
+        if (!prev || prev.tab !== tab) return prev;
+        if (result.error) return { ...prev, error: result.error };
+        const seen = new Set(prev.items.map((p) => p.postId));
+        return {
+          ...prev,
+          items: [
+            ...prev.items,
+            ...result.items.filter((p) => !seen.has(p.postId)),
+          ],
+          page: next,
+          hasMore: result.hasMore,
+        };
       });
-      setPage(next);
-      setHasMore(result.hasMore);
     })();
   };
 
