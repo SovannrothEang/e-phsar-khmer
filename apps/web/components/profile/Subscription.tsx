@@ -15,7 +15,9 @@ import type { LucideIcon } from "lucide-react";
 import { useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import {
+  getMyEntitlements,
   getMySubscriptions,
+  type PlanEntitlements,
   type UserSubscription,
 } from "@/actions/subscriptions";
 
@@ -155,6 +157,9 @@ export default function Subscription() {
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [entitlements, setEntitlements] = useState<PlanEntitlements | null>(
+    null,
+  );
 
   const loadSubscriptions = useCallback(async () => {
     setLoading(true);
@@ -170,6 +175,11 @@ export default function Subscription() {
 
   useEffect(() => {
     let mounted = true;
+    getMyEntitlements()
+      .then((value) => {
+        if (mounted) setEntitlements(value);
+      })
+      .catch(() => {});
     getMySubscriptions()
       .then((items) => {
         if (mounted) setSubscriptions(items);
@@ -218,6 +228,46 @@ export default function Subscription() {
             <ArrowRight className="ml-2 size-4" />
           </Button>
         </div>
+
+        {entitlements && (
+          <section
+            aria-label="Current limits"
+            className="mb-6 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-border"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-foreground">
+                {entitlements.plan === "free" ? "Free plan" : "Your limits"}
+              </h2>
+              <span className="text-xs text-muted-foreground">
+                {entitlements.plan === "free"
+                  ? "Subscribe to raise these limits"
+                  : "Highest active plan applies to all your ads"}
+              </span>
+            </div>
+            <div className="mt-4">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="text-muted-foreground">Active ads</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {entitlements.usage.ads} / {entitlements.limits.ads}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full ${entitlements.usage.ads >= entitlements.limits.ads ? "bg-amber-500" : "bg-[#00a0e9]"}`}
+                  style={{
+                    width: `${Math.min(100, Math.round((entitlements.usage.ads / Math.max(1, entitlements.limits.ads)) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-4 text-xs leading-5 text-muted-foreground">
+              Up to {entitlements.limits.photos} photos per ad ·{" "}
+              {entitlements.limits.renews} renewals per ad. If a plan ends, ads
+              over the free limit are hidden from public browsing until you
+              renew — they are not deleted.
+            </p>
+          </section>
+        )}
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2">

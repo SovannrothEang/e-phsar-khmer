@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +15,7 @@ import type { RequestUser } from '../common/types/api-response.types';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PaymentEffectRunner } from './payment-effect-runner.service';
+import { PaymentGatewayRegistry } from './providers';
 import {
   checkOwnedPaymentTransaction,
   createPaymentTransaction,
@@ -37,7 +39,10 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 @ApiBearerAuth()
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly effectRunner: PaymentEffectRunner) {}
+  constructor(
+    private readonly effectRunner: PaymentEffectRunner,
+    private readonly gateways: PaymentGatewayRegistry,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -75,6 +80,19 @@ export class PaymentsController {
         offset: query.offset,
       }),
     );
+  }
+
+  // Declared before `:id` so Express doesn't route "providers" as an id.
+  // Reads in-memory registry state only — no use-case, nothing to run.
+  @Get('providers')
+  @ApiOperation({
+    summary:
+      'List the registered payment providers for a checkout picker. ' +
+      '`available: false` means the provider is registered but missing ' +
+      'credentials — show it, but do not let the payer pick it.',
+  })
+  providers() {
+    return this.gateways.list();
   }
 
   @Get(':id')
@@ -116,6 +134,10 @@ export class PaymentsController {
       '(see payment_status_history.actorType) — never customer-initiated.',
   })
   update(@Param('id') id: string, @Body() dto: UpdatePaymentDto) {
+    // Every purchase is final — there is no refund path, not even for admins.
+    if (dto.status === 'refund_pending' || dto.status === 'refunded') {
+      throw new BadRequestException('Refunds are not supported');
+    }
     return this.effectRunner.run(
       upsertPayment({
         id,

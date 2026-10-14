@@ -14,6 +14,7 @@ import {
   userSubscriptions,
 } from '../db/schema/subscriptions.schema';
 import { users } from '../db/schema/users.schema';
+import { EntitlementsService } from './entitlements.service';
 
 export interface PaidPurchaseSettlement {
   purchaseId: string;
@@ -101,14 +102,21 @@ function durationFromSnapshot(snapshot: unknown): {
 
 @Injectable()
 export class SubscriptionActivationService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   async activatePaidPurchase(
     settlement: PaidPurchaseSettlement,
   ): Promise<SubscriptionActivationResult> {
-    return this.db.transaction((tx) =>
+    const result = await this.db.transaction((tx) =>
       this.activatePurchaseInTx(tx, settlement.purchaseId, settlement),
     );
+    if (result.status === 'activated' && settlement.customerId) {
+      await this.entitlements.reconcileListingsSafely(settlement.customerId);
+    }
+    return result;
   }
 
   private async activatePurchaseInTx(
@@ -205,7 +213,7 @@ export class SubscriptionActivationService {
     termId: string;
     reason: string;
   }): Promise<{ id: string }> {
-    return this.db.transaction(async (tx) => {
+    const granted = await this.db.transaction(async (tx) => {
       const [term] = await tx
         .select()
         .from(subscriptionTerms)
@@ -254,5 +262,7 @@ export class SubscriptionActivationService {
       }
       return { id: activation.subscriptionId };
     });
+    await this.entitlements.reconcileListingsSafely(input.userId);
+    return granted;
   }
 }

@@ -19,6 +19,7 @@ import {
 } from '../db/schema/subscriptions.schema';
 import { paymentTransactions } from '../payment/entity/payment-transaction';
 import { PaymentEffectRunner } from '../payment/payment-effect-runner.service';
+import { PaymentGatewayRegistry } from '../payment/providers';
 import { createPaymentTransaction } from '../payment/use-cases';
 import { CreateSubscriptionCheckoutDto } from './dto/create-subscription-checkout.dto';
 import { addDuration } from './subscription-activation.service';
@@ -81,6 +82,7 @@ export class SubscriptionsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly paymentRunner: PaymentEffectRunner,
+    private readonly gateways: PaymentGatewayRegistry,
   ) {}
 
   async catalog() {
@@ -219,6 +221,15 @@ export class SubscriptionsService {
     amount: string;
     currency: string;
   }> {
+    // Refuse up front: an unconfigured provider's charge() only fails later,
+    // inside the queue, leaving the payer watching a QR that never comes.
+    const provider = dto.provider ?? 'bakong';
+    if (!this.gateways.isAvailable(provider)) {
+      throw new BadRequestException(
+        'This payment method is not available right now',
+      );
+    }
+
     let purchase = await this.findPurchaseByIdempotencyKey(
       userId,
       dto.idempotencyKey,
@@ -372,7 +383,7 @@ export class SubscriptionsService {
           customerId: userId,
           orderId: purchase.id,
           description: `Subscription purchase ${purchase.id}`,
-          provider: 'bakong',
+          provider,
           method: dto.method ?? 'bank',
         }),
       );

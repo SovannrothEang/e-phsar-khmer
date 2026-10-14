@@ -63,6 +63,40 @@ export interface PaymentTransactionStatus {
   } | null;
 }
 
+export interface PaymentProvider {
+  name: string;
+  displayName: string;
+  /** Registered but missing credentials � show it, don't let it be picked. */
+  available: boolean;
+}
+
+export async function getPaymentProviders(): Promise<PaymentProvider[]> {
+  const { data } = await userServerFetch<PaymentProvider[]>(
+    "/payments/providers",
+  );
+  return data;
+}
+
+export interface PlanEntitlements {
+  plan: "free" | "premium";
+  limits: {
+    photos: number;
+    ads: number;
+    renews: number;
+    autoRenews: number;
+    videos: number;
+  };
+  expiresAt: string | null;
+  usage: { ads: number };
+}
+
+export async function getMyEntitlements(): Promise<PlanEntitlements> {
+  const { data } = await userServerFetch<PlanEntitlements>(
+    "/subscriptions/entitlements",
+  );
+  return data;
+}
+
 export async function getSubscriptionCatalog(): Promise<
   SubscriptionCatalogItem[]
 > {
@@ -81,6 +115,7 @@ export async function getMySubscriptions(): Promise<UserSubscription[]> {
 export async function createSubscriptionCheckout(input: {
   termId: string;
   idempotencyKey: string;
+  provider: string;
 }) {
   try {
     const { data } = await userServerFetch<{

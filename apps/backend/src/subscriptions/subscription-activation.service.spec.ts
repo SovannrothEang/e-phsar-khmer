@@ -44,7 +44,10 @@ describe('SubscriptionActivationService', () => {
           callback(tx),
         ),
       };
-      const service = new SubscriptionActivationService(db as never);
+      const service = new SubscriptionActivationService(
+        db as never,
+        { reconcileListingsSafely: jest.fn() } as never,
+      );
 
       const result = await service.activatePaidPurchase({
         purchaseId: purchase.id,
@@ -74,7 +77,10 @@ describe('SubscriptionActivationService', () => {
         callback(tx),
       ),
     };
-    const service = new SubscriptionActivationService(db as never);
+    const service = new SubscriptionActivationService(
+      db as never,
+      { reconcileListingsSafely: jest.fn() } as never,
+    );
 
     const result = await service.activatePaidPurchase({
       purchaseId: purchase.id,
@@ -101,7 +107,10 @@ describe('SubscriptionActivationService', () => {
         callback(tx),
       ),
     };
-    const service = new SubscriptionActivationService(db as never);
+    const service = new SubscriptionActivationService(
+      db as never,
+      { reconcileListingsSafely: jest.fn() } as never,
+    );
 
     const result = await service.activatePaidPurchase({
       purchaseId: purchase.id,
@@ -151,7 +160,10 @@ describe('SubscriptionActivationService', () => {
         callback(tx),
       ),
     };
-    const service = new SubscriptionActivationService(db as never);
+    const service = new SubscriptionActivationService(
+      db as never,
+      { reconcileListingsSafely: jest.fn() } as never,
+    );
 
     const result = await service.activatePaidPurchase({
       purchaseId: purchase.id,
@@ -204,7 +216,10 @@ describe('SubscriptionActivationService', () => {
         callback(tx),
       ),
     };
-    const service = new SubscriptionActivationService(db as never);
+    const service = new SubscriptionActivationService(
+      db as never,
+      { reconcileListingsSafely: jest.fn() } as never,
+    );
 
     const settlement = {
       purchaseId: purchase.id,
@@ -223,7 +238,7 @@ describe('SubscriptionActivationService', () => {
       await service.activatePaidPurchase(settlement);
     }
 
-    const inserted = insertValues.mock.calls[0][0] as { expiresAt: Date };
+    const inserted = (insertValues.mock.calls as [{ expiresAt: Date }][])[0][0];
     if (keepsExpiry) {
       expect(inserted.expiresAt).toEqual(activeExpiry);
     } else {

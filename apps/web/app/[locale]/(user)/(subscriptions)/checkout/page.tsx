@@ -9,21 +9,24 @@ import {
   Check,
   CircleAlert,
   Clock3,
+  CreditCard,
   LockKeyhole,
-  ScanLine,
   ShieldCheck,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import {
   createSubscriptionCheckout,
   getMySubscriptions,
+  getPaymentProviders,
   getPaymentTransactionStatus,
   getSubscriptionCatalog,
+  type PaymentProvider,
   type PaymentTransactionStatus,
   type SubscriptionCatalogItem,
 } from "@/actions/subscriptions";
 import { Button } from "@/components/ui/button";
+import { KhqrCard } from "@/components/payment/KhqrCard";
 
 // ~7 minutes at 2.5s — longer than the 5 minute KHQR lifetime, so the page
 // never stops watching a code that could still be paid.
@@ -46,16 +49,68 @@ function money(value: string | number): string {
   });
 }
 
+// Picker copy per provider. Both providers hand back a KHQR, so both say
+// "scan"; the KHQR icon and wording are the guideline's own "KHQR Payment"
+// method component. Unknown providers fall back to the backend displayName.
+const PROVIDER_UI: Record<
+  string,
+  { icon: string; title: string; subtitle: string; appName: string }
+> = {
+  bakong: {
+    icon: "/payment/khqr-method.svg",
+    title: "KHQR Payment",
+    subtitle: "Scan to pay with Bakong app or any bank apps",
+    appName: "Bakong",
+  },
+  aba_payway: {
+    icon: "/icon/ABA.svg",
+    title: "ABA PayWay",
+    subtitle: "Scan with ABA Mobile or any KHQR banking app",
+    appName: "ABA Mobile",
+  },
+};
+
+function providerUi(provider: PaymentProvider) {
+  return (
+    PROVIDER_UI[provider.name] ?? {
+      icon: null,
+      title: provider.displayName,
+      subtitle: `Pay with ${provider.displayName}`,
+      appName: provider.displayName,
+    }
+  );
+}
+
+// Bakong's charge() stores `{ qr, expiresAt }`; ABA PayWay's purchase
+// response carries the KHQR payload as `qrString` (`qr_string` in its docs).
 function getQr(
   rawResponse: unknown,
 ): { qr: string; expiresAt: number | null } | null {
   if (!rawResponse || typeof rawResponse !== "object") return null;
-  const { qr, expiresAt } = rawResponse as {
-    qr?: unknown;
-    expiresAt?: unknown;
+  const raw = rawResponse as Record<string, unknown>;
+  const qr = [raw.qr, raw.qrString, raw.qr_string].find(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  if (!qr) return null;
+  return {
+    qr,
+    expiresAt: typeof raw.expiresAt === "number" ? raw.expiresAt : null,
   };
-  if (typeof qr !== "string") return null;
-  return { qr, expiresAt: typeof expiresAt === "number" ? expiresAt : null };
+}
+
+// Reads one top-level EMV tag from a KHQR payload (ID, 2-digit length,
+// value). Tag 59 is the merchant name — the card's "receiver name" — taken
+// from the code itself so it always matches what the payer's app shows.
+function emvTag(payload: string, tag: string): string | null {
+  let i = 0;
+  while (i + 4 <= payload.length) {
+    const id = payload.slice(i, i + 2);
+    const length = Number(payload.slice(i + 2, i + 4));
+    if (!Number.isInteger(length)) return null;
+    if (id === tag) return payload.slice(i + 4, i + 4 + length);
+    i += 4 + length;
+  }
+  return null;
 }
 
 function clock(ms: number): string {
@@ -67,6 +122,8 @@ export default function CheckoutPage() {
   const params = useSearchParams();
   const termId = params.get("termId");
   const [catalog, setCatalog] = useState<SubscriptionCatalogItem[]>([]);
+  const [providers, setProviders] = useState<PaymentProvider[] | null>(null);
+  const [providerName, setProviderName] = useState<string | null>(null);
   const [payment, setPayment] = useState<PaymentTransactionStatus | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
   const [activated, setActivated] = useState(false);
@@ -92,10 +149,32 @@ export default function CheckoutPage() {
       .finally(() => {
         if (mounted) setLoadingCatalog(false);
       });
+    getPaymentProviders()
+      .then((items) => {
+        if (!mounted) return;
+        setProviders(items);
+        setProviderName(
+          (current) =>
+            current ?? items.find((item) => item.available)?.name ?? null,
+        );
+      })
+      .catch(() => {
+        if (mounted) setProviders([]);
+      });
     return () => {
       mounted = false;
     };
   }, []);
+
+  const provider = providers?.find((item) => item.name === providerName);
+
+  function selectProvider(name: string) {
+    if (name === providerName) return;
+    setProviderName(name);
+    // A key already spent on another provider would replay that provider's
+    // payment, so a new choice is a new checkout.
+    idempotencyKey.current = null;
+  }
 
   const offer = useMemo(
     () => catalog.find((item) => item.termId === termId),
@@ -103,13 +182,14 @@ export default function CheckoutPage() {
   );
 
   async function startCheckout() {
-    if (!offer) return;
+    if (!offer || !provider) return;
     setStartingCheckout(true);
     setError(null);
     idempotencyKey.current ??= crypto.randomUUID();
     const result = await createSubscriptionCheckout({
       termId: offer.termId,
       idempotencyKey: idempotencyKey.current,
+      provider: provider.name,
     });
     setStartingCheckout(false);
     if (!result.success) {
@@ -208,6 +288,9 @@ export default function CheckoutPage() {
   }, [waitingForPayment, qrInfo?.expiresAt]);
 
   const remainingMs = qrInfo?.expiresAt ? qrInfo.expiresAt - now : null;
+  const receiverName = qrInfo ? emvTag(qrInfo.qr, "59") : null;
+  const appLink = payment?.checkout?.redirectUrl ?? null;
+  const ui = provider ? providerUi(provider) : null;
   const paymentFailed =
     payment?.status === "failed" ||
     payment?.status === "cancelled" ||
@@ -240,7 +323,7 @@ export default function CheckoutPage() {
               Checkout
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Review your plan, then pay with Bakong KHQR.
+              Review your plan, choose how to pay, then scan the KHQR.
             </p>
           </div>
           <ol className="flex items-center gap-3 text-sm" aria-label="Progress">
@@ -364,13 +447,11 @@ export default function CheckoutPage() {
                 </p>
               </div>
             ) : payment ? (
-              <div className="grid gap-8 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center">
+              <div className="grid gap-8 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
                     <Clock3 className="size-3.5" />
-                    {remainingMs !== null
-                      ? `Expires in ${clock(remainingMs)}`
-                      : "Waiting for payment"}
+                    Waiting for payment
                   </span>
                   <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
                     Scan to pay{" "}
@@ -380,7 +461,7 @@ export default function CheckoutPage() {
                   </h2>
                   <ol className="mt-5 space-y-3 text-sm text-foreground">
                     {[
-                      "Open Bakong or a supported banking app",
+                      `Open ${ui?.appName ?? "Bakong"} or any KHQR banking app`,
                       "Scan the KHQR code",
                       "Confirm the amount and approve",
                     ].map((text, index) => (
@@ -396,39 +477,120 @@ export default function CheckoutPage() {
                     Keep this page open — it confirms automatically.
                   </p>
                 </div>
-                <div className="mx-auto w-full max-w-[240px] rounded-2xl bg-white p-4 ring-1 ring-border">
-                  {qrInfo ? (
-                    <QRCodeSVG
-                      value={qrInfo.qr}
-                      size={208}
-                      level="M"
-                      className="h-auto w-full"
-                    />
-                  ) : (
-                    <div className="flex aspect-square flex-col items-center justify-center text-center">
-                      <span className="size-7 animate-spin rounded-full border-2 border-border border-t-[#00a0e9]" />
-                      <p className="mt-3 text-xs text-neutral-500">
-                        Preparing your QR code…
-                      </p>
+                <div className="mx-auto w-full max-w-[260px]">
+                  <KhqrCard
+                    qr={qrInfo?.qr ?? null}
+                    receiverName={receiverName}
+                    amount={Number(payment.amount)}
+                    currency={payment.currency}
+                  />
+                  {/* Expiry and app hand-off sit outside the card, per the
+                      guideline: only name, amount and QR belong inside it. */}
+                  {remainingMs !== null && (
+                    <p className="mt-4 text-center text-xs tabular-nums text-muted-foreground">
+                      {clock(remainingMs)} | QR will expire
+                    </p>
+                  )}
+                  {appLink && (
+                    <div className="sm:hidden">
+                      <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="h-px flex-1 bg-border" /> Or
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                      <a
+                        href={appLink}
+                        className="flex h-11 w-full items-center justify-center rounded-xl bg-[#E1232E] text-sm font-semibold text-white hover:bg-[#c81e28]"
+                      >
+                        Pay via {ui?.appName ?? "app"}
+                      </a>
                     </div>
                   )}
-                  <p className="mt-3 text-center text-[11px] font-medium tracking-wide text-neutral-500">
-                    BAKONG KHQR
-                  </p>
                 </div>
               </div>
             ) : (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="flex size-14 items-center justify-center rounded-full bg-[#00a0e9]/10 text-[#0089c8]">
-                  <ScanLine className="size-7" />
-                </span>
-                <h2 className="mt-4 text-xl font-semibold text-foreground">
-                  Ready when you are
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  Payment method
                 </h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                  Continue to create your payment request. Your KHQR code
-                  appears right here.
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your KHQR code appears here once you continue.
                 </p>
+                {providers === null ? (
+                  <div className="mt-5 space-y-3">
+                    {[0, 1].map((row) => (
+                      <div
+                        key={row}
+                        className="h-[74px] animate-pulse rounded-xl bg-muted"
+                      />
+                    ))}
+                  </div>
+                ) : providers.length === 0 ? (
+                  <p className="mt-5 rounded-xl bg-muted p-4 text-sm text-muted-foreground">
+                    We couldn&apos;t load payment methods. Refresh the page to
+                    try again.
+                  </p>
+                ) : (
+                  <div
+                    role="radiogroup"
+                    aria-label="Payment method"
+                    className="mt-5 space-y-3"
+                  >
+                    {providers.map((item) => {
+                      const itemUi = providerUi(item);
+                      const selected = item.name === providerName;
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={!item.available}
+                          onClick={() => selectProvider(item.name)}
+                          className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                            selected
+                              ? "bg-[#00a0e9]/5 ring-2 ring-[#00a0e9]"
+                              : "ring-1 ring-border hover:bg-muted/60"
+                          }`}
+                        >
+                          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white ring-1 ring-border">
+                            {itemUi.icon ? (
+                              <Image
+                                src={itemUi.icon}
+                                alt=""
+                                width={40}
+                                height={40}
+                                unoptimized
+                                className="size-full object-contain"
+                              />
+                            ) : (
+                              <CreditCard className="size-5 text-muted-foreground" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-semibold text-foreground">
+                              {itemUi.title}
+                            </span>
+                            <span className="block text-sm text-muted-foreground">
+                              {item.available
+                                ? itemUi.subtitle
+                                : "Unavailable right now"}
+                            </span>
+                          </span>
+                          <span
+                            aria-hidden
+                            className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
+                              selected
+                                ? "bg-[#00a0e9] text-white"
+                                : "ring-1 ring-border"
+                            }`}
+                          >
+                            {selected && <Check className="size-3" />}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -502,7 +664,7 @@ export default function CheckoutPage() {
                   </div>
                   {!payment && (
                     <Button
-                      disabled={startingCheckout}
+                      disabled={startingCheckout || !provider}
                       onClick={() => void startCheckout()}
                       className="mt-5 h-11 w-full rounded-xl bg-[#00a0e9] text-sm font-semibold text-white hover:bg-[#008ccb]"
                     >
@@ -524,7 +686,9 @@ export default function CheckoutPage() {
             <div className="flex items-start gap-2 rounded-b-2xl border-t border-border bg-muted/60 px-6 py-4 text-xs leading-5 text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
               <span>
-                Your plan activates only after Bakong confirms the payment.
+                Your plan activates only after{" "}
+                {provider?.displayName ?? "the payment provider"} confirms the
+                payment. All purchases are final — no refunds.
               </span>
             </div>
             <div className="flex items-center gap-2 px-6 py-3 text-xs text-muted-foreground">

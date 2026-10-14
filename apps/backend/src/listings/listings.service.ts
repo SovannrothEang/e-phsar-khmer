@@ -21,6 +21,7 @@ import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
 import { ReactionsService } from '../reactions/reactions.service';
+import { EntitlementsService } from '../subscriptions/entitlements.service';
 import type { DbClient } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import type {
@@ -96,12 +97,15 @@ export class ListingsService {
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly filesService: FilesService,
     private readonly reactionsService: ReactionsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
     userId: string,
     dto: CreateListingDto,
   ): Promise<ListingWithPhotos> {
+    await this.entitlements.assertPhotos(userId, dto.photos?.length ?? 0);
+
     const [cat] = await this.db
       .select({ id: categories.id })
       .from(categories)
@@ -177,6 +181,14 @@ export class ListingsService {
     const existing = await this.findById(id);
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
+
+    if (dto.photos !== undefined) {
+      await this.entitlements.assertPhotos(
+        userId,
+        dto.photos.length,
+        existing.photos.length,
+      );
+    }
 
     const updates: Partial<ListingRow> = { updatedAt: new Date() };
     if (dto.title !== undefined) updates.title = dto.title;
@@ -485,24 +497,53 @@ export class ListingsService {
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
 
-    const publishedAt = new Date();
-    const expiresAt = new Date(
-      publishedAt.getTime() + 30 * 24 * 60 * 60 * 1000,
-    );
+    if (existing.status === 'restricted') {
+      throw new ForbiddenException({
+        code: 'PLAN_RESTRICTED',
+        message:
+          'This ad is hidden because it is over your plan’s limit. Renew or upgrade your subscription to show it again.',
+      });
+    }
+
+    const now = new Date();
+    if (existing.publishedAt === null) {
+      // A brand-new ad: needs a free slot, and its photos must fit the plan.
+      await this.entitlements.assertPhotos(userId, existing.photos.length);
+      await this.entitlements.assertCanHoldAnotherAd(userId, id);
+    } else {
+      // Re-publishing an ad that already went live is a renewal. An ad that
+      // lapsed (or was deleted) is no longer counted, so it also needs a slot.
+      await this.entitlements.assertCanRenew(userId, existing.renewCount);
+      const stillLive =
+        existing.status === 'active' &&
+        (existing.expiresAt === null || existing.expiresAt > now);
+      if (!stillLive) {
+        await this.entitlements.assertCanHoldAnotherAd(userId, id);
+      }
+    }
+
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const [updated] = await this.db
       .update(listings)
-      .set({ status: 'active', publishedAt, expiresAt, updatedAt: new Date() })
+      .set({
+        status: 'active',
+        publishedAt: existing.publishedAt ?? now,
+        expiresAt,
+        renewCount:
+          existing.publishedAt === null
+            ? existing.renewCount
+            : existing.renewCount + 1,
+        updatedAt: now,
+      })
       .where(eq(listings.id, id))
       .returning();
 
-    const photos = await this.db
-      .select()
-      .from(listingPhotos)
-      .where(eq(listingPhotos.listingId, id))
-      .orderBy(listingPhotos.sort);
+    // The count check above is not atomic with the write; settling here keeps
+    // two parallel publishes from leaving the user over their allowance.
+    await this.entitlements.reconcileListingsSafely(userId);
 
-    return { ...updated, photos };
+    return { ...updated, photos: existing.photos };
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   userSubscriptions,
 } from '../../db/schema/subscriptions.schema';
 import type { GrantSubscriptionDto } from './dto/grant-subscription.dto';
+import { EntitlementsService } from '../../subscriptions/entitlements.service';
 import { SubscriptionActivationService } from '../../subscriptions/subscription-activation.service';
 
 export interface UserSubscriptionView {
@@ -37,6 +38,7 @@ export class UserSubscriptionsService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly activation: SubscriptionActivationService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async list(): Promise<UserSubscriptionView[]> {
@@ -132,12 +134,14 @@ export class UserSubscriptionsService {
 
   async remove(id: string): Promise<{ id: string }> {
     const [row] = await this.db
-      .select({ id: userSubscriptions.id })
+      .select({ id: userSubscriptions.id, userId: userSubscriptions.userId })
       .from(userSubscriptions)
       .where(eq(userSubscriptions.id, id))
       .limit(1);
     if (!row) throw new NotFoundException('Subscription not found');
     await this.db.delete(userSubscriptions).where(eq(userSubscriptions.id, id));
+    // The plan just changed under the user's ads.
+    await this.entitlements.reconcileListingsSafely(row.userId);
     return { id };
   }
 }

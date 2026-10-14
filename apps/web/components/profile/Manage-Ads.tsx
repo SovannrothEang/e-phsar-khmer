@@ -6,13 +6,74 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
+import { GridCardPost } from "@/components/ads/GridCardPost";
+import { loadMyAds } from "@/actions/my-ads";
+import type { PlanEntitlements } from "@/actions/subscriptions";
+import type { Post } from "@/lib/posts";
+
+type Tab = "active" | "expired";
 
 export default function ManageAds() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"active" | "expired">("active");
+  const [activeTab, setActiveTab] = useState<Tab>("active");
+  // `items === null` = the current tab is still loading.
+  const [items, setItems] = useState<Post[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<PlanEntitlements | null>(null);
+  const [counts, setCounts] = useState<Partial<Record<Tab, number>>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setItems(null);
+    setError(null);
+    setPage(1);
+
+    void (async () => {
+      const result = await loadMyAds(activeTab, 1);
+      if (cancelled) return;
+      setItems(result.items);
+      setHasMore(result.hasMore);
+      setError(result.error ?? null);
+      setCounts((c) => ({ ...c, ...result.counts }));
+      if (result.plan) setPlan(result.plan);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const loadMore = () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const tab = activeTab;
+    const next = page + 1;
+
+    void (async () => {
+      const result = await loadMyAds(tab, next);
+      setLoadingMore(false);
+      if (tab !== activeTab) return;
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setItems((current) => {
+        const seen = new Set((current ?? []).map((p) => p.postId));
+        return [
+          ...(current ?? []),
+          ...result.items.filter((p) => !seen.has(p.postId)),
+        ];
+      });
+      setPage(next);
+      setHasMore(result.hasMore);
+    })();
+  };
 
   return (
     <div className="min-h-screen bg-muted pt-4">
@@ -45,11 +106,15 @@ export default function ManageAds() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 px-4">
           <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
             Total Ads
-            <p className="text-lg  text-foreground">0/5</p>
+            <p className="text-lg text-foreground">
+              {plan ? `${plan.usage.ads}/${plan.limits.ads}` : "–"}
+            </p>
           </div>
           <div className="bg-muted h-20 w-full text-center p-6 rounded-md text-foreground font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
             Renews
-            <p className="text-lg text-foreground">0/5</p>
+            <p className="text-lg text-foreground">
+              {plan ? `${plan.limits.renews} per ad` : "–"}
+            </p>
           </div>
         </div>
         <div className="bg-muted rounded-md mb-12 mx-4 p-2 flex">
@@ -61,7 +126,8 @@ export default function ManageAds() {
                 : "text-muted-foreground hover:bg-accent/50"
             }`}
           >
-            Active <span className="text-[#00a0e9]">(0)</span>
+            Active{" "}
+            <span className="text-[#00a0e9]">({counts.active ?? 0})</span>
           </button>
           <button
             onClick={() => setActiveTab("expired")}
@@ -71,36 +137,65 @@ export default function ManageAds() {
                 : "text-muted-foreground hover:bg-accent/50"
             }`}
           >
-            Expired <span className="text-[#00a0e9]">(0)</span>
+            Expired{" "}
+            <span className="text-[#00a0e9]">({counts.expired ?? 0})</span>
           </button>
         </div>
-        <div className="flex flex-col items-center justify-center px-4 text-center min-h-[400px]">
-          <div className="bg-muted w-36 h-36 rounded-full flex items-center justify-center ">
-            <ImagePlus className="w-16 h-16 text-muted-foreground stroke-1" />
-          </div>
-
-          <h2 className="text-lg font-medium text-foreground mb-3">
-            No Result!
-          </h2>
-
-          {activeTab === "active" ? (
-            <div className="flex flex-col items-center gap-8">
-              <p className="text-muted-foreground text-sm">
-                Oops! You don&apos;t have any active ads.
-              </p>
-              <Button
-                onClick={() => router.push("/post")}
-                className="bg-[#f28e1c] hover:bg-[#d17a15] text-white font-semibold text-sm px-6 py-5   rounded-sm transition-colors cursor-pointer"
-              >
-                Sell your stuff
-              </Button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              You don&apos;t have any expired ads yet.
+        {error || items === null ? (
+          <div className="flex items-center justify-center px-4 text-center min-h-[400px]">
+            <p className="text-sm text-muted-foreground">
+              {error ?? "Loading…"}
             </p>
-          )}
-        </div>
+          </div>
+        ) : items.length > 0 ? (
+          <div className="px-4 pb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {items.map((post) => (
+                <GridCardPost key={post.postId} post={post} />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-sm border bg-card px-6 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center px-4 text-center min-h-[400px]">
+            <div className="bg-muted w-36 h-36 rounded-full flex items-center justify-center ">
+              <ImagePlus className="w-16 h-16 text-muted-foreground stroke-1" />
+            </div>
+
+            <h2 className="text-lg font-medium text-foreground mb-3">
+              No Result!
+            </h2>
+
+            {activeTab === "active" ? (
+              <div className="flex flex-col items-center gap-8">
+                <p className="text-muted-foreground text-sm">
+                  Oops! You don&apos;t have any active ads.
+                </p>
+                <Button
+                  onClick={() => router.push("/post")}
+                  className="bg-[#f28e1c] hover:bg-[#d17a15] text-white font-semibold text-sm px-6 py-5   rounded-sm transition-colors cursor-pointer"
+                >
+                  Sell your stuff
+                </Button>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                You don&apos;t have any expired ads yet.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
