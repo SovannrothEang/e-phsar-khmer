@@ -11,6 +11,7 @@ import {
   userSubscriptions,
 } from '../../db/schema/subscriptions.schema';
 import type { GrantSubscriptionDto } from './dto/grant-subscription.dto';
+import { SubscriptionActivationService } from '../../subscriptions/subscription-activation.service';
 
 export interface UserSubscriptionView {
   id: string;
@@ -28,34 +29,15 @@ export interface UserSubscriptionView {
   paymentMethod: string | null;
   subscribedAt: Date;
   expiresAt: Date;
-  status: 'active' | 'expired';
-}
-
-function addDuration(
-  from: Date,
-  value: number,
-  unit: 'day' | 'month' | 'year',
-): Date {
-  const d = new Date(from);
-  if (unit === 'day') d.setDate(d.getDate() + value);
-  else if (unit === 'month') d.setMonth(d.getMonth() + value);
-  else d.setFullYear(d.getFullYear() + value);
-  return d;
-}
-
-function finalPrice(
-  price: number,
-  discount: number,
-  type: 'percent' | 'amount',
-): number {
-  const final =
-    type === 'percent' ? price * (1 - discount / 100) : price - discount;
-  return Math.max(0, Math.round(final * 100) / 100);
+  status: 'active' | 'expired' | 'superseded';
 }
 
 @Injectable()
 export class UserSubscriptionsService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly activation: SubscriptionActivationService,
+  ) {}
 
   async list(): Promise<UserSubscriptionView[]> {
     const rows = await this.db
@@ -76,6 +58,7 @@ export class UserSubscriptionsService {
         paymentMethod: userSubscriptions.paymentMethod,
         subscribedAt: userSubscriptions.subscribedAt,
         expiresAt: userSubscriptions.expiresAt,
+        supersededAt: userSubscriptions.supersededAt,
       })
       .from(userSubscriptions)
       .innerJoin(users, eq(users.id, userSubscriptions.userId))
@@ -117,7 +100,11 @@ export class UserSubscriptionsService {
       paymentMethod: r.paymentMethod,
       subscribedAt: r.subscribedAt,
       expiresAt: r.expiresAt,
-      status: r.expiresAt.getTime() < now ? 'expired' : 'active',
+      status: r.supersededAt
+        ? 'superseded'
+        : r.expiresAt.getTime() < now
+          ? 'expired'
+          : 'active',
     }));
   }
 
@@ -136,26 +123,11 @@ export class UserSubscriptionsService {
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
 
-    const now = new Date();
-    const expiresAt = addDuration(now, term.durationValue, term.durationUnit);
-    const price = finalPrice(
-      Number(term.price),
-      Number(term.discount),
-      term.discountType,
-    );
-
-    const [row] = await this.db
-      .insert(userSubscriptions)
-      .values({
-        userId: dto.userId,
-        termId: dto.termId,
-        priceUsd: price.toString(),
-        paymentMethod: dto.paymentMethod ?? null,
-        subscribedAt: now,
-        expiresAt,
-      })
-      .returning({ id: userSubscriptions.id });
-    return { id: row.id };
+    return this.activation.grantManual({
+      userId: dto.userId,
+      termId: dto.termId,
+      reason: dto.paymentMethod ?? 'Admin grant',
+    });
   }
 
   async remove(id: string): Promise<{ id: string }> {

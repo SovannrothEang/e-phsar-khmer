@@ -1,359 +1,538 @@
-// 'use client'
-
-// import { useSearchParams } from "next/navigation"
-// import { useState } from "react"
-// import { Link } from "@/i18n/routing"
-// import { House, ChevronRight, CirclePlus } from 'lucide-react';
-
-// export default function CheckoutPage() {
-//   const params = useSearchParams()
-
-//   const category = params.get("category") || "Services"
-//   const term = params.get("term") === "1year" ? "1 Year" : "6 Months"
-//   const price = Number(params.get("price") || 0)
-
-//   const [method, setMethod] = useState("khqr")
-
-//   const vat = price * 0.1
-//   const total = price + vat
-
-//   return (
-
-//     <div className="min-h-screen bg-muted pb-2">
-//       <div className="max-w-4xl mx-auto py-8 px-4">
-//         <nav className="flex items-center space-x-1 text-sm ">
-//           <Link
-//             href="/"
-//             className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300">
-//             <House size={16} className="text-foreground  group-hover:text-gray-300" />
-//             <span className="text-foreground  group-hover:text-gray-300 pl-1.5">Home</span>
-//           </Link>
-//           <ChevronRight size={16} className="block text-gray-500" />
-//           <Link
-//             href="/"
-//             className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300">
-//             <span className="text-foreground  group-hover:text-gray-300 pl-1.5">Profile</span>
-//           </Link>
-//           <ChevronRight size={16} className="block text-gray-500" />
-//           <Link
-//             href={{
-//               pathname: "/profile/membership"
-//             }}
-//             className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300">
-//             <span className="text-foreground  group-hover:text-gray-300 pl-1.5">Membership</span>
-//           </Link>
-//           <ChevronRight size={16} className="block text-gray-500" />
-//           <h1 className="text-gray-500 dark:text-gray-400">Check Out</h1>
-//         </nav>
-//       </div>
-
-//       <main className="max-w-4xl mx-auto px-4">
-//         <div className="border bg-card p-4 rounded-sm">
-//           <h2 className="text-lg font-medium">Subscription</h2>
-//           <p className="font-medium capitalize">
-//             {category} - {term}
-//           </p>
-//           <p className="text-sm text-muted-foreground">
-//             Price: ${price.toFixed(2)}
-//           </p>
-//         </div>
-//         <div className="border bg-card p-4 rounded-sm mt-2">
-//           <h2 className="text-sm text-gray-500">Seems like you haven't saved any addresses yet!</h2>
-//           <div className="mt-4 border bg-[#00a0e9]/10 rounded-sm  p-1.5 text-center hover:bg-[#00a0e9]/80 transition-colors ">
-//             <Link
-//               href={{ pathname: "/profile/premium-account", query: { id: "me" } }}
-//               className="text-[#00a0e9]/80 hover:text-card flex items-center justify-center text-center font-semibold">
-//               <CirclePlus size={24} className="block mr-2" />
-//               Add Address
-//             </Link>
-//           </div>
-//         </div>
-//         {/* Payment */}
-//         <div className="border bg-card p-4 rounded-sm mt-2 space-y-3">
-//           <h2 className="font-medium text-lg">Payment Method</h2>
-
-//           <label className="flex gap-2">
-//             <input
-//               type="radio"
-//               checked={method === "khqr"}
-//               onChange={() => setMethod("khqr")}
-//             />
-//             KHQR
-//           </label>
-
-//           <label className="flex gap-2">
-//             <input
-//               type="radio"
-//               checked={method === "card"}
-//               onChange={() => setMethod("card")}
-//             />
-//             Card
-//           </label>
-//         </div>
-
-//         <div className="border bg-card p-4 rounded-sm mt-2 space-y-2">
-//           <h2 className="font-medium text-lg">Summary</h2>
-//           <div className="flex justify-between text-sm">
-//             <span>Subtotal</span>
-//             <span>${price}</span>
-//           </div>
-
-//           <div className="flex justify-between text-sm">
-//             <span>Discount</span>
-//             <span>${vat}</span>
-//           </div>
-
-//           <div className="flex justify-between text-sm">
-//             <span>VAT</span>
-//             <span>${total}</span>
-//           </div>
-//         </div>
-
-//         <button className="w-full bg-orange-500 text-white py-3 rounded">
-//           Pay Now
-//         </button>
-//       </main>
-//     </div>
-
-//   )
-// }
-
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { Link, useRouter } from "@/i18n/routing";
 import {
-  House,
-  ChevronRight,
-  CirclePlus,
-  EllipsisVertical,
-  CreditCard,
-  Zap,
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  CircleAlert,
+  Clock3,
+  LockKeyhole,
+  ScanLine,
+  ShieldCheck,
 } from "lucide-react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
+import { QRCodeSVG } from "qrcode.react";
+import { Link } from "@/i18n/routing";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  createSubscriptionCheckout,
+  getMySubscriptions,
+  getPaymentTransactionStatus,
+  getSubscriptionCatalog,
+  type PaymentTransactionStatus,
+  type SubscriptionCatalogItem,
+} from "@/actions/subscriptions";
+import { Button } from "@/components/ui/button";
+
+// ~7 minutes at 2.5s — longer than the 5 minute KHQR lifetime, so the page
+// never stops watching a code that could still be paid.
+const MAX_POLLS = 170;
+
+function priceFor(item: SubscriptionCatalogItem): number {
+  const price = Number(item.price);
+  const discount = Number(item.discount);
+  const final =
+    item.discountType === "percent"
+      ? price * (1 - discount / 100)
+      : price - discount;
+  return Math.max(0, Math.round(final * 100) / 100);
+}
+
+function money(value: string | number): string {
+  return Number(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function getQr(
+  rawResponse: unknown,
+): { qr: string; expiresAt: number | null } | null {
+  if (!rawResponse || typeof rawResponse !== "object") return null;
+  const { qr, expiresAt } = rawResponse as {
+    qr?: unknown;
+    expiresAt?: unknown;
+  };
+  if (typeof qr !== "string") return null;
+  return { qr, expiresAt: typeof expiresAt === "number" ? expiresAt : null };
+}
+
+function clock(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export default function CheckoutPage() {
   const params = useSearchParams();
-  const router = useRouter();
+  const termId = params.get("termId");
+  const [catalog, setCatalog] = useState<SubscriptionCatalogItem[]>([]);
+  const [payment, setPayment] = useState<PaymentTransactionStatus | null>(null);
+  const [purchaseId, setPurchaseId] = useState<string | null>(null);
+  const [activated, setActivated] = useState(false);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [startingCheckout, setStartingCheckout] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const idempotencyKey = useRef<string | null>(null);
+  const pollCount = useRef(0);
 
-  const category = params.get("category") || "Services";
-  const term = params.get("term") === "1year" ? "1 Year" : "6 Months";
-  const price = Number(params.get("price") || 60);
+  useEffect(() => {
+    let mounted = true;
+    getSubscriptionCatalog()
+      .then((items) => {
+        if (mounted) setCatalog(items);
+      })
+      .catch(() => {
+        if (mounted)
+          setError(
+            "We couldn't load this offer. Please go back and try again.",
+          );
+      })
+      .finally(() => {
+        if (mounted) setLoadingCatalog(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  const [method, setMethod] = useState("card");
+  const offer = useMemo(
+    () => catalog.find((item) => item.termId === termId),
+    [catalog, termId],
+  );
 
-  const discount = 0;
-  const vat = price * 0.1;
-  const total = price - discount + vat;
+  async function startCheckout() {
+    if (!offer) return;
+    setStartingCheckout(true);
+    setError(null);
+    idempotencyKey.current ??= crypto.randomUUID();
+    const result = await createSubscriptionCheckout({
+      termId: offer.termId,
+      idempotencyKey: idempotencyKey.current,
+    });
+    setStartingCheckout(false);
+    if (!result.success) {
+      setError(result.error);
+      return;
+    }
+    setPurchaseId(result.data.purchaseId);
+    setActivated(false);
+    setPayment({
+      id: result.data.paymentTransactionId,
+      status: "pending",
+      amount: result.data.amount,
+      currency: result.data.currency,
+      checkout: null,
+    });
+  }
+
+  function retryCheckout() {
+    setPayment(null);
+    setPurchaseId(null);
+    setActivated(false);
+    setError(null);
+    idempotencyKey.current = crypto.randomUUID();
+  }
+
+  const paymentId = payment?.id;
+
+  useEffect(() => {
+    if (!paymentId || !purchaseId) return;
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout>;
+
+    const poll = async () => {
+      if (cancelled) return;
+      if (pollCount.current >= MAX_POLLS) {
+        setError(
+          "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
+        );
+        return;
+      }
+      pollCount.current += 1;
+      const result = await getPaymentTransactionStatus(paymentId);
+      if (cancelled) return;
+      if (!result.success) {
+        setError(`${result.error}; retrying…`);
+        timeout = setTimeout(poll, 2500);
+        return;
+      }
+
+      setError(null);
+      setPayment(result.data);
+      if (result.data.status === "succeeded") {
+        try {
+          const subscriptions = await getMySubscriptions();
+          if (
+            subscriptions.some(
+              (subscription) =>
+                subscription.purchaseId === purchaseId &&
+                subscription.status === "active",
+            )
+          ) {
+            setActivated(true);
+            return;
+          }
+        } catch {
+          // Keep polling activation status through temporary API failures.
+        }
+      } else if (
+        result.data.status !== "pending" &&
+        result.data.status !== "processing"
+      ) {
+        return;
+      }
+
+      timeout = setTimeout(poll, 2500);
+    };
+
+    pollCount.current = 0;
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [paymentId, purchaseId]);
+
+  const qrInfo = getQr(payment?.checkout?.rawResponse);
+  const waitingForPayment =
+    !!payment &&
+    !activated &&
+    (payment.status === "pending" || payment.status === "processing");
+
+  useEffect(() => {
+    if (!waitingForPayment || !qrInfo?.expiresAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [waitingForPayment, qrInfo?.expiresAt]);
+
+  const remainingMs = qrInfo?.expiresAt ? qrInfo.expiresAt - now : null;
+  const paymentFailed =
+    payment?.status === "failed" ||
+    payment?.status === "cancelled" ||
+    payment?.status === "expired";
+  const step = activated ? 3 : payment ? 2 : 1;
+  const planPrice = offer ? priceFor(offer) : 0;
+  const dueToday = payment ? Number(payment.amount) : planPrice;
+  const credit = payment && planPrice > dueToday ? planPrice - dueToday : 0;
 
   return (
-    <div className="min-h-screen bg-muted  pb-2">
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <nav className="flex items-center space-x-1 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300"
-          >
-            <House
-              size={16}
-              className="text-foreground  group-hover:text-gray-300"
-            />
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href={{ pathname: "/me/membership" }}
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Membership
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Check Out</h1>
-        </nav>
-      </div>
+    <div className="min-h-screen bg-muted pb-16">
+      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
+        <Link
+          href={
+            offer
+              ? {
+                  pathname: "/premium-account/[category]",
+                  params: { category: offer.categorySlug },
+                }
+              : "/premium-account"
+          }
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" /> Back to plans
+        </Link>
 
-      <main className="max-w-4xl mx-auto px-4 space-y-4">
-        {/* Subscription Card */}
-        <div className="border bg-card rounded-sm p-4">
-          <h2 className="text-lg font-medium mb-4">Subscription</h2>
-          <div className="flex items-start justify-between">
-            <div className="flex gap-4">
-              <div className="w-16 h-16 bg-gray-200 rounded-sm flex items-center justify-center flex-shrink-0">
-                <Image
-                  src="/avatar/sayi.png"
-                  alt="Profile"
-                  width={80}
-                  height={80}
-                  className="w-full h-full object-cover rounded-sm"
-                />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900">
-                  {category}: {term}
-                </p>
-                <p className="text-sm text-gray-600">Account ID: 1082891</p>
-                <p className="text-sm text-gray-600">
-                  {category}: {term}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Valid Until: 29. Oct 2026
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" className="rounded-full w-8 h-8 p-1">
-                    <EllipsisVertical size={20} />
-                  </Button>
-                </PopoverTrigger>
-                {/* This creates the border and the "Change" text container */}
-                <PopoverContent className="w-24 p-1" align="end">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-sm font-normal"
-                    onClick={() => router.push("/premium-account")}
-                  >
-                    Change
-                  </Button>
-                </PopoverContent>
-              </Popover>
-            </div>
+        <div className="mt-3 mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Checkout
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review your plan, then pay with Bakong KHQR.
+            </p>
           </div>
-        </div>
-        <div className="border bg-card p-4 rounded-sm mt-2">
-          <h2 className="text-sm text-gray-500">
-            Seems like you haven&apos;t saved any addresses yet!
-          </h2>
-          <div className="mt-4 border bg-[#00a0e9]/10 rounded-sm  p-1.5 text-center hover:bg-[#00a0e9]/80 transition-colors group hover:cursor-pointer ">
-            <Link
-              href={{ pathname: "/premium-account", query: { id: "me" } }}
-              className="text-[#00a0e9]/80 hover:text-card flex items-center justify-center text-center font-semibold group-hover:text-white"
-            >
-              <CirclePlus size={24} className="block mr-2" />
-              Add Address
-            </Link>
-          </div>
+          <ol className="flex items-center gap-3 text-sm" aria-label="Progress">
+            {["Review", "Pay", "Active"].map((label, index) => {
+              const number = index + 1;
+              const done = number < step || (number === 3 && activated);
+              const current = number === step && !done;
+              return (
+                <li key={label} className="flex items-center gap-3">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
+                        done
+                          ? "bg-emerald-600 text-white"
+                          : current
+                            ? "bg-[#00a0e9] text-white"
+                            : "bg-card text-muted-foreground ring-1 ring-border"
+                      }`}
+                    >
+                      {done ? <Check className="size-3.5" /> : number}
+                    </span>
+                    <span
+                      className={
+                        current
+                          ? "font-medium text-foreground"
+                          : "hidden text-muted-foreground sm:inline"
+                      }
+                    >
+                      {label}
+                    </span>
+                  </span>
+                  {index < 2 && (
+                    <span
+                      aria-hidden
+                      className="hidden h-px w-6 bg-border sm:block"
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ol>
         </div>
 
-        {/* Payment Methods */}
-        <div className="border bg-white rounded-sm p-4 shadow-sm">
-          <h2 className="text-lg font-medium mb-2">Payment Methods</h2>
-          <div className="space-y-3">
-            {/* KHQR */}
-            <label
-              className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-              htmlFor="khqr"
-            >
-              <input
-                id="khqr"
-                type="radio"
-                checked={method === "khqr"}
-                onChange={() => setMethod("khqr")}
-                className="w-4 h-4"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 bg-red-600 rounded flex items-center justify-center text-white font-bold text-sm">
-                    KH
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900">KHQR</p>
-                    <p className="text-xs text-gray-600">
-                      Scan to pay with any banking app
-                    </p>
-                  </div>
+        {error && (
+          <div
+            role="alert"
+            className="mb-5 flex items-start gap-2 rounded-xl bg-card p-4 text-sm text-destructive ring-1 ring-destructive/30"
+          >
+            <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
+          </div>
+        )}
+
+        <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="rounded-2xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-8">
+            {loadingCatalog ? (
+              <div className="h-72 animate-pulse rounded-xl bg-muted" />
+            ) : !offer ? (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="flex size-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                  <CircleAlert className="size-6" />
+                </span>
+                <h2 className="mt-4 font-semibold text-foreground">
+                  Offer unavailable
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  This term may have been removed or deactivated.
+                </p>
+                <Link
+                  href="/premium-account"
+                  className="mt-4 text-sm font-medium text-[#0089c8] hover:underline"
+                >
+                  Browse available plans
+                </Link>
+              </div>
+            ) : activated ? (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                  <BadgeCheck className="size-8" />
+                </span>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+                  You&apos;re all set
+                </h2>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  Payment confirmed and your {offer.packageName} package is
+                  ready to use.
+                </p>
+                <Link
+                  href="/me/subscriptions"
+                  className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
+                >
+                  View my subscriptions <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            ) : paymentFailed ? (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                  <CircleAlert className="size-8" />
+                </span>
+                <h2 className="mt-4 text-xl font-semibold text-foreground">
+                  Payment didn&apos;t complete
+                </h2>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  The code expired or the payment wasn&apos;t received, so no
+                  subscription was activated. Start a new checkout to try again.
+                </p>
+                <Button
+                  onClick={retryCheckout}
+                  className="mt-6 h-11 rounded-xl bg-[#00a0e9] px-6 text-white hover:bg-[#008ccb]"
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : payment?.status === "succeeded" ? (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="size-10 animate-spin rounded-full border-2 border-border border-t-emerald-600" />
+                <h2 className="mt-5 text-xl font-semibold text-foreground">
+                  Payment received
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Activating your subscription — this page updates by itself.
+                </p>
+              </div>
+            ) : payment ? (
+              <div className="grid gap-8 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center">
+                <div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                    <Clock3 className="size-3.5" />
+                    {remainingMs !== null
+                      ? `Expires in ${clock(remainingMs)}`
+                      : "Waiting for payment"}
+                  </span>
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+                    Scan to pay{" "}
+                    <span className="tabular-nums">
+                      ${money(payment.amount)}
+                    </span>
+                  </h2>
+                  <ol className="mt-5 space-y-3 text-sm text-foreground">
+                    {[
+                      "Open Bakong or a supported banking app",
+                      "Scan the KHQR code",
+                      "Confirm the amount and approve",
+                    ].map((text, index) => (
+                      <li key={text} className="flex items-center gap-3">
+                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        {text}
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-5 text-xs text-muted-foreground">
+                    Keep this page open — it confirms automatically.
+                  </p>
                 </div>
-              </div>
-            </label>
-
-            {/* Credit/Debit Card */}
-            <label
-              className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-              htmlFor="card"
-            >
-              <input
-                id="card"
-                type="radio"
-                checked={method === "card"}
-                onChange={() => setMethod("card")}
-                className="w-4 h-4"
-              />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center">
-                      <CreditCard size={20} className="text-white" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        Credit/Debit Card
+                <div className="mx-auto w-full max-w-[240px] rounded-2xl bg-white p-4 ring-1 ring-border">
+                  {qrInfo ? (
+                    <QRCodeSVG
+                      value={qrInfo.qr}
+                      size={208}
+                      level="M"
+                      className="h-auto w-full"
+                    />
+                  ) : (
+                    <div className="flex aspect-square flex-col items-center justify-center text-center">
+                      <span className="size-7 animate-spin rounded-full border-2 border-border border-t-[#00a0e9]" />
+                      <p className="mt-3 text-xs text-neutral-500">
+                        Preparing your QR code…
                       </p>
-                      <div className="flex gap-1 mt-0.5">
-                        <CreditCard size={14} className="text-blue-600" />
-                        <Zap size={14} className="text-orange-500" />
-                      </div>
-                    </div>
-                  </div>
-                  {method === "card" && (
-                    <div className="w-5 h-5 rounded-full border-2 border-blue-500 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                     </div>
                   )}
+                  <p className="mt-3 text-center text-[11px] font-medium tracking-wide text-neutral-500">
+                    BAKONG KHQR
+                  </p>
                 </div>
               </div>
-            </label>
-          </div>
-        </div>
+            ) : (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-[#00a0e9]/10 text-[#0089c8]">
+                  <ScanLine className="size-7" />
+                </span>
+                <h2 className="mt-4 text-xl font-semibold text-foreground">
+                  Ready when you are
+                </h2>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  Continue to create your payment request. Your KHQR code
+                  appears right here.
+                </p>
+              </div>
+            )}
+          </section>
 
-        {/* Summary */}
-        <div className="border bg-card rounded-sm p-4 shadow-sm">
-          <h2 className="text-lg font-medium mb-2">Summary</h2>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">${price.toFixed(2)}</span>
+          <aside className="rounded-2xl bg-card shadow-sm ring-1 ring-border md:sticky md:top-20">
+            <div className="p-6">
+              <h2 className="text-sm font-semibold text-foreground">
+                Order summary
+              </h2>
+              {loadingCatalog ? (
+                <div className="mt-4 h-40 animate-pulse rounded-xl bg-muted" />
+              ) : offer ? (
+                <>
+                  <div className="mt-4">
+                    <span className="text-xs font-medium text-[#0089c8]">
+                      {offer.categoryName}
+                    </span>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {offer.packageName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {offer.planName} · {offer.termName} ·{" "}
+                      {offer.durationValue} {offer.durationUnit}
+                      {offer.durationValue === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <dl className="mt-5 space-y-2.5 border-t border-border pt-5 text-sm">
+                    {[
+                      ["Photos per ad", offer.photos],
+                      ["Active ads", offer.ads],
+                      ["Renewals", offer.renews],
+                      ["Auto-renewals", offer.autoRenews],
+                      ["Videos", offer.videos],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-2">
+                        <dt className="text-muted-foreground">{label}</dt>
+                        <dd className="font-medium tabular-nums text-foreground">
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-5 space-y-2 border-t border-border pt-5 text-sm">
+                    {credit > 0 && (
+                      <>
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Plan price</span>
+                          <span className="tabular-nums">
+                            ${money(planPrice)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                          <span>Credit from current plan</span>
+                          <span className="tabular-nums">
+                            −${money(credit)}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex items-baseline justify-between">
+                      <span className="font-medium text-foreground">
+                        Due today
+                      </span>
+                      <span className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                        ${money(dueToday)}
+                        <small className="ml-1 text-xs font-medium text-muted-foreground">
+                          {payment?.currency ?? "USD"}
+                        </small>
+                      </span>
+                    </div>
+                  </div>
+                  {!payment && (
+                    <Button
+                      disabled={startingCheckout}
+                      onClick={() => void startCheckout()}
+                      className="mt-5 h-11 w-full rounded-xl bg-[#00a0e9] text-sm font-semibold text-white hover:bg-[#008ccb]"
+                    >
+                      {startingCheckout
+                        ? "Preparing checkout…"
+                        : "Continue to payment"}
+                      {!startingCheckout && (
+                        <ArrowRight className="ml-2 size-4" />
+                      )}
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Offer details unavailable.
+                </p>
+              )}
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Discount</span>
-              <span className="font-medium">${discount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">VAT</span>
-              <span className="font-medium">${vat.toFixed(2)}</span>
-            </div>
-            <div className="border-t pt-2 mt-2 flex justify-between">
-              <span className="font-semibold text-gray-900">
-                Total (incl. VAT)
+            <div className="flex items-start gap-2 rounded-b-2xl border-t border-border bg-muted/60 px-6 py-4 text-xs leading-5 text-muted-foreground">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+              <span>
+                Your plan activates only after Bakong confirms the payment.
               </span>
-              <span className="font-bold text-lg">${total.toFixed(2)}</span>
             </div>
-          </div>
+            <div className="flex items-center gap-2 px-6 py-3 text-xs text-muted-foreground">
+              <LockKeyhole className="size-3.5" /> Linked to your account
+            </div>
+          </aside>
         </div>
-
-        <button className="w-full bg-orange-500 hover:bg-orange-600 text-card font-medium py-2 rounded-sm transition-colors">
-          Review Address & Check out
-        </button>
-      </main>
+      </div>
     </div>
   );
 }

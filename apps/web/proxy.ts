@@ -11,8 +11,12 @@ export default function proxy(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
   const host = req.headers.get("host") || "";
 
-  // Check if the current hostname is the admin subdomain (e.g. admin.sovannroth.xyz or admin.localhost:3001)
-  const isAdminSubdomain = host.startsWith("admin.");
+  // Check if the current hostname is the backoffice/admin subdomain
+  const isAdminSubdomain =
+    host.startsWith("phsar-backoffice.") ||
+    host.startsWith("backoffice.") ||
+    host.startsWith("admin.") ||
+    host.startsWith("phsar-admin.");
 
   // =========================================================================
   // CASE 1: Request came via admin subdomain (e.g. admin.yourdomain.com)

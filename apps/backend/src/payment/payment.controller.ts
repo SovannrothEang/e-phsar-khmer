@@ -26,12 +26,6 @@ import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 
 /**
- * No tenants table exists yet (see ../tenant/README.md) — every transaction
- * is created under this fixed placeholder until real tenant scoping lands.
- */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
-
-/**
  * Every route here does exactly one thing: adapt its DTO/params into a
  * use-case's input shape, hand it to `PaymentEffectRunner`, return the
  * `Promise<T>` that comes back. All business logic — including composing
@@ -55,7 +49,6 @@ export class PaymentsController {
   create(@CurrentUser() user: RequestUser, @Body() dto: CreatePaymentDto) {
     return this.effectRunner.runDurably((outbox) =>
       createPaymentTransaction(outbox, {
-        tenantId: DEFAULT_TENANT_ID,
         reference: dto.reference,
         idempotencyKey: dto.idempotencyKey,
         amount: dto.amount.toString(),

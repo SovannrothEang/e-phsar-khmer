@@ -15,6 +15,7 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   lt,
   ne,
   or,
@@ -267,6 +268,7 @@ export class AdminService {
         .where(
           and(
             inArray(userSubscriptions.userId, pageUserIds),
+            isNull(userSubscriptions.supersededAt),
             gt(userSubscriptions.expiresAt, new Date()),
           ),
         );

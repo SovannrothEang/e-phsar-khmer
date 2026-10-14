@@ -39,6 +39,9 @@ const nextConfig: NextConfig = {
     "*.lhr.life",
     "*.localhost:3001",
     "admin.localhost:3001",
+    "backoffice.localhost:3001",
+    "phsar-backoffice.localhost:3001",
+    "phsar-admin.localhost:3001",
   ],
 };
 

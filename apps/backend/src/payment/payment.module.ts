@@ -14,6 +14,7 @@ import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-han
 import { PaymentProcessor } from './processors/payment.processor';
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     // For PaymentSettledOutboxHandler — telling the customer their payment
     // settled is a notification concern, not a payment-processing one.
     NotificationsModule,
+    SubscriptionsCoreModule,
   ],
   controllers: [PaymentsController],
   providers: [

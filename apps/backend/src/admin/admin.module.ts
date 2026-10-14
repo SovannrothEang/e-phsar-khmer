@@ -17,9 +17,10 @@ import { UserSubscriptionsController } from './subscriptions/user-subscriptions.
 import { UserSubscriptionsService } from './subscriptions/user-subscriptions.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
+import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
 
 @Module({
-  imports: [FilesModule, ChatModule],
+  imports: [FilesModule, ChatModule, SubscriptionsCoreModule],
   controllers: [
     AdminController,
     AdminCategoriesController,
