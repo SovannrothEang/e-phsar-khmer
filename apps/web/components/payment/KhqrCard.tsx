@@ -1,4 +1,4 @@
-import { Nunito_Sans } from "next/font/google";
+import { nunitoSans } from "@/lib/fonts";
 import { QRCodeSVG } from "qrcode.react";
 
 // The KHQR card from NBC's "KHQR Card Guideline" (docs/KHQR Card
@@ -11,8 +11,6 @@ import { QRCodeSVG } from "qrcode.react";
 // The rest (corner radius, header fold, dashed rule, QR placement) is
 // measured off the guideline's own vector artwork, as are the wordmark and
 // the centre currency badges in public/payment/.
-
-const nunito = Nunito_Sans({ subsets: ["latin"], weight: ["400", "700"] });
 
 const KHQR_RED = "#E1232E";
 
@@ -71,7 +69,7 @@ export function KhqrCard({
 
   return (
     <div
-      className={`${nunito.className} ${className ?? ""}`}
+      className={`${nunitoSans.className} ${className ?? ""}`}
       style={{ containerType: "inline-size" }}
     >
       <div

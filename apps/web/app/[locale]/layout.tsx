@@ -1,5 +1,5 @@
 import "@/styles/globals.css";
-import { Inter } from "next/font/google";
+import { inter } from "@/lib/fonts";
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
@@ -9,13 +9,6 @@ import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
 import { ClientThemeProvider } from "@/components/client-theme-provider";
 import { Providers } from "@/app/providers";
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
