@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BadgeCheck,
   BriefcaseBusiness,
   CarFront,
   Grid2X2,
@@ -13,9 +14,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import {
+  getMySubscriptions,
   getSubscriptionCatalog,
-  type SubscriptionCatalogItem,
 } from "@/actions/subscriptions";
+import {
+  currentSubscription,
+  daysUntil,
+  priceFor,
+} from "@/lib/subscription-pricing";
 
 const categoryIcons: Record<string, LucideIcon> = {
   auto: CarFront,
@@ -24,16 +30,6 @@ const categoryIcons: Record<string, LucideIcon> = {
   property: House,
   services: BriefcaseBusiness,
 };
-
-function priceFor(item: SubscriptionCatalogItem): number {
-  const price = Number(item.price);
-  const discount = Number(item.discount);
-  const final =
-    item.discountType === "percent"
-      ? price * (1 - discount / 100)
-      : price - discount;
-  return Math.max(0, Math.round(final * 100) / 100);
-}
 
 function money(value: number): string {
   return value.toLocaleString("en-US", {
@@ -61,7 +57,15 @@ const steps = [
 ];
 
 export default async function PremiumAccountPage() {
-  const catalog = await getSubscriptionCatalog().catch(() => []);
+  const [catalog, subscriptions] = await Promise.all([
+    getSubscriptionCatalog().catch(() => []),
+    getMySubscriptions().catch(() => []),
+  ]);
+  const active = currentSubscription(subscriptions);
+  const activeCategory = active?.termId
+    ? catalog.find((item) => item.termId === active.termId)
+    : undefined;
+  const daysLeft = active ? daysUntil(active.expiresAt) : 0;
   const categoryMap = new Map<
     string,
     {
@@ -104,35 +108,97 @@ export default async function PremiumAccountPage() {
             Home
           </Link>
           <span aria-hidden>/</span>
-          <Link href="/me/membership" className="hover:text-foreground">
-            Membership
+          <Link href="/me/subscriptions" className="hover:text-foreground">
+            Subscriptions
           </Link>
           <span aria-hidden>/</span>
           <span className="text-foreground">Premium plans</span>
         </nav>
 
-        <header className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-10">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#00a0e9]/10 px-3 py-1 text-xs font-semibold text-[#0089c8]">
-            <Sparkles className="size-3.5" /> Premium membership
-          </span>
-          <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Sell more with a plan that fits your business
-          </h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
-            More photos, more active ads and more renewals. Pay once with Bakong
-            KHQR — no card needed.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-2">
-              <ShieldCheck className="size-4 text-emerald-600" /> Confirmed by
-              Bakong before activation
+        {active ? (
+          <header className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-[#00a0e9]/50 sm:p-10">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <BadgeCheck className="size-3.5" /> You&apos;re a premium member
             </span>
-            <span className="inline-flex items-center gap-2">
-              <Zap className="size-4 text-amber-500" /> Upgrade any time, pay
-              only the difference
+            <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              {active.packageName ?? active.planName ?? "Premium"} is active
+            </h1>
+            <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
+              {[active.categoryName, active.planName, active.termName]
+                .filter(Boolean)
+                .join(" · ")}
+              {" — "}
+              <strong className="font-semibold tabular-nums text-foreground">
+                {daysLeft}
+              </strong>{" "}
+              {daysLeft === 1 ? "day" : "days"} left. Need more? Upgrade to a
+              bigger package and pay only the difference for the time remaining.
+            </p>
+            <ul className="mt-6 flex flex-wrap gap-2 text-sm">
+              {(
+                [
+                  ["photos per ad", active.photos],
+                  ["active ads", active.ads],
+                  ["renewals", active.renews],
+                  ["auto-renewals", active.autoRenews],
+                  ["videos", active.videos],
+                ] as const
+              ).map(([label, value]) => (
+                <li
+                  key={label}
+                  className="rounded-full bg-muted px-3 py-1 text-muted-foreground"
+                >
+                  <strong className="font-semibold tabular-nums text-foreground">
+                    {value}
+                  </strong>{" "}
+                  {label}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-6 flex flex-wrap gap-3">
+              {activeCategory && (
+                <Link
+                  href={{
+                    pathname: "/premium-account/[category]",
+                    params: { category: activeCategory.categorySlug },
+                  }}
+                  className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#008ccb]"
+                >
+                  Upgrade my plan <ArrowRight className="size-4" />
+                </Link>
+              )}
+              <Link
+                href="/me/subscriptions"
+                className="inline-flex h-11 items-center rounded-xl px-5 text-sm font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-muted"
+              >
+                Manage subscription
+              </Link>
+            </div>
+          </header>
+        ) : (
+          <header className="rounded-3xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-10">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#00a0e9]/10 px-3 py-1 text-xs font-semibold text-[#0089c8]">
+              <Sparkles className="size-3.5" /> Premium membership
             </span>
-          </div>
-        </header>
+            <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Sell more with a plan that fits your business
+            </h1>
+            <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
+              More photos, more active ads and more renewals. Pay once with
+              Bakong KHQR — no card needed.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-2">
+                <ShieldCheck className="size-4 text-emerald-600" /> Confirmed by
+                Bakong before activation
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <Zap className="size-4 text-amber-500" /> Upgrade any time, pay
+                only the difference
+              </span>
+            </div>
+          </header>
+        )}
 
         <section className="mt-10" aria-labelledby="browse-heading">
           <div className="mb-4 flex items-end justify-between gap-3">
@@ -141,10 +207,12 @@ export default async function PremiumAccountPage() {
                 id="browse-heading"
                 className="text-xl font-semibold tracking-tight text-foreground"
               >
-                Browse by category
+                {active ? "Upgrade options" : "Browse by category"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Choose where you want to grow your listings.
+                {active
+                  ? "Packages bigger than yours can be bought as an upgrade."
+                  : "Choose where you want to grow your listings."}
               </p>
             </div>
             <span className="text-sm text-muted-foreground">
@@ -211,35 +279,37 @@ export default async function PremiumAccountPage() {
           )}
         </section>
 
-        <section className="mt-12" aria-labelledby="how-heading">
-          <h2
-            id="how-heading"
-            className="text-xl font-semibold tracking-tight text-foreground"
-          >
-            How it works
-          </h2>
-          <ol className="mt-4 grid gap-4 sm:grid-cols-3">
-            {steps.map(({ Icon, title, text }, index) => (
-              <li
-                key={title}
-                className="rounded-2xl bg-card p-5 ring-1 ring-border"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-muted text-foreground">
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Step {index + 1}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-medium text-foreground">{title}</h3>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  {text}
-                </p>
-              </li>
-            ))}
-          </ol>
-        </section>
+        {!active && (
+          <section className="mt-12" aria-labelledby="how-heading">
+            <h2
+              id="how-heading"
+              className="text-xl font-semibold tracking-tight text-foreground"
+            >
+              How it works
+            </h2>
+            <ol className="mt-4 grid gap-4 sm:grid-cols-3">
+              {steps.map(({ Icon, title, text }, index) => (
+                <li
+                  key={title}
+                  className="rounded-2xl bg-card p-5 ring-1 ring-border"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-9 items-center justify-center rounded-full bg-muted text-foreground">
+                      <Icon className="size-4" />
+                    </span>
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Step {index + 1}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 font-medium text-foreground">{title}</h3>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                    {text}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
       </div>
     </div>
   );

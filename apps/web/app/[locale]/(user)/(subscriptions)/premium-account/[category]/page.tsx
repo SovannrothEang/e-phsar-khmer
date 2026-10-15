@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   Camera,
   Check,
   Megaphone,
@@ -15,19 +16,17 @@ import {
 } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import {
+  getMySubscriptions,
   getSubscriptionCatalog,
   type SubscriptionCatalogItem,
+  type UserSubscription,
 } from "@/actions/subscriptions";
-
-function priceFor(item: SubscriptionCatalogItem): number {
-  const price = Number(item.price);
-  const discount = Number(item.discount);
-  const final =
-    item.discountType === "percent"
-      ? price * (1 - discount / 100)
-      : price - discount;
-  return Math.max(0, Math.round(final * 100) / 100);
-}
+import {
+  currentSubscription,
+  offerState,
+  packageIdOf,
+  priceFor,
+} from "@/lib/subscription-pricing";
 
 function money(value: number): string {
   return value.toLocaleString("en-US", {
@@ -47,9 +46,18 @@ export default function PremiumPlanPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
+  const [active, setActive] = useState<UserSubscription | null>(null);
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     let mounted = true;
+    // Fail soft: without the user's plan every offer reads as a new purchase,
+    // and checkout still re-checks on the server.
+    getMySubscriptions()
+      .then((items) => {
+        if (mounted) setActive(currentSubscription(items));
+      })
+      .catch(() => {});
     getSubscriptionCatalog()
       .then((items) => {
         if (mounted) setCatalog(items);
@@ -80,6 +88,7 @@ export default function PremiumPlanPage() {
       items.sort((a, b) => priceFor(a) - priceFor(b)),
     );
   }, [offers]);
+  const activePackageId = packageIdOf(active, catalog);
   const categoryName = offers[0]?.categoryName ?? categorySlug;
   const categoryDescription = offers[0]?.categoryDescription;
 
@@ -163,6 +172,7 @@ export default function PremiumPlanPage() {
                 packageOffers.find(
                   (term) => term.termId === picked[base.packageId],
                 ) ?? base;
+              const state = offerState(selected, active, activePackageId, now);
               const final = priceFor(selected);
               const original = Number(selected.price);
               const discounted = final < original;
@@ -184,7 +194,11 @@ export default function PremiumPlanPage() {
               return (
                 <article
                   key={base.packageId}
-                  className="flex flex-col rounded-2xl bg-card p-6 shadow-sm ring-1 ring-border"
+                  className={`flex flex-col rounded-2xl bg-card p-6 shadow-sm ring-1 ${
+                    state.kind === "current"
+                      ? "ring-2 ring-emerald-500/60"
+                      : "ring-border"
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -195,10 +209,16 @@ export default function PremiumPlanPage() {
                         {base.packageName}
                       </h2>
                     </div>
-                    {savePct > 0 && (
-                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                        Save {savePct}%
+                    {state.kind === "current" ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                        <BadgeCheck className="size-3.5" /> In use
                       </span>
+                    ) : (
+                      savePct > 0 && (
+                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          Save {savePct}%
+                        </span>
+                      )
                     )}
                   </div>
 
@@ -267,19 +287,54 @@ export default function PremiumPlanPage() {
                     ))}
                   </ul>
 
-                  <Link
-                    href={{
-                      pathname: "/checkout",
-                      query: { termId: selected.termId },
-                    }}
-                    className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#008ccb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a0e9] focus-visible:ring-offset-2"
-                  >
-                    Choose {base.packageName}
-                    <ArrowRight className="size-4" />
-                  </Link>
-                  <p className="mt-3 text-center text-xs text-muted-foreground">
-                    Activates after Bakong payment confirms.
-                  </p>
+                  {state.kind === "current" ? (
+                    <>
+                      <Link
+                        href="/me/subscriptions"
+                        className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-muted"
+                      >
+                        <BadgeCheck className="size-4 text-emerald-600" />
+                        You&apos;re on this plan
+                      </Link>
+                      <p className="mt-3 text-center text-xs text-muted-foreground">
+                        {active &&
+                          `Active until ${new Date(active.expiresAt).toLocaleDateString()}.`}
+                      </p>
+                    </>
+                  ) : state.kind === "unavailable" ? (
+                    <>
+                      <span
+                        aria-disabled
+                        className="mt-7 inline-flex h-11 cursor-not-allowed items-center justify-center rounded-xl bg-muted px-5 text-sm font-semibold text-muted-foreground"
+                      >
+                        Not an upgrade
+                      </span>
+                      <p className="mt-3 text-center text-xs text-muted-foreground">
+                        Your current plan already covers this for the time left.
+                        Available once it ends.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={{
+                          pathname: "/checkout",
+                          query: { termId: selected.termId },
+                        }}
+                        className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#008ccb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a0e9] focus-visible:ring-offset-2"
+                      >
+                        {state.kind === "upgrade"
+                          ? `Upgrade · $${money(state.due)} today`
+                          : `Choose ${base.packageName}`}
+                        <ArrowRight className="size-4" />
+                      </Link>
+                      <p className="mt-3 text-center text-xs text-muted-foreground">
+                        {state.kind === "upgrade"
+                          ? "Prorated to your current expiry, minus unused credit."
+                          : "Activates after Bakong payment confirms."}
+                      </p>
+                    </>
+                  )}
                 </article>
               );
             })}

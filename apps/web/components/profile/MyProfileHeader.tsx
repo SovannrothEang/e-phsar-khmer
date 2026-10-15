@@ -246,7 +246,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
                         variant="outline"
-                        onClick={() => router.replace("/me/membership")}
+                        onClick={() => router.replace("/me/subscriptions")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
                         Upgrade Account

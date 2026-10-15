@@ -24,23 +24,20 @@ import {
   type PaymentProvider,
   type PaymentTransactionStatus,
   type SubscriptionCatalogItem,
+  type UserSubscription,
 } from "@/actions/subscriptions";
+import {
+  currentSubscription,
+  offerState,
+  packageIdOf,
+  priceFor,
+} from "@/lib/subscription-pricing";
 import { Button } from "@/components/ui/button";
 import { KhqrCard } from "@/components/payment/KhqrCard";
 
 // ~7 minutes at 2.5s — longer than the 5 minute KHQR lifetime, so the page
 // never stops watching a code that could still be paid.
 const MAX_POLLS = 170;
-
-function priceFor(item: SubscriptionCatalogItem): number {
-  const price = Number(item.price);
-  const discount = Number(item.discount);
-  const final =
-    item.discountType === "percent"
-      ? price * (1 - discount / 100)
-      : price - discount;
-  return Math.max(0, Math.round(final * 100) / 100);
-}
 
 function money(value: string | number): string {
   return Number(value).toLocaleString("en-US", {
@@ -131,6 +128,7 @@ export default function CheckoutPage() {
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [active, setActive] = useState<UserSubscription | null>(null);
   const idempotencyKey = useRef<string | null>(null);
   const pollCount = useRef(0);
 
@@ -149,6 +147,11 @@ export default function CheckoutPage() {
       .finally(() => {
         if (mounted) setLoadingCatalog(false);
       });
+    getMySubscriptions()
+      .then((items) => {
+        if (mounted) setActive(currentSubscription(items));
+      })
+      .catch(() => {});
     getPaymentProviders()
       .then((items) => {
         if (!mounted) return;
@@ -275,6 +278,23 @@ export default function CheckoutPage() {
     };
   }, [paymentId, purchaseId]);
 
+  // Only gates the pre-payment step: once a checkout exists, its own status
+  // drives the page (activation flips `active` to the new plan anyway).
+  const blocked =
+    !payment && offer
+      ? (() => {
+          const state = offerState(
+            offer,
+            active,
+            packageIdOf(active, catalog),
+            now,
+          );
+          return state.kind === "current" || state.kind === "unavailable"
+            ? state.kind
+            : null;
+        })()
+      : null;
+
   const qrInfo = getQr(payment?.checkout?.rawResponse);
   const waitingForPayment =
     !!payment &&
@@ -397,6 +417,39 @@ export default function CheckoutPage() {
                 >
                   Browse available plans
                 </Link>
+              </div>
+            ) : blocked ? (
+              <div className="flex min-h-72 flex-col items-center justify-center text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                  <BadgeCheck className="size-8" />
+                </span>
+                <h2 className="mt-4 text-xl font-semibold text-foreground">
+                  {blocked === "current"
+                    ? "You're already on this plan"
+                    : "Not an upgrade from your current plan"}
+                </h2>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  {blocked === "current"
+                    ? `Your ${offer.packageName} package is active — nothing to pay.`
+                    : "Your current plan already covers this for the time left. Pick a bigger package to upgrade."}
+                </p>
+                <div className="mt-6 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href={{
+                      pathname: "/premium-account/[category]",
+                      params: { category: offer.categorySlug },
+                    }}
+                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
+                  >
+                    See upgrade options <ArrowRight className="size-4" />
+                  </Link>
+                  <Link
+                    href="/me/subscriptions"
+                    className="inline-flex h-11 items-center rounded-xl px-5 text-sm font-semibold text-foreground ring-1 ring-border hover:bg-muted"
+                  >
+                    My subscriptions
+                  </Link>
+                </div>
               </div>
             ) : activated ? (
               <div className="flex min-h-72 flex-col items-center justify-center text-center">
@@ -662,7 +715,7 @@ export default function CheckoutPage() {
                       </span>
                     </div>
                   </div>
-                  {!payment && (
+                  {!payment && !blocked && (
                     <Button
                       disabled={startingCheckout || !provider}
                       onClick={() => void startCheckout()}
