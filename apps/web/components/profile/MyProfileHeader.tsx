@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Link, useRouter } from "@/i18n/routing";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { uploadUserPhoto } from "@/actions/user-photo";
@@ -75,6 +75,18 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // The tabs are routes, so the default is derived from the URL: the highlight
+  // stays correct on a hard load of a sub-tab and on back/forward (an
+  // uncontrolled Tabs would keep showing "Manage Ads"). The key remounts Tabs
+  // when the route changes so Radix's internal state can't go stale, while a
+  // click still lights its own tab immediately — no waiting for navigation.
+  const pathname = usePathname();
+  const activeTab =
+    PROFILE_TABS.find(({ href }) => href === pathname)?.value ??
+    // /me/* pages that are not tabs (followers, membership, ...) keep the
+    // default section lit instead of dropping the highlight entirely.
+    "manage-ads";
 
   // The profile page currently renders from a mock currentUser; these overrides
   // reflect an upload immediately. router.refresh() keeps server data in sync
@@ -234,7 +246,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
                         variant="outline"
-                        onClick={() => router.replace("/me/membership")}
+                        onClick={() => router.replace("/me/subscriptions")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
                         Upgrade Account
@@ -280,7 +292,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs defaultValue="manage-ads" className="flex-1">
+            <Tabs key={activeTab} defaultValue={activeTab} className="flex-1">
               <TabsList variant="line" className="w-full">
                 {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
                   <TabsTrigger

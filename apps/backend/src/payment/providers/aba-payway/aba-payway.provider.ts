@@ -56,6 +56,7 @@ const SIGNATURE_HEADER = 'x-payway-hmac-sha512';
 @Injectable()
 export class AbaPaywayProvider implements PaymentGatewayProvider {
   readonly name = 'aba_payway';
+  readonly displayName = 'ABA PayWay';
   private readonly apiClient: ApiClient;
 
   constructor(private readonly configService: ConfigService) {

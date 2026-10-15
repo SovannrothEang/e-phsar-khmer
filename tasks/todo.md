@@ -5264,3 +5264,20 @@ so neighbours in a row didn't share a price line. `CardHeader` is now `flex flex
 items-stretch` and the price row carries `mt-auto`, pinning it to every card's bottom. Verified with
 per-row measurements — priceY and heartY are identical within every row (`maxDelta 0`), including
 rows that mix condition and no-condition cards — and a visual: `/tmp/align-mixed.png`.
+
+## 2026-10-14 — Subscription × Bakong audit + premium UI refresh
+
+- **Backend:** upgrade checkout now charges the target term _prorated to the remaining time_ minus the unused-value credit (was: full term price − credit, while the new subscription keeps the old expiry — the user overpaid). `manual_comp` grants always start a full term. A retried checkout whose payment is `failed/cancelled/expired` closes the purchase (`failed`) and returns 409 instead of handing back a dead payment. Settled payments that cannot activate a purchase (`not_pending`/`not_found`/mismatch) now log a "needs manual review" warning.
+- **Web:** premium-account, plan list, checkout and `/me/subscriptions` rebuilt — rounded cards, ring borders, flat tints (no gradients), term switcher, QR countdown, upgrade-credit line, poll window ≥ QR lifetime.
+- **Verified:** `jest src/subscriptions src/payment` (52 pass), web `tsc` + eslint clean. Not browser-verified.
+- **Still open:** nothing marks a purchase `failed` on its own (only lazily on checkout retry); two concurrent _initial_ purchases that both get paid yield one subscription (second supersedes first, same expiry).
+
+## 2026-10-14 — Subscription limits enforced (free plan + user_subscriptions)
+
+- **Entitlements:** `src/subscriptions/entitlements.service.ts` is the one place limits are decided. No live subscription → free plan (`entitlements.constants.ts`: 3 ads, 5 photos/ad, 0 renews/auto-renews/videos). Subscribers get the purchase's frozen offer snapshot (live package for legacy grants), highest value wins across overlapping subs, free plan is the floor. Global per user (no category scoping).
+- **Enforced:** photos per ad on create/update (existing photos grandfathered); active-ad allowance and `renews` on publish (`listings.renew_count`, new); 403 with `PLAN_LIMIT_PHOTOS|ADS|RENEWS|RESTRICTED`.
+- **Lapse = public restriction, not deletion:** new `listing_status` value `restricted`. `reconcileListings` keeps the newest N ads public and restricts the rest; restores them when the allowance covers them again. Runs after activation / admin grant / admin removal / publish, plus a 10-min BullMQ sweep (`entitlements` queue) for lapses. `restricted` is excluded from the feed, likes and saves lists.
+- **No refunds:** `PATCH /payments/:id` rejects `refund_pending`/`refunded`; checkout says all purchases are final. Upgrade credit (unused-value proration) kept — it is not a cash refund.
+- **API/UI:** `GET /subscriptions/entitlements`; post form shows plan banner and caps photos; `/me/subscriptions` shows usage.
+- **Migration `0037_burly_taskmaster`** (enum value + column) generated, NOT applied to the shared dev DB.
+- **Not enforced (no feature exists):** `autoRenews`, `videos`.

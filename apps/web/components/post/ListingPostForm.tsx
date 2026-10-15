@@ -619,8 +619,8 @@ export default function ListingPostForm({
       toast.error(result.error);
       return;
     }
-    toast.success("Your ad was published");
     if (result.warning) toast.warning(result.warning);
+    else toast.success("Your ad was published");
     router.push({
       pathname: "/post/[slug]",
       params: { slug: result.listingId },
@@ -686,6 +686,31 @@ export default function ListingPostForm({
           Reset
         </button>
       </div>
+
+      {config.plan && (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm ring-1 ${
+            config.plan.usage.ads >= config.plan.limits.ads
+              ? "bg-amber-500/10 text-amber-800 ring-amber-500/30 dark:text-amber-300"
+              : "bg-muted text-muted-foreground ring-border"
+          }`}
+        >
+          <span>
+            <strong className="font-semibold text-foreground">
+              {config.plan.plan === "free" ? "Free plan" : "Premium plan"}
+            </strong>{" "}
+            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used · up
+            to {config.plan.limits.photos} photos per ad
+          </span>
+          <Link
+            href="/premium-account"
+            className="font-semibold text-[#0089c8] hover:underline"
+          >
+            {config.plan.plan === "free" ? "Upgrade" : "See plans"}
+          </Link>
+        </div>
+      )}
 
       {/* ── Photos ─────────────────────────────────────────────────────────── */}
       <ImageUpload

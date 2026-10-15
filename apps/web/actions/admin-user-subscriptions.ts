@@ -18,7 +18,7 @@ export interface UserSubscriptionRow {
   paymentMethod: string | null;
   subscribedAt: string;
   expiresAt: string;
-  status: "active" | "expired";
+  status: "active" | "expired" | "superseded";
 }
 
 export async function getUserSubscriptions(): Promise<UserSubscriptionRow[]> {

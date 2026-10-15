@@ -21,6 +21,10 @@ export const listingStatusEnum = pgEnum('listing_status', [
   'active',
   'expired',
   'deleted',
+  // Hidden from public browsing because the owner is over their plan's ad
+  // limit (e.g. the subscription lapsed). Reversible: reconciliation flips it
+  // back to 'active' once the owner's allowance covers it again.
+  'restricted',
 ]);
 export const discountTypeEnum = pgEnum('discount_type', ['percent', 'amount']);
 export const listingConditionEnum = pgEnum('listing_condition', [
@@ -79,6 +83,9 @@ export const listings = pgTable(
     contactEmail: varchar('contact_email', { length: 255 }),
     status: listingStatusEnum('status').default('draft').notNull(),
     viewsCount: integer('views_count').default(0).notNull(),
+    // Times this ad was re-published after its first publish — what the
+    // plan's `renews` allowance is spent against.
+    renewCount: integer('renew_count').default(0).notNull(),
     // The price a buyer actually pays — what cards show and what price
     // filters/sorts must use. MUST stay equal to `applyDiscount` in
     // apps/web/lib/utils.ts (v <= 0 → no discount, percent >= 100 → 0, amount

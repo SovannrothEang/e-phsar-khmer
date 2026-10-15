@@ -12,8 +12,10 @@ import { PaymentEventOutboxHandler } from './outbox/payment-event-outbox-handler
 import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
 import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
+import { PaymentReconciler } from './reconciler/payment-reconciler.service';
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
 
 @Module({
   imports: [
@@ -37,6 +39,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     // For PaymentSettledOutboxHandler — telling the customer their payment
     // settled is a notification concern, not a payment-processing one.
     NotificationsModule,
+    SubscriptionsCoreModule,
   ],
   controllers: [PaymentsController],
   providers: [
@@ -59,6 +62,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     PaymentPollOutboxHandler,
     // Consumes all three BullMQ job kinds — the first @Processor in this repo.
     PaymentProcessor,
+    // The guarantee behind the poll chain: settles any unresolved attempt
+    // straight from Postgres, so a payment made while the app was down (or the
+    // chain broke) still activates. See reconciler/payment-reconciler.service.ts.
+    PaymentReconciler,
     // Consumes the business-level payment.succeeded event — notifies the
     // customer directly, no BullMQ hop (see its own doc comment).
     PaymentSettledOutboxHandler,

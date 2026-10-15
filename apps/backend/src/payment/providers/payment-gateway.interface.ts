@@ -19,6 +19,9 @@ import type {
 export interface PaymentGatewayProvider {
   readonly name: PaymentProviderName;
 
+  /** Human-readable label for the checkout's provider picker. */
+  readonly displayName: string;
+
   charge(request: ChargeRequest): Promise<ChargeResult>;
 
   /**

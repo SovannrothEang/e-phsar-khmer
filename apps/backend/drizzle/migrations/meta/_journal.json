@@ -246,6 +246,27 @@
       "when": 1790742092643,
       "tag": "0034_acoustic_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791280976789,
+      "tag": "0035_sudden_shinobi_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791339988762,
+      "tag": "0036_messy_millenium_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791970052855,
+      "tag": "0037_burly_taskmaster",
+      "breakpoints": true
     }
   ]
 }

@@ -7,6 +7,18 @@ import type { ChatMessage } from "@/types/chat";
 const WS_RECONNECT_BASE_MS = 1_000;
 const WS_RECONNECT_MAX_MS = 30_000;
 const WS_RECONNECT_ATTEMPTS = 10;
+/**
+ * How long a hidden tab keeps its socket before closing it. Short enough that a
+ * forgotten background tab stops pinning a backend instance, long enough that
+ * a quick tab switch doesn't churn a reconnect + ticket fetch.
+ */
+const WS_HIDDEN_GRACE_MS = 60_000;
+
+function isTabHidden(): boolean {
+  return (
+    typeof document !== "undefined" && document.visibilityState === "hidden"
+  );
+}
 
 /**
  * `API_URL` (`lib/api/client.ts`) is deliberately server-only — this hook
@@ -84,6 +96,13 @@ type ConnectedListener = (connected: boolean) => void;
  * to invalidate after a client-side login. Exhausting the budget is not
  * permanent: coming back online or refocusing the tab starts a fresh round.
  *
+ * A tab hidden for `WS_HIDDEN_GRACE_MS` closes its socket and reopens it when
+ * it becomes visible again. An open socket keeps a backend instance alive (and
+ * billed for provisioned memory) even when nothing is sent, so without this one
+ * forgotten background tab pinned an instance for days. Nothing is lost while
+ * it's closed: polling pauses in hidden tabs too, and on refocus the thread's
+ * `after=` delta poll and the inbox/badge refetch catch up.
+ *
  * Every connect fetches a fresh short-lived ticket (`getChatWsTicket`) rather
  * than relying on the auth cookie, which is never sent when the backend is on
  * another origin (e.g. an ngrok tunnel) — and which may hold an expired access
@@ -101,9 +120,12 @@ class ChatSocket {
   private refCount = 0;
   private attempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private hiddenTimer: ReturnType<typeof setTimeout> | null = null;
   /** Bumped per connect/teardown so an in-flight ticket fetch can tell it's stale. */
   private generation = 0;
   private connecting = false;
+  /** Set after the first open in this tab — later opens are reconnects. */
+  private hasConnectedBefore = false;
   isConnected = false;
 
   subscribe(listener: Listener): () => void {
@@ -139,7 +161,7 @@ class ChatSocket {
   }
 
   private ensureConnected() {
-    if (this.connecting) return;
+    if (this.connecting || isTabHidden()) return;
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
@@ -158,6 +180,8 @@ class ChatSocket {
     this.connecting = false;
     // Torn down (or superseded) while the ticket was in flight.
     if (generation !== this.generation || this.refCount === 0) return;
+    // Hidden while the ticket was in flight — `onVisibilityChange` reconnects.
+    if (isTabHidden()) return;
     if (!ticket) {
       this.scheduleReconnect();
       return;
@@ -172,6 +196,16 @@ class ChatSocket {
       if (this.ws !== ws) return;
       this.attempt = 0;
       this.setConnected(true);
+      // Pushes sent while we were closed (hidden tab, network drop) are gone,
+      // and the badge/inbox stop polling once connected — nudge them to
+      // refetch. An open thread catches up on its own (`use-chat-thread.ts`).
+      if (this.hasConnectedBefore) {
+        for (const listener of this.listeners) {
+          listener({ type: "inbox_update" });
+          listener({ type: "unread_count" });
+        }
+      }
+      this.hasConnectedBefore = true;
     };
 
     ws.onmessage = (event) => {
@@ -204,39 +238,51 @@ class ChatSocket {
     this.attempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if (this.refCount > 0) void this.connect();
+      if (this.refCount > 0 && !isTabHidden()) void this.connect();
     }, delay);
   }
 
   /** Network back / tab refocused: retry now with a fresh backoff budget. */
   private readonly wake = () => {
-    if (this.refCount === 0) return;
-    if (
-      typeof document !== "undefined" &&
-      document.visibilityState === "hidden"
-    )
-      return;
+    if (this.refCount === 0 || isTabHidden()) return;
     this.attempt = 0;
     this.ensureConnected();
   };
 
+  private readonly onVisibilityChange = () => {
+    if (isTabHidden()) {
+      if (this.hiddenTimer) return;
+      this.hiddenTimer = setTimeout(() => {
+        this.hiddenTimer = null;
+        if (isTabHidden()) this.disconnect();
+      }, WS_HIDDEN_GRACE_MS);
+      return;
+    }
+    this.clearHiddenTimer();
+    this.wake();
+  };
+
+  private clearHiddenTimer() {
+    if (this.hiddenTimer) clearTimeout(this.hiddenTimer);
+    this.hiddenTimer = null;
+  }
+
   private addWakeListeners() {
     window.addEventListener("online", this.wake);
-    document.addEventListener("visibilitychange", this.wake);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   private removeWakeListeners() {
     window.removeEventListener("online", this.wake);
-    document.removeEventListener("visibilitychange", this.wake);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.clearHiddenTimer();
   }
 
-  private setConnected(v: boolean) {
-    this.isConnected = v;
-    for (const cb of this.connectedListeners) cb(v);
-  }
-
-  private teardown() {
-    this.removeWakeListeners();
+  /**
+   * Close the socket but keep every subscriber — used when the tab is hidden.
+   * `wake` reopens it; `teardown` is the full stop once nobody is subscribed.
+   */
+  private disconnect() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
     this.generation += 1; // invalidates an in-flight ticket fetch
@@ -246,6 +292,16 @@ class ChatSocket {
     ws?.close();
     this.attempt = 0;
     this.setConnected(false);
+  }
+
+  private setConnected(v: boolean) {
+    this.isConnected = v;
+    for (const cb of this.connectedListeners) cb(v);
+  }
+
+  private teardown() {
+    this.removeWakeListeners();
+    this.disconnect();
   }
 }
 
