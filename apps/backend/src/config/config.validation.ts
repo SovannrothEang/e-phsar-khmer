@@ -99,6 +99,25 @@ const envSchema = z.object({
   PAYMENT_JOB_BACKOFF_MS: z.coerce.number().default(5000),
   PAYMENT_WORKER_CONCURRENCY: z.coerce.number().default(5),
 
+  // Payment reconciler — the guarantee that a payment which was actually made
+  // settles even if the app crashed, the poll chain broke, or the browser
+  // closed. Reads straight from Postgres (no BullMQ, no outbox row), so it
+  // works whichever instance runs it. See src/payment/reconciler/.
+  PAYMENT_RECONCILER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  PAYMENT_RECONCILE_INTERVAL_MS: z.coerce.number().default(15_000),
+  // Comma-separated provider names. Conservative on purpose: only providers
+  // with no webhook (Bakong) need a poll backstop; ABA PayWay is webhook-driven.
+  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong'),
+  // A pending attempt this old that the provider still reports unpaid is
+  // failed (the QR has long expired). 15 min vs. the 5 min QR lifetime.
+  PAYMENT_PENDING_ABANDON_MS: z.coerce.number().default(15 * 60 * 1000),
+  // How long after creation a failed-by-timeout attempt is still checked, so
+  // a late-arriving payment is honoured instead of lost.
+  PAYMENT_LATE_PAYMENT_GRACE_MS: z.coerce.number().default(24 * 60 * 60 * 1000),
+
   // ABA PayWay gateway credentials. Optional so build/tests don't require
   // sandbox access — AbaPaywayProvider fails fast with a clear message if
   // charge()/reconcile() is actually called unconfigured.
