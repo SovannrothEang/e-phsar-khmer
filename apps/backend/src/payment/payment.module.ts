@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentsController } from './payment.controller';
+import { AbaPaywayWebhookController } from './webhooks/aba-payway-webhook.controller';
 import { PAYMENT_GATEWAY_PROVIDERS, PaymentGatewayRegistry } from './providers';
 import { AbaPaywayProvider } from './providers/aba-payway/aba-payway.provider';
 import { BakongProvider } from './providers/bakong/bakong.provider';
@@ -41,7 +42,7 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     NotificationsModule,
     SubscriptionsCoreModule,
   ],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, AbaPaywayWebhookController],
   providers: [
     PaymentGatewayRegistry,
     AbaPaywayProvider,
@@ -73,12 +74,7 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
   // BullModule re-exported so any future module (e.g. a subscription
   // checkout flow) can `imports: [PaymentModule]` and `@InjectQueue` the
   // same `payments` queue instead of re-registering it.
-  // PaymentEffectRunner and AbaPaywayProvider exported for WebhooksModule.
-  exports: [
-    PaymentGatewayRegistry,
-    PaymentEffectRunner,
-    AbaPaywayProvider,
-    BullModule,
-  ],
+  // PaymentEffectRunner exported for SubscriptionsModule's checkout.
+  exports: [PaymentGatewayRegistry, PaymentEffectRunner, BullModule],
 })
 export class PaymentModule {}

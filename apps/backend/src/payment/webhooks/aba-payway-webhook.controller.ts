@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Headers,
@@ -8,30 +9,27 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Public } from '../common/decorators/public.decorator';
-import { PaymentEffectRunner } from '../payment/payment-effect-runner.service';
+import { Public } from '../../common/decorators/public.decorator';
+import { PaymentEffectRunner } from '../payment-effect-runner.service';
 import {
   findPaymentAttemptByProviderAttemptId,
   receivePaymentProviderEvent,
-} from '../payment/use-cases';
-import { AbaPaywayProvider } from '../payment/providers/aba-payway/aba-payway.provider';
+} from '../use-cases';
+import { AbaPaywayProvider } from '../providers/aba-payway/aba-payway.provider';
 
 /**
- * ABA PayWay's webhook intake — separated from the payment CRUD controller
- * because this is a provider-specific wire-format handler, not part of the
- * payment lifecycle API. ABA sends its payment notification to this route
- * (configured via ABA_PAYWAY_WEBHOOK_URL env var).
+ * ABA PayWay's callback intake (`return_url` = `ABA_PAYWAY_WEBHOOK_URL`).
+ * Verify the signature, then store the event and enqueue it — nothing is
+ * written for a bad callback.
  *
- * Route: POST /api/v1/webhooks/aba-payway
+ * Route: POST /api/v1/payments/webhooks/aba-payway
  *
- * No service layer here: signature verification and payload parsing are
- * gateway-specific request validation (plain sync calls on the injected
- * provider, same job a guard would do), not a business action — the one
- * actual write is `receivePaymentProviderEvent`, the same use-case the
- * payment module's own controller used to expose.
+ * Legacy alias `webhooks/aba-payway`: ABA gets the callback URL per
+ * transaction, so checkouts created before the move still call the old path.
+ * Drop it once none are unresolved (the reconciler covers a missed callback).
  */
 @ApiTags('webhooks')
-@Controller('webhooks/aba-payway')
+@Controller(['payments/webhooks/aba-payway', 'webhooks/aba-payway'])
 export class AbaPaywayWebhookController {
   private readonly logger = new Logger(AbaPaywayWebhookController.name);
 
@@ -45,10 +43,8 @@ export class AbaPaywayWebhookController {
   @HttpCode(200)
   @ApiOperation({
     summary:
-      "Receive ABA PayWay's payment notification. verifyWebhookSignature() " +
-      '(HMAC-SHA512 over the payload, keyed by the merchant API key, ' +
-      'checked against the X-PayWay-Hmac-Sha512 header) runs first and ' +
-      'rejects with 401 before any DB write.',
+      "Receive ABA PayWay's payment notification (401 on a bad " +
+      'X-PayWay-Hmac-Sha512 signature, before any write)',
   })
   async webhook(
     @Body() body: Record<string, unknown>,
@@ -63,12 +59,19 @@ export class AbaPaywayWebhookController {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
-    const parsed = this.provider.parseWebhookEvent(rawBody);
+    // Signed but unusable (no tran_id): a 400, not a 500.
+    let parsed: ReturnType<AbaPaywayProvider['parseWebhookEvent']>;
+    try {
+      parsed = this.provider.parseWebhookEvent(rawBody);
+    } catch (error) {
+      this.logger.warn(
+        `Unusable ABA PayWay webhook: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BadRequestException('Malformed ABA PayWay callback');
+    }
     const providerName = this.provider.name;
 
-    // Read outside the transaction on purpose — correlating the webhook to
-    // an attempt doesn't need transactional isolation with the write below,
-    // and there's no reason to hold a transaction open for it.
+    // Correlation is a plain read; it needs no transaction.
     const attempt = parsed.providerAttemptId
       ? await this.effectRunner.run(
           findPaymentAttemptByProviderAttemptId({
@@ -88,8 +91,7 @@ export class AbaPaywayWebhookController {
       }),
     );
 
-    // ABA PayWay retries on a non-zero `code` in the JSON body, not just on
-    // HTTP status — this ack shape is what stops it resending.
+    // ABA retries on a non-zero `code` in the body, not just on HTTP status.
     return { code: 0, message: 'Received' };
   }
 }

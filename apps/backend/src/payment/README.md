@@ -54,7 +54,7 @@ primitives that have more than one caller (`checkPayment`, `upsertPayment`,
 controller routes, which is what earns a primitive its own file here. Two
 primitives have exactly one caller each — `listPayments`
 (`PaymentsController`) and `findPaymentAttemptByProviderAttemptId`
-(`AbaPaywayWebhookController`, in [`../webhooks/`](../webhooks)) — and both
+(`AbaPaywayWebhookController`, in [`webhooks/`](webhooks)) — and both
 are deliberate exceptions to the single-caller fold below: their only caller
 is a Nest controller, so folding would put a Drizzle query inside a route
 handler. The thin-controller rule wins over file count in that case.
