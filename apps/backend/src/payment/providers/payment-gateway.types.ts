@@ -59,6 +59,12 @@ export interface ChargeResult {
   failureMessage?: string;
   rawResponse: unknown;
   /**
+   * Epoch ms after which the provider itself refuses payment. A pending
+   * attempt is stored with it and failed once it passes (plus a short grace),
+   * without asking the provider — for webhook-only providers.
+   */
+  expiresAt?: number;
+  /**
    * Set by a provider with no webhook channel at all (e.g. Bakong) on a
    * `pending` result, asking `processPaymentAttempt` to schedule a
    * `reconcile()` poll instead of waiting for a callback that will never

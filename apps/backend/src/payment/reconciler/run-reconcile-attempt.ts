@@ -5,7 +5,7 @@ import { DbClientTag } from '../../db/db.provider';
 import type { OutboxService } from '../../outbox/outbox.service';
 import type { PaymentGatewayRegistry } from '../providers/payment-gateway.registry';
 import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
-import { reconcilePaymentAttempt } from '../use-cases';
+import { expirePaymentAttempt, reconcilePaymentAttempt } from '../use-cases';
 import type { ReconcilePaymentAttemptOutcome } from '../use-cases';
 
 export type ReconcileAttemptResult = ReconcilePaymentAttemptOutcome | 'error';
@@ -60,5 +60,32 @@ export async function runReconcileAttempt(
       `Reconcile of attempt ${input.paymentAttemptId} crashed: ${String(Cause.squash(exit.cause))}`,
     );
   }
+  return 'error';
+}
+
+/** Promise boundary for `expirePaymentAttempt` (DB only, no provider call). */
+export async function runExpireAttempt(
+  deps: Pick<ReconcileAttemptDeps, 'db' | 'logger'>,
+  paymentAttemptId: string,
+): Promise<'skipped' | 'expired' | 'error'> {
+  const exit = await Effect.runPromiseExit(
+    Effect.provide(
+      expirePaymentAttempt({ paymentAttemptId }),
+      DbClientTag.layer(deps.db),
+    ),
+  );
+  if (Exit.isSuccess(exit)) return exit.value;
+
+  const failure = Cause.findErrorOption(exit.cause);
+  // A version conflict means the webhook settled it first — the intended winner.
+  if (
+    Option.isSome(failure) &&
+    failure.value._tag === 'PaymentTransactionConflictError'
+  ) {
+    return 'skipped';
+  }
+  deps.logger.warn(
+    `Expiring attempt ${paymentAttemptId} failed: ${Option.isSome(failure) ? failure.value._tag : String(Cause.squash(exit.cause))}`,
+  );
   return 'error';
 }

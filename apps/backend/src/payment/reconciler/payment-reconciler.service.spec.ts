@@ -1,13 +1,15 @@
 import { PaymentReconciler } from './payment-reconciler.service';
-import { runReconcileAttempt } from './run-reconcile-attempt';
+import { runExpireAttempt, runReconcileAttempt } from './run-reconcile-attempt';
 
 // The Effect bridge is mocked at its Promise boundary — `effect` is ESM-only
 // and Jest never needs to load it to test the sweep's own logic.
 jest.mock('./run-reconcile-attempt', () => ({
   runReconcileAttempt: jest.fn(),
+  runExpireAttempt: jest.fn(),
 }));
 
 const reconcileMock = runReconcileAttempt as unknown as jest.Mock;
+const expireMock = runExpireAttempt as unknown as jest.Mock;
 
 /** A drizzle-style query chain that resolves `rows` at `.limit()`. */
 function chain(rows: unknown[]) {
@@ -23,6 +25,7 @@ const MINUTE = 60_000;
 
 function build(opts: {
   stuck?: unknown[];
+  expired?: unknown[];
   candidates?: unknown[];
   providers?: string[];
   activate?: jest.Mock;
@@ -30,8 +33,10 @@ function build(opts: {
   const db = {
     select: jest
       .fn()
-      // 1st select = purchases awaiting activation, 2nd = attempts to reconcile.
+      // In call order: purchases awaiting activation, expired webhook-only
+      // attempts, then attempts to reconcile.
       .mockReturnValueOnce(chain(opts.stuck ?? []))
+      .mockReturnValueOnce(chain(opts.expired ?? []))
       .mockReturnValueOnce(chain(opts.candidates ?? [])),
   };
   const outbox = { wakeupAfterCommit: jest.fn() };
@@ -62,7 +67,10 @@ const attempt = (id: string, ageMs: number) => ({
 });
 
 describe('PaymentReconciler.runOnce', () => {
-  beforeEach(() => reconcileMock.mockReset());
+  beforeEach(() => {
+    reconcileMock.mockReset();
+    expireMock.mockReset();
+  });
 
   it('settles an unresolved attempt and wakes the outbox so activation follows', async () => {
     reconcileMock.mockResolvedValue('succeeded');
@@ -185,6 +193,52 @@ describe('PaymentReconciler.runOnce', () => {
 
     expect(activation.activatePaidPurchase).toHaveBeenCalledTimes(1);
     expect(summary.checked).toBe(0);
-    expect(db.select).toHaveBeenCalledTimes(1);
+    // activation + expiry only — the candidates query is skipped.
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PaymentReconciler.runOnce — webhook-only expiry', () => {
+  beforeEach(() => {
+    reconcileMock.mockReset();
+    expireMock.mockReset();
+  });
+
+  it('fails each expired attempt and counts it as abandoned, with no provider call', async () => {
+    expireMock.mockResolvedValue('expired');
+    const { reconciler } = build({ expired: [{ id: 'e1' }, { id: 'e2' }] });
+
+    const summary = await reconciler.runOnce(1);
+
+    expect(expireMock).toHaveBeenCalledTimes(2);
+    expect(expireMock).toHaveBeenCalledWith(expect.anything(), 'e1');
+    expect(expireMock).toHaveBeenCalledWith(expect.anything(), 'e2');
+    expect(summary.abandoned).toBe(2);
+    expect(reconcileMock).not.toHaveBeenCalled();
+  });
+
+  it('does not count an attempt a webhook settled first (skipped)', async () => {
+    expireMock.mockResolvedValue('skipped');
+    const { reconciler } = build({ expired: [{ id: 'e1' }] });
+
+    expect((await reconciler.runOnce(1)).abandoned).toBe(0);
+  });
+
+  it('keeps going after one attempt fails to expire', async () => {
+    expireMock.mockResolvedValueOnce('error').mockResolvedValueOnce('expired');
+    const { reconciler } = build({ expired: [{ id: 'e1' }, { id: 'e2' }] });
+
+    expect((await reconciler.runOnce(1)).abandoned).toBe(1);
+    expect(expireMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('expires even when no provider is configured to poll', async () => {
+    expireMock.mockResolvedValue('expired');
+    const { reconciler } = build({ expired: [{ id: 'e1' }], providers: [] });
+
+    const summary = await reconciler.runOnce(1);
+
+    expect(summary.abandoned).toBe(1);
+    expect(summary.checked).toBe(0);
   });
 });

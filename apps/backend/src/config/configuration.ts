@@ -84,6 +84,7 @@ export default () => {
       merchantId: env.ABA_PAYWAY_MERCHANT_ID,
       baseUrl: env.ABA_PAYWAY_BASE_URL,
       webhookUrl: env.ABA_PAYWAY_WEBHOOK_URL,
+      lifetimeMinutes: env.ABA_PAYWAY_LIFETIME_MINUTES,
     },
     bakong: {
       baseUrl: env.BAKONG_BASE_URL,

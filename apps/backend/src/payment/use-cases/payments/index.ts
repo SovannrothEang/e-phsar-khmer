@@ -39,5 +39,6 @@ export * from './processing/poll-payment-attempt.use-case';
 export * from './processing/settle-reconciled-attempt.use-case';
 export * from './processing/reconcile-payment-attempt.use-case';
 export * from './processing/fail-payment-attempt.use-case';
+export * from './processing/expire-payment-attempt.use-case';
 export * from './processing/fail-abandoned-payment-job.use-case';
 export * from './processing/enqueue-payment-settled-event.use-case';
