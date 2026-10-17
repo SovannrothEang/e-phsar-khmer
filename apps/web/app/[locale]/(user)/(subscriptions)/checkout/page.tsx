@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -34,10 +34,22 @@ import {
 } from "@/lib/subscription-pricing";
 import { Button } from "@/components/ui/button";
 import { KhqrCard } from "@/components/payment/KhqrCard";
+import { useNotificationEvents } from "@/hooks/use-chat-ws";
+import { useMobilePlatform } from "@/hooks/use-mobile-platform";
 
-// ~7 minutes at 2.5s — longer than the 5 minute KHQR lifetime, so the page
-// never stops watching a code that could still be paid.
-const MAX_POLLS = 170;
+// Waiting for the charge job to hand back the KHQR: up to ~20s.
+const QR_WAIT_MS = 1_000;
+const QR_WAIT_TRIES = 20;
+// Payment status reads only when no push can arrive: socket down, or the
+// code just expired (failures and expiry are not pushed).
+const FALLBACK_REFRESH_MS = 5_000;
+// Kept above the backend's 30 s expiry sweep slack (PaymentReconciler), so
+// the page is still reading when an expired checkout flips to failed.
+const EXPIRY_GRACE_MS = 60_000;
+// Both providers stamp `expiresAt` into the checkout (Bakong: the 5 min KHQR;
+// ABA: `ABA_PAYWAY_LIFETIME_MINUTES`), which drives the countdown and the
+// stop. This is only the fallback for a checkout that arrives without one.
+const NO_EXPIRY_WAIT_MS = 7 * 60_000;
 
 function money(value: string | number): string {
   return Number(value).toLocaleString("en-US", {
@@ -130,7 +142,8 @@ export default function CheckoutPage() {
   const [now, setNow] = useState(() => Date.now());
   const [active, setActive] = useState<UserSubscription | null>(null);
   const idempotencyKey = useRef<string | null>(null);
-  const pollCount = useRef(0);
+  const platform = useMobilePlatform();
+  const appOpenedFor = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -219,64 +232,142 @@ export default function CheckoutPage() {
   }
 
   const paymentId = payment?.id;
+  const hasCheckout = !!payment?.checkout;
+  // Still waiting on the outcome — "succeeded" included, since the plan may
+  // not be active yet when the payment is read.
+  const awaitingResult =
+    !!payment &&
+    !activated &&
+    (payment.status === "pending" ||
+      payment.status === "processing" ||
+      payment.status === "succeeded");
 
+  // One read of the payment, plus the subscription once it has succeeded.
+  // Runs on a push or a fallback trigger below — never on a fixed interval
+  // while the socket is up. A call arriving mid-read is folded into one
+  // rerun, so a push landing during a catch-up read is never dropped.
+  const livePaymentId = useRef(paymentId);
+  const reading = useRef(false);
+  const rerun = useRef(false);
   useEffect(() => {
+    livePaymentId.current = paymentId;
+  }, [paymentId]);
+
+  const refreshPayment = useCallback(async () => {
     if (!paymentId || !purchaseId) return;
-    let cancelled = false;
-    let timeout: ReturnType<typeof setTimeout>;
+    if (reading.current) {
+      rerun.current = true;
+      return;
+    }
+    reading.current = true;
+    try {
+      do {
+        rerun.current = false;
+        const result = await getPaymentTransactionStatus(paymentId);
+        // A retry started a new checkout while this read was in flight.
+        if (livePaymentId.current !== paymentId) return;
+        if (!result.success) {
+          setError(result.error);
+          continue;
+        }
+        setError(null);
+        setPayment(result.data);
+        if (result.data.status !== "succeeded") continue;
+        const subscriptions = await getMySubscriptions().catch(() => null);
+        if (
+          subscriptions?.some(
+            (subscription) =>
+              subscription.purchaseId === purchaseId &&
+              subscription.status === "active",
+          )
+        ) {
+          setActivated(true);
+        }
+      } while (rerun.current);
+    } finally {
+      reading.current = false;
+    }
+  }, [paymentId, purchaseId]);
 
-    const poll = async () => {
-      if (cancelled) return;
-      if (pollCount.current >= MAX_POLLS) {
-        setError(
-          "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
-        );
+  // The KHQR is created asynchronously by the charge job, so read the
+  // payment until it carries one — a short, bounded wait, not a status poll.
+  useEffect(() => {
+    if (!awaitingResult || hasCheckout) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (tries > QR_WAIT_TRIES) {
+        clearInterval(timer);
+        setError("We couldn't load the payment code. Please try again.");
         return;
       }
-      pollCount.current += 1;
-      const result = await getPaymentTransactionStatus(paymentId);
-      if (cancelled) return;
-      if (!result.success) {
-        setError(`${result.error}; retrying…`);
-        timeout = setTimeout(poll, 2500);
-        return;
-      }
+      void refreshPayment();
+    }, QR_WAIT_MS);
+    void refreshPayment();
+    return () => clearInterval(timer);
+  }, [awaitingResult, hasCheckout, refreshPayment]);
 
-      setError(null);
-      setPayment(result.data);
-      if (result.data.status === "succeeded") {
-        try {
-          const subscriptions = await getMySubscriptions();
-          if (
-            subscriptions.some(
-              (subscription) =>
-                subscription.purchaseId === purchaseId &&
-                subscription.status === "active",
-            )
-          ) {
-            setActivated(true);
+  // The outcome is pushed: the backend sends `payment.succeeded` over the
+  // shared socket once the subscription is active (every provider settles
+  // through that one event — ABA's webhook, Bakong's check, the reconciler).
+  const { isConnected } = useNotificationEvents({
+    enabled: awaitingResult,
+    onNotification: (notification) => {
+      if (
+        notification.type === "payment.succeeded" &&
+        notification.data?.paymentTransactionId === paymentId
+      ) {
+        void refreshPayment();
+      }
+    },
+  });
+
+  // A push sent while the socket was down is not replayed — catch up on
+  // every (re)connect.
+  useEffect(() => {
+    if (awaitingResult && isConnected) void refreshPayment();
+  }, [awaitingResult, isConnected, refreshPayment]);
+
+  // No socket at all (blocked, misconfigured, reconnects exhausted): a slow
+  // read keeps the page settling on its own.
+  useEffect(() => {
+    if (!awaitingResult || isConnected) return;
+    const timer = setInterval(() => void refreshPayment(), FALLBACK_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [awaitingResult, isConnected, refreshPayment]);
+
+  // Failures and expiry are not pushed, so once the code can no longer be
+  // paid, read for a short grace window to pick up the final status, then
+  // stop. A late `payment.succeeded` push still lands after that. Without an
+  // expiry on the code, the clock starts when waiting starts (this effect
+  // only re-runs if an expiry turns up, or for a new checkout).
+  const qrExpiresAt = getQr(payment?.checkout?.rawResponse)?.expiresAt ?? null;
+  useEffect(() => {
+    if (!awaitingResult) return;
+    const deadline = qrExpiresAt ?? Date.now() + NO_EXPIRY_WAIT_MS;
+    const graceEnd = deadline + EXPIRY_GRACE_MS;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(
+      () => {
+        void refreshPayment();
+        interval = setInterval(() => {
+          if (Date.now() > graceEnd) {
+            clearInterval(interval);
+            setError(
+              "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
+            );
             return;
           }
-        } catch {
-          // Keep polling activation status through temporary API failures.
-        }
-      } else if (
-        result.data.status !== "pending" &&
-        result.data.status !== "processing"
-      ) {
-        return;
-      }
-
-      timeout = setTimeout(poll, 2500);
-    };
-
-    pollCount.current = 0;
-    void poll();
+          void refreshPayment();
+        }, FALLBACK_REFRESH_MS);
+      },
+      Math.max(0, deadline - Date.now()),
+    );
     return () => {
-      cancelled = true;
       clearTimeout(timeout);
+      clearInterval(interval);
     };
-  }, [paymentId, purchaseId]);
+  }, [awaitingResult, qrExpiresAt, refreshPayment]);
 
   // Only gates the pre-payment step: once a checkout exists, its own status
   // drives the page (activation flips `active` to the new plan anyway).
@@ -310,6 +401,29 @@ export default function CheckoutPage() {
   const remainingMs = qrInfo?.expiresAt ? qrInfo.expiresAt - now : null;
   const receiverName = qrInfo ? emvTag(qrInfo.qr, "59") : null;
   const appLink = payment?.checkout?.redirectUrl ?? null;
+  const qrShown = !!qrInfo;
+
+  // On a phone, hand off to the provider's app (ABA's deeplink) as soon as
+  // the QR is up — the browser's own "Open in …?" prompt is the ask, and an
+  // app that isn't installed simply doesn't open, leaving the QR. Once per
+  // checkout, so a re-render or a return from the app never re-fires it.
+  useEffect(() => {
+    if (!platform || !appLink || !qrShown || !waitingForPayment) return;
+    if (!paymentId || appOpenedFor.current === paymentId) return;
+    appOpenedFor.current = paymentId;
+    window.location.href = appLink;
+  }, [platform, appLink, qrShown, waitingForPayment, paymentId]);
+
+  // Back from the app: read once rather than wait on a push the
+  // backgrounded socket may have missed.
+  useEffect(() => {
+    if (!awaitingResult) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshPayment();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [awaitingResult, refreshPayment]);
   const ui = provider ? providerUi(provider) : null;
   const paymentFailed =
     payment?.status === "failed" ||
@@ -544,8 +658,8 @@ export default function CheckoutPage() {
                       {clock(remainingMs)} | QR will expire
                     </p>
                   )}
-                  {appLink && (
-                    <div className="sm:hidden">
+                  {appLink && platform && (
+                    <div>
                       <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="h-px flex-1 bg-border" /> Or
                         <span className="h-px flex-1 bg-border" />
