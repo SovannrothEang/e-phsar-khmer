@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { queueRedisOptions } from '../common/queue/queue-connection';
 
 export type ChatPushEvent =
   | { targetUserId: string; type: 'message'; payload: unknown }
@@ -52,18 +53,10 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
   private handler: ((event: ChatPushEvent) => void) | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const options = {
-      host: this.config.get<string>('queue.host') ?? 'localhost',
-      port: this.config.get<number>('queue.port') ?? 6379,
-      username: this.config.get<string>('queue.username'),
-      password: this.config.get<string>('queue.password'),
-      db: this.config.get<number>('queue.db') ?? 0,
-      tls: this.config.get<boolean>('queue.tls') ? {} : undefined,
-    };
     // Pub/sub needs its own connection — a subscribed ioredis client can't
     // issue other commands — so this is deliberately separate from BullMQ's.
-    this.pub = new Redis(options);
-    this.sub = new Redis(options);
+    this.pub = new Redis(queueRedisOptions(this.config, 'chat-pub'));
+    this.sub = new Redis(queueRedisOptions(this.config, 'chat-sub'));
 
     // ioredis is an EventEmitter: an 'error' event with no listener is a
     // fatal unhandled exception that crashes the whole process, not just
