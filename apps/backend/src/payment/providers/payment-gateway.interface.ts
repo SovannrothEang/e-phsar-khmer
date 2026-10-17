@@ -36,6 +36,13 @@ export interface PaymentGatewayProvider {
   reconcile?(providerTransactionId: string): Promise<ChargeResult>;
 
   /**
+   * The provider's webhook is signed, so once `verifyWebhookSignature` passes
+   * its status is final: `processProviderEvent` settles on it directly instead
+   * of calling `reconcile()` (a webhook-only provider has no polling).
+   */
+  readonly trustsVerifiedWebhook?: boolean;
+
+  /**
    * Whether this provider has the credentials it needs to actually call
    * out (e.g. an API key/merchant id from env config) — not whether it's
    * registered (that's `PaymentGatewayRegistry.resolve` succeeding at

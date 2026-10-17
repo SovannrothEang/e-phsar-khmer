@@ -47,6 +47,8 @@ import {
     ChatMaintenanceScheduler,
     ChatMaintenanceProcessor,
   ],
-  exports: [ChatService, ChatMetricsService],
+  // ChatPubSubService is exported for NotificationsModule's realtime channel —
+  // the per-tab socket is the app's only push transport today.
+  exports: [ChatService, ChatMetricsService, ChatPubSubService],
 })
 export class ChatModule {}

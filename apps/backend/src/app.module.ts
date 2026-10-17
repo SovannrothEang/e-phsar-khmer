@@ -36,7 +36,6 @@ import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentModule } from './payment/payment.module';
-import { WebhooksModule } from './webhooks/webhooks.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
@@ -92,7 +91,6 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     AttributesModule,
     AdminModule,
     PaymentModule,
-    WebhooksModule,
     SubscriptionsModule,
   ],
   controllers: [AppController],

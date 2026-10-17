@@ -6,7 +6,17 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, eq, gte, inArray, isNotNull, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  notInArray,
+  or,
+} from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
 import { OutboxService } from '../../outbox/outbox.service';
@@ -15,7 +25,7 @@ import { SubscriptionActivationService } from '../../subscriptions/subscription-
 import { paymentAttempts, paymentTransactions } from '../entity';
 import { PaymentGatewayRegistry } from '../providers/payment-gateway.registry';
 import { RECOVERABLE_FAILURE_CODES, isDueThisTick } from './reconcile-policy';
-import { runReconcileAttempt } from './run-reconcile-attempt';
+import { runExpireAttempt, runReconcileAttempt } from './run-reconcile-attempt';
 
 /** Attempts younger than this are checked every tick; older ones less often. */
 const FAST_WINDOW_MS = 30 * 60 * 1000;
@@ -23,6 +33,11 @@ const FAST_WINDOW_MS = 30 * 60 * 1000;
 const SLOW_EVERY_TICKS = 20;
 /** Most attempts looked at per tick — bounds provider calls per cycle. */
 const BATCH_LIMIT = 100;
+/**
+ * Slack past a webhook-only checkout's expiry before failing it, so a callback
+ * already in flight lands first. Kept under the web page's 60 s grace.
+ */
+const EXPIRY_GRACE_MS = 30 * 1000;
 
 export interface ReconcileSummary {
   checked: number;
@@ -138,6 +153,7 @@ export class PaymentReconciler
     // activated (the `payment.succeeded` event was consumed by an instance
     // that only notified, or lost) is finished here, with no provider call.
     summary.activated = await this.activateSettledPurchases();
+    summary.abandoned += await this.expireWebhookAttempts();
 
     const providers = this.providers();
     if (providers.length === 0) return summary;
@@ -257,6 +273,46 @@ export class PaymentReconciler
       }
     }
     return activated;
+  }
+
+  /**
+   * Fails pending attempts whose stored `expiresAt` has passed, for providers
+   * that are NOT polled (webhook-only, i.e. ABA): the provider refuses payment
+   * after its lifetime, so there is nothing to ask — this only closes our side.
+   * Database only, never a provider call.
+   */
+  private async expireWebhookAttempts(): Promise<number> {
+    const polled = this.providers();
+    const cutoff = new Date(Date.now() - EXPIRY_GRACE_MS);
+    const expired = await this.db
+      .select({ id: paymentAttempts.id })
+      .from(paymentAttempts)
+      .innerJoin(
+        paymentTransactions,
+        eq(paymentTransactions.id, paymentAttempts.paymentTransactionId),
+      )
+      .where(
+        and(
+          eq(paymentAttempts.status, 'pending'),
+          isNotNull(paymentTransactions.expiresAt),
+          lt(paymentTransactions.expiresAt, cutoff),
+          polled.length > 0
+            ? notInArray(paymentAttempts.provider, polled)
+            : undefined,
+        ),
+      )
+      .orderBy(asc(paymentTransactions.expiresAt))
+      .limit(BATCH_LIMIT);
+
+    let count = 0;
+    for (const row of expired) {
+      const outcome = await runExpireAttempt(
+        { db: this.db, logger: this.logger },
+        row.id,
+      );
+      if (outcome === 'expired') count += 1;
+    }
+    return count;
   }
 
   private providers(): string[] {

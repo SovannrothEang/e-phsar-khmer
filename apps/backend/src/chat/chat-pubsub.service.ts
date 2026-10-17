@@ -15,7 +15,16 @@ export type ChatPushEvent =
   // thread refetches its delta to pick up the new peerLastReadAt. Without
   // this, a WS-connected sender (whose delta poll is paused) never sees the
   // "seen" tick until focus/reconnect.
-  | { targetUserId: string; type: 'read'; payload: { conversationId: string } };
+  | { targetUserId: string; type: 'read'; payload: { conversationId: string } }
+  // A user-facing notification was just created (see
+  // RealtimeNotificationChannel) — e.g. `payment.succeeded`, which is what
+  // lets the checkout page settle without polling. Not chat-specific: this
+  // socket is simply the one realtime connection a signed-in tab holds.
+  | {
+      targetUserId: string;
+      type: 'notification';
+      payload: { type: string; data?: Record<string, unknown> };
+    };
 
 const CHANNEL = 'chat:push';
 
