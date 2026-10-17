@@ -59,6 +59,14 @@ export type ChatWsEvent =
   | { type: "unread_count" }
   /** The peer read my messages in this conversation — refetch receipts. */
   | { type: "read"; payload: { conversationId: string } }
+  /**
+   * A notification was created for me (e.g. `payment.succeeded`). The
+   * socket is the app's one push transport, not only chat's.
+   */
+  | {
+      type: "notification";
+      payload: { type: string; data?: Record<string, unknown> };
+    }
   /** Reply to our own `send_message` frame. */
   | {
       type: "ack";
@@ -393,6 +401,43 @@ export function useChatRealtimeEvents({
     const unsubscribe = chatSocket.subscribe((event) => {
       if (event.type === "inbox_update" || event.type === "unread_count")
         onEventRef.current(event);
+    });
+    const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
+    return () => {
+      unsubscribe();
+      unsubscribeConnected();
+    };
+  }, [enabled]);
+
+  return { isConnected: enabled && isConnected };
+}
+
+/**
+ * Notification pushes (`{ type: "notification" }` frames) on the shared
+ * socket. A push sent while the socket was down is not replayed, so callers
+ * that wait on one should re-read their state whenever `isConnected` flips
+ * back to true.
+ */
+export function useNotificationEvents({
+  enabled,
+  onNotification,
+}: {
+  enabled: boolean;
+  onNotification: (
+    notification: Extract<ChatWsEvent, { type: "notification" }>["payload"],
+  ) => void;
+}): { isConnected: boolean } {
+  const [isConnected, setIsConnected] = useState(chatSocket.isConnected);
+  const onNotificationRef = useRef(onNotification);
+  useEffect(() => {
+    onNotificationRef.current = onNotification;
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsubscribe = chatSocket.subscribe((event) => {
+      if (event.type === "notification")
+        onNotificationRef.current(event.payload);
     });
     const unsubscribeConnected = chatSocket.onConnectedChange(setIsConnected);
     return () => {
