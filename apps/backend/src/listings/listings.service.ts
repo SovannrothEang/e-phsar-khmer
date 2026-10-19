@@ -257,7 +257,10 @@ export class ListingsService {
     return { ...updated, photos };
   }
 
-  async findById(id: string): Promise<ListingWithPhotos> {
+  async findById(
+    id: string,
+    options?: { includeRemoved?: boolean },
+  ): Promise<ListingWithPhotos> {
     // The owner's handle travels with the listing so a client never has to
     // guess it — the detail page's seller card used to derive one from the
     // free-text `contactName`, which is unrelated to the account and produced
@@ -270,6 +273,12 @@ export class ListingsService {
       .where(eq(listings.id, id))
       .limit(1);
     if (!row) throw new NotFoundException('Listing not found');
+    // A moderation take-down is invisible to every public reader, including
+    // the direct detail URL. Owner paths (`publish`/`remove`) pass
+    // `includeRemoved` so they can see the row and refuse/act deliberately;
+    // the default fails closed.
+    if (row.listing.takenDownAt && !options?.includeRemoved)
+      throw new NotFoundException('Listing not found');
 
     const [photos, likeCount] = await Promise.all([
       this.db
@@ -411,6 +420,11 @@ export class ListingsService {
   private liveConditions(): SQL[] {
     return [
       eq(listings.status, 'active'),
+      // Moderation take-downs stay down even if the owner flips the status
+      // back; `taken_down_at` is the durable intent, `status` is the display
+      // state. Null for every non-moderated listing, so the feed is unchanged
+      // for all existing rows.
+      isNull(listings.takenDownAt),
       or(isNull(listings.expiresAt), sql`${listings.expiresAt} > now()`)!,
     ];
   }
@@ -481,9 +495,16 @@ export class ListingsService {
   }
 
   async publish(userId: string, id: string): Promise<ListingWithPhotos> {
-    const existing = await this.findById(id);
+    const existing = await this.findById(id, { includeRemoved: true });
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
+    // `status='deleted'` alone would let the owner resurrect the ad with one
+    // publish call — the take-down marker is the real guard.
+    if (existing.takenDownAt)
+      throw new ForbiddenException({
+        code: 'LISTING_TAKEN_DOWN',
+        message: 'This listing was removed by moderation',
+      });
 
     const publishedAt = new Date();
     const expiresAt = new Date(
@@ -732,7 +753,9 @@ export class ListingsService {
   }
 
   async remove(userId: string, id: string): Promise<ListingWithPhotos> {
-    const existing = await this.findById(id);
+    // A taken-down listing is already hidden; the owner may still remove it
+    // (idempotent), so this path must see the row.
+    const existing = await this.findById(id, { includeRemoved: true });
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
 

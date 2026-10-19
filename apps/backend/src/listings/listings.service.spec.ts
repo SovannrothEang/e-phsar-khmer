@@ -392,6 +392,65 @@ describe('ListingsService.findById seller handle', () => {
   });
 });
 
+describe('ListingsService moderation take-downs', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: ListingsService;
+
+  /** .select().from().leftJoin().where().limit() — the joined listing query. */
+  const listingQuery = (result: object[]) => ({
+    from: () => ({
+      leftJoin: () => ({
+        where: () => ({ limit: () => Promise.resolve(result) }),
+      }),
+    }),
+  });
+  /** .select().from().where().orderBy() — the photos query that follows it. */
+  const photosQuery = () => ({
+    from: () => ({ where: () => ({ orderBy: () => Promise.resolve([]) }) }),
+  });
+
+  const takenDownListing = {
+    listing: { id: 'listing-9', userId: 'user-9', takenDownAt: new Date() },
+    sellerUsername: 'seller9',
+  };
+
+  function mockListing(row: object) {
+    db.select
+      .mockReturnValueOnce(listingQuery([row]))
+      .mockReturnValueOnce(photosQuery());
+  }
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  it('404s a taken-down listing on the public read', async () => {
+    mockListing(takenDownListing);
+
+    await expect(service.findById('listing-9')).rejects.toThrow(
+      'Listing not found',
+    );
+  });
+
+  it('returns it to owner paths that opt in', async () => {
+    mockListing(takenDownListing);
+
+    await expect(
+      service.findById('listing-9', { includeRemoved: true }),
+    ).resolves.toMatchObject({ id: 'listing-9' });
+  });
+
+  it('refuses to republish a taken-down listing', async () => {
+    mockListing(takenDownListing);
+
+    await expect(service.publish('user-9', 'listing-9')).rejects.toThrow(
+      'removed by moderation',
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
 /**
  * Search/filter additions (spec-search.md). A generic chainable mock: every
  * builder method records its arguments and returns the chain, and awaiting
@@ -495,6 +554,12 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(sql).toMatch(
       /\("listings"\."expires_at" is null or "listings"\."expires_at" > now\(\)\)/,
     );
+  });
+
+  it('hides moderation take-downs from every feed query', async () => {
+    const [page] = queue([]);
+    await service.findFeed({});
+    expect(whereOf(page).sql).toMatch(/"listings"\."taken_down_at" is null/);
   });
 
   it('filters model year numerically and engine type by name', async () => {

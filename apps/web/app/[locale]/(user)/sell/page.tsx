@@ -162,8 +162,8 @@
 import { useState } from "react";
 import { CategorySelecter, PostForm } from "@/components/post/PostForm";
 import type { Category, Subcategory } from "@/types/category";
-import { IconChevronRight, IconHome } from "@tabler/icons-react";
-import { Link } from "@/i18n/routing";
+import { IconChevronRight } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { Separator } from "@/components/ui/separator";
 
 export default function SellPage() {
@@ -191,22 +191,10 @@ export default function SellPage() {
     <>
       <div className="pt-6 bg-muted">
         <div className="max-w-4xl mx-auto w-full pb-60">
-          <nav className="flex items-center gap-2 text-base pb-6">
-            <Link
-              href="/"
-              className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-            >
-              <IconHome
-                size={18}
-                className="text-foreground dark:text-gray-400 group-hover:text-blue-300"
-              />
-              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-                Home
-              </span>
-            </Link>
-            <IconChevronRight size={16} className="block mt-1 text-gray-500" />
-            <h1 className="text-gray-500 dark:text-gray-400">Post</h1>
-          </nav>
+          <Breadcrumbs
+            className="pb-6"
+            items={[{ label: "Home", href: "/" }, { label: "Post" }]}
+          />
           <div className="w-full max-w-4xl rounded-sm border bg-card overflow-hidden">
             {/* Header */}
             <div className=" px-5 py-6">

@@ -34,64 +34,80 @@ import {
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getUserReports,
   updateUserReportStatus,
 } from "@/actions/admin-reports";
 import { ReportUser } from "@/types/reportuser";
 import { toast } from "@/components/ui/sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
 
 type ReportUserRow = ReportUser & {
   _reporterName: string;
   _targetName: string;
+  _targetUsername: string | null;
 };
 
 export default function ReportUsersPage() {
   const queryClient = useQueryClient();
-  const { data: reports = [] } = useQuery({
+  const {
+    data: reports = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "reports", "users"],
-    queryFn: async (): Promise<ReportUser[]> => {
+    queryFn: async (): Promise<ReportUserRow[]> => {
       const rows = await getUserReports();
-      return rows.map(
-        (r) =>
-          ({
-            ReportUserID: r.id,
-            TargetUserID: r.targetUserId,
-            ReportedByUserID: r.reporterId,
-            ReportImage: r.imagePaths ?? [],
-            ReportReasonID: r.reasonText ?? "",
-            ReportUserDescription: r.description ?? "",
-            Status: (r.status.charAt(0).toUpperCase() +
-              r.status.slice(1)) as ReportUser["Status"],
-            CreatedAt: r.createdAt,
-            ReviewedBy: r.reviewedById ?? undefined,
-            _reporterName: r.reporterName,
-            _targetName: r.targetName,
-          }) as ReportUserRow,
-      );
+      return rows.map((r) => ({
+        ReportUserID: r.id,
+        TargetUserID: r.targetUserId,
+        ReportedByUserID: r.reporterId,
+        ReportImage: r.imagePaths ?? [],
+        ReportReasonID: r.reasonText ?? "",
+        ReportUserDescription: r.description ?? "",
+        Status: (r.status.charAt(0).toUpperCase() +
+          r.status.slice(1)) as ReportUser["Status"],
+        CreatedAt: r.createdAt,
+        ReviewedBy: r.reviewerName ?? undefined,
+        _reporterName: r.reporterName,
+        _targetName: r.targetName,
+        _targetUsername: r.targetUsername,
+      }));
     },
   });
-  const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["admin", "reports", "users"] });
 
+  const statusMutation = useMutation({
+    mutationFn: (input: { id: string; status: "approved" | "rejected" }) =>
+      updateUserReportStatus(input.id, input.status),
+    onSuccess: (res, input) => {
+      if (!res.success) {
+        toast.error(res.error ?? "Update failed");
+        return;
+      }
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "reports", "users"],
+      });
+      toast.success(`Report ${input.status}`);
+    },
+  });
+
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [tab, setTab] = useState("all");
   const router = useRouter();
   const locale = useLocale();
-
-  const updateStatus = async (id: string, status: ReportUser["Status"]) => {
-    const s = status.toLowerCase() as "pending" | "approved" | "rejected";
-    const res = await updateUserReportStatus(id, s);
-    if (res.success) {
-      refresh();
-      toast.success(`Report ${status}`);
-    } else {
-      toast.error(res.error ?? "Update failed");
-    }
-  };
 
   // ✅ SEARCH & FILTER
   const filteredReports = (reports as Array<ReportUserRow>).filter((r) => {
@@ -199,15 +215,39 @@ export default function ReportUsersPage() {
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created At</TableHead>
-              <TableHead>ReviewdBy</TableHead>
+              <TableHead>ReviewedBy</TableHead>
               <TableHead className="text-center">Action</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {paginatedReports.length === 0 ? (
+            {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-6">
+                <TableCell
+                  colSpan={10}
+                  className="h-32 text-center text-muted-foreground"
+                >
+                  Loading reports…
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={10} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <p>Could not load reports.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : paginatedReports.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-6">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
                     <p>No reports found</p>
                     {searchQuery && (
@@ -234,13 +274,15 @@ export default function ReportUsersPage() {
                     {report.ReportImage && report.ReportImage.length > 0 ? (
                       <div className="flex flex-wrap gap-1 justify-center max-h-[90px] overflow-y-auto p-0.5">
                         {report.ReportImage.slice(0, 24).map((image, index) => (
-                          // eslint-disable-next-line @next/next/no-img-element -- dynamic attachment URL
-                          <img
+                          <DbImage
                             key={index}
                             src={image}
                             alt={`Report attachment ${index + 1}`}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded object-cover border border-muted cursor-pointer"
                             onClick={() => window.open(image, "_blank")}
+                            fallback={<NoImageCell />}
                           />
                         ))}
                       </div>
@@ -282,17 +324,17 @@ export default function ReportUsersPage() {
                       {report.Status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{report.CreatedAt.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {new Date(report.CreatedAt).toLocaleString()}
+                  </TableCell>
                   <TableCell>{report.ReviewedBy ?? "-"}</TableCell>
                   <TableCell className="flex gap-2 justify-center">
                     <Button
                       size="sm"
+                      disabled={!report._targetUsername}
                       onClick={() => {
-                        const slug =
-                          (report as ReportUserRow)._targetName
-                            ?.replace(/\s+/g, "-")
-                            .toLowerCase() + report.TargetUserID;
-                        router.push(`/${locale}/${slug}`);
+                        if (!report._targetUsername) return;
+                        router.push(`/${locale}/${report._targetUsername}`);
                       }}
                       className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"
                     >
@@ -300,10 +342,10 @@ export default function ReportUsersPage() {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() =>
-                        updateStatus(report.ReportUserID, "Approved")
+                      onClick={() => setConfirmId(report.ReportUserID)}
+                      disabled={
+                        report.Status === "Approved" || statusMutation.isPending
                       }
-                      disabled={report.Status === "Approved"}
                       className="text-white bg-green-500 rounded-sm hover:bg-green-600 hover:text-white cursor-pointer"
                     >
                       Approve
@@ -312,9 +354,14 @@ export default function ReportUsersPage() {
                     <Button
                       size="sm"
                       onClick={() =>
-                        updateStatus(report.ReportUserID, "Rejected")
+                        statusMutation.mutate({
+                          id: report.ReportUserID,
+                          status: "rejected",
+                        })
                       }
-                      disabled={report.Status === "Rejected"}
+                      disabled={
+                        report.Status === "Rejected" || statusMutation.isPending
+                      }
                       className="text-white bg-red-500 rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
                     >
                       Reject
@@ -395,6 +442,44 @@ export default function ReportUsersPage() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={confirmId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Approve this report?</DialogTitle>
+            <DialogDescription>
+              The account is suspended immediately, all of its active listings
+              are removed from the marketplace, and every phone number on it is
+              banned from registering again. This is permanent — rejecting the
+              report later will not restore the account, its listings or the
+              numbers.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmId(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-500 text-white hover:bg-green-600"
+              onClick={() => {
+                if (confirmId)
+                  statusMutation.mutate({
+                    id: confirmId,
+                    status: "approved",
+                  });
+                setConfirmId(null);
+              }}
+            >
+              Approve and suspend
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

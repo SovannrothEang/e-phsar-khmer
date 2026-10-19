@@ -2,7 +2,7 @@ import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import CommonCategoryLayout from "@/components/category-layouts/CommonCategoryLayout";
 import ServicesCategoryLayout from "@/components/category-layouts/ServicesCategoryLayout";
 import JobsCategoryLayout from "@/components/category-layouts/JobsCategoryLayout";
@@ -119,27 +119,12 @@ export default async function CategoryPage({
 
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-1">
-          <nav className="flex items-center gap-2 text-base">
-            <Link
-              href="/"
-              className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-            >
-              <IconHome
-                size={18}
-                className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300"
-              />
-              <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-                Home
-              </span>
-            </Link>
-            <IconChevronRightFilled
-              size={16}
-              className="block mt-1 text-gray-500"
-            />
-            <h1 className="text-gray-500 dark:text-gray-400">
-              {category.name} <span>in Cambodia</span>
-            </h1>
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: `${category.name} in Cambodia` },
+            ]}
+          />
         </div>
       </div>
 

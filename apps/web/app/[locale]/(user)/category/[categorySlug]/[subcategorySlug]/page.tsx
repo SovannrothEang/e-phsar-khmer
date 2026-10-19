@@ -3,7 +3,7 @@ import { Link } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { IconHome, IconChevronRightFilled } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 // ─── Header: one component; chip flags come from the maps below ──────────────
 import LSPCYEHeader, {
   type LSPCYEHeaderProps,
@@ -346,58 +346,37 @@ export default async function SubcategoryPage({
       {/* ── Breadcrumb + header ───────────────────────────────────────────── */}
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-1">
-          <nav
-            className="flex items-center gap-2 text-base"
-            aria-label="Breadcrumb"
-          >
-            <Link
-              href="/"
-              className="group flex items-center gap-1.5 text-gray-500 dark:text-gray-400 hover:text-blue-300 transition-colors duration-150"
-            >
-              <IconHome size={18} />
-              <span>Home</span>
-            </Link>
-            <IconChevronRightFilled size={16} className="mt-1 text-gray-500" />
-            <Link
-              href={{
-                pathname: "/category/[categorySlug]",
-                params: { categorySlug: category.slug },
-              }}
-              className="text-gray-500 dark:text-gray-400 hover:text-blue-300 transition-colors duration-150"
-            >
-              {category.name}
-            </Link>
-            <IconChevronRightFilled size={16} className="mt-1 text-gray-500" />
-            {isFiltered ? (
-              <Link
-                href={{
-                  pathname: "/category/[categorySlug]/[subcategorySlug]",
-                  params: {
-                    categorySlug: category.slug,
-                    subcategorySlug: subcategory.slug,
-                  },
-                }}
-                className="text-gray-500 dark:text-gray-400 hover:text-blue-300 transition-colors duration-150"
-              >
-                {subcategory.name}
-              </Link>
-            ) : (
-              <span className="text-gray-500 dark:text-gray-400">
-                {subcategory.name} in Cambodia
-              </span>
-            )}
-            {isFiltered && (
-              <>
-                <IconChevronRightFilled
-                  size={16}
-                  className="mt-1 text-gray-500"
-                />
-                <span className="text-gray-500 dark:text-gray-400 capitalize">
-                  {filterLabel} in Cambodia
-                </span>
-              </>
-            )}
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              {
+                label: category.name,
+                href: {
+                  pathname: "/category/[categorySlug]",
+                  params: { categorySlug: category.slug },
+                },
+              },
+              ...(isFiltered
+                ? [
+                    {
+                      label: subcategory.name,
+                      href: {
+                        pathname:
+                          "/category/[categorySlug]/[subcategorySlug]" as const,
+                        params: {
+                          categorySlug: category.slug,
+                          subcategorySlug: subcategory.slug,
+                        },
+                      },
+                    },
+                    {
+                      label: `${filterLabel} in Cambodia`,
+                      className: "capitalize",
+                    },
+                  ]
+                : [{ label: `${subcategory.name} in Cambodia` }]),
+            ]}
+          />
         </div>
       </div>
 

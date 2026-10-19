@@ -1,6 +1,5 @@
 import React from "react";
-import { IconHome, IconChevronRight } from "@tabler/icons-react";
-import { Link } from "@/i18n/routing";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 
 // Define the data structure for the metric rows
 const insights = [
@@ -46,31 +45,13 @@ export default function InsightPage() {
   return (
     <div className="min-h-screen bg-muted pb-10">
       <div className="max-w-7xl mx-auto py-8">
-        <nav className="flex items-center space-x-2 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:underline"
-          >
-            <IconHome
-              size={16}
-              className="text-foreground  group-hover:underline"
-            />
-            <span className="text-foreground  group-hover:underline pl-1.5">
-              Home
-            </span>
-          </Link>
-          <IconChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/me"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:underline"
-          >
-            <span className="text-foreground  group-hover:underline pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <IconChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Insight</h1>
-        </nav>
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Insight" },
+          ]}
+        />
       </div>
 
       {/* Main Content */}

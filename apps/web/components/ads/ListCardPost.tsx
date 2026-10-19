@@ -1,6 +1,7 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { ReportPost } from "@/components/report/ReportPost";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function ListCardPost({ post }: { post: Post }) {
     </div>
   );
   const [shareOpen, setShareOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <>
@@ -153,7 +155,13 @@ export function ListCardPost({ post }: { post: Post }) {
                   <span>Share</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem className="flex items-center gap-3 px-3 py-2 cursor-pointer text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer text-destructive focus:text-destructive"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setReportOpen(true);
+                  }}
+                >
                   <AlertTriangle size={15} />
                   <span>Report</span>
                 </DropdownMenuItem>
@@ -263,6 +271,8 @@ export function ListCardPost({ post }: { post: Post }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ReportPost post={post} open={reportOpen} onOpenChange={setReportOpen} />
     </>
   );
 }

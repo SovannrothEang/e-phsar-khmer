@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { UsersService } from './users.service';
 
 jest.mock('bcrypt');
@@ -114,12 +115,16 @@ describe('UsersService phone management', () => {
     });
 
     it('throws ConflictException when phone already in use', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve([{ id: 'existing' }]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: phone owner check
+        const rows = selectCall === 1 ? [] : [{ id: 'existing' }];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
+        };
       });
 
       await expect(
@@ -131,7 +136,9 @@ describe('UsersService phone management', () => {
       let selectCall = 0;
       db.select.mockImplementation(() => {
         selectCall++;
-        if (selectCall === 1) {
+        // 1: banned-phone lookup, 2: existing-phone check — both empty;
+        // 3: hasAny (this user already has a phone)
+        if (selectCall <= 2) {
           return {
             from: () => ({
               where: () => ({ limit: () => Promise.resolve([]) }),
@@ -1226,12 +1233,13 @@ describe('UsersService self-service account changes', () => {
       let selectCall = 0;
       db.select.mockImplementation(() => {
         selectCall++;
-        // 1: users.primaryPhone owner check, 2: user_phones owner check,
-        // 3: the current primary row, 4: findById after the transaction
+        // 1: banned-phone lookup, 2: users.primaryPhone owner check, 3:
+        // user_phones owner check, 4: the current primary row, 5: findById
+        // after the transaction
         const rows =
-          selectCall === 3
+          selectCall === 4
             ? [{ id: 'p1' }]
-            : selectCall === 4
+            : selectCall === 5
               ? [{ ...fakeUser, primaryPhone: PHONE }]
               : [];
         return {
@@ -1272,12 +1280,16 @@ describe('UsersService self-service account changes', () => {
     });
 
     it('refuses a number another account already owns', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve([{ id: 'someone-else' }]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: phone owner check
+        const rows = selectCall === 1 ? [] : [{ id: 'someone-else' }];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
+        };
       });
 
       await expect(
@@ -1288,5 +1300,31 @@ describe('UsersService self-service account changes', () => {
       ).rejects.toThrow(ConflictException);
       expect(db.transaction).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('UsersService public profile visibility', () => {
+  it('does not expose a moderation-suspended account', async () => {
+    let where: unknown;
+    const db = makeDb();
+    db.select.mockImplementation(() => {
+      const c: Record<string, unknown> = {};
+      c.from = () => c;
+      c.where = (arg: unknown) => {
+        where = arg;
+        return c;
+      };
+      c.limit = () => Promise.resolve([]);
+      return c;
+    });
+    const service = makeService(db);
+
+    await expect(service.getPublicProfile('sokdara')).rejects.toThrow(
+      NotFoundException,
+    );
+
+    const { sql } = new PgDialect().sqlToQuery(where as never);
+    expect(sql).toContain('"status" = $');
+    expect(sql).toContain('"deleted_at" is null');
   });
 });

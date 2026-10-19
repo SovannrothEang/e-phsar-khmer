@@ -20,6 +20,8 @@ class SignUploadDto {
     'cover',
     'listing',
     'chat',
+    'resume',
+    'report',
     'category',
     'subcategory',
     'brand',
@@ -31,6 +33,8 @@ class SignUploadDto {
     | 'cover'
     | 'listing'
     | 'chat'
+    | 'resume'
+    | 'report'
     | 'category'
     | 'subcategory'
     | 'brand'
@@ -57,8 +61,16 @@ export class FilesController {
     @Body() dto: SignUploadDto,
   ) {
     // Chat uploads are namespaced per user so ChatService can verify
-    // ownership of an imagePath by its `chat/{userId}/` prefix.
-    const folder = dto.scope === 'chat' ? `chat/${user.id}` : dto.scope;
+    // ownership of an imagePath by its `chat/{userId}/` prefix. Resume photos
+    // are namespaced the same way: this scope is the CV builder's photo only
+    // (a public-bucket image the CV displays) — the CV *file* never travels
+    // through /files, it goes to the private resume-files bucket.
+    // Report evidence is namespaced too: ReportSubmissionService and the
+    // delete guard both rely on `report/{userId}/` to prove ownership.
+    const folder =
+      dto.scope === 'chat' || dto.scope === 'resume' || dto.scope === 'report'
+        ? `${dto.scope}/${user.id}`
+        : dto.scope;
     return this.filesService.createSignedUploadUrl(
       this.filesService.getDefaultBucket(),
       folder,

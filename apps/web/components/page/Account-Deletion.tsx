@@ -1,32 +1,16 @@
-import { Link } from "@/i18n/routing";
-import { IconHome, IconChevronRight } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 
 export default function AccountDeletion() {
   return (
     <div className="min-h-screen mx-auto w-full pb-2 pt-4 bg-muted">
       <div className="px-4 bg-muted">
         <div className="max-w-7xl mx-auto w-full pb-2">
-          <nav className="flex items-center gap-2 text-base">
-            <Link
-              href="/"
-              className="group flex items-center transition-colors duration-150 text-foreground dark:text-gray-400 hover:text-blue-300"
-            >
-              <IconHome
-                size={16}
-                className="text-foreground dark:text-gray-400 group-hover:text-blue-300"
-              />
-              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-                Home
-              </span>
-            </Link>
-            <IconChevronRight
-              size={16}
-              className="block text-muted-foreground"
-            />
-            <h1 className="text-muted-foreground dark:text-gray-400">
-              Account Deletion
-            </h1>
-          </nav>
+          <Breadcrumbs
+            items={[
+              { label: "Home", href: "/" },
+              { label: "Account Deletion" },
+            ]}
+          />
         </div>
       </div>
       <main className="w-full bg-muted">

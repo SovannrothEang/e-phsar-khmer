@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import {
-  IconChevronRightFilled,
-  IconHome,
   IconLayoutGridFilled,
   IconListFilled,
   IconSearch,
   IconX,
 } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
 import SortFilter from "@/components/filter/SortFilter";
@@ -112,27 +111,10 @@ export default async function SearchPage({
   return (
     <main className="min-h-screen flex flex-col bg-muted">
       <div className="px-4 py-4">
-        <nav className="max-w-7xl mx-auto w-full flex items-center gap-2 text-base">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <IconHome
-              size={18}
-              className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300"
-            />
-            <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-              {t("home")}
-            </span>
-          </Link>
-          <IconChevronRightFilled
-            size={16}
-            className="block mt-1 text-gray-500"
-          />
-          <span className="text-gray-500 dark:text-gray-400">
-            {t("search")}
-          </span>
-        </nav>
+        <Breadcrumbs
+          className="max-w-7xl mx-auto w-full"
+          items={[{ label: t("home"), href: "/" }, { label: t("search") }]}
+        />
       </div>
 
       <Tabs

@@ -15,6 +15,13 @@ const envSchema = z.object({
   // the Supabase dashboard with public off, a 25 MB file size limit and
   // allowed MIME type application/octet-stream.
   CHAT_FILES_BUCKET: z.string().default('chat-files'),
+  // Private bucket for uploaded CV files. Create it in the Supabase dashboard
+  // with public off, a 5 MB file size limit and allowed MIME types
+  // application/pdf, application/msword,
+  // application/vnd.openxmlformats-officedocument.wordprocessingml.document and
+  // text/plain — a CV is personal data, so it is never a public URL and never
+  // goes near the `listings` bucket.
+  RESUME_FILES_BUCKET: z.string().default('resume-files'),
   CHAT_ATTACHMENT_DAILY_BYTES: z.coerce
     .number()
     .int()

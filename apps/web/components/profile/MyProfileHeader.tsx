@@ -260,7 +260,10 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                   </div>
 
                   <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                    <Button className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer">
+                    <Button
+                      onClick={() => router.push("/me/resume")}
+                      className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer"
+                    >
                       <IdCard className="h-5 w-5" />
                       Resume (CV)
                     </Button>

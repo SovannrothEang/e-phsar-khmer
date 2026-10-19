@@ -24,6 +24,9 @@ import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { ListingsModule } from './listings/listings.module';
 import { ReactionsModule } from './reactions/reactions.module';
+import { ReportsModule } from './reports/reports.module';
+import { ResumeModule } from './resume/resume.module';
+import { ApplicationsModule } from './applications/applications.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
@@ -81,6 +84,9 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     LocationsModule,
     ListingsModule,
     ReactionsModule,
+    ReportsModule,
+    ResumeModule,
+    ApplicationsModule,
     BrandsModule,
     FilesModule,
     HealthModule,

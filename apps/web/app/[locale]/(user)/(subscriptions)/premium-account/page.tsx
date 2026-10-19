@@ -1,5 +1,6 @@
 import { Link } from "@/i18n/routing";
-import { House, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 
 const categories = [
   {
@@ -37,44 +38,18 @@ const categories = [
 export default function PremiumAccountPage() {
   return (
     <div className="min-h-screen bg-muted pb-10">
-      <div className="max-w-6xl mx-auto py-4">
-        <nav className="flex items-center space-x-2 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300"
-          >
-            <House
-              size={16}
-              className="text-foreground  group-hover:text-gray-300"
-            />
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href={{ pathname: "/me/membership" }}
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Membership
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Account</h1>
-        </nav>
+      <div className="max-w-7xl mx-auto py-4">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: { pathname: "/me/membership" } },
+            { label: "Account" },
+          ]}
+        />
       </div>
       <main className="max-w-4xl mx-auto px-4">
-        <div className="p-4 space-y-2">
+        <div className="py-4 space-y-2">
           <h1 className="text-xl font-semibold">
             Increase your sales with Psa Khmer Premium Service!
           </h1>

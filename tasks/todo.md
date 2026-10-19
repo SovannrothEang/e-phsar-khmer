@@ -3098,6 +3098,8 @@ From the two-axis review of the search-round-2 + ledger working tree.
 
 **Verification**: backend 473/473 (25 new), `tsc --noEmit` clean, eslint clean on touched files.
 
+**Follow-up (same day, captain's screenshot):** the first pass only moved Likes/Share; the mock's header is a **thumbnail column on the left with the details beside it**, so the job gallery gained a `variant="thumbs"` layout on `PostImage` (same slides + lightbox, a strip of small images instead of the hero) and `Post-Detail` wraps the job header in a flex row. A job with no logo renders no column — the details take the full width. Verified by screenshot on three listings: a job with a logo (thumb column + title/likes/meta/price+Apply), a job without one (collapsed column), and a car listing (hero gallery, overlay likes/share, no Apply).
+
 **Left open**: apply `0032`; filter-bar i18n (sort labels + chips are English-only across the
 whole bar, not just the new ones); payment use-case/processor tests (blocked on ESM `effect`
 under Jest); `failed` outbox + `idempotency_keys` retention; no `payment.failed` event.
@@ -5264,3 +5266,533 @@ so neighbours in a row didn't share a price line. `CardHeader` is now `flex flex
 items-stretch` and the price row carries `mt-auto`, pinning it to every card's bottom. Verified with
 per-row measurements — priceY and heartY are identical within every row (`maxDelta 0`), including
 rows that mix condition and no-condition cards — and a visual: `/tmp/align-mixed.png`.
+
+---
+
+# CLAUDE.md refresh (2026-10-06, /init)
+
+Audited the doc against the code and fixed the drift (22 replacements; CLAUDE.md only):
+added `apps/mobile` to the monorepo table plus a Mobile section (Expo 54 prototype — no API
+client, no type gate) and reframed the `docs/` scout reports; documented CI and the `prod`
+deploy chain and rewrote the stale "No CI" gap; updated the migration ledger to `0000`–`0034`
+(v1's pair renumbered a second time to `0033`/`0034` behind main's `0031_listing_search` /
+`0032_ledger_entries_amount_positive`); brought Listings up to date (multi-token `q` with a
+trigram fallback, `effective_price` bounds, `sort`/`postedWithin`/facets/`userId`, sort-aware
+text cursor); added the Notifications module and the ABA PayWay webhook route; replaced the
+stale "no delete-account flow" gap with the real 90-day recovery window; refreshed the env
+table (outbox / purge / queue / payment / ABA / Bakong groups); updated the web mock-vs-real
+map (`/all-ads`, `/search`, `/notifications`, `/settings/*`, follower lists are real) and the
+jest count (41 suites / 533 tests, verified by running the suite).
+
+**Risk found while auditing:** `.prettierignore` (the file that keeps prettier away from
+CLAUDE.md) is still **untracked**. CI's format gate checks out the repo without it, and v1's
+CLAUDE.md does not pass `prettier --check` (prod's does — which is why prod's CI went green).
+Commit it before the next v1 push or the Format step fails.
+
+**Shortened, same day:** CLAUDE.md compressed 183 KB → 74 KB (23.5k → ~9.6k words) — every
+durable fact and trap kept, prose and war-stories cut, detail deferred to AGENTS.md /
+docs/architecture.md / module READMEs. Full pre-compression text backed up at
+/tmp/CLAUDE.md.backup-2026-10-06-pre-summary (uncommitted; HEAD holds the older verbose copy).
+
+---
+
+# Membership back outside the profile shell — standalone like Resume (2026-10-11, captain's screenshots)
+
+The `/me` reshuffle that grouped the account pages under a `(profile)` layout (so they render
+with the cover/avatar/tabs shell) had swept `/me/membership` in with it, so "Upgrade Account"
+landed on the plan card _inside_ the profile chrome. The captain's target is the bare page —
+breadcrumb, "Membership" heading, Free card — nothing around it, the same shape as `/me/resume`.
+
+- `me/(profile)/membership/` moved back to `me/membership/`, its committed location — the page
+  file itself is untouched, so the net diff for it settles to HEAD. The rest of the reshuffle is
+  unaffected; `me/` now holds `membership`, `resume`, and `(profile)`.
+- `MyProfileHeader`'s "Upgrade Account" already targets `/me/membership` (the 09-28 canonical-URL
+  decision above), so the click lands on the standalone page with no wiring change.
+- Deliberate delta from the 09-28 entry's accepted consequence: `/me/membership` is no longer
+  login-gated (it left the guarded group), so the footer's Membership link works anonymously
+  again — consistent with `/me/resume`, and the page is a static mock today.
+
+Verified: `pnpm --filter web lint` clean; `pnpm --filter web build` green; headless-chromium CDP
+check of `/en/me/membership` (anonymous) renders the standalone page — breadcrumb + Free card, no
+"Upload Cover", no tabs, no "Upgrade Account" chrome; screenshot `/tmp/membership-standalone.png`.
+`/en/me` still 307s to `/en/login`, so the guarded group itself is intact.
+
+The rule going forward: the `(profile)` group IS the profile chrome — membership (like resume)
+stays out of it.
+
+---
+
+# Membership-flow polish: theme-blue crumb hovers, quiet rows, one crumb container (2026-10-11, part 2)
+
+Follow-up on the standalone membership page after the captain's hover/position review:
+
+- **Breadcrumb hovers are theme blue now** (`group-hover:text-[#00a0e9]`) across the flow —
+  membership, premium-account, premium-account/[category], checkout. They were
+  `group-hover:text-gray-300` (a washed-out gray), and the outer links' `hover:text-blue-300`
+  never applied at all (the inner span overrode it). The commented-out first-draft block in
+  `checkout/page.tsx` was left untouched.
+- **The plan rows no longer react to hover** — `hover:bg-muted transition-colors` removed; they
+  are display-only and shouldn't read as clickable.
+- **One crumb container across the flow** (what the captain saw as "it move a little inside"):
+  premium-account was `max-w-6xl` → now `max-w-7xl` like membership, its content inset `p-4` →
+  `py-4`, and checkout's crumb wrapper `max-w-4xl py-8 px-4` → `max-w-7xl py-4`. Crumb left x and
+  heading left x are now identical on membership and premium-account.
+
+Verified (headless chromium + CDP with hover emulation): hovering Home computes
+`rgb(0, 160, 233)`; a hovered row's background stays `rgba(0, 0, 0, 0)` (same as its neighbour);
+both pages report nav left 73 / h1 left 281. `pnpm --filter web lint` clean, `next build` green.
+Screenshots: `/tmp/hover-home.png`, `/tmp/hover-row.png`.
+
+**Left open:** other breadcrumbs (all-ads, search, sell, category pages, Resume, the public info
+pages) reuse this crumb markup — at least all-ads carries the same dead `hover:text-blue-300`; a
+mechanical sweep is pending the captain's word.
+
+---
+
+# Breadcrumbs: one shared component, the standard applied to all 18 trails (2026-10-11, part 3)
+
+The captain approved the `/en/premium-account` crumb as the standard with the font bumped to the
+category pages' `text-base`, and chose a shared component over a manual sweep — closing the
+"Left open" note above.
+
+- **New `apps/web/components/common/Breadcrumbs.tsx`** — single owner of the trail: lucide
+  `House` + `ChevronRight` at 16px, `space-x-2` gaps, `text-base`, theme-blue `#00a0e9` hover
+  (the dead `hover:text-blue-300` / washed `group-hover:text-gray-300` / underline variants are
+  gone), gray current item rendered as `<h1>`, `aria-label="Breadcrumb"` for free. First crumb
+  carries the house icon; an href-less crumb is the current page; per-crumb `className` (e.g.
+  `capitalize`) and a nav `className` (e.g. listing-detail's `flex-wrap`) cover the variants.
+- **All 18 trails refactored onto it**: membership, premium-account, premium-account/[category],
+  checkout, all-ads, category, category/[subcategory], search, sell, insight, resume,
+  account-deletion, posting-rule, privacy-policy, safety-tips, contact-us, post form, listing
+  detail. Icon imports trimmed or removed in every file; 8 then-unused `Link` imports cleaned.
+- **Content fixes (captain-approved):** every "Profile" crumb now links `/me` (it pointed at `/`
+  — the home page — in the membership flow), Resume's "Account" crumb renamed "Profile", and
+  Safety Tips' crumb label fixed from the copy-pasted "Ads Posting Rule".
+
+Verified (headless chromium + CDP, hover emulation): all 18 routes report font 16px / gap 8px /
+16px house / chevrons = items−1 / current as `<h1>`; hover computes `rgb(0, 160, 233)`. Resume
+and post checked with a read-only minted session (no rows created — JWT signed for the existing
+`testtest001` row); resume's Profile crumb href = `/en/me`. Listing detail's trail still ends on
+a linked brand/category, unchanged from before. `pnpm --filter web lint` clean; `next build`
+green — after adding `as const` to the conditional typed-route pathnames, because contextual
+typing does not reach inside `cond ? [ … ] : [ … ]` spreads. Screenshots:
+`/tmp/crumbs-category.png`, `/tmp/crumbs-resume.png`.
+
+**Environment note:** the backend dev server was found down (category pages rendered "Category
+not found" — a dead API, not a code change); restarted. Web :3001 and backend :3000 both run.
+
+**Icon alignment, same day (captain's screenshot):** the house and chevrons sat ~1.1px / ~1.4px
+below the text's cap-ink centre — measured from rendered pixels of a 6x crop, not eyeballed —
+because the 24px line box's midline sits below the letters' optical centre. Both icons now carry
+a 1px upward optical nudge (`-translate-y-px`); re-measured at 0.08px / 0.42px residual. The
+why-comment lives in the component so the nudge isn't "cleaned up" later.
+
+---
+
+# Resume Step 1 gets its "Next to summary" CTA (2026-10-14, captain's screenshot)
+
+The Step-1 dialog ("Add Personal Details") had the Marital Status choice buttons but no way
+forward — the captain's mock shows a full-width theme-blue **"Next to summary"** under a
+divider. Added as the dialog's pinned footer (`shrink-0 border-t px-6 py-4`, with
+`h-12 w-full rounded-sm bg-[#00a0e9] text-base font-medium` on the button) — the mock's divider + CTA, exactly as the mock shows. UI-only for now: the click does nothing until the
+Summary step exists (the file doc comment updated to say so), and nothing is saved yet — the
+same stage as the rest of the form.
+
+Verified (headless chromium + CDP, read-only minted session): the dialog opens from "Start
+building" and the button renders 902 × 48 at `rgb(0, 160, 233)` with 24px side margins; Marital
+Status sits directly above the divider when scrolled to the bottom. Screenshot:
+`/tmp/resume-next-btn.png`.
+
+---
+
+# Resume Steps 1→2: required-field gating + the Career Summary step (2026-10-14, part 2)
+
+Supersedes the "click does nothing" note above — the builder moves now.
+
+- **Step 1 gating:** First Name / Last Name became controlled inputs (they were uncontrolled
+  `defaultValue`s, so nothing could validate them); "Next to summary" stays disabled
+  (`disabled:opacity-50 disabled:cursor-not-allowed`) until first name, last name and at least
+  one phone number are non-empty — the starred fields are the rule.
+- **Step 2 — `ResumeCareerSummaryDialog.tsx`:** the captain's mock: back arrow + "Career
+  Summary" + "Step 2 of 8", the 2–4-sentence helper copy, a large `resize-y` textarea, and the
+  divider footer with a gray "Skip" + the blue "Next to Experiences". Skip/Next are UI-only
+  until Step 3 (Experiences) exists.
+- **Step state lives in `ResumeStartBuilding`** (`step: 1 | 2 | null`); both dialogs stay
+  mounted and toggle by `open`, so each step's answers survive back-and-forth navigation —
+  verified, not assumed.
+
+Verified (headless chromium + CDP, minted session): at open the button is disabled (names
+prefilled, phone empty) → filling the phone enables it → clearing the first name re-disables;
+"Next to summary" opens Step 2 with every element and color right (Skip ≈ gray-500, Next =
+`rgb(0, 160, 233)`); back → Step 1 still holds "Test" + "012345678"; forward again → the summary
+draft is still in the textarea. Screenshot: `/tmp/resume-step2.png`.
+
+**Environment note:** the backend had gone down again mid-check (the resume page fail-softs to
+`/en/login` without it); restarted — web :3001 + backend :3000 both up.
+
+**Same day, follow-up (captain's rule):** the gating flipped from "button disabled" to "allow
+the click, then flag what's missing". "Next to summary" is always active now; a click with
+First Name / Last Name / Phone missing renders the missing fields in red — the UI kit's
+`FieldError` (`role="alert"`) + `aria-invalid` styling on label, border and message — and
+scrolls the first one into view. Errors update live and clear as fields are filled (the
+`canContinue`-driven `disabled` state is gone). Verified (headless chromium + CDP, minted
+session): click with empty phone → stays on Step 1 with exactly "At least one phone number is
+required."; clearing a name adds its error live; filling everything clears to none; the next
+click advances to Step 2. Screenshot: `/tmp/resume-validation.png`.
+
+---
+
+# Resume Step 3 — the Experiences entry form (2026-10-14, part 3)
+
+"Next to Experiences" (and Step 2's Skip) now advance to Step 3, built to the captain's mock:
+the helper line ("Show your most relevant experience from the past 10 years…"), Company* /
+Position* inputs, a Location picker reusing the province → district → commune popup, side-by-
+side Start*/End* date pickers reusing the DOB calendar (placeholders "Select Start Date" /
+"Select End Date"), an "I currently work here" Switch, and a tall Description textarea (the
+`components/ui/textarea` wrapper). Turning the switch on clears and disables End Date; turning
+it off re-enables it. Header mirrors the other steps (back arrow, "Experiences", "Step 3 of 8").
+The mock showed no footer — the gray Skip + blue "Next to Educations" pair is borrowed from
+Step 2's footer and is easy to change. UI only: nothing saved; Skip/Next wait for Step 4.
+
+Verified (headless chromium + CDP, minted session): the Step 1 → 2 → 3 chain reaches the
+dialog; every label, input and placeholder present; the toggle disables End Date; back returns
+to Career Summary; Step 2's Skip also lands on Step 3. Screenshot: `/tmp/resume-step3.png`.
+
+**Same day, follow-up (captain's rule):** "Next to Educations" is enabled and validates
+Step-1-style — click allowed, missing fields flagged in red with the captain's exact copy
+("Please enter the 'Company'", "Please enter the 'Position'", "Please select 'Start Date'",
+"Please select 'End Date'"), first missing scrolled into view; the date buttons carry the
+red border/ring via `data-invalid` styling (`aria-invalid` isn't a valid ARIA attribute on a
+button role — the label + `FieldError`'s `role="alert"` carry the semantics instead). Ticking "I currently work here" now flips the End Date display
+to **"Present"** (non-muted, disabled, value cleared) and drops its error; unticking restores
+"Select End Date" and its validation. Errors update live and clear as fields fill; a fully
+valid click stays on Step 3 (Step 4 pending). Verified (headless chromium + CDP): empty click →
+all four exact messages + aria-invalid on all four controls; tick → End error gone + "Present";
+untick + click → End error back; dates picked through the real calendar (Jan 15 / Jan 20 2000);
+final click → zero errors, dialog stays. Screenshots: `/tmp/resume-step3-errors.png`,
+`/tmp/resume-step3-present.png`.
+
+---
+
+# Resume Step 4 — Educations, and the toggles go theme blue (2026-10-14, part 4)
+
+- **"Next to Educations" now advances** (when valid) and **Step 3's Skip also lands on Step 4**
+  — Skip was inert while Step 4 didn't exist.
+- **New `ResumeEducationsDialog.tsx`** — the captain's mock: School*, Degree* (a popover picker
+  reusing Step 1's `EDUCATION_LEVELS`, now exported from that file), Major*, side-by-side
+  Start*/End\* date pickers, an **"I currently attend here"** toggle (same Present rule as
+  Step 3 — tick → End Date shows "Present", its error drops), Description textarea, and a
+  "Next to Skills" footer (Skip waits for Step 5). No helper line — the mock has none.
+- **Validation copy exactly as the mock:** "Please enter the 'School'", "Please select
+  'Degree'", "Please enter the 'Major'", "Please select 'Start Date'", "Please select 'End
+  Date'" — click-then-flag style, red borders via `data-invalid` on the picker/date buttons.
+- **The toggles are theme blue now** — `data-checked:bg-[#00a0e9]` on both the Step 3 and
+  Step 4 switches; the kit's default checked color (`bg-primary`) reads black in light mode,
+  and the captain wants the brand color.
+
+Verified (headless chromium + CDP, minted session): Step 3's toggle computes
+`rgb(0, 160, 233)` when checked; a valid Step 3 (company + position + "currently work here" +
+start date) advances to Step 4; the empty click yields the five exact messages and stays; the
+Degree picker selects "Bachelor's Degree"; Step 4's toggle is blue, flips End Date to
+"Present", and the Degree/End errors clear live. Screenshot:
+`/tmp/resume-step4-errors.png`.
+
+---
+
+# Resume Step 5 — Skills, and the Educations helper line (2026-10-14, part 5)
+
+- **Educations** gets its helper line above the form: "Present your educational background to
+  demonstrate the knowledge and value you bring to the role."
+- **New `ResumeSkillsDialog.tsx`** — the captain's mock: Title* input and Level* (a picker with
+  exactly **Basic / Intermediate / Advanced / Expert**); helper line "List the skills that best
+  represent your strengths and help you stand out from other candidates."; header "Skills" +
+  "Step 5 of 8"; footer Skip (waits for Step 6) + blue "Next to Languages".
+- **Validation copy as the mock:** "Please enter the 'Title'", "Please select 'Level'" —
+  click-then-flag, red via `data-invalid` on the picker.
+- **Step 4's Next and Skip now advance** to Step 5 (Next validates first; Skip goes straight).
+
+Verified (headless chromium + CDP, minted session): the full 1 → 5 chain; Step 5 inventory
+(Title + Level + helper line); the empty click yields the two exact messages and stays; the
+Level dropdown lists Basic / Intermediate / Advanced / Expert and picks "Expert"; a valid click
+keeps the dialog (Step 6 pending). Screenshots: `/tmp/resume-step5-errors.png`,
+`/tmp/resume-step5-level.png`.
+
+---
+
+# Resume Step 6 — Languages, and one uniform dialog box (2026-10-14, part 6)
+
+- **All five resume dialogs are the same size now** — `h-[85vh]` instead of `max-h-[85vh]`, so
+  short forms (Skills, Languages) keep the full-height box and the footer stays pinned at the
+  bottom instead of the dialog shrinking to its content. Measured: 935px (85vh of 1100) on
+  Steps 1, 2, 5 and 6 — identical.
+- **New `ResumeLanguagesDialog.tsx`** — Title* and Level* (Beginner / Intermediate / Advanced /
+  Native, per the captain's mock), helper line "Add the languages you speak to increase your
+  opportunities with more companies and employers.", header "Languages" + "Step 6 of 8",
+  footer Skip (waits for Step 7) + blue "Next to Hobbies & Interests".
+- **Validation** mirrors Steps 3–5: "Please enter the 'Title'" / "Please select 'Level'".
+- **Step 5's Next and Skip advance** to Step 6.
+
+Verified (headless chromium + CDP, minted session): uniform heights; full 1 → 6 chain; the
+empty click yields the two exact messages and stays; the Level dropdown lists the four options
+and picks "Native"; a valid click keeps the dialog (Step 7 pending). Screenshots:
+`/tmp/resume-step6-errors.png`, `/tmp/resume-step6-level.png`, `/tmp/resume-step5-fullbox.png`.
+
+**Caught during verification:** the first pass forgot to attach Skills' `onNext` in
+`ResumeStartBuilding` (the prop existed on the dialog but the JSX never passed it, and the
+Languages dialog wasn't mounted) — the CDP flow caught the dead button; fixed and re-verified.
+
+---
+
+# Resume Steps 7–8 — Hobbies & Interests, References; the wizard is complete (2026-10-14, part 7)
+
+- **Step 7 — `ResumeHobbiesDialog.tsx`:** helper line "Share what you enjoy doing to give
+  employers a sense of your personality." above one big free-text box — nothing required, so
+  Skip and "Next to References" both just advance. No label on the box, per the mock.
+- **Step 8 — `ResumeReferencesDialog.tsx`:** helper line "Add professional references to
+  support your experience and increase employer confidence."; Name*, Company*, Position*, Phone
+  Number* (up to 3 rows — the blue + / red ⊖ pattern from Step 1) and an optional Email. Footer
+  is gray Skip + blue **Finish**; Finish validates house-style ("Please enter the 'Name'" /
+  "'Company'" / "'Position'" / "At least one phone number is required.") and then stops —
+  saving / preview is the next thing to build.
+- **Step 6's Next and Skip now advance** to Step 7.
+
+Verified (headless chromium + CDP, minted session): the **complete 1 → 8 chain** in one run;
+every dialog box measures 935px (uniform); both helper lines verbatim; Step 8's empty Finish
+yields the four exact messages; the phone + button adds "Phone Number 2"; a filled Finish
+clears everything and stays (save pending). Screenshots: `/tmp/resume-step7.png`,
+`/tmp/resume-step8-errors.png`.
+
+The 8-step builder UI is now complete, all UI-only — wiring persistence is the remaining epic.
+
+---
+
+# Finish / Skip now land on the finished resume view (2026-10-14, part 8)
+
+The captain's rule: clicking "Finish" (Step 8) or "Skip" on any step (2–8) takes the user to the
+finished resume view — skipped steps' required-field checks don't block, and whatever was filled
+in shows up.
+
+- **`ResumePreview.tsx` (the mock):** the Resume (CV) card with the personal-details grid
+  (Gender / Date Of Birth / Nationality / Marital Status / Phone / Email / Education Level /
+  Location, `N/A` until filled, phone in theme blue), the 3 × 4 photo (or placeholder),
+  "Edit Personal Details", then "Completed Profile" with a computed percentage (one point per
+  tracked field — with only the phone filled that's exactly the mock's 10%), a meter, and one
+  - chip per still-missing item. The download icon waits for a real file (inert).
+- **Step 1 now reports its data upward** (`onDataChange`): nationality / email / address became
+  controlled inputs, and the dialog reports its whole state on every change, so the view always
+  shows what the user typed — including edits made later via "Edit Personal Details".
+- **Skip rewired on Steps 2–8** (`onSkip`) and Step 8's "Finish" (`onFinished`) — both end the
+  wizard (`done` + close the dialog); the page swaps the "How do you want to start?" card for
+  the view. `Resume.tsx` hands everything below the breadcrumb to `ResumeStartBuilding` now.
+
+Verified (headless chromium + CDP, minted session): Skip from Step 2 closes the dialog and lands
+on the view with the entered phone shown blue and "10% Completed"; editing the name via "Edit
+Personal Details" updates the view live ("Sakkuna Suon"); re-entering and skipping from Step 3
+lands there again. Screenshot: `/tmp/resume-preview.png`. Lint clean, build green.
+
+**Naming note:** the mock's "Complated Profile" is rendered as "Completed Profile" — flag if the
+typo was intentional.
+
+**Correction + build-out (same day, the captain's rule):** Skip was wrong — it skips the
+CURRENT step and advances one (3 → 4), bypassing that step's required-field validation; it does
+NOT jump to the end. Only Step 8's Skip (and its valid "Finish") end the builder and land on
+the view. Rewired `onSkip` in `ResumeStartBuilding` for Steps 2–7 to advance; the dialogs' docs
+updated to match. **The view also gained its body** (mocks): one card per step — Summary, Work
+Experiences, Educations, Skills, Languages, Hobbies & Interests, References — each with the
+step's icon in a gray circle, the + button and "Add X" link reopening that step
+(`onOpenStep`), then the **CV / Resume** upload card (amber title, support-types line,
+pale-blue "Upload file (CV)" — inert until an upload path exists) and **Job Preferences**
+(+ inert; no wizard step yet). Verified (headless chromium + CDP, minted session): Skip chains
+3 → 4 → 5 → 6 → 7 → 8; Step 8's Skip lands on the view; all nine cards + eight "Add" labels
+render; "+" reopens Summary (Step 2) and Hobbies & Interests (Step 7). Screenshot:
+`/tmp/resume-view-cards.png`. Lint clean, build green.
+
+---
+
+# The view's forms are their own edit-mode (2026-10-14, part 9)
+
+The captain's rule: the view's actions don't reopen the wizard — they open the same dialogs in
+an "edit" mode with a different purpose and chrome (mocks 36–38): title swaps to "Edit Personal
+Details" / "Add X", no "Step N of 8", no back arrow (X close instead), no description/helper
+line (the card above already says it), and a full-width **orange Save** that validates the
+form's own required fields and closes on success. The wizard flow is untouched.
+
+- Every wizard dialog gained `mode?: "wizard" | "edit"` + `onSave`; `ResumeStartBuilding` holds
+  a second `editing` open-state next to `step`, and the view's "Edit Personal Details", chips
+  and per-card "+" now set `editing` instead of `step`. State stays shared (same component
+  instance), so edits made in edit mode update the view live.
+- Step-1 validation copy aligned to the house format: "Please enter the 'First Name'" /
+  "'Last Name'" (was "…is required."), matching mock 36.
+- The Completed-Profile checklist grew the two new chips from mock 35: **Position** and
+  **Years of Experience** (Step 1's Current Position / Years of Experience inputs became
+  controlled and now flow into the view data) — 12 tracked items, % recomputed.
+
+Verified (headless chromium + CDP, minted session): wizard chrome intact (Step 1 of 8 + Next);
+the chips row lists all 11 labels incl. Position/YoE; "Edit Personal Details" opens with no
+step chrome/back, orange Save, empty-name Save shows "Please enter the 'First Name'" and stays,
+valid Save closes to the view; "Add Summary" has no description and saves+closes; the
+Experience card's "+" opens "Add Experience" with no helper; X closes; a fresh reload serves
+the wizard exactly as before. Screenshot: `/tmp/resume-edit-experience.png`. Lint clean, build
+green.
+
+**Note:** Save currently validates + closes (state lives in-session; real persistence is the
+next epic). The upload/download stubs remain inert.
+
+---
+
+# Chip behaviors, the close-flash fix, and a fuller checklist (2026-10-14, part 10)
+
+- **The X-flash bug:** closing an edit-mode dialog cleared `editing` immediately, so during the
+  exit animation `mode` flipped back to "wizard" and the old step chrome flashed for a moment.
+  `ResumeStartBuilding` now keeps a `lastOpen {id, mode}` record that only changes on OPEN, and
+  `modeFor(n)` reads it — the closing dialog stays in the mode it was opened in.
+- **The checklist grew** (mocks 35/40/41): the personal fields plus **Summary, Educations,
+  Work experience, Skills, Hobbies & Interests, Languages, References, Attachment** — 20 items,
+  still computed. Sections count as filled when the wizard validated through them
+  (`advanceFrom` marks on Next) or the view's form saved (`saveSection`); Skip does not mark.
+- **Chip behaviors:** a personal-field chip opens the edit form scrolled to that field, tints
+  its label amber and focuses its control (blue border) so the user types immediately (mock 42)
+  — matched by label text, imperative one-shot highlight with frame-retry (Radix mounts the
+  portal a frame late). A section chip opens that section's Add form directly. The **Attachment
+  chip** flips the CV / Resume title from neutral to amber and smooth-scrolls to the card (the
+  title is now normal by default — amber only after that click).
+
+Verified (headless chromium + CDP, minted session): at +80 ms into the close animation the title
+still reads "Edit Personal Details" (was: wizard chrome), then closes; the Nationality chip
+lands with the amber label + blue focused input in view and Save records the value (chip gone,
+"Nationality: Cambodian", 10%); the References chip opens "Add Reference" directly; the
+Attachment chip turns the title amber and scrolls the card to the top. Screenshot:
+`/tmp/resume-chip-nationality.png`. Lint clean, build green.
+
+**Same day addendum:** the Date Of Birth chip now opens the edit form with the calendar
+**already open** — no second click on the field (the focus effect opens the popover for `dob`
+and resets it on close). Verified (CDP): chip → "Edit Personal Details" with the month grid
+visibly open and the trigger bordered blue; picking day 15 set the field, closed the picker,
+and Save recorded "Jan 15, 2000". Lint clean, build green.
+
+---
+
+# Resume data display — entries are real now (2026-10-14, part 11)
+
+The approved plan (`tasks/plan-resume-data-display.md`) built: the view renders saved entries
+with the captain's row formats, and the forms feed a resume document.
+
+- **The document lives in `ResumeStartBuilding`**: personal + summary/hobbies text + arrays of
+  experience/education/skill/language/reference entries. Section forms submit one entry on
+  their valid action (wizard Next / orange Save) via `onSubmit`, and the parent **upserts by
+  id** — the id is a per-draft `crypto.randomUUID` held in a ref, reset when the form opens
+  (⋮ → Edit loads the entry back into the form via `initial`; Add loads blanks; wizard mode
+  keeps on-screen state so Back/Next never wipes a step).
+- **Filled displays (mocks 44/45)**: Education/Experience rows = bold title / italic
+  `2000-Jan - Present` / `Degree in Major` or `Position · Location`, description clamped, **⋮
+  menu per entry (Edit / Delete)**; Skills/Languages = `Title • Level` one-liners; Summary and
+  Hobbies render the text clamped to 4 lines with Show more; References rows = name /
+  `Position, Company` / contacts line. Empty sections keep their description + Add link.
+- **Chips and % now derive from the data** (`entries.length > 0`, text non-empty) — the
+  saved-once `completedSections` flag is gone; deleting an entry brings its chip back.
+- Dialog gotcha fixed en route: the props edits had added `initial`/`onSubmit` to the types
+  only — the destructured bindings were missing (runtime `ReferenceError: onSubmit is not
+defined`, caught by the CDP run since no build had run in between). Lint's React rules also
+  demanded the load-effect's setState be suppressed explicitly (both `set-state-in-effect` and
+  `exhaustive-deps`).
+
+Verified (headless chromium + CDP, minted session): the wizard's summary text shows on the
+view; adding an education from the chip renders `RUPP` / `2000-Jan - Present` /
+`Bachelor's Degree in Computer Science`; ⋮ → Edit reopens pre-filled ("RUPP"), saving shows
+"RUPP 2"; ⋮ → Delete removes the row and restores the Educations chip; adding a language shows
+`English • Intermediate`; the percent reads 15% (phone + summary + language of 20 items).
+Note: Radix menus are keyboard-selectable but ignore synthetic clicks in the CDP driver —
+focus the trigger, Enter to open, arrow to the item. Lint clean, build green (one transient
+Google-Fonts fetch failure on the first build attempt, gone on retry).
+
+**Same day, follow-up (captain's mocks 47/51–53):** Job Preferences got its own dialog (no
+wizard step, as instructed): Open Job toggle (blue), Preferred Position, and three
+**multi-select** pickers (Categories / Locations / Job Type) — picked values render as
+removable blue chips on the field and the list check-circles keep toggling without closing the
+menu. **Preferred Position is required only while Open Job is on** — the star appears with the
+toggle, and Save flags "Please enter the 'Position'" house-style (red border + scroll-to) when
+it's empty; off, nothing is required. Options come from the backend via the resume page
+(`getAllCategories` / `getAttributeOptions("jobtypes")` / `getProvinces`). The card's filled
+state shows "Open Job" (or the position) plus the picked values joined. Verified (CDP): star +
+error on empty with the toggle on; two picks in one session with chips and × removals; Save
+renders "Open Job" / "Cars and Vehicles · Jobs"; reopening prefills the position and the checked
+toggle; toggling off clears the requirement and saves empty. One gotcha fixed en route: the
+props TYPE was updated without the destructured binding again (`onJobPreference`
+ReferenceError) — caught by the CDP run via the dev log's `[browser] Uncaught` line.
+
+**Categories picker fix (same day, captain's correction):** "Categories" means the **JOB**
+categories, not the marketplace's main ones. It now lists the Jobs category's subcategories
+(Accounting, Administration, Architecture/Engineering, … via
+`getCategoryWithSubcategories("jobs")`), while Job Type keeps the spec's employment types
+(Full-time … Other-Jobs — the `jobtypes` set, slug-filtered as a guard). Verified (CDP): both
+dropdowns read correctly. (A test artifact briefly showed both popovers' items concatenated,
+which made `jobtypes` look like it mixed the industry names in — the live API returns only the
+7 employment types.)
+
+**Filled display regrouped (2026-10-15, captain's screenshot):** the Job Preferences card had
+flattened everything into one `·`-joined line ("not well showing"); it now renders one labeled
+line per group — "Preferred Position: …" (when Open Job is on), "Categories: …", "Locations: …",
+"Job Type: …" — each omitted when empty, values comma-separated. Verified (CDP): a filled
+preference reads "Open Job / Preferred Position: Engineer / Categories: Accounting,
+Administration / Locations: Banteay Meanchey / Job Type: Internships". Lint clean, build green.
+
+**Card redesigned to the captain's mock (2026-10-15, image 57):** the filled state is now
+**labelled rows with dividers** — "Open Job / Enable" (only while on), "Preferred Position",
+"Categories", "Locations", "Job Type", each value bold and multi-values joined with the mock's
+`" , "` spacing; empty rows are omitted. The top-right action is a **blue pencil** (the ⋮ menu
+is gone from this card — Edit only, no delete affordance), and the footer link is a pencil +
+**"Edit Preference"**. Verified (CDP): all five label/value pairs render verbatim, the pencil
+(`aria-label="Edit preference"`) and the Edit Preference link are present. Lint clean, build
+green.
+
+**Caret → clear-× (same day, image 58):** the Job Preferences multi-selects now swap their
+chevron for a clear-× once the field has values (the personal-location field's pattern — an
+absolute button outside the trigger, `aria-label="Clear <label>"`), and the × empties the
+selection while the per-chip ×s still remove one at a time. Verified (CDP): empty = caret, no
+clear button; one pick = chip + "Clear Categories"; clicking it returns "Select..." and the
+caret. Lint clean, build green.
+
+**Blank values never hide a row (same day, image 59):** the card always renders all five rows
+once a preference exists — Open Job reads **Enable/Disable** and a blank Position / Categories /
+Locations / Job Type reads **"Not defined"** (bold, like every other value). Verified (CDP):
+saving an all-blank preference shows Disable + four "Not defined" rows and the Edit Preference
+link. Lint clean, build green.
+
+**Card bottoms everywhere + clear-× on the remaining pickers (2026-10-15, image 60):** filled
+list cards (Experience/Education/Skill/Language/Reference) now keep their **"+ Add X" link
+below the entries**, and the single-text cards swap to the mock's pencil chrome — the header's
+
+- becomes a **blue pencil** and the body closes with a pencil **"Edit Summary" / "Edit Hobbies &
+  Interests"** link (their ⋮ menus are gone; deleting = clearing via the form). The four popover
+  pickers that still showed a bare caret now use the caret→**clear-×** swap like Job Preferences:
+  Degree (educations), Level (skills), Level (languages), and Education Level (personal details).
+  The `cardHeaderFilled` + `editLink` helpers (shared with Job Preferences) live in
+  `ResumePreview`. Verified (CDP): summary + hobbies render pencil headers and Edit links; the
+  skill card shows the row, one ⋮, and "Add Skill" BELOW the row (geometry asserted); the Level
+  picker's "Clear Level" × appears after picking. Lint clean, build green.
+
+## 2026-10-16 — Job Applications (apply from a job listing, delivered via chat)
+
+Captain's mock: an orange **"Apply For This Job"** beside the price on a job listing, with Likes/Share moved up beside the title. The repo had no apply capability at all, and the two /me pages that describe one were static empty states.
+
+**Backend** — new module `apps/backend/src/applications/` + `db/schema/applications.schema.ts` + migration `0036_job_applications` (one `job_applications` table, one status enum, unique `(listing_id, applicant_id)`). `POST /listings/:listingId/applications` validates first (unknown 404, non-job 400, own listing 400, non-active 400, soft-deleted poster 404, blocked 403, duplicate **409**), then **delivers through `ChatService.sendMessage` with `clientMessageId = "apply:<listingId>:<applicantId>"`**, and only then inserts the row — so a failed send never leaves a phantom application, and a retry replays the chat instead of double-sending. The poster's `application.created` notification is gated on the inserted row, like `follow.created`. Reads: `GET /users/me/applications` (+`?listingId=` for the detail page's state), `/received`, `/:id` (the poster's first read flips `pending`→`viewed`), `PATCH /:id` (poster: viewed|hired|rejected), `POST /:id/cv/sign`. 28 new unit tests — suite now **44 suites / 601 tests**.
+
+**The résumé, application-scoped** — `resumeSnapshot` (JSONB) freezes `ResumeService.getDocument()` at apply time, which is the only path any other account has to a résumé (Decision 13's forward path). `GET /resume` stays owner-only; the poster downloads the CV through `signAttachmentById` (a new internal primitive on the resume attachments service, documented as never-to-be-routed). The CV file is not copied — a removed/replaced CV answers 409 `RESUME_CV_REMOVED` and the card says so while the résumé text still renders.
+
+**Web** — `ApplyJobButton` + `ApplyJobDialog` in the job detail price row (jobs only, hidden on your own ad / off-active, anonymous → login); `PostSocialActions` extracts the like+share pair so the job header can host it and `PostImage` keeps it as the photo overlay (`showActions={false}` on jobs — no second copy). Both /me pages are real now (`Apply-Jobs.tsx`, `Job-Applications.tsx`) over `actions/applications.ts` + `JobApplicationRow`, with the poster's `ApplicantResumeDialog` rendering the frozen snapshot and marking the application viewed.
+
+**Verified** (dev stack, both servers): API — apply 201 + chat message carrying the job card + one notification; duplicate 409 with the existing id and no second notification; both lists and the `?listingId=` state read scoped per user; poster GET flips viewed; snapshot frozen; stranger **and applicant** both 404 on the résumé read and CV sign; poster's signed URL downloads the real PDF (143,865 B); PATCH hire → the seeker's list reads `hired`. UI (headless CDP): Apply button in the price row, Likes/Share beside the title, overlay clean; dialog shows the résumé card + "CV: use-case.pdf" and submits → button flips to **Applied**; `/me/applied-jobs` and `/me/job-applications` render real rows with actions; the poster's chat thread shows the message + the job context card; the résumé dialog renders the frozen document; a **non-job** listing keeps today's layout byte-for-byte (overlay intact, no Apply). Two bugs the types could not catch were found and fixed by that walk: the poster's avatar initial rendered as `@`, and the résumé dialog never loaded (a controlled Radix `open` flip does not fire `onOpenChange`).
+
+**Left open**: no withdraw / un-apply; no notification to the applicant on hire/reject; re-applying after a rejection is impossible by design (the unique pair) — revisit with an `attempt` column if it matters; new strings are hardcoded English like every sibling job/resume surface; the `.pipeline/` files still hold the uncommitted resume ship, so this feature has no pipeline spec of its own yet.
+
+## 2026-10-17 — Reports: report a listing/account → admin take-down + phone ban
+
+The report feature had three disconnected halves: real tables + admin API, but **no user-facing create path at all** (both dialogs were inert markup) and approving a report changed no state. Captain's requirement: approving a user report **bans that phone number** — the account goes inactive and the number can never register again.
+
+**Backend** — new `src/reports/` module: public `GET /reports/reasons?targetType=` (active picklist, ordered) and `POST /reports` (JWT, 5/min) with target/self/reason/pending-duplicate/evidence-ownership validation (`report/{reporterId}/` paths). Migration `0037_report_takedown` adds `listing_reports.image_paths`, `listings.taken_down_at` and `banned_phones` (unique normalized E.164 phone; FKs SET NULL so a ban outlives the account). `admin/reports` PATCH now commits the verdict and the take-down in one transaction: a listing report sets `status='deleted'` + `taken_down_at` (feed + public detail hide it; owner `publish` 403 `LISTING_TAKEN_DOWN`); a user report sets `status='suspended'`, takes down every listing the account owns (`status='deleted'` + `taken_down_at`), and bans every phone on the account. Ban enforcement at register / OTP request / OTP login / OTP verify / mirror / add-phone → 403 `PHONE_BANNED`; `verifyPhoneOtp` gained the missing suspended-account check. Rejecting never restores (pinned by tests). Admin lists now join reviewer + target username/owner names; routes use `ParseUUIDPipe`; the seed seeds 24 reasons and no longer fabricates sample reports (it had accumulated 56 pending reports against real users — removed).
+
+**Web** — both dialogs are real (`actions/reports.ts` via `userServerFetch`; reasons from the backend; React Query; controlled fields; the account report has the mock's 24-slot evidence strip with real uploads via `scope="report"` (the listing report is reason + description only, per the captain's mock 2026-10-19); 401 → login bounce; reset on close). Report is hidden on your own listing/profile; the dead `ListCardPost` menu item is wired. Admin queues: fixed the UUID→`0` View link, the `ReviewdBy` typo, the profile link (now `targetUsername`) and the `CreatedAt` no-op; added an image column (DbImage), loading/error states, `useMutation` pending guards, reviewer names, and an Approve confirm dialog that states the take-down. Deleted 8 orphaned mock report files.
+
+**Verified** — 46 suites / 623 tests; lint, `next build`, `format:check`, turbo lint/check-types and the `drizzle-kit generate` drift check all green. API (live): report scope path, invalid evidence 400, create 201, duplicate 409, approve → listing 404 + owner publish 403 + reject does not restore; user approve → suspended (`deleted_at` null) + banned phone, existing token 401, OTP login + register + verify all 403 `PHONE_BANNED`, add-phone to another account 403. UI (headless CDP): listing detail Report dialog opens with backend reasons + description + photo + submit; admin users page renders reporter/target names, reason, status, ReviewedBy and the action buttons. Test accounts/reports removed afterwards.
+
+**Left open** — evidence images live in the public listings bucket (unguessable URL, not private); no unban endpoint (manual database delete); the suspended account's listings are taken down with it (no restore path); admin reasons CRUD still has no UI; new copy is hardcoded English.

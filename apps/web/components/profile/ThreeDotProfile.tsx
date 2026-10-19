@@ -21,8 +21,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/lib/user";
 
-export function ThreeDotProfile({ user }: { user: User }) {
+export function ThreeDotProfile({
+  user,
+  viewerId,
+}: {
+  user: User;
+  viewerId?: string | null;
+}) {
   const [reportOpen, setReportOpen] = useState(false);
+  // Reporting yourself is a backend 400; don't offer it on your own profile.
+  const isOwnProfile = viewerId != null && String(user.userId) === viewerId;
   return (
     <>
       <DropdownMenu modal={false}>
@@ -50,19 +58,20 @@ export function ThreeDotProfile({ user }: { user: User }) {
               Copy Link
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="text-red-500">
-              <AlertTriangleIcon />
-              <Button
-                variant="ghost"
-                onClick={() => setReportOpen(true)}
-                className="text-red-500 cursor-pointer "
-              >
-                Report
-              </Button>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          {!isOwnProfile && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  className="text-red-500"
+                  onSelect={() => setReportOpen(true)}
+                >
+                  <AlertTriangleIcon />
+                  Report
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <ReportAccount

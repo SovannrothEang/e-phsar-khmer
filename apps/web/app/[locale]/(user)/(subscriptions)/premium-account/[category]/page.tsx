@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
-import { CircleCheck, House, ChevronRight } from "lucide-react";
+import { CircleCheck } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { Link } from "@/i18n/routing";
 
 const plansData = {
@@ -34,51 +35,18 @@ export default function PremiumPlanPage() {
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-7xl mx-auto ">
         {/* Breadcrumbs */}
-        <nav className="flex items-center space-x-1 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300"
-          >
-            <House
-              size={16}
-              className="text-foreground  group-hover:text-gray-300"
-            />
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href={{ pathname: "/me/membership" }}
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Membership
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href={{ pathname: "/premium-account", query: { id: "me" } }}
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Premium Account
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400 capitalize">
-            {category}
-          </h1>
-        </nav>
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: { pathname: "/me/membership" } },
+            {
+              label: "Premium Account",
+              href: { pathname: "/premium-account", query: { id: "me" } },
+            },
+            { label: category, className: "capitalize" },
+          ]}
+        />
       </div>
 
       <main className="max-w-4xl mx-auto px-4">

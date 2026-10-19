@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { House, ChevronRight, Mail, Phone, Clock8 } from "lucide-react";
+import { Mail, Phone, Clock8 } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import {
   Accordion,
   AccordionContent,
@@ -44,22 +45,9 @@ export default function ContactUs() {
     <div className="h-[calc(100vh-140px)] mx-auto w-full bg-muted">
       <div className="px-4 py-4 bg-muted">
         <div className="max-w-4xl mx-auto w-full px-4 pb-2">
-          <nav className="flex items-center gap-2 text-base">
-            <Link
-              href="/"
-              className="group flex items-center transition-colors duration-150 text-foreground dark:text-gray-400 hover:text-blue-300"
-            >
-              <House
-                size={16}
-                className="text-foreground dark:text-gray-400 group-hover:text-blue-300"
-              />
-              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-                Home
-              </span>
-            </Link>
-            <ChevronRight size={16} className="block text-muted-foreground" />
-            <h3 className="text-muted-foreground">Contact Us</h3>
-          </nav>
+          <Breadcrumbs
+            items={[{ label: "Home", href: "/" }, { label: "Contact Us" }]}
+          />
         </div>
       </div>
 

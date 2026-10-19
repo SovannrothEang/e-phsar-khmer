@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -28,6 +29,7 @@ import {
   buildUsernameBase,
   generateUniqueUsername,
 } from '../users/username.util';
+import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 
 export interface AuthTokens {
@@ -117,6 +119,7 @@ export class AuthService {
   }
 
   async registerWithPhone(dto: RegisterDto): Promise<{ otpSent: true }> {
+    await this.assertPhoneNotBanned(dto.phone);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
@@ -124,6 +127,8 @@ export class AuthService {
   async verifyPhoneOtp(
     dto: VerifyOtpDto,
   ): Promise<AuthTokens & { user: PublicUser }> {
+    // Moderation ban first: a banned number must not even burn an OTP.
+    await this.assertPhoneNotBanned(dto.phone);
     // Password is checked BEFORE the Supabase call so a wrong password
     // never burns an OTP attempt. For an existing user this is a login
     // (password must match); for an absent user this is a registration
@@ -133,6 +138,11 @@ export class AuthService {
       .from(users)
       .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
       .limit(1);
+
+    // This endpoint bypasses loginWithPassword, so it needs its own
+    // suspension guard — otherwise a suspended account could mint tokens
+    // through the OTP login flow.
+    if (existing) this.assertAccountActive(existing);
 
     // A legacy bare account (created before passwords were required) is
     // COMPLETED in place: possessing the OTP proves phone ownership, so the
@@ -223,11 +233,13 @@ export class AuthService {
       dto.phone,
       insertExtras,
     );
+    this.assertAccountActive(user);
     const tokens = this.issueTokens(user);
     return { ...tokens, user: this.toPublicUser(user) };
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
+    await this.assertPhoneNotBanned(phone);
     await this.supabaseService.signInWithOtp(phone);
     return { otpSent: true };
   }
@@ -244,6 +256,11 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+
+    // After the credential check on purpose: a wrong password still answers
+    // 401 with no SMS, so the ban is not an oracle for a number the caller
+    // cannot prove they own.
+    await this.assertPhoneNotBanned(dto.phone);
 
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
@@ -271,6 +288,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid social access token');
 
     const user = await this.mirrorSupabaseUser(data.user, dto.provider);
+    this.assertAccountActive(user);
     const tokens = this.issueTokens(user);
     return { ...tokens, user: this.toPublicUser(user) };
   }
@@ -350,6 +368,7 @@ export class AuthService {
       });
     }
 
+    this.assertAccountActive(user);
     const tokens = this.issueTokens(user);
     return { ...tokens, user: this.toPublicUser(user) };
   }
@@ -427,6 +446,30 @@ export class AuthService {
     return current;
   }
 
+  /**
+   * Every token-issuing path must pass through this. `loginWithPassword` and
+   * `refresh` check inline; the alternate providers (OTP verify, social,
+   * Telegram) do not, and a suspended account must not mint a session through
+   * any of them.
+   */
+  private assertAccountActive(user: UserRow): void {
+    if (user.status !== 'active' || user.deletedAt)
+      throw new UnauthorizedException('Account suspended');
+  }
+
+  /**
+   * Moderation ban. The number may never register, receive an OTP, or be
+   * added to another account — the ban outlives the account's hard purge.
+   */
+  private async assertPhoneNotBanned(phone: string): Promise<void> {
+    if (await isPhoneBanned(this.db, phone)) {
+      throw new ForbiddenException({
+        code: 'PHONE_BANNED',
+        message: 'This phone number has been banned.',
+      });
+    }
+  }
+
   private issueTokens(user: UserRow): AuthTokens {
     const jwtPayload = { sub: user.id, role: user.role };
     const accessExpiresIn = (this.configService.get<string>(
@@ -456,6 +499,10 @@ export class AuthService {
     insertExtras?: Partial<typeof users.$inferInsert>,
   ): Promise<UserRow> {
     const resolvedPhone = phone ?? supabaseUser.phone ?? null;
+    // Defence in depth: every caller that resolves a phone is checked at its
+    // own entry point too, but this is the last gate before a row is created
+    // or returned for a number moderation banned.
+    if (resolvedPhone) await this.assertPhoneNotBanned(resolvedPhone);
 
     let user: UserRow;
 

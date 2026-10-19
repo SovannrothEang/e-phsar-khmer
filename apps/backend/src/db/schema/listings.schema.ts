@@ -98,6 +98,10 @@ export const listings = pgTable(
     ),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    // Set only by moderation (an approved listing report). Kept separate from
+    // `status` because a taken-down listing must stay hidden even if its owner
+    // re-publishes it — `status` alone cannot express that intent.
+    takenDownAt: timestamp('taken_down_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

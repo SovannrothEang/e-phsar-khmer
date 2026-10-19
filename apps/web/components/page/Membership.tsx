@@ -1,6 +1,7 @@
 "use client";
 
-import { IconHome, IconChevronRight } from "@tabler/icons-react";
+import { IconChevronRight } from "@tabler/icons-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
@@ -23,31 +24,13 @@ export default function Membership() {
   return (
     <div className="min-h-screen bg-muted pb-2">
       <div className="max-w-7xl mx-auto py-4">
-        <nav className="flex items-center space-x-1 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300"
-          >
-            <IconHome
-              size={16}
-              className="text-foreground  group-hover:text-gray-300"
-            />
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <IconChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <IconChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Membership</h1>
-        </nav>
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership" },
+          ]}
+        />
       </div>
       <main className="max-w-4xl mx-auto px-4">
         <h1 className="text-2xl font-medium text-foreground mb-4">
@@ -63,7 +46,7 @@ export default function Membership() {
             {insights.map((item, index) => (
               <div
                 key={index}
-                className="px-4 py-4 flex items-start justify-between group hover:bg-muted transition-colors"
+                className="px-4 py-4 flex items-start justify-between"
               >
                 <div className="space-y-1">
                   <h3 className="text-sm text-foreground">{item.label}</h3>

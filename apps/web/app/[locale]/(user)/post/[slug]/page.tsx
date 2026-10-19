@@ -3,6 +3,7 @@ import { buildRealDetailData, getListingById } from "@/lib/api/categories";
 import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFollowStatus } from "@/lib/api/users";
+import { loadJobApplyState } from "@/lib/api/job-apply";
 import { posts } from "@/lib/posts";
 import type { Metadata } from "next";
 
@@ -64,6 +65,13 @@ export default async function PostDetailPage({
           sellerFollowing={
             viewer ? await getFollowStatus(real.listing.userId) : false
           }
+          jobApply={await loadJobApplyState({
+            listingId: real.listing.id,
+            categorySlug: real.cate?.slug,
+            listingStatus: real.listing.status,
+            posterId: real.listing.userId,
+            viewerId: viewer?.id,
+          })}
         />
       );
     }

@@ -202,9 +202,9 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       const db = makeDb();
       db.select.mockImplementation(() => {
         selectCall++;
-        // call 1: existing-user check → none; call 2: recovery-window lookup
-        // (an account this phone could revive) → none; call 3: username
-        // probe → free
+        // 1: banned-phone lookup → none; 2: existing-user check → none;
+        // 3: recovery-window lookup (an account this phone could revive) →
+        // none; 4: username probe → free; 5: the mirror's own ban re-check
         return {
           from: () => ({
             where: () => ({ limit: () => Promise.resolve([]) }),
@@ -233,7 +233,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
         lastName: 'Dara',
         username: 'sokdara',
       });
-      expect(selectCall).toBe(3);
+      expect(selectCall).toBe(5);
     });
 
     it('omits username when names are absent', async () => {
@@ -271,9 +271,12 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       const db = makeDb();
       db.select.mockImplementation(() => {
         selectCall++;
+        // 1: banned-phone lookup → not banned; 2: existing-user fetch;
+        // 3: the mirror's own ban re-check → not banned
+        const rows = selectCall === 2 ? [existing] : [];
         return {
           from: () => ({
-            where: () => ({ limit: () => Promise.resolve([existing]) }),
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
         };
       });
@@ -296,22 +299,26 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
         updatedAt: expect.any(Date) as unknown as Date,
       });
       expect(bcrypt.hash).not.toHaveBeenCalled();
-      expect(selectCall).toBe(1); // no username probes
+      expect(selectCall).toBe(3); // no username probes
     });
 
     it('wrong password → 401 and Supabase OTP is never consumed', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       const db = makeDb();
-      db.select.mockImplementation(() => ({
-        from: () => ({
-          where: () => ({
-            limit: () =>
-              Promise.resolve([
-                makeUser({ primaryPhone: PHONE, passwordHash: '$2b$10$hash' }),
-              ]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: existing-user fetch
+        const rows =
+          selectCall === 1
+            ? []
+            : [makeUser({ primaryPhone: PHONE, passwordHash: '$2b$10$hash' })];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
-      }));
+        };
+      });
       const supabase = makeSupabase();
       const service = makeAuthService(db, supabase);
 
@@ -332,8 +339,9 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       const db = makeDb();
       db.select.mockImplementation(() => {
         selectCall++;
-        if (selectCall === 1) {
-          // existing-user fetch: bare legacy account
+        // 1: banned-phone lookup → not banned; 2: existing-user fetch (bare
+        // legacy account); 3: username probe → free
+        if (selectCall === 2) {
           return {
             from: () => ({
               where: () => ({
@@ -401,16 +409,21 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
     it('sends OTP after password validates', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       const db = makeDb();
-      db.select.mockImplementation(() => ({
-        from: () => ({
-          where: () => ({
-            limit: () =>
-              Promise.resolve([
-                makeUser({ primaryPhone: PHONE, passwordHash: '$2b$10$hash' }),
-              ]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: the account lookup; 2: the post-credential ban check → not
+        // banned (this path checks the ban *after* the password on purpose)
+        const rows =
+          selectCall === 1
+            ? [makeUser({ primaryPhone: PHONE, passwordHash: '$2b$10$hash' })]
+            : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
-      }));
+        };
+      });
       const supabase = makeSupabase();
       const service = makeAuthService(db, supabase);
 
@@ -471,10 +484,11 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       const db = makeDb();
       db.select.mockImplementation(() => {
         selectCall++;
-        // 1: the active-account lookup → none; 2: the recovery lookup → the
-        // deleted account (the WHERE that makes it *recoverable* — window and
-        // surviving phone — is SQL and is exercised against the database).
-        const rows = selectCall === 1 ? [] : [recoverable];
+        // 1: banned-phone lookup → not banned; 2: the active-account lookup
+        // → none; 3: the recovery lookup → the deleted account (the WHERE
+        // that makes it *recoverable* — window and surviving phone — is SQL
+        // and is exercised against the database).
+        const rows = selectCall <= 2 ? [] : [recoverable];
         return {
           from: () => ({
             where: () => ({ limit: () => Promise.resolve(rows) }),
@@ -522,7 +536,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
             where: () => ({
               limit: () =>
                 Promise.resolve(
-                  selectCall === 1
+                  selectCall <= 2
                     ? []
                     : [
                         makeUser({

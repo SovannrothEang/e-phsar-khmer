@@ -28,6 +28,7 @@ import {
 import type { UserRow, UserPhoneRow } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import { FilesService } from '../files/files.service';
+import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ConfigService } from '@nestjs/config';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import type { AddPhoneDto } from './dto/add-phone.dto';
@@ -207,6 +208,7 @@ export class UsersService {
   }
 
   async addPhone(userId: string, dto: AddPhoneDto): Promise<UserPhoneRow> {
+    await this.assertPhoneNotBanned(dto.phone);
     const [existing] = await this.db
       .select()
       .from(userPhones)
@@ -464,6 +466,11 @@ export class UsersService {
     userId: string,
     phone: string,
   ): Promise<void> {
+    // A moderation-banned number can never be added to (or swapped into) an
+    // account — otherwise the ban is one free Telegram/social account away
+    // from bypass.
+    await this.assertPhoneNotBanned(phone);
+
     const [owner] = await this.db
       .select({ id: users.id })
       .from(users)
@@ -482,6 +489,15 @@ export class UsersService {
       .limit(1);
     if (row && row.userId !== userId) {
       throw new ConflictException('PHONE_TAKEN');
+    }
+  }
+
+  private async assertPhoneNotBanned(phone: string): Promise<void> {
+    if (await isPhoneBanned(this.db, phone)) {
+      throw new ForbiddenException({
+        code: 'PHONE_BANNED',
+        message: 'This phone number has been banned.',
+      });
     }
   }
 
@@ -670,7 +686,15 @@ export class UsersService {
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(and(eq(users.username, username), isNull(users.deletedAt)))
+      // A moderation-suspended account is not publicly viewable: approving a
+      // user report must take the profile down, not just block its login.
+      .where(
+        and(
+          eq(users.username, username),
+          isNull(users.deletedAt),
+          eq(users.status, 'active'),
+        ),
+      )
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
 

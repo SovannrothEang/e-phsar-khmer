@@ -21,6 +21,9 @@ export default () => {
       filesBucket: env.CHAT_FILES_BUCKET,
       attachmentDailyBytes: env.CHAT_ATTACHMENT_DAILY_BYTES,
     },
+    resume: {
+      filesBucket: env.RESUME_FILES_BUCKET,
+    },
     database: {
       url: env.DATABASE_URL,
       poolMax: env.DATABASE_POOL_MAX,

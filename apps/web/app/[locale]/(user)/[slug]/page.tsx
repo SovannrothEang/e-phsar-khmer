@@ -11,6 +11,7 @@ import {
 import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
 import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { loadJobApplyState } from "@/lib/api/job-apply";
 import { redirect } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { posts } from "@/lib/posts";
@@ -105,6 +106,13 @@ export default async function SlugPage({
             sellerFollowing={
               viewer ? await getFollowStatus(real.listing.userId) : false
             }
+            jobApply={await loadJobApplyState({
+              listingId: real.listing.id,
+              categorySlug: real.cate?.slug,
+              listingStatus: real.listing.status,
+              posterId: real.listing.userId,
+              viewerId: viewer?.id,
+            })}
           />
         );
       }

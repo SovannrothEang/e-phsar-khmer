@@ -258,7 +258,7 @@ export default function PublicProfileHeader({
                     <Mail className="h-4 w-4" />
                   </Button>
                 )}
-                <ThreeDotProfile user={user} />
+                <ThreeDotProfile user={user} viewerId={viewerId} />
               </div>
             </div>
           </div>

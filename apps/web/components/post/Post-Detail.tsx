@@ -2,8 +2,8 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { IconHome } from "@tabler/icons-react";
-import { ChevronRight, Truck } from "lucide-react";
+import { Truck } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { IconClockHour4, IconMapPin } from "@tabler/icons-react";
 import ProfileSidebar from "./Profile-Sidebar";
 import {
@@ -21,6 +21,9 @@ import LoanCalculator from "./LoanCalculator";
 import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
 import PostImage from "./PostImage";
+import { PostSocialActions } from "./PostSocialActions";
+import { ApplyJobButton } from "./ApplyJobButton";
+import type { ApplyResumeSummary } from "./ApplyJobDialog";
 import ListingSpecs from "./ListingSpecs";
 import type { BackendListing } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
@@ -41,6 +44,17 @@ export interface RealDetailData {
   brand?: { slug: string; name: string };
   model?: { slug: string; name: string };
   seller: User;
+}
+
+/**
+ * What the Apply control needs beyond the listing itself — assembled by the
+ * page only for a real, active job listing the viewer neither owns nor has
+ * already applied to. Absent means "render no Apply control at all".
+ */
+export interface JobApplyState {
+  /** The viewer's existing application id, when they already applied. */
+  appliedApplicationId: string | null;
+  resume: ApplyResumeSummary | null;
 }
 
 /** Adapt a backend listing into the template's local `Post` shape. */
@@ -110,6 +124,7 @@ export default function PostDetail({
   real,
   viewerId,
   sellerFollowing = false,
+  jobApply = null,
 }: {
   id: string;
   real?: RealDetailData;
@@ -118,6 +133,8 @@ export default function PostDetail({
   viewerId?: string | null;
   /** Whether that viewer already follows the seller — seeds the sidebar toggle. */
   sellerFollowing?: boolean;
+  /** Present only when this viewer may apply to *this* job listing. */
+  jobApply?: JobApplyState | null;
 }) {
   const isReal = !!real;
   const post = isReal ? toPostView(real.listing) : getPostById(id);
@@ -133,6 +150,11 @@ export default function PostDetail({
 
   const hasBrand = !!brand;
   const hasModel = !!model;
+
+  // The one listing family whose header differs: a job moves the like/share
+  // pair beside the title and carries the Apply control (captain's mock,
+  // 2026-10-16). Every other listing renders exactly as before.
+  const isJobListing = isReal && cate?.slug === "jobs";
 
   // Mock listings have no matching row in the real `listings` table — attaching
   // their id would only 400 once a message actually tries to send it.
@@ -191,114 +213,137 @@ export default function PostDetail({
       </div>
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto w-full pb-2">
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 hover:text-[#00a0e9]"
-          >
-            <IconHome size={18} className="group-hover:text-[#00a0e9]" />
-            <span className="pl-1.5">Home</span>
-          </Link>
-          {cate && (
-            <>
-              <ChevronRight size={14} />
-              <Link
-                href={{
-                  pathname: "/category/[categorySlug]",
-                  params: { categorySlug: cate.slug },
-                }}
-                className="hover:text-[#00a0e9]"
-              >
-                {cate.name}
-              </Link>
-            </>
-          )}
-          {subcate && (
-            <>
-              <ChevronRight size={14} />
-              <Link
-                href={{
-                  pathname: "/category/[categorySlug]/[subcategorySlug]",
-                  params: {
-                    categorySlug: cate?.slug || "",
-                    subcategorySlug: subcate.slug,
+        <Breadcrumbs
+          className="flex-wrap"
+          items={[
+            { label: "Home", href: "/" },
+            ...(cate
+              ? [
+                  {
+                    label: cate.name,
+                    href: {
+                      pathname: "/category/[categorySlug]" as const,
+                      params: { categorySlug: cate.slug },
+                    },
                   },
-                }}
-                className="hover:text-[#00a0e9]"
-              >
-                {subcate.name}
-              </Link>
-            </>
-          )}
-          {hasBrand && (
-            <>
-              <ChevronRight size={14} />
-              <Link
-                href={{
-                  pathname:
-                    "/category/[categorySlug]/[subcategorySlug]/[brandOrType]",
-                  params: {
-                    categorySlug: cate?.slug || "",
-                    subcategorySlug: subcate?.slug || "",
-                    brandOrType: brand.slug,
+                ]
+              : []),
+            ...(subcate
+              ? [
+                  {
+                    label: subcate.name,
+                    href: {
+                      pathname:
+                        "/category/[categorySlug]/[subcategorySlug]" as const,
+                      params: {
+                        categorySlug: cate?.slug || "",
+                        subcategorySlug: subcate.slug,
+                      },
+                    },
                   },
-                }}
-                className="hover:text-[#00a0e9]"
-              >
-                {brand.name}
-              </Link>
-            </>
-          )}
-          {hasModel && (
-            <>
-              <ChevronRight size={14} />
-              <span>{model.name}</span>
-            </>
-          )}
-        </nav>
+                ]
+              : []),
+            ...(hasBrand
+              ? [
+                  {
+                    label: brand.name,
+                    href: {
+                      pathname:
+                        "/category/[categorySlug]/[subcategorySlug]/[brandOrType]" as const,
+                      params: {
+                        categorySlug: cate?.slug || "",
+                        subcategorySlug: subcate?.slug || "",
+                        brandOrType: brand.slug,
+                      },
+                    },
+                  },
+                ]
+              : []),
+            ...(hasModel ? [{ label: model.name }] : []),
+          ]}
+        />
       </div>
       {/* Main content */}
       <div className="max-w-7xl mx-auto w-full mt-2 mb-10">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 w-full min-w-38 space-y-4">
             <div className="bg-card border rounded-sm overflow-hidden">
-              <PostImage post={post} />
-              <div className="px-4 pt-3 pb-0">
-                <h1 className="text-xl md:text-3xl font-medium text-foreground leading-snug">
-                  {post.title}
-                </h1>
-                <div className="flex flex-wrap items-center gap-4 text-[13px] text-foreground mt-2">
-                  <p>ID {displayId}</p>
-                  <div className="flex items-center">
-                    <IconMapPin className="w-4 h-4 mr-1" />
-                    {locationLine}
+              {/* A job ad leads with its logo beside the details, not with a
+                  full-bleed banner (the captain's mock): the strip of small
+                  images is the gallery, the title/price/Apply block sits next
+                  to it. Every other listing keeps the hero gallery above. */}
+              <div
+                className={
+                  isJobListing
+                    ? "flex flex-col sm:flex-row gap-3 p-3"
+                    : undefined
+                }
+              >
+                <PostImage
+                  post={post}
+                  showActions={!isJobListing}
+                  variant={isJobListing ? "thumbs" : "hero"}
+                />
+                <div
+                  className={
+                    isJobListing ? "min-w-0 flex-1 sm:pt-0.5" : "px-4 pt-3 pb-0"
+                  }
+                >
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <h1 className="text-xl md:text-3xl font-medium text-foreground leading-snug flex-1 min-w-0">
+                      {post.title}
+                    </h1>
+                    {isJobListing && (
+                      <PostSocialActions
+                        post={post}
+                        className="flex gap-2 shrink-0"
+                      />
+                    )}
                   </div>
-                  <div className="flex items-center">
-                    <IconClockHour4 className="w-4 h-4 mr-1" />
-                    {post.createdat.toLocaleString()}
+                  <div className="flex flex-wrap items-center gap-4 text-[13px] text-foreground mt-2">
+                    <p>ID {displayId}</p>
+                    <div className="flex items-center">
+                      <IconMapPin className="w-4 h-4 mr-1" />
+                      {locationLine}
+                    </div>
+                    <div className="flex items-center">
+                      <IconClockHour4 className="w-4 h-4 mr-1" />
+                      {post.createdat.toLocaleString()}
+                    </div>
                   </div>
-                </div>
-                {post.freeDelivery && (
-                  <div className="mt-3">
-                    <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] text-xs font-medium rounded-sm border border-blue-100">
-                      <Truck className="w-3.5 h-3.5 mr-1" /> Free Delivery
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-end gap-2.5 mt-3 pb-4">
-                  <span className="text-xl md:text-2xl font-medium text-[#e3281b] leading-none">
-                    {post.price === null ? "Negotiable" : `$${post.price}`}
-                  </span>
-                  {post.oldPrice && (
-                    <span className="text-sm text-gray-400 line-through mb-0.5">
-                      ${post.oldPrice}
-                    </span>
+                  {post.freeDelivery && (
+                    <div className="mt-3">
+                      <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] text-xs font-medium rounded-sm border border-blue-100">
+                        <Truck className="w-3.5 h-3.5 mr-1" /> Free Delivery
+                      </span>
+                    </div>
                   )}
-                  {post.discount && (
-                    <span className="text-sm bg-[#fdf0e6] text-[#f68b1e] px-1.5 py-0.5 rounded-sm mb-1">
-                      {post.discount}
-                    </span>
-                  )}
+                  <div className="flex items-end justify-between gap-3 flex-wrap mt-3 pb-4">
+                    <div className="flex items-end gap-2.5">
+                      <span className="text-xl md:text-2xl font-medium text-[#e3281b] leading-none">
+                        {post.price === null ? "Negotiable" : `$${post.price}`}
+                      </span>
+                      {post.oldPrice && (
+                        <span className="text-sm text-gray-400 line-through mb-0.5">
+                          ${post.oldPrice}
+                        </span>
+                      )}
+                      {post.discount && (
+                        <span className="text-sm bg-[#fdf0e6] text-[#f68b1e] px-1.5 py-0.5 rounded-sm mb-1">
+                          {post.discount}
+                        </span>
+                      )}
+                    </div>
+                    {jobApply && real && (
+                      <ApplyJobButton
+                        listingId={real.listing.id}
+                        listingTitle={real.listing.title}
+                        viewerId={viewerId ?? null}
+                        resume={jobApply.resume}
+                        appliedApplicationId={jobApply.appliedApplicationId}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
               <hr className="border" />
@@ -329,7 +374,7 @@ export default function PostDetail({
                   addressLine={addressLine}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
-                <ThreeButton post={post} />
+                <ThreeButton post={post} viewerId={viewerId} />
               </div>
             </div>
             {/* Disclaimer */}

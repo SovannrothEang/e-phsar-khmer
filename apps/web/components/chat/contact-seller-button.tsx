@@ -27,6 +27,7 @@ export function ContactSellerButton({
   listingId,
   listing,
   viewerId,
+  label,
   className,
   size = "default",
   variant = "default",
@@ -39,6 +40,9 @@ export function ContactSellerButton({
   /** Pass the signed-in user's id when the host page has it, to hide the
    *  button on your own ad without an extra request. */
   viewerId?: string | null;
+  /** Overrides the default "Message seller" — a job application's poster is
+   *  not a seller, and an applicant is not a buyer. */
+  label?: string;
   className?: string;
   size?: "default" | "sm" | "lg";
   variant?: "default" | "outline" | "secondary" | "ghost";
@@ -95,7 +99,7 @@ export function ContactSellerButton({
       ) : (
         <MessageCircle className="size-4" />
       )}
-      {t("messageSeller")}
+      {label ?? t("messageSeller")}
     </Button>
   );
 }

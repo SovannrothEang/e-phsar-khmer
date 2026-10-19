@@ -246,6 +246,27 @@
       "when": 1790742092643,
       "tag": "0034_acoustic_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792051899211,
+      "tag": "0035_resume",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792142295944,
+      "tag": "0036_job_applications",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792222996261,
+      "tag": "0037_sloppy_maggott",
+      "breakpoints": true
     }
   ]
 }

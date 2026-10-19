@@ -123,14 +123,8 @@
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Link, useRouter } from "@/i18n/routing";
-import {
-  House,
-  ChevronRight,
-  CirclePlus,
-  EllipsisVertical,
-  CreditCard,
-  Zap,
-} from "lucide-react";
+import { CirclePlus, EllipsisVertical, CreditCard, Zap } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -154,41 +148,15 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-muted  pb-2">
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <nav className="flex items-center space-x-1 text-sm ">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-foreground  group-hover:text-gray-300"
-          >
-            <House
-              size={16}
-              className="text-foreground  group-hover:text-gray-300"
-            />
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Profile
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <Link
-            href={{ pathname: "/me/membership" }}
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <span className="text-foreground  group-hover:text-gray-300 pl-1.5">
-              Membership
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Check Out</h1>
-        </nav>
+      <div className="max-w-7xl mx-auto py-4">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: { pathname: "/me/membership" } },
+            { label: "Check Out" },
+          ]}
+        />
       </div>
 
       <main className="max-w-4xl mx-auto px-4 space-y-4">

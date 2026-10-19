@@ -2,12 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { Link } from "@/i18n/routing";
 import { Separator } from "@/components/ui/separator";
 import { Category, Subcategory } from "@/types/post-form";
 import {
   ChevronRight,
-  House,
   MapPin,
   Phone,
   Mail,
@@ -16,6 +14,7 @@ import {
   DollarSign,
   Truck,
 } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import ImageUpload from "@/components/post/ImageUpload";
 import ListingPostForm from "@/components/post/ListingPostForm";
 import DbImage from "@/components/common/DbImage";
@@ -1300,22 +1299,10 @@ export default function PostPage() {
   return (
     <div className="min-h-screen bg-muted">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-6">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <House
-              size={16}
-              className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300"
-            />
-            <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Post</h1>
-        </nav>
+        <Breadcrumbs
+          className="mb-6"
+          items={[{ label: "Home", href: "/" }, { label: "Post" }]}
+        />
 
         <div className="bg-card border rounded-sm p-6 shadow-sm">
           <h1 className="text-2xl font-bold  mb-1">Post an Ad</h1>
