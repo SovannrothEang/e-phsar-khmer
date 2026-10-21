@@ -30,6 +30,8 @@ export interface UserSubscription {
   purchaseId: string | null;
   termId: string | null;
   termName: string | null;
+  /** The group (subscription category) this subscription belongs to. */
+  categoryId: string | null;
   categoryName: string | null;
   planName: string | null;
   packageName: string | null;
@@ -77,22 +79,52 @@ export async function getPaymentProviders(): Promise<PaymentProvider[]> {
   return data;
 }
 
-export interface PlanEntitlements {
-  plan: "free" | "premium";
-  limits: {
-    photos: number;
-    ads: number;
-    renews: number;
-    autoRenews: number;
-    videos: number;
-  };
-  expiresAt: string | null;
-  usage: { ads: number };
+export interface PlanLimits {
+  photos: number;
+  ads: number;
+  renews: number;
+  autoRenews: number;
+  videos: number;
 }
 
-export async function getMyEntitlements(): Promise<PlanEntitlements> {
+/**
+ * One allowance: a group the user holds (its package limits, shared by all
+ * the group's subcategories) or a free-plan cap ("Cars for sale", "Other ads").
+ */
+export interface EntitlementBucket {
+  key: string;
+  kind: "group" | "free";
+  name: string;
+  groupId: string | null;
+  limits: PlanLimits;
+  used: number;
+  expiresAt: string | null;
+}
+
+export interface PlanEntitlements {
+  /** "premium" when the user holds a live subscription in any group. */
+  plan: "free" | "premium";
+  /**
+   * With a subcategory: that subcategory's bucket. Without: the free plan's
+   * account-wide numbers (ads = the shared "other ads" cap).
+   */
+  limits: PlanLimits;
+  expiresAt: string | null;
+  /** With a subcategory: ads in its bucket. Without: every live ad. */
+  usage: { ads: number };
+  bucket: EntitlementBucket | null;
+  buckets: EntitlementBucket[];
+}
+
+/** Pass the subcategory being posted to for the limits that apply there. */
+export async function getMyEntitlements(
+  subcategoryId?: string,
+): Promise<PlanEntitlements> {
+  const query = subcategoryId
+    ? `?subcategoryId=${encodeURIComponent(subcategoryId)}`
+    : "";
   const { data } = await userServerFetch<PlanEntitlements>(
-    "/subscriptions/entitlements",
+    `/subscriptions/entitlements${query}`,
   );
   return data;
 }

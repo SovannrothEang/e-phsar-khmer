@@ -140,7 +140,7 @@ export default function CheckoutPage() {
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [active, setActive] = useState<UserSubscription | null>(null);
+  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const idempotencyKey = useRef<string | null>(null);
   const platform = useMobilePlatform();
   const appOpenedFor = useRef<string | null>(null);
@@ -162,7 +162,7 @@ export default function CheckoutPage() {
       });
     getMySubscriptions()
       .then((items) => {
-        if (mounted) setActive(currentSubscription(items));
+        if (mounted) setSubscriptions(items);
       })
       .catch(() => {});
     getPaymentProviders()
@@ -195,6 +195,12 @@ export default function CheckoutPage() {
   const offer = useMemo(
     () => catalog.find((item) => item.termId === termId),
     [catalog, termId],
+  );
+  // The offer's own category: a purchase there replaces (upgrades) that
+  // category's subscription and leaves the others alone.
+  const active = useMemo(
+    () => currentSubscription(subscriptions, offer?.categoryId ?? null),
+    [subscriptions, offer],
   );
 
   async function startCheckout() {
@@ -273,9 +279,10 @@ export default function CheckoutPage() {
         setError(null);
         setPayment(result.data);
         if (result.data.status !== "succeeded") continue;
-        const subscriptions = await getMySubscriptions().catch(() => null);
+        const latest = await getMySubscriptions().catch(() => null);
+        if (latest) setSubscriptions(latest);
         if (
-          subscriptions?.some(
+          latest?.some(
             (subscription) =>
               subscription.purchaseId === purchaseId &&
               subscription.status === "active",

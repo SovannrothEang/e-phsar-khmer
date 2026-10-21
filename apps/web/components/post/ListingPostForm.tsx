@@ -697,17 +697,24 @@ export default function ListingPostForm({
           }`}
         >
           <span>
+            {/* Limits are per bucket: the group subscription covering this
+                subcategory, else the free cap for where it is posted. */}
             <strong className="font-semibold text-foreground">
-              {config.plan.plan === "free" ? "Free plan" : "Premium plan"}
+              {config.plan.bucket?.kind === "group"
+                ? `${config.plan.bucket.name} plan`
+                : "Free plan"}
             </strong>{" "}
-            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used · up
-            to {config.plan.limits.photos} photos per ad
+            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used
+            {config.plan.bucket?.kind === "free"
+              ? ` in ${config.plan.bucket.name}`
+              : ""}{" "}
+            · up to {config.plan.limits.photos} photos per ad
           </span>
           <Link
             href="/premium-account"
             className="font-semibold text-[#0089c8] hover:underline"
           >
-            {config.plan.plan === "free" ? "Upgrade" : "See plans"}
+            {config.plan.bucket?.kind === "group" ? "See plans" : "Upgrade"}
           </Link>
         </div>
       )}

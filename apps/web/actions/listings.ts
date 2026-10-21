@@ -360,7 +360,7 @@ export async function getListingFormConfig(
   // declares 8.
   const schemaPhotoMax =
     (sub.fieldSchema ?? []).find((f) => f.key === "photos")?.max ?? 8;
-  const plan = await getMyEntitlements().catch(() => null);
+  const plan = await getMyEntitlements(sub.id).catch(() => null);
   const photoMax = plan
     ? Math.min(schemaPhotoMax, plan.limits.photos)
     : schemaPhotoMax;
@@ -555,11 +555,12 @@ export async function createListing(
 ): Promise<CreateListingResult> {
   // Refuse up front when the plan has no free ad slot, so a failed publish
   // doesn't leave an orphaned draft behind.
-  const plan = await getMyEntitlements().catch(() => null);
+  // Limits are per category bucket, so ask for the one this ad lands in.
+  const plan = await getMyEntitlements(payload.subcategoryId).catch(() => null);
   if (plan && plan.usage.ads >= plan.limits.ads) {
     return {
       success: false,
-      error: `Your ${plan.plan === "free" ? "free" : "current"} plan allows ${plan.limits.ads} active ads and you have ${plan.usage.ads}. Upgrade your subscription or remove an ad to post another.`,
+      error: `Your ${plan.bucket?.kind === "group" ? `${plan.bucket.name} subscription` : "free plan"} allows ${plan.limits.ads} active ads ${plan.bucket?.kind === "group" ? "in its categories" : `in ${plan.bucket?.name ?? "this category"}`} and you have ${plan.usage.ads}. Upgrade your subscription or remove an ad to post another.`,
     };
   }
 

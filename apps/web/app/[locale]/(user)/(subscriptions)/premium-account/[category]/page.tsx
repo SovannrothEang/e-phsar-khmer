@@ -46,7 +46,7 @@ export default function PremiumPlanPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
-  const [active, setActive] = useState<UserSubscription | null>(null);
+  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [now] = useState(() => Date.now());
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export default function PremiumPlanPage() {
     // and checkout still re-checks on the server.
     getMySubscriptions()
       .then((items) => {
-        if (mounted) setActive(currentSubscription(items));
+        if (mounted) setSubscriptions(items);
       })
       .catch(() => {});
     getSubscriptionCatalog()
@@ -88,6 +88,12 @@ export default function PremiumPlanPage() {
       items.sort((a, b) => priceFor(a) - priceFor(b)),
     );
   }, [offers]);
+  // Only this category's subscription matters here: buying into another
+  // category is a separate, side-by-side subscription, never an upgrade.
+  const active = currentSubscription(
+    subscriptions,
+    offers[0]?.categoryId ?? null,
+  );
   const activePackageId = packageIdOf(active, catalog);
   const categoryName = offers[0]?.categoryName ?? categorySlug;
   const categoryDescription = offers[0]?.categoryDescription;

@@ -18,7 +18,7 @@ import {
   getSubscriptionCatalog,
 } from "@/actions/subscriptions";
 import {
-  currentSubscription,
+  activeSubscriptions,
   daysUntil,
   priceFor,
 } from "@/lib/subscription-pricing";
@@ -28,6 +28,7 @@ const categoryIcons: Record<string, LucideIcon> = {
   food: Utensils,
   general: Grid2X2,
   property: House,
+  service: BriefcaseBusiness,
   services: BriefcaseBusiness,
 };
 
@@ -61,7 +62,12 @@ export default async function PremiumAccountPage() {
     getSubscriptionCatalog().catch(() => []),
     getMySubscriptions().catch(() => []),
   ]);
-  const active = currentSubscription(subscriptions);
+  // One subscription per category, held side by side.
+  const held = activeSubscriptions(subscriptions);
+  const heldByCategory = new Map(
+    held.flatMap((item) => (item.categoryId ? [[item.categoryId, item]] : [])),
+  );
+  const active = held[0] ?? null;
   const activeCategory = active?.termId
     ? catalog.find((item) => item.termId === active.termId)
     : undefined;
@@ -134,6 +140,18 @@ export default async function PremiumAccountPage() {
               {daysLeft === 1 ? "day" : "days"} left. Need more? Upgrade to a
               bigger package and pay only the difference for the time remaining.
             </p>
+            {held.length > 1 && (
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                Also active:{" "}
+                {held
+                  .slice(1)
+                  .map(
+                    (item) =>
+                      `${[item.categoryName, item.packageName ?? item.planName].filter(Boolean).join(" ")} (${daysUntil(item.expiresAt)} days left)`,
+                  )
+                  .join(", ")}
+              </p>
+            )}
             <ul className="mt-6 flex flex-wrap gap-2 text-sm">
               {(
                 [
@@ -207,12 +225,11 @@ export default async function PremiumAccountPage() {
                 id="browse-heading"
                 className="text-xl font-semibold tracking-tight text-foreground"
               >
-                {active ? "Upgrade options" : "Browse by category"}
+                Browse by category
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {active
-                  ? "Packages bigger than yours can be bought as an upgrade."
-                  : "Choose where you want to grow your listings."}
+                Each category is its own subscription — hold several at once,
+                and upgrade any of them for the time it has left.
               </p>
             </div>
             <span className="text-sm text-muted-foreground">
@@ -235,6 +252,7 @@ export default async function PremiumAccountPage() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map((category) => {
                 const Icon = categoryIcons[category.slug] ?? Grid2X2;
+                const mine = heldByCategory.get(category.id);
                 return (
                   <Link
                     key={category.id}
@@ -248,10 +266,19 @@ export default async function PremiumAccountPage() {
                       <span className="flex size-11 items-center justify-center rounded-xl bg-[#00a0e9]/10 text-[#0089c8] transition-colors group-hover:bg-[#00a0e9] group-hover:text-white">
                         <Icon className="size-5" />
                       </span>
-                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-                        {category.packages.size}{" "}
-                        {category.packages.size === 1 ? "package" : "packages"}
-                      </span>
+                      {mine ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          <BadgeCheck className="size-3.5" />
+                          {mine.packageName ?? mine.planName ?? "Active"}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                          {category.packages.size}{" "}
+                          {category.packages.size === 1
+                            ? "package"
+                            : "packages"}
+                        </span>
+                      )}
                     </div>
                     <h3 className="mt-5 text-lg font-semibold text-foreground">
                       {category.name}

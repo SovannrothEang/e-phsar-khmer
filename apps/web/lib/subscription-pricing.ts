@@ -18,17 +18,44 @@ export function priceFor(item: SubscriptionCatalogItem): number {
   return Math.max(0, Math.round(final * 100) / 100);
 }
 
-/** The subscription checkout treats as "current": active, latest expiry. */
+/**
+ * The subscription checkout treats as "current" for a group (subscription
+ * category): active, latest expiry. A user holds one per group side by side,
+ * so pass the group being bought into; without one, the latest of any group.
+ */
 export function currentSubscription(
   subscriptions: UserSubscription[],
+  categoryId?: string | null,
 ): UserSubscription | null {
   return (
     subscriptions
-      .filter((item) => item.status === "active")
+      .filter(
+        (item) =>
+          item.status === "active" &&
+          (categoryId === undefined || item.categoryId === categoryId),
+      )
       .sort(
         (a, b) =>
           new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime(),
       )[0] ?? null
+  );
+}
+
+/** Every active subscription, one per group, latest expiry first. */
+export function activeSubscriptions(
+  subscriptions: UserSubscription[],
+): UserSubscription[] {
+  const byGroup = new Map<string, UserSubscription>();
+  for (const item of subscriptions) {
+    if (item.status !== "active") continue;
+    const key = item.categoryId ?? item.id;
+    const kept = byGroup.get(key);
+    if (!kept || new Date(item.expiresAt) > new Date(kept.expiresAt)) {
+      byGroup.set(key, item);
+    }
+  }
+  return [...byGroup.values()].sort(
+    (a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime(),
   );
 }
 

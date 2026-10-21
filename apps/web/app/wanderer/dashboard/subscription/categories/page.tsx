@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -14,7 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreVertical, Search, Trash2, Plus, Pencil } from "lucide-react";
+import {
+  Info,
+  ListChecks,
+  MoreVertical,
+  Search,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
+import { getAdminSubcategories } from "@/actions/admin-subcategories";
+import { SubscriptionScopeDialog } from "@/components/dashboard/subscription-scope-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,10 +96,31 @@ const emptyForm = {
 
 export default function SubscriptionCategoryPage() {
   const queryClient = useQueryClient();
-  const { data: subscriptionCategories = [] } = useQuery({
+  const { data: rawCategories = [] } = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: async () => (await getSubCategories()).map(toVerbose),
+    queryFn: getSubCategories,
   });
+  const subscriptionCategories = useMemo(
+    () => rawCategories.map(toVerbose),
+    [rawCategories],
+  );
+  const coverage = useMemo(
+    () =>
+      new Map(rawCategories.map((c) => [c.id, c.subcategoryIds?.length ?? 0])),
+    [rawCategories],
+  );
+  const { data: allSubcategories = [] } = useQuery({
+    queryKey: ["admin", "subcategories"],
+    queryFn: getAdminSubcategories,
+  });
+  const uncovered = useMemo(() => {
+    const covered = new Set(
+      rawCategories.flatMap((c) => c.subcategoryIds ?? []),
+    );
+    return allSubcategories.filter((s) => !covered.has(s.subId)).length;
+  }, [rawCategories, allSubcategories]);
+  const [scopeGroupId, setScopeGroupId] = useState<string | null>(null);
+  const scopeGroup = rawCategories.find((c) => c.id === scopeGroupId) ?? null;
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "sub", "categories"] });
   const [currentPage, setCurrentPage] = useState(1);
@@ -280,6 +311,14 @@ export default function SubscriptionCategoryPage() {
           </DialogContent>
         </Dialog>
       </div>
+      {uncovered > 0 && (
+        <p className="flex items-center gap-2 rounded-md bg-sky-500/10 px-4 py-3 text-sm text-sky-800 dark:text-sky-300">
+          <Info className="size-4 shrink-0" />
+          {uncovered} listing{" "}
+          {uncovered === 1 ? "subcategory is" : "subcategories are"} covered by
+          no subscription category — ads posted there always use the free plan.
+        </p>
+      )}
       <div className="relative w-80">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
@@ -300,7 +339,7 @@ export default function SubscriptionCategoryPage() {
               <TableHead className="text-center">ID</TableHead>
               <TableHead className="text-center">Categories Name</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-center">Total Plans</TableHead>
+              <TableHead className="text-center">Covers</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead className="w-[70px]">Actions</TableHead>
@@ -329,7 +368,13 @@ export default function SubscriptionCategoryPage() {
                     {sub.desc}
                   </TableCell>
                   <TableCell className="text-center">
-                    {sub.subscriptionplans.length}
+                    <button
+                      type="button"
+                      onClick={() => setScopeGroupId(sub.subscriptionCateId)}
+                      className="cursor-pointer text-sky-600 hover:underline"
+                    >
+                      {coverage.get(sub.subscriptionCateId) ?? 0} subcategories
+                    </button>
                   </TableCell>
                   <TableCell>{formatDate(sub.createdAt)}</TableCell>
                   <TableCell>{formatDate(sub.updatedAt)}</TableCell>
@@ -345,6 +390,15 @@ export default function SubscriptionCategoryPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="center">
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={() =>
+                            setScopeGroupId(sub.subscriptionCateId)
+                          }
+                        >
+                          <ListChecks className="mr-2 size-4" />
+                          Coverage
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-yellow-500 cursor-pointer"
                           onClick={() => openEditDialog(sub)}
@@ -475,6 +529,16 @@ export default function SubscriptionCategoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {scopeGroup && (
+        <SubscriptionScopeDialog
+          key={scopeGroup.id}
+          group={scopeGroup}
+          groups={rawCategories}
+          onClose={() => setScopeGroupId(null)}
+          onSaved={refresh}
+        />
+      )}
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>

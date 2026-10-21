@@ -17,6 +17,7 @@ import {
   IconCategory2,
   IconPackages,
   IconClockHour4,
+  IconGift,
   IconAccessPoint,
   IconCalendarStats,
   IconBriefcase,
@@ -182,6 +183,11 @@ const subscriptionSubItems = [
     title: "Terms",
     icon: IconClockHour4,
     href: "/wanderer/dashboard/subscription/terms",
+  },
+  {
+    title: "Free Plan",
+    icon: IconGift,
+    href: "/wanderer/dashboard/subscription/free-plan",
   },
 ] as const;
 
