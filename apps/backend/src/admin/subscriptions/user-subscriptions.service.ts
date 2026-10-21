@@ -53,7 +53,7 @@ export class UserSubscriptionsService {
   ) {}
 
   /**
-   * Current rows only (one per user) unless `history` is set, which adds
+   * Current rows only (one per user per group) unless `history` is set, which adds
    * every superseded row — upgrades, replacements, revokes.
    */
   async list(history = false): Promise<UserSubscriptionView[]> {
@@ -94,7 +94,7 @@ export class UserSubscriptionsService {
       )
       .leftJoin(
         subscriptionCategories,
-        eq(subscriptionCategories.id, subscriptionPlans.categoryId),
+        eq(subscriptionCategories.id, userSubscriptions.subscriptionCategoryId),
       )
       .where(history ? undefined : isNull(userSubscriptions.supersededAt))
       .orderBy(desc(userSubscriptions.subscribedAt));

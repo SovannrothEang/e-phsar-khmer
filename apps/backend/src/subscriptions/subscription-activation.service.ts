@@ -10,6 +10,7 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import {
   subscriptionPackages,
+  subscriptionPlans,
   subscriptionPurchases,
   subscriptionTerms,
   userSubscriptions,
@@ -40,6 +41,7 @@ export type SubscriptionActivationResult =
 interface OfferSnapshot {
   durationValue?: unknown;
   durationUnit?: unknown;
+  subscriptionCategoryId?: unknown;
 }
 
 export function addDuration(
@@ -136,8 +138,9 @@ export interface ActivationPlan {
 
 /**
  * Decides what a settled purchase grants and which rows it retires. A user
- * holds at most one current (non-superseded) row, so every current row is
- * superseded by the new one — history stays as superseded rows, never deletes.
+ * holds at most one current (non-superseded) row per group, and `current` is
+ * that group's rows only, so every one of them is superseded by the new one —
+ * history stays as superseded rows, never deletes. Other groups are untouched.
  */
 export function planActivation(input: {
   kind: 'initial' | 'upgrade' | 'manual_comp';
@@ -244,7 +247,9 @@ export class SubscriptionActivationService {
       .for('update');
 
     const duration = durationFromSnapshot(purchase.offerSnapshot);
+    const groupId = await this.groupOf(tx, purchase);
     const now = new Date();
+    // Only this group's current row is replaced; Auto and Property coexist.
     const current = await tx
       .select({
         id: userSubscriptions.id,
@@ -255,6 +260,9 @@ export class SubscriptionActivationService {
         and(
           eq(userSubscriptions.userId, purchase.userId),
           isNull(userSubscriptions.supersededAt),
+          groupId
+            ? eq(userSubscriptions.subscriptionCategoryId, groupId)
+            : isNull(userSubscriptions.subscriptionCategoryId),
         ),
       );
 
@@ -312,6 +320,7 @@ export class SubscriptionActivationService {
       .values({
         userId: purchase.userId,
         termId: purchase.termId,
+        subscriptionCategoryId: groupId,
         priceUsd: purchase.amountUsd,
         paymentMethod: purchase.kind === 'manual_comp' ? 'comp' : 'bakong',
         subscribedAt: now,
@@ -338,6 +347,35 @@ export class SubscriptionActivationService {
     return { status: 'activated', subscriptionId: subscription.id };
   }
 
+  /**
+   * The group a purchase belongs to: frozen in its offer snapshot at checkout,
+   * else (older purchases) derived through its term. Null only when neither
+   * survives — that subscription then covers no subcategory.
+   */
+  private async groupOf(
+    tx: DbExecutor,
+    purchase: { offerSnapshot: unknown; termId: string | null },
+  ): Promise<string | null> {
+    const frozen = (purchase.offerSnapshot as OfferSnapshot | null)
+      ?.subscriptionCategoryId;
+    if (typeof frozen === 'string') return frozen;
+    if (!purchase.termId) return null;
+    const [row] = await tx
+      .select({ groupId: subscriptionPlans.categoryId })
+      .from(subscriptionTerms)
+      .innerJoin(
+        subscriptionPackages,
+        eq(subscriptionPackages.id, subscriptionTerms.packageId),
+      )
+      .innerJoin(
+        subscriptionPlans,
+        eq(subscriptionPlans.id, subscriptionPackages.planId),
+      )
+      .where(eq(subscriptionTerms.id, purchase.termId))
+      .limit(1);
+    return row?.groupId ?? null;
+  }
+
   async grantManual(input: {
     userId: string;
     termId: string;
@@ -352,8 +390,21 @@ export class SubscriptionActivationService {
       if (!term) throw new NotFoundException('Subscription term not found');
 
       const [pkg] = await tx
-        .select()
+        .select({
+          id: subscriptionPackages.id,
+          name: subscriptionPackages.name,
+          photos: subscriptionPackages.photos,
+          ads: subscriptionPackages.ads,
+          renews: subscriptionPackages.renews,
+          autoRenews: subscriptionPackages.autoRenews,
+          videos: subscriptionPackages.videos,
+          subscriptionCategoryId: subscriptionPlans.categoryId,
+        })
         .from(subscriptionPackages)
+        .innerJoin(
+          subscriptionPlans,
+          eq(subscriptionPlans.id, subscriptionPackages.planId),
+        )
         .where(eq(subscriptionPackages.id, term.packageId))
         .limit(1);
       if (!pkg) throw new NotFoundException('Subscription package not found');
@@ -374,6 +425,7 @@ export class SubscriptionActivationService {
             durationUnit: term.durationUnit,
             packageId: pkg.id,
             packageName: pkg.name,
+            subscriptionCategoryId: pkg.subscriptionCategoryId,
             photos: pkg.photos,
             ads: pkg.ads,
             renews: pkg.renews,

@@ -780,7 +780,7 @@ describe('ListingsService plan enforcement', () => {
     expect(entitlements.assertPhotos).toHaveBeenCalled();
     expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalledWith(
       'u1',
-      'l1',
+      expect.objectContaining({ userId: 'u1' }),
     );
     expect(entitlements.assertCanRenew).not.toHaveBeenCalled();
     expect(set).toHaveBeenCalledWith(
@@ -797,7 +797,11 @@ describe('ListingsService plan enforcement', () => {
       renewCount: 1,
     });
     await service.publish('u1', 'l1');
-    expect(entitlements.assertCanRenew).toHaveBeenCalledWith('u1', 1);
+    expect(entitlements.assertCanRenew).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1' }),
+      1,
+    );
     // still live → already counted, so no slot check
     expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
     expect(set).toHaveBeenCalledWith(

@@ -104,7 +104,11 @@ export class ListingsService {
     userId: string,
     dto: CreateListingDto,
   ): Promise<ListingWithPhotos> {
-    await this.entitlements.assertPhotos(userId, dto.photos?.length ?? 0);
+    await this.entitlements.assertPhotos(
+      userId,
+      { categoryId: dto.categoryId, subcategoryId: dto.subcategoryId },
+      dto.photos?.length ?? 0,
+    );
 
     const [cat] = await this.db
       .select({ id: categories.id })
@@ -185,6 +189,7 @@ export class ListingsService {
     if (dto.photos !== undefined) {
       await this.entitlements.assertPhotos(
         userId,
+        existing,
         dto.photos.length,
         existing.photos.length,
       );
@@ -508,17 +513,25 @@ export class ListingsService {
     const now = new Date();
     if (existing.publishedAt === null) {
       // A brand-new ad: needs a free slot, and its photos must fit the plan.
-      await this.entitlements.assertPhotos(userId, existing.photos.length);
-      await this.entitlements.assertCanHoldAnotherAd(userId, id);
+      await this.entitlements.assertPhotos(
+        userId,
+        existing,
+        existing.photos.length,
+      );
+      await this.entitlements.assertCanHoldAnotherAd(userId, existing);
     } else {
       // Re-publishing an ad that already went live is a renewal. An ad that
       // lapsed (or was deleted) is no longer counted, so it also needs a slot.
-      await this.entitlements.assertCanRenew(userId, existing.renewCount);
+      await this.entitlements.assertCanRenew(
+        userId,
+        existing,
+        existing.renewCount,
+      );
       const stillLive =
         existing.status === 'active' &&
         (existing.expiresAt === null || existing.expiresAt > now);
       if (!stillLive) {
-        await this.entitlements.assertCanHoldAnotherAd(userId, id);
+        await this.entitlements.assertCanHoldAnotherAd(userId, existing);
       }
     }
 

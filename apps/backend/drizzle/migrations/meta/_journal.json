@@ -274,6 +274,13 @@
       "when": 1792409751342,
       "tag": "0038_thankful_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792557756050,
+      "tag": "0039_fuzzy_firelord",
+      "breakpoints": true
     }
   ]
 }

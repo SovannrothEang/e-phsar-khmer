@@ -13,7 +13,11 @@ function makePurchase(overrides: Record<string, unknown> = {}) {
     status: 'pending',
     amountUsd: '10.00',
     currency: 'USD',
-    offerSnapshot: { durationValue: 1, durationUnit: 'month' },
+    offerSnapshot: {
+      durationValue: 1,
+      durationUnit: 'month',
+      subscriptionCategoryId: 'group-1',
+    },
     ...overrides,
   };
 }
@@ -243,7 +247,13 @@ describe('SubscriptionActivationService', () => {
       await service.activatePaidPurchase(settlement);
     }
 
-    const inserted = (insertValues.mock.calls as [{ expiresAt: Date }][])[0][0];
+    const inserted = (
+      insertValues.mock.calls as [
+        { expiresAt: Date; subscriptionCategoryId: string | null },
+      ][]
+    )[0][0];
+    // The new row joins the purchase's group, so only that group is replaced.
+    expect(inserted.subscriptionCategoryId).toBe('group-1');
     if (keepsExpiry) {
       expect(inserted.expiresAt).toEqual(activeExpiry);
     } else {
