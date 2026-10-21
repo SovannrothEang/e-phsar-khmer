@@ -36,12 +36,14 @@ const STATUS_STYLE: Record<UserSubscription["status"], string> = {
   active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   expired: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   superseded: "bg-muted text-muted-foreground",
+  revoked: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
 const STATUS_LABEL: Record<UserSubscription["status"], string> = {
   active: "Active",
   expired: "Expired",
   superseded: "Upgraded",
+  revoked: "Revoked",
 };
 
 function money(value: string | number): string {

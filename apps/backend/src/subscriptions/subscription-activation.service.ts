@@ -2,9 +2,10 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import {
@@ -29,6 +30,7 @@ export type SubscriptionActivationResult =
   | {
       status:
         | 'already_paid'
+        | 'needs_refund'
         | 'not_found'
         | 'not_pending'
         | 'payment_link_pending'
@@ -100,8 +102,95 @@ function durationFromSnapshot(snapshot: unknown): {
   return { value, unit };
 }
 
+export type SupersededReason = 'upgrade' | 'replaced' | 'expired' | 'revoked';
+
+export type SubscriptionStatus =
+  | 'active'
+  | 'expired'
+  | 'superseded'
+  | 'revoked';
+
+export function subscriptionStatus(
+  row: {
+    expiresAt: Date;
+    supersededAt: Date | null;
+    supersededReason: string | null;
+  },
+  now = Date.now(),
+): SubscriptionStatus {
+  if (row.supersededAt) {
+    if (row.supersededReason === 'revoked') return 'revoked';
+    if (row.supersededReason === 'expired') return 'expired';
+    return 'superseded';
+  }
+  return row.expiresAt.getTime() > now ? 'active' : 'expired';
+}
+
+export interface ActivationPlan {
+  /** `null` = nothing left to grant; the payment needs a refund. */
+  expiresAt: Date | null;
+  supersede: { id: string; reason: SupersededReason }[];
+  /** The purchase was priced against a subscription that has since changed. */
+  needsReview: boolean;
+}
+
+/**
+ * Decides what a settled purchase grants and which rows it retires. A user
+ * holds at most one current (non-superseded) row, so every current row is
+ * superseded by the new one — history stays as superseded rows, never deletes.
+ */
+export function planActivation(input: {
+  kind: 'initial' | 'upgrade' | 'manual_comp';
+  replacesSubscriptionId: string | null;
+  fullTermEnd: Date;
+  current: { id: string; expiresAt: Date }[];
+  baseExpiresAt: Date | null;
+  now: Date;
+}): ActivationPlan {
+  const { kind, now, current } = input;
+  const active = current
+    .filter((row) => row.expiresAt > now)
+    .sort((a, b) => b.expiresAt.getTime() - a.expiresAt.getTime())[0];
+
+  let expiresAt: Date | null;
+  let needsReview = false;
+  if (kind === 'manual_comp') {
+    // An admin comp is a fresh grant, so it always starts a full term.
+    expiresAt = input.fullTermEnd;
+  } else if (kind === 'upgrade') {
+    // Checkout prorated the price to the base's remaining time, so the
+    // upgrade keeps that boundary.
+    const fresh = !!active && active.id === input.replacesSubscriptionId;
+    const base = input.baseExpiresAt;
+    expiresAt = active?.expiresAt ?? (base && base > now ? base : null);
+    needsReview = !fresh;
+  } else {
+    // Charged full price, so a full term — even if another plan became
+    // active after checkout; that plan's remaining time is up for review.
+    expiresAt = input.fullTermEnd;
+    needsReview = !!active;
+  }
+
+  if (expiresAt === null) return { expiresAt, supersede: [], needsReview };
+  return {
+    expiresAt,
+    supersede: current.map((row) => ({
+      id: row.id,
+      reason:
+        row.expiresAt <= now
+          ? 'expired'
+          : kind === 'upgrade'
+            ? 'upgrade'
+            : 'replaced',
+    })),
+    needsReview,
+  };
+}
+
 @Injectable()
 export class SubscriptionActivationService {
+  private readonly logger = new Logger(SubscriptionActivationService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly entitlements: EntitlementsService,
@@ -156,32 +245,66 @@ export class SubscriptionActivationService {
 
     const duration = durationFromSnapshot(purchase.offerSnapshot);
     const now = new Date();
-    const [active] = await tx
-      .select()
+    const current = await tx
+      .select({
+        id: userSubscriptions.id,
+        expiresAt: userSubscriptions.expiresAt,
+      })
       .from(userSubscriptions)
       .where(
         and(
           eq(userSubscriptions.userId, purchase.userId),
           isNull(userSubscriptions.supersededAt),
-          gt(userSubscriptions.expiresAt, now),
         ),
-      )
-      .orderBy(desc(userSubscriptions.expiresAt))
-      .limit(1);
+      );
 
-    // Paid upgrades keep the current expiry boundary (checkout already
-    // prorated the price to the remaining time). An admin comp is a fresh
-    // grant, so it always starts a full term.
-    const expiresAt =
-      active && purchase.kind !== 'manual_comp'
-        ? active.expiresAt
-        : addDuration(now, duration.value, duration.unit);
+    // A stale upgrade whose base is no longer current (revoked, or replaced
+    // by another purchase) still owes the payer the period it was priced on.
+    let baseExpiresAt: Date | null = null;
+    if (
+      purchase.replacesSubscriptionId &&
+      !current.some((row) => row.id === purchase.replacesSubscriptionId)
+    ) {
+      const [base] = await tx
+        .select({ expiresAt: userSubscriptions.expiresAt })
+        .from(userSubscriptions)
+        .where(eq(userSubscriptions.id, purchase.replacesSubscriptionId))
+        .limit(1);
+      baseExpiresAt = base?.expiresAt ?? null;
+    }
 
-    if (active) {
+    const plan = planActivation({
+      kind: purchase.kind,
+      replacesSubscriptionId: purchase.replacesSubscriptionId,
+      fullTermEnd: addDuration(now, duration.value, duration.unit),
+      current,
+      baseExpiresAt,
+      now,
+    });
+
+    if (plan.expiresAt === null) {
+      // Nothing is left to grant for what was paid; keep the money visible
+      // for a refund instead of inventing a period nobody priced.
+      await tx
+        .update(subscriptionPurchases)
+        .set({ status: 'paid', paidAt: now, refundRequestedAt: now })
+        .where(eq(subscriptionPurchases.id, purchase.id));
+      this.logger.warn(
+        `Purchase ${purchase.id} settled after its upgrade base lapsed — flagged for refund`,
+      );
+      return { status: 'needs_refund' };
+    }
+
+    for (const row of plan.supersede) {
       await tx
         .update(userSubscriptions)
-        .set({ supersededAt: now, supersededReason: 'upgrade' })
-        .where(eq(userSubscriptions.id, active.id));
+        .set({ supersededAt: now, supersededReason: row.reason })
+        .where(
+          and(
+            eq(userSubscriptions.id, row.id),
+            isNull(userSubscriptions.supersededAt),
+          ),
+        );
     }
 
     const [subscription] = await tx
@@ -192,7 +315,7 @@ export class SubscriptionActivationService {
         priceUsd: purchase.amountUsd,
         paymentMethod: purchase.kind === 'manual_comp' ? 'comp' : 'bakong',
         subscribedAt: now,
-        expiresAt,
+        expiresAt: plan.expiresAt,
       })
       .returning({ id: userSubscriptions.id });
 
@@ -202,8 +325,15 @@ export class SubscriptionActivationService {
         status: 'paid',
         paidAt: now,
         subscriptionId: subscription.id,
+        ...(plan.needsReview ? { refundRequestedAt: now } : {}),
       })
       .where(eq(subscriptionPurchases.id, purchase.id));
+
+    if (plan.needsReview) {
+      this.logger.warn(
+        `Purchase ${purchase.id} settled against a subscription that changed since checkout — flagged for review`,
+      );
+    }
 
     return { status: 'activated', subscriptionId: subscription.id };
   }

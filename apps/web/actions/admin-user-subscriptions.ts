@@ -18,12 +18,17 @@ export interface UserSubscriptionRow {
   paymentMethod: string | null;
   subscribedAt: string;
   expiresAt: string;
-  status: "active" | "expired" | "superseded";
+  supersededAt: string | null;
+  supersededReason: string | null;
+  status: "active" | "expired" | "superseded" | "revoked";
 }
 
-export async function getUserSubscriptions(): Promise<UserSubscriptionRow[]> {
+/** Current subscriptions (one per user); `history` adds superseded rows. */
+export async function getUserSubscriptions(
+  history = false,
+): Promise<UserSubscriptionRow[]> {
   const { data } = await serverFetch<UserSubscriptionRow[]>(
-    "/admin/user-subscriptions",
+    `/admin/user-subscriptions${history ? "?history=true" : ""}`,
   );
   return data;
 }
@@ -47,14 +52,17 @@ export async function grantSubscription(input: {
   }
 }
 
-export async function deleteUserSubscription(id: string) {
+/** Ends a current subscription; the row is kept as history, never deleted. */
+export async function revokeUserSubscription(id: string) {
   try {
-    await serverFetch(`/admin/user-subscriptions/${id}`, { method: "DELETE" });
+    await serverFetch(`/admin/user-subscriptions/${id}/revoke`, {
+      method: "POST",
+    });
     return { success: true };
   } catch (err) {
     return {
       success: false,
-      error: err instanceof ApiError ? err.message : "Failed to delete",
+      error: err instanceof ApiError ? err.message : "Failed to revoke",
     };
   }
 }

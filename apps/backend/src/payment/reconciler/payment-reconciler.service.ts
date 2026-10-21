@@ -260,6 +260,7 @@ export class PaymentReconciler
           );
         } else if (
           result.status === 'payment_mismatch' ||
+          result.status === 'needs_refund' ||
           result.status === 'not_found'
         ) {
           this.logger.warn(

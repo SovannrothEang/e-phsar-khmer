@@ -267,6 +267,13 @@
       "when": 1791970052855,
       "tag": "0037_burly_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792409751342,
+      "tag": "0038_thankful_skullbuster",
+      "breakpoints": true
     }
   ]
 }

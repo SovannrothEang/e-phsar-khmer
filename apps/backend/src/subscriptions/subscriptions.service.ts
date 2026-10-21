@@ -22,7 +22,10 @@ import { PaymentEffectRunner } from '../payment/payment-effect-runner.service';
 import { PaymentGatewayRegistry } from '../payment/providers';
 import { createPaymentTransaction } from '../payment/use-cases';
 import { CreateSubscriptionCheckoutDto } from './dto/create-subscription-checkout.dto';
-import { addDuration } from './subscription-activation.service';
+import {
+  addDuration,
+  subscriptionStatus,
+} from './subscription-activation.service';
 
 function calculatePrice(
   price: string,
@@ -152,6 +155,7 @@ export class SubscriptionsService {
         subscribedAt: userSubscriptions.subscribedAt,
         expiresAt: userSubscriptions.expiresAt,
         supersededAt: userSubscriptions.supersededAt,
+        supersededReason: userSubscriptions.supersededReason,
         purchaseId: subscriptionPurchases.id,
         offerSnapshot: subscriptionPurchases.offerSnapshot,
       })
@@ -203,11 +207,7 @@ export class SubscriptionsService {
         priceUsd: row.priceUsd,
         subscribedAt: row.subscribedAt,
         expiresAt: row.expiresAt,
-        status: row.supersededAt
-          ? 'superseded'
-          : row.expiresAt.getTime() > now
-            ? 'active'
-            : 'expired',
+        status: subscriptionStatus(row, now),
       };
     });
   }

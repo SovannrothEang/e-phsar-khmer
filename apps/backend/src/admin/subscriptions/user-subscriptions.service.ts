@@ -1,5 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
 import { users } from '../../db/schema/users.schema';
@@ -12,7 +17,11 @@ import {
 } from '../../db/schema/subscriptions.schema';
 import type { GrantSubscriptionDto } from './dto/grant-subscription.dto';
 import { EntitlementsService } from '../../subscriptions/entitlements.service';
-import { SubscriptionActivationService } from '../../subscriptions/subscription-activation.service';
+import {
+  SubscriptionActivationService,
+  subscriptionStatus,
+} from '../../subscriptions/subscription-activation.service';
+import type { SubscriptionStatus } from '../../subscriptions/subscription-activation.service';
 
 export interface UserSubscriptionView {
   id: string;
@@ -30,7 +39,9 @@ export interface UserSubscriptionView {
   paymentMethod: string | null;
   subscribedAt: Date;
   expiresAt: Date;
-  status: 'active' | 'expired' | 'superseded';
+  supersededAt: Date | null;
+  supersededReason: string | null;
+  status: SubscriptionStatus;
 }
 
 @Injectable()
@@ -41,7 +52,11 @@ export class UserSubscriptionsService {
     private readonly entitlements: EntitlementsService,
   ) {}
 
-  async list(): Promise<UserSubscriptionView[]> {
+  /**
+   * Current rows only (one per user) unless `history` is set, which adds
+   * every superseded row — upgrades, replacements, revokes.
+   */
+  async list(history = false): Promise<UserSubscriptionView[]> {
     const rows = await this.db
       .select({
         id: userSubscriptions.id,
@@ -61,6 +76,7 @@ export class UserSubscriptionsService {
         subscribedAt: userSubscriptions.subscribedAt,
         expiresAt: userSubscriptions.expiresAt,
         supersededAt: userSubscriptions.supersededAt,
+        supersededReason: userSubscriptions.supersededReason,
       })
       .from(userSubscriptions)
       .innerJoin(users, eq(users.id, userSubscriptions.userId))
@@ -80,6 +96,7 @@ export class UserSubscriptionsService {
         subscriptionCategories,
         eq(subscriptionCategories.id, subscriptionPlans.categoryId),
       )
+      .where(history ? undefined : isNull(userSubscriptions.supersededAt))
       .orderBy(desc(userSubscriptions.subscribedAt));
 
     const now = Date.now();
@@ -102,11 +119,9 @@ export class UserSubscriptionsService {
       paymentMethod: r.paymentMethod,
       subscribedAt: r.subscribedAt,
       expiresAt: r.expiresAt,
-      status: r.supersededAt
-        ? 'superseded'
-        : r.expiresAt.getTime() < now
-          ? 'expired'
-          : 'active',
+      supersededAt: r.supersededAt,
+      supersededReason: r.supersededReason,
+      status: subscriptionStatus(r, now),
     }));
   }
 
@@ -132,14 +147,30 @@ export class UserSubscriptionsService {
     });
   }
 
-  async remove(id: string): Promise<{ id: string }> {
+  /**
+   * Ends a user's current subscription without deleting it: the row stays as
+   * history (and keeps its purchase link), marked `revoked`.
+   */
+  async revoke(id: string): Promise<{ id: string }> {
     const [row] = await this.db
-      .select({ id: userSubscriptions.id, userId: userSubscriptions.userId })
-      .from(userSubscriptions)
-      .where(eq(userSubscriptions.id, id))
-      .limit(1);
-    if (!row) throw new NotFoundException('Subscription not found');
-    await this.db.delete(userSubscriptions).where(eq(userSubscriptions.id, id));
+      .update(userSubscriptions)
+      .set({ supersededAt: new Date(), supersededReason: 'revoked' })
+      .where(
+        and(
+          eq(userSubscriptions.id, id),
+          isNull(userSubscriptions.supersededAt),
+        ),
+      )
+      .returning({ userId: userSubscriptions.userId });
+    if (!row) {
+      const [exists] = await this.db
+        .select({ id: userSubscriptions.id })
+        .from(userSubscriptions)
+        .where(eq(userSubscriptions.id, id))
+        .limit(1);
+      if (!exists) throw new NotFoundException('Subscription not found');
+      throw new ConflictException('Subscription is no longer current');
+    }
     // The plan just changed under the user's ads.
     await this.entitlements.reconcileListingsSafely(row.userId);
     return { id };

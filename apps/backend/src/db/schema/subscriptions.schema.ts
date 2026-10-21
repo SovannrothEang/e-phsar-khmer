@@ -163,6 +163,11 @@ export const userSubscriptions = pgTable(
     index('user_subscriptions_active_idx')
       .on(t.userId, t.expiresAt)
       .where(sql`${t.supersededAt} is null`),
+    // At most one current row per user: an upgrade, renewal or revoke
+    // supersedes the old row (history) instead of adding a second live one.
+    uniqueIndex('user_subscriptions_one_current_uq')
+      .on(t.userId)
+      .where(sql`${t.supersededAt} is null`),
   ],
 );
 

@@ -41,7 +41,7 @@ export interface UserSubscription {
   priceUsd: string;
   subscribedAt: string;
   expiresAt: string;
-  status: "active" | "expired" | "superseded";
+  status: "active" | "expired" | "superseded" | "revoked";
 }
 
 export interface PaymentTransactionStatus {
