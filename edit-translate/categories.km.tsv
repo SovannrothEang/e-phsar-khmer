@@ -1,0 +1,159 @@
+slug	parent	en	km
+cars-and-vehicles		Cars and Vehicles	រថយន្ត និង យានយន្ត
+cars-for-sale	cars-and-vehicles	Cars For Sale	រថយន្តសម្រាប់លក់
+bicycles	cars-and-vehicles	Bicycles	កង់
+motorcycles-for-sale	cars-and-vehicles	Motorcycles For Sale	ម៉ូតូសម្រាប់លក់
+vehicles-for-rent	cars-and-vehicles	Vehicles For Rent	យានជំនិះសម្រាប់ជួល
+maintenance-and-repair	cars-and-vehicles	Maintenance & Repair	ថែទាំ និង ជួលជុល
+lorries-vans-and-tractors	cars-and-vehicles	Lorries, Vans & Tractors	ឡានដឹកទំនិញ & ត្រាក់ទ័រ
+financing-and-insurance	cars-and-vehicles	Financing & Insurance	ហិរញ្ញវត្ថុ & ធានារ៉ាប់រង
+tuk-tuk-and-remork	cars-and-vehicles	Tuk Tuk & Remork	តុកតុក & រ៉ឺម៉ក
+parts-and-accessories	cars-and-vehicles	Parts & Accessories	គ្រឿងបន្លាស់ & សំភារះ
+vehicles-others	cars-and-vehicles	Others	ផ្សេងទៀត
+phones-and-tablets		Phones & Tablets	ទូរស័ព្ទ & ថេប្លេត
+phones	phones-and-tablets	Phones	ទូរស័ព្ទ
+tablets	phones-and-tablets	Tablets	ថេប្លេត
+smart-watches	phones-and-tablets	Smart Watches	នាឡិកាឆ្លាតវៃ
+phone-accessories	phones-and-tablets	Phone Accessories	គ្រឿងបន្លាស់ទូរស័ព្ទ
+phone-numbers	phones-and-tablets	Phone Numbers	លេខទូរសព្ទ
+computers-and-accessories		Computers & Accessories	កុំព្យូទ័រ & គ្រឿងបន្លាស់
+laptops	computers-and-accessories	Laptops	កុំព្យូទ័រយួរដៃ
+desktops	computers-and-accessories	Desktops	កុំព្យូទ័រលើតុ
+all-in-one	computers-and-accessories	All-in-One	All-in-One
+monitors	computers-and-accessories	Monitors	ម៉ូនីទ័រ
+printers-and-scanners	computers-and-accessories	Printers & Scanners	ម៉ាស៊ីនបោះពុម្ព & ម៉ាស៊ីនស្កេន
+computers-parts-and-accessories	computers-and-accessories	Parts & Accessories	គ្រឿងបន្លាស់ & សំភារះ
+softwares	computers-and-accessories	Softwares	កម្មវិធី
+electronics-and-appliances		Electronics & Appliances	អេឡិចត្រូនិច និង គ្រឿងប្រើប្រាស់
+washing-machines-and-dryers	electronics-and-appliances	Washing Machines & Dryers	ម៉ាស៊ីនបោកគក់ & សម្ងួត
+fridges-and-freezers	electronics-and-appliances	Fridges & Freezers	ទូរទឹកកក និង ទូក្លាសេ
+air-conditioning-and-heating	electronics-and-appliances	Air Conditioning & Heating	ម៉ាស៊ីនត្រជាក់ និង កំដៅ
+tools	electronics-and-appliances	Tools	ឧបករណ៍
+machinery	electronics-and-appliances	Machinery	គ្រឿងម៉ាស៊ីន
+consumer-electronics	electronics-and-appliances	Consumer Electronics	គ្រឿងអេឡិចត្រូនិក
+security-cameras	electronics-and-appliances	Security Cameras	កាមេរ៉ាសុវត្ថិភាព
+lighting	electronics-and-appliances	Lighting	អំពូល
+cameras-and-camcorders	electronics-and-appliances	Cameras & Camcorders	កាមេរ៉ា & ម៉ាស៊ីនថត
+tvs-videos-and-audio	electronics-and-appliances	TVs, Videos & Audio	ទូរទស្សន៍ វីដេអូ & សំឡេង
+home-appliances	electronics-and-appliances	Home Appliances	ឧបករណ៍ប្រើប្រាស់ក្នុងផ្ទះ
+video-games-consoles-toys	electronics-and-appliances	Video games, consoles, toys	វីដេអូហ្គេម & ប្រដាប់ប្រដាក្មេងលេង
+home-and-land		Home & Land	ផ្ទះ & ដី
+house-for-sale	home-and-land	House For Sale	ផ្ទះលក់
+house-for-rent	home-and-land	House For Rent	ផ្ទះជួល
+condo-for-sale	home-and-land	Condo For Sale	ខុនដូសម្រាប់លក់
+apartment-for-rent	home-and-land	Apartment For Rent	អាផាតមិនសំរាប់ជួល
+land-for-sale	home-and-land	Land For Sale	ដីលក់
+land-for-rent	home-and-land	Land For Rent	ដីសម្រាប់ជួល
+commercial-properties-for-sale	home-and-land	Commercial Properties For Sale	អចលនទ្រព្យពាណិជ្ជកម្មសម្រាប់លក់
+commercial-properties-for-rent	home-and-land	Commercial Properties For Rent	អចលនទ្រព្យពាណិជ្ជកម្មសម្រាប់ជួល
+room-for-rent	home-and-land	Room For Rent	បន្ទប់ជួល
+properties-wanted	home-and-land	Properties Wanted	ត្រូវការអចលនទ្រព្យ
+agent-services	home-and-land	Agent Services	សេវាកម្មភ្នាក់ងារ
+home-and-land-others	home-and-land	Others	ផ្សេងទៀត
+jobs		Jobs	ការងារ
+accounting-jobs	jobs	Accounting	គណនេយ្យ
+administration	jobs	Administration	រដ្ឋបាល
+architecture-engineering	jobs	Architecture/Engineering	ស្ថាបត្យកម្ម/វិស្វកម្ម
+assistant-secretary	jobs	Assistant/Secretary	ជំនួយការ/លេខាធិការ
+audit-taxation	jobs	Audit/Taxation	សវនកម្ម/ពន្ធដារ
+banking-insurance	jobs	Banking/Insurance	ធនាគារ/ធានារ៉ាប់រង
+cashier-receptionist	jobs	Cashier/Receptionist	អ្នកគិតលុយ/អ្នកទទួលភ្ញៀវ
+catering-restaurant	jobs	Catering/Restaurant	អាហារដ្ឋាន/ភោជនីយដ្ឋាន
+cleaner-maid	jobs	Cleaner/Maid	អ្នកសម្អាត/កូនឈ្នួល
+consultancy	jobs	Consultancy	ប្រឹក្សាយោបល់
+customer-service	jobs	Customer Service	សេវាកម្មអតិថិជន
+design	jobs	Design	រចនា
+education-training	jobs	Education/Training	ការអប់រំ/បណ្តុះបណ្តាល
+finance	jobs	Finance	ហិរញ្ញវត្ថុ
+freight-shipping-delivery-warehouse	jobs	Freight/Shipping/Delivery/Warehouse	ដឹកទំនិញ/ដឹកជញ្ជូន/ចែកចាយ/ឃ្លាំង
+hotel-hospitality	jobs	Hotel/Hospitality	សណ្ឋាគារ / មន្ទីរពេទ្យ
+human-resources	jobs	Human Resources	ធនធានមនុស្ស
+information-technology	jobs	Information Technology	ពត៌មានវិទ្យា
+lawyer-legal-services	jobs	Lawyer/Legal Services	មេធាវី/សេវាច្បាប់
+management	jobs	Management	ការគ្រប់គ្រង
+manufacturing	jobs	Manufacturing	ការផលិត
+marketing	jobs	Marketing	ទីផ្សារ
+media-advertising	jobs	Media/Advertising	ប្រព័ន្ធផ្សព្វផ្សាយ/ការផ្សាយពាណិជ្ជកម្ម
+medical-health-nursing	jobs	Medical/Health/Nursing	វេជ្ជសាស្ត្រ/សុខភាព/គិលានុបដ្ឋាយិកា
+merchandising-purchasing	jobs	Merchandising/Purchasing	ការទិញ/លក់ទំនិញ
+operations	jobs	Operations	ប្រតិបត្តិការ
+project-management	jobs	Project Management	ការគ្រប់គ្រងគម្រោង
+quality-control	jobs	Quality Control	ការត្រួតពិនិត្យគុណភាព
+resort-casino	jobs	Resort/Casino	Resort/Casino
+sales	jobs	Sales	ការលក់
+security-driver	jobs	Security/Driver	សន្តិសុខ/អ្នកបើកបរ
+technicians	jobs	Technicians	អ្នកបច្ចេកទេស
+telecommunications	jobs	Telecommunications	ទូរគមនាគមន៍
+translations-interpretation	jobs	Translations/Interpretation	ការបកប្រែ/ការបកស្រាយ
+travel-agents-ticket-sales	jobs	Travel Agents/Ticket Sales	ភ្នាក់ងារទេសចរណ៍/លក់សំបុត្រ
+jobs-others	jobs	Others	ផ្សេងទៀត
+services		Services	សេវាកម្ម
+accounting-services	services	Accounting	គណនេយ្យ
+financial-services	services	Financial Services	សេវាហិរញ្ញវត្ថុ
+travel-and-tourism	services	Travel & Tourism	ការធ្វើដំណើរ និងទេសចរណ៍
+automotive-services	services	Automotive	រថយន្ត
+advertising-and-media	services	Advertising & Media	ការផ្សាយពាណិជ្ជកម្ម & ប្រព័ន្ធផ្សព្វផ្សាយ
+bridal-services	services	Bridal Services	សំអាងការ
+cleaning-and-maid-services	services	Cleaning & Maid Services	សេវាសំអាត & មេផ្ទះ
+construction-arch-and-interiors	services	Construction, Arch. & Interiors	សំណង់ ស្ថាបត្យកម្ម និងផ្នែកខាងក្នុង
+education-training-services	services	Education/Training	ការអប់រំ & បណ្តុះបណ្តាល
+engineering-services	services	Engineering	សេវាកម្មវិស្វកម្ម
+insurance-services	services	Insurance	ធានារ៉ាប់រង
+massage-and-spa	services	Massage & Spa	ម៉ាស្សា & ស្ប៉ា
+hospitality-travel-and-tourism	services	Hospitality, Travel & Tourism	បដិសណ្ឋារកិច្ច និង ទេសចរ
+health-medical-and-pharma	services	Health, Medical & Pharma	សុខភាព វេជ្ជសាស្ត្រ & ឱសថ
+it-and-telecom	services	IT & Telecom	អាយធី & ទូរគមនាគមន៍
+interior-design-and-renovation	services	Interior Design & Renovation	រចនា និង កែលម្អ
+legal-services	services	Legal	សេវាច្បាប់
+movers-and-logistics	services	Movers & Logistics	សេវាកម្មដឹកជញ្ជូន
+plumbing-and-electrical	services	Plumbing & Electrical	បំពង់ទឹក & អគ្គិសនី
+property-and-real-estate	services	Property & Real Estate	សេវាកម្មអចលនទ្រព្យ
+science-services	services	Science	វិទ្យាសាស្ត្រ
+supply-chain-and-logistics	services	Supply Chain & Logistics	ផ្គត់ផ្គង់ & ដឹកជញ្ជូន
+printing-and-publishing	services	Printing & Publishing	បោះពុម្ពផ្សាយ
+other-services	services	Other Services	សេវាកម្មផ្សេងទៀត
+fashion-and-beauty		Fashion & Beauty	សំលៀកបំពាក់ & សម្រស់
+womens-fashion	fashion-and-beauty	Women's Fashion	សម្លៀកបំពាក់ស្ត្រី
+mens-fashion	fashion-and-beauty	Men's Fashion	សម្លៀកបំពាក់បុរស
+baby-and-kids	fashion-and-beauty	Baby & Kids	ទារក & កុមារ
+travel-and-luggage	fashion-and-beauty	Travel & Luggage	ការធ្វើដំណើរ និង វ៉ាលី
+fashion-accessories	fashion-and-beauty	Fashion Accessories	គ្រឿង Fashion
+beauty-and-healthcare-products	fashion-and-beauty	Beauty & Healthcare Products	សម្ផស្ស & សុខភាព
+furniture-and-decor		Furniture & Decor	គ្រឿងសង្ហារិម & ការតុបតែង
+table-and-desks	furniture-and-decor	Table & Desks	តុ & តុការិយាល័យ
+chairs-and-sofas	furniture-and-decor	Chairs & Sofas	កៅអី & សាឡុង
+wardrobe-and-cabinets	furniture-and-decor	Wardrobe & Cabinets	ទូខោអាវ & ទូ
+shelves-and-drawers	furniture-and-decor	Shelves & Drawers	ធ្នើរ & ថត
+beds-and-mattresses	furniture-and-decor	Beds & Mattresses	គ្រែ & ពូក
+curtains-and-carpets	furniture-and-decor	Curtains & Carpets	វាំងនន & កំរាលព្រំ
+other-furniture	furniture-and-decor	Other Furniture	គ្រឿងសង្ហារិមផ្សេងទៀត
+kitchenware	furniture-and-decor	Kitchenware	សម្ភារៈផ្ទះបាយ
+household-items	furniture-and-decor	Household Items	របស់របរប្រើប្រាស់ក្នុងផ្ទះ
+handicrafts-paintings	furniture-and-decor	Handicrafts-Paintings	សិប្បកម្ម - គំនូរ
+books-sports-and-hobbies		Books & Sports & Hobbies	សៀវភៅ កីឡា & ចំណូលចិត្ត
+musical-instruments	books-sports-and-hobbies	Musical Instruments	ឧបករណ៍ភ្លេង
+fishing	books-sports-and-hobbies	Fishing	ការនេសាទត្រី
+hike-and-camping	books-sports-and-hobbies	Hike & Camping	ឡើងភ្នំ និង បោះជំរុំ
+cds-dvds-vhs	books-sports-and-hobbies	CDs, DVDs, VHS	CDS, DVDS, VHS
+books	books-sports-and-hobbies	Books	សៀវភៅ
+sports-equipment	books-sports-and-hobbies	Sports Equipment	ឧបករណ៍កីឡា
+hobbies-others	books-sports-and-hobbies	Others	ផ្សេងទៀត
+pets		Pets	សត្វចិញ្ចឹម
+dogs	pets	Dogs	ឆ្កែ
+cats	pets	Cats	ឆ្មា
+birds	pets	Birds	បក្សី
+fish	pets	Fish	ត្រី
+pet-food	pets	Pet Food	ចំណីសត្វ
+pet-accessories	pets	Pet Accessories	គ្រឿងសម្ភារៈសត្វចិញ្ចឹម
+other-pets	pets	Other pets	សត្វចិញ្ចឹមផ្សេងទៀត
+foods		Foods	អាហារ
+meat	foods	Meat	សាច់
+seafood	foods	Seafood	អាហារសមុទ្រ
+fruits	foods	Fruits	ផ្លែឈើ
+vegetables	foods	Vegetables	បន្លែ
+beverages	foods	Beverages	ភេសជ្ជៈ
+grocery	foods	Grocery	គ្រឿងទេស
+bread-and-bakery	foods	Bread & Bakery	នំបុ័ង & នំខេក
+beer-and-wine	foods	Beer & Wine	ស្រាបៀរ & ស្រា
+rice-and-cereal	foods	Rice & Cereal	អង្ករ & ធញ្ញជាតិ
+other-foods	foods	Other Foods	អាហារផ្សេងទៀត

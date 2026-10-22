@@ -6,6 +6,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -16,6 +17,11 @@ export class UpdateAttributeDto {
   @IsString()
   @MinLength(1)
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  nameKm?: string;
 
   @IsOptional()
   @IsString()

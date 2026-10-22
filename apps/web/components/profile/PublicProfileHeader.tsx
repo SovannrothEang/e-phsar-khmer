@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
@@ -42,6 +43,7 @@ export default function PublicProfileHeader({
   /** Whether that viewer already follows this profile. */
   initialFollowing?: boolean;
 }) {
+  const t = useTranslations("Profile");
   const pathname = usePathname();
   const activeList = readProfileTab(useSearchParams());
 
@@ -88,7 +90,7 @@ export default function PublicProfileHeader({
         >
           <Image
             src={coverImg}
-            alt="Cover"
+            alt={t("coverAlt")}
             width={1920}
             height={1080}
             className="object-cover hover:opacity-95 transition-opacity"
@@ -114,7 +116,7 @@ export default function PublicProfileHeader({
                 <div className="w-full h-full rounded-full overflow-hidden relative">
                   <Image
                     src={profileImg}
-                    alt="Profile"
+                    alt={t("avatarAlt")}
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     className="object-cover"
@@ -145,12 +147,12 @@ export default function PublicProfileHeader({
                       {
                         list: "following",
                         value: user.following,
-                        label: "Following",
+                        label: t("following"),
                       },
                       {
                         list: "followers",
                         value: user.follower,
-                        label: "Followers",
+                        label: t("followers"),
                       },
                     ] as const
                   ).map(({ list, value, label }) => {
@@ -187,11 +189,12 @@ export default function PublicProfileHeader({
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1">
-                    <Calendar size={12} /> Joined {user.joinDate}
+                    <Calendar size={12} />{" "}
+                    {t("joined", { date: user.joinDate ?? "" })}
                   </span>
                   {user.verified && (
                     <span className="flex items-center gap-1 text-blue-500 font-medium">
-                      <CircleCheckBig size={12} /> Verified
+                      <CircleCheckBig size={12} /> {t("verified")}
                     </span>
                   )}
                   {user.email && (
@@ -274,7 +277,7 @@ export default function PublicProfileHeader({
                   className="flex items-center gap-2 px-4 h-11  font-medium transition"
                 >
                   <House />
-                  Home
+                  {t("home")}
                 </Link>
               </TabsTrigger>
               <TabsTrigger value="about" asChild>
@@ -286,7 +289,7 @@ export default function PublicProfileHeader({
                   className="flex items-center gap-2 px-4 h-11  font-medium transition"
                 >
                   <Info />
-                  About
+                  {t("about")}
                 </Link>
               </TabsTrigger>
             </TabsList>

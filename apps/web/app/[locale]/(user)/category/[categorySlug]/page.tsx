@@ -1,6 +1,6 @@
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import CommonCategoryLayout from "@/components/category-layouts/CommonCategoryLayout";
@@ -60,12 +60,15 @@ export default async function CategoryPage({
 }) {
   const { categorySlug } = await params;
   const locale = await getLocale();
+  const t = await getTranslations();
 
   const category = await getCategoryWithSubcategories(categorySlug, locale);
 
   if (!category) {
     return (
-      <div className="container mx-auto px-4 py-8">Category not found</div>
+      <div className="container mx-auto px-4 py-8">
+        {t("Category.notFound")}
+      </div>
     );
   }
 
@@ -121,8 +124,8 @@ export default async function CategoryPage({
         <div className="max-w-7xl mx-auto w-full pb-1">
           <Breadcrumbs
             items={[
-              { label: "Home", href: "/" },
-              { label: `${category.name} in Cambodia` },
+              { label: t("Search.home"), href: "/" },
+              { label: t("Common.inCambodia", { name: category.name }) },
             ]}
           />
         </div>

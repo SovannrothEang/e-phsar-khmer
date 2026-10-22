@@ -4,6 +4,8 @@ import type WebSocket from 'ws';
 export type ConnectionInfo = {
   socket: WebSocket;
   userId: string;
+  /** Device revocation epoch from the JWT/WsTicket `sid`, if any. */
+  sessionId: string | null;
   lastPongAt: number;
 };
 

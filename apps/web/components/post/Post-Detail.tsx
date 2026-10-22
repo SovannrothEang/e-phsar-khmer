@@ -1,4 +1,6 @@
 "use client";
+import { useEffect, useRef } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
@@ -30,6 +32,7 @@ import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
 import type { ListingContext } from "@/types/chat";
 import { applyDiscount, shortLocation } from "@/lib/utils";
+import { trackEvent } from "@/lib/insights/queue";
 
 /**
  * Real-listing data slotted into this template. The page (RSC) builds this from
@@ -136,6 +139,24 @@ export default function PostDetail({
   /** Present only when this viewer may apply to *this* job listing. */
   jobApply?: JobApplyState | null;
 }) {
+  const t = useTranslations();
+  const format = useFormatter();
+  const realListingId = real?.listing.id ?? null;
+  const realListingOwnerId = real?.listing.userId ?? null;
+  const viewTrackedFor = useRef<string | null>(null);
+
+  // One view per listing per mounted detail page. The ref is keyed by id so
+  // Strict Mode cannot double-count and client navigation between listings
+  // still records the new one.
+  useEffect(() => {
+    if (!realListingId) return;
+    if (viewerId && viewerId === realListingOwnerId) return;
+    if (viewTrackedFor.current === realListingId) return;
+
+    viewTrackedFor.current = realListingId;
+    trackEvent(realListingId, "view");
+  }, [realListingId, realListingOwnerId, viewerId]);
+
   const isReal = !!real;
   const post = isReal ? toPostView(real.listing) : getPostById(id);
   if (!post) return notFound();
@@ -216,7 +237,7 @@ export default function PostDetail({
         <Breadcrumbs
           className="flex-wrap"
           items={[
-            { label: "Home", href: "/" },
+            { label: t("Search.home"), href: "/" },
             ...(cate
               ? [
                   {
@@ -308,20 +329,26 @@ export default function PostDetail({
                     </div>
                     <div className="flex items-center">
                       <IconClockHour4 className="w-4 h-4 mr-1" />
-                      {post.createdat.toLocaleString()}
+                      {format.dateTime(post.createdat, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
                     </div>
                   </div>
                   {post.freeDelivery && (
                     <div className="mt-3">
                       <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] text-xs font-medium rounded-sm border border-blue-100">
-                        <Truck className="w-3.5 h-3.5 mr-1" /> Free Delivery
+                        <Truck className="w-3.5 h-3.5 mr-1" />{" "}
+                        {t("Common.freeDelivery")}
                       </span>
                     </div>
                   )}
                   <div className="flex items-end justify-between gap-3 flex-wrap mt-3 pb-4">
                     <div className="flex items-end gap-2.5">
                       <span className="text-xl md:text-2xl font-medium text-[#e3281b] leading-none">
-                        {post.price === null ? "Negotiable" : `$${post.price}`}
+                        {post.price === null
+                          ? t("Common.negotiable")
+                          : `$${post.price}`}
                       </span>
                       {post.oldPrice && (
                         <span className="text-sm text-gray-400 line-through mb-0.5">
@@ -350,7 +377,7 @@ export default function PostDetail({
               {/* Description */}
               <div className="p-4">
                 <h2 className="text-xl font-semibold text-foreground mb-4">
-                  Description
+                  {t("Post.description")}
                 </h2>
                 {isReal && (
                   <ListingSpecs
@@ -372,6 +399,7 @@ export default function PostDetail({
                   coords={coords}
                   locationLine={isReal ? fullLocation : undefined}
                   addressLine={addressLine}
+                  listingId={real?.listing.id}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
                 <ThreeButton post={post} viewerId={viewerId} />

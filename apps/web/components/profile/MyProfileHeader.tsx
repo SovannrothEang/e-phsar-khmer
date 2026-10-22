@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import {
   Settings,
@@ -12,11 +13,11 @@ import {
   FolderOpen,
   BriefcaseBusiness,
   Info,
-  BadgeDollarSign,
+  FileText,
   Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Link, useRouter } from "@/i18n/routing";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { uploadUserPhoto } from "@/actions/user-photo";
@@ -44,25 +45,55 @@ interface ProfileHeaderProps {
 }
 
 const PROFILE_TABS = [
-  { value: "manage-ads", href: "/me", label: "Manage Ads", icon: FolderOpen },
-  { value: "about", href: "/me/about", label: "About", icon: Info },
+  // `routes` = every route this tab owns. The Jobs tab has two faces
+  // (/me/job-applications and /me/applied-jobs); a route owned by no tab
+  // highlights nothing rather than the wrong tab.
+  {
+    value: "manage-ads",
+    href: "/me",
+    routes: ["/me"],
+    labelKey: "Me.manageAdsTab",
+    icon: FolderOpen,
+  },
+  {
+    value: "about",
+    href: "/me/about",
+    routes: ["/me/about"],
+    labelKey: "Me.aboutTab",
+    icon: Info,
+  },
   {
     value: "jobs",
     href: "/me/job-applications",
-    label: "Jobs",
+    routes: ["/me/job-applications", "/me/applied-jobs"],
+    labelKey: "Me.jobs",
     icon: BriefcaseBusiness,
   },
-  { value: "saved", href: "/me/saved", label: "Saved", icon: Bookmark },
-  { value: "likes", href: "/me/likes", label: "Likes", icon: Heart },
+  {
+    value: "saved",
+    href: "/me/saved",
+    routes: ["/me/saved"],
+    labelKey: "Nav.saved",
+    icon: Bookmark,
+  },
+  {
+    value: "likes",
+    href: "/me/likes",
+    routes: ["/me/likes"],
+    labelKey: "Nav.likes",
+    icon: Heart,
+  },
   {
     value: "subscriptions",
     href: "/me/subscriptions",
-    label: "Subscriptions",
-    icon: BadgeDollarSign,
+    routes: ["/me/subscriptions"],
+    labelKey: "Me.subscriptionsTab",
+    icon: FileText,
   },
 ] as const;
 
 export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
+  const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
 
@@ -75,6 +106,16 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // The tab strip is controlled by the route, not by click state: the header
+  // is shared by every /me page, so arriving from the avatar dropdown (or a
+  // hard reload) must highlight the tab the URL belongs to. Match exactly —
+  // a `/me` prefix rule would swallow every /me subpage. Unmatched subpages
+  // (followers/following, membership) highlight nothing.
+  const activeTab = PROFILE_TABS.find(({ routes }) =>
+    routes.some((route) => pathname === route),
+  )?.value;
 
   // The profile page currently renders from a mock currentUser; these overrides
   // reflect an upload immediately. router.refresh() keeps server data in sync
@@ -88,11 +129,11 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
 
   async function handlePhotoUpload(kind: "avatar" | "cover", file: File) {
     if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are allowed");
+      toast.error(t("Me.imageOnly"));
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be 5MB or smaller");
+      toast.error(t("Me.imageTooLarge"));
       return;
     }
     const setUploading =
@@ -110,10 +151,12 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
         if (kind === "avatar") setAvatarOverride(url);
         else setCoverOverride(url);
       }
-      toast.success(`${kind === "avatar" ? "Avatar" : "Cover"} updated`);
+      toast.success(
+        t(kind === "avatar" ? "Me.avatarUpdated" : "Me.coverUpdated"),
+      );
       router.refresh();
     } catch {
-      toast.error("Upload failed");
+      toast.error(t("Me.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -164,7 +207,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
             {displayedCover && (
               <Image
                 src={displayedCover}
-                alt="Cover"
+                alt={t("Me.coverAlt")}
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 fill
                 unoptimized
@@ -187,7 +230,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                   <Camera className="scale-135 text-foreground" />
                 )}
                 <span className="text-sm font-bold text-foreground">
-                  {uploadingCover ? "Uploading..." : "Upload Cover"}
+                  {uploadingCover ? t("Common.uploading") : t("Me.uploadCover")}
                 </span>
               </Button>
             )}
@@ -237,7 +280,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                         onClick={() => router.replace("/me/membership")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
-                        Upgrade Account
+                        {t("Me.upgradeAccount")}
                       </Button>
                     </div>
                     <div className="flex gap-4 mb-2">
@@ -245,17 +288,21 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                         href="/me/following"
                         className="text-sm transition-colors hover:text-[#00a0e9]"
                       >
-                        {user.following} Following
+                        {t("Me.followingCount", {
+                          count: user.following,
+                        })}
                       </Link>
                       <Link
                         href="/me/followers"
                         className="text-sm transition-colors hover:text-[#00a0e9]"
                       >
-                        {user.follower} Followers
+                        {t("Me.followersCount", {
+                          count: user.follower,
+                        })}
                       </Link>
                     </div>
                     <p className="text-sm text-muted-foreground ">
-                      Joined {user.joinDate}
+                      {t("Me.joined", { date: user.joinDate })}
                     </p>
                   </div>
 
@@ -265,7 +312,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer"
                     >
                       <IdCard className="h-5 w-5" />
-                      Resume (CV)
+                      {t("Nav.resume")}
                     </Button>
                     <Button className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer">
                       <Forward className="h-5 w-5" />
@@ -283,9 +330,9 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs defaultValue="manage-ads" className="flex-1">
+            <Tabs value={activeTab ?? ""} className="flex-1">
               <TabsList variant="line" className="w-full">
-                {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
+                {PROFILE_TABS.map(({ value, href, labelKey, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
                     value={value}
@@ -297,7 +344,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       className="flex items-center gap-2 font-medium transition"
                     >
                       <Icon className="h-4 w-4" />
-                      {label}
+                      {t(labelKey)}
                     </Link>
                   </TabsTrigger>
                 ))}

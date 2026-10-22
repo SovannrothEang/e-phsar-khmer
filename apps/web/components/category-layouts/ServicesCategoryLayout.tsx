@@ -5,6 +5,7 @@ import { IconLayoutGridFilled, IconListFilled } from "@tabler/icons-react";
 import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
 import SortFilter from "@/components/filter/SortFilter";
 import MoreFilters from "@/components/filter/MoreFilters";
+import { useTranslations } from "next-intl";
 
 interface ServicesCategoryLayoutProps {
   category: {
@@ -17,13 +18,13 @@ interface ServicesCategoryLayoutProps {
 export default function ServicesCategoryLayout({
   category,
 }: ServicesCategoryLayoutProps) {
+  const t = useTranslations();
   return (
     <>
       {/* HEADER */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
         <h1 className="font-semibold text-lg md:text-lg">
-          {category.name}{" "}
-          <span className="font-semibold text-lg">in Cambodia</span>
+          {t("Common.inCambodia", { name: category.name })}
         </h1>
       </div>
 

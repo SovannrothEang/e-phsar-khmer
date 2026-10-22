@@ -49,6 +49,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 type CategoryWithDates = Category & {
   createdAt: string;
   updatedAt: string;
+  nameKm: string;
 };
 
 function AddCategoryForm({
@@ -61,6 +62,7 @@ function AddCategoryForm({
   const form = useAppForm({
     defaultValues: {
       name: "",
+      nameKm: "",
       slug: "",
       cateIcon: "",
     } satisfies CategoryFormData as CategoryFormData,
@@ -88,6 +90,10 @@ function AddCategoryForm({
       <FieldGroup className="py-4">
         <form.AppField name="name">
           {(field) => <field.Input label="Name" required />}
+        </form.AppField>
+
+        <form.AppField name="nameKm">
+          {(field) => <field.Input label="Khmer name" />}
         </form.AppField>
 
         <form.AppField name="slug">
@@ -136,6 +142,7 @@ function EditCategoryForm({
   const form = useAppForm({
     defaultValues: {
       name: category.name,
+      nameKm: category.nameKm,
       slug: category.slug,
       cateIcon: category.cateIcon,
     } satisfies CategoryFormData as CategoryFormData,
@@ -163,6 +170,10 @@ function EditCategoryForm({
       <FieldGroup className="py-4">
         <form.AppField name="name">
           {(field) => <field.Input label="Name" required />}
+        </form.AppField>
+
+        <form.AppField name="nameKm">
+          {(field) => <field.Input label="Khmer name" />}
         </form.AppField>
 
         <form.AppField name="slug">
@@ -286,6 +297,7 @@ export default function CategoriesPage() {
   const filteredCategories = categoryList.filter(
     (category) =>
       category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      category.nameKm.toLowerCase().includes(searchQuery.toLowerCase()) ||
       category.slug.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -408,7 +420,14 @@ export default function CategoriesPage() {
                         {category.cateId}
                       </TableCell>
 
-                      <TableCell>{category.name}</TableCell>
+                      <TableCell>
+                        <div>{category.name}</div>
+                        {category.nameKm && (
+                          <div className="text-xs text-muted-foreground">
+                            {category.nameKm}
+                          </div>
+                        )}
+                      </TableCell>
 
                       <TableCell>{category.slug}</TableCell>
 

@@ -1,4 +1,7 @@
+"use client";
+
 import { Link } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import type { ComponentProps } from "react";
 
 export interface ListingSpecsProps {
@@ -29,33 +32,33 @@ const toText = (v: unknown): string | undefined => {
 // then year, taxType, Condition (only for condition-carrying categories —
 // the same ones that show the Condition chip on the browse bar), bodyType,
 // engineType, transmission, color, then the remaining keys.
-const ATTR_KEYS: [key: string, label: string][] = [
-  ["year", "Year"],
-  ["taxType", "Tax Type"],
-  ["bodyType", "Body Type"],
-  ["vehicleType", "Vehicle Type"],
-  ["engineType", "Engine Type"],
-  ["transmission", "Transmission"],
-  ["color", "Color"],
-  ["jobType", "Job Type"],
-  ["experience", "Experience"],
+const ATTR_KEYS: [key: string, labelKey: string][] = [
+  ["year", "attributes.year"],
+  ["taxType", "attributes.taxType"],
+  ["bodyType", "attributes.bodyType"],
+  ["vehicleType", "attributes.vehicleType"],
+  ["engineType", "attributes.engineType"],
+  ["transmission", "attributes.transmission"],
+  ["color", "attributes.color"],
+  ["jobType", "attributes.jobType"],
+  ["experience", "attributes.experience"],
   // Home & Land sit before `type`: the property form reads Bedroom → Bathroom
   // → Facing → Size → Type, so the published grid has to as well. The keys are
   // the schema's own **singular** `bedroom`/`bathroom` — this list carried the
   // plural forms from before the family had a form, and a key that is not here
   // is invisible on the detail page even though the listing stores it.
-  ["bedroom", "Bedroom"],
-  ["bathroom", "Bathroom"],
-  ["facing", "Facing"],
-  ["size", "Size"],
-  ["type", "Type"],
-  ["accessory", "Accessory"],
-  ["screenSize", "Screen Size"],
-  ["storage", "Storage"],
-  ["ram", "RAM"],
-  ["cpu", "CPU"],
-  ["vga", "VGA"],
-  ["network", "Network"],
+  ["bedroom", "attributes.bedroom"],
+  ["bathroom", "attributes.bathroom"],
+  ["facing", "attributes.facing"],
+  ["size", "attributes.size"],
+  ["type", "attributes.type"],
+  ["accessory", "attributes.accessory"],
+  ["screenSize", "attributes.screenSize"],
+  ["storage", "attributes.storage"],
+  ["ram", "attributes.ram"],
+  ["cpu", "attributes.cpu"],
+  ["vga", "attributes.vga"],
+  ["network", "attributes.network"],
 ];
 
 // Subcategories whose listing forms carry a Condition field (mirrors the
@@ -95,7 +98,7 @@ const CONDITION_SUBCATEGORIES = new Set([
 // The parts-and-accessories form keys its "Type" picker (Cars/Bicycles/…) as
 // `vehicleType` — same key as the rentals' "Vehicle Type"; label per design.
 const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
-  "parts-and-accessories": { vehicleType: "Type" },
+  "parts-and-accessories": { vehicleType: "attributes.type" },
   // The `accessory` key prints "Accessory" on Phone Accessories and
   // "Accessory Type" on Fashion Accessories (captain, 2026-09-27). Both
   // subcategories read the SAME `accessories` set under the SAME key — only the
@@ -103,7 +106,7 @@ const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   // `field_schema`, which is what the post form already reads via
   // `config.labels`. This map is the detail page's equivalent, and it exists so
   // the two surfaces cannot disagree about the same key.
-  "fashion-accessories": { accessory: "Accessory Type" },
+  "fashion-accessories": { accessory: "attributes.accessoryType" },
 };
 
 /**
@@ -146,6 +149,8 @@ export default function ListingSpecs({
   attributes,
   condition,
 }: ListingSpecsProps) {
+  const t = useTranslations("Specs");
+  const tCommon = useTranslations("Common");
   const browseHref: Href | undefined =
     cate && subcate
       ? {
@@ -163,7 +168,7 @@ export default function ListingSpecs({
 
   const rows: Row[] = [
     {
-      label: "Main Category",
+      label: t("mainCategory"),
       value: cate?.name,
       href: cate
         ? {
@@ -173,7 +178,7 @@ export default function ListingSpecs({
         : undefined,
     },
     {
-      label: "Category",
+      label: t("category"),
       value: subcate?.name,
       href: subcate && cate ? browseHref : undefined,
     },
@@ -181,7 +186,7 @@ export default function ListingSpecs({
 
   if (brand?.name) {
     rows.push({
-      label: "Brand",
+      label: t("brand"),
       value: brand.name,
       href:
         brand && cate && subcate
@@ -199,7 +204,7 @@ export default function ListingSpecs({
 
   if (model?.name) {
     rows.push({
-      label: "Model",
+      label: t("model"),
       value: model.name,
       href:
         model && cate && subcate && brand?.slug
@@ -246,19 +251,19 @@ export default function ListingSpecs({
   const pushCondition = () => {
     if (!showCondition || conditionInserted) return;
     rows.push({
-      label: "Condition",
-      value: condition === "used" ? "Used" : "New",
+      label: t("condition"),
+      value: tCommon(condition === "used" ? "condition.used" : "condition.new"),
       href: browseHref,
     });
     conditionInserted = true;
   };
 
-  for (const [key, label] of ATTR_KEYS) {
+  for (const [key, labelKey] of ATTR_KEYS) {
     const value = toText(attributes?.[key]);
     if (!value) continue;
     if (!conditionPreKeys.has(key)) pushCondition();
     rows.push({
-      label: labelOverrides?.[key] ?? label,
+      label: t(labelOverrides?.[key] ?? labelKey),
       value: `${value}${VALUE_SUFFIX[key] ?? ""}`,
       href: browseHref,
     });

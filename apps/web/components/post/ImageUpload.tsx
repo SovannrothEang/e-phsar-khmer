@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Upload, X } from "lucide-react";
 import { signUpload, type UploadSignFn } from "@/actions/files";
 import { toast } from "@/components/ui/sonner";
@@ -34,6 +35,7 @@ export default function ImageUpload({
   /** How many photos this subcategory accepts (the schema's `photos.max`). */
   max?: number;
 }) {
+  const t = useTranslations("PostForm");
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Upload a single new file via /files/sign (scope=listing) and surface the
@@ -53,7 +55,7 @@ export default function ImageUpload({
     if (res.ok) {
       onUploaded?.(signed.data.publicUrl);
       onSigned?.({ url: signed.data.publicUrl, path: signed.data.path });
-    } else toast.error("Failed to upload a photo");
+    } else toast.error(t("uploadFailed"));
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -82,7 +84,7 @@ export default function ImageUpload({
       <div className="flex justify-between items-center mb-2">
         <label className="text-base font-bold text-foreground">{title}</label>
         <span className="text-xs text-muted-foreground">
-          Max: {images.length} / {max}
+          {t("maxPhotos", { count: images.length, max })}
         </span>
       </div>
 
@@ -107,7 +109,7 @@ export default function ImageUpload({
               </button>
               {i === 0 && (
                 <span className="absolute bottom-0 left-0 right-0 bg-[#00a0e9] text-white text-[9px] text-center py-0.5 font-medium">
-                  COVER
+                  {t("cover")}
                 </span>
               )}
             </div>
@@ -132,14 +134,12 @@ export default function ImageUpload({
         >
           <Upload className="w-10 h-10 text-[#00a0e9]" />
           <p className="text-sm text-gray-500">
-            Drag & Drop your photo here, or{" "}
+            {t("dropTitle")}{" "}
             <span className="text-[#00a0e9] font-semibold underline">
-              Click to Browse
+              {t("browse")}
             </span>
           </p>
-          <p className="text-xs text-gray-400">
-            Supports: jpg, png, gif, jpeg, heic, heif, dng, webp
-          </p>
+          <p className="text-xs text-gray-400">{t("supported")}</p>
         </div>
       )}
 

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { IconMapPin } from "@tabler/icons-react";
 
 /** The design's map mock — the detail page never embeds a live map. */
@@ -17,6 +20,7 @@ export default function ListingLocationMap({
   coords: { lat: number; lng: number } | null;
   locationLine?: string;
 }) {
+  const t = useTranslations("Post.map");
   const href = coords
     ? `https://www.google.com/maps?q=${coords.lat},${coords.lng}`
     : locationLine
@@ -39,7 +43,7 @@ export default function ListingLocationMap({
       />
       <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-sm bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm">
         <IconMapPin className="mr-1" />
-        Show on Google Map
+        {t("show")}
       </span>
     </a>
   );

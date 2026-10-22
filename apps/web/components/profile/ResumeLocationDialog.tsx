@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, ChevronLeft, X } from "lucide-react";
 
 import {
@@ -57,6 +58,7 @@ export function ResumeLocationDialog({
   value: ResumeLocation;
   onChange: (location: ResumeLocation) => void;
 }) {
+  const t = useTranslations("Resume");
   // The parent remounts this dialog on every open (key), so `level` starts
   // fresh at "province" — re-opening never resumes a half-drilled level.
   const [level, setLevel] = useState<Level>("province");
@@ -85,10 +87,10 @@ export function ResumeLocationDialog({
         : value.commune;
   const title =
     level === "province"
-      ? "Location"
+      ? t("labels.location")
       : level === "district"
-        ? (value.province?.name ?? "Location")
-        : (value.district?.name ?? "Location");
+        ? (value.province?.name ?? t("labels.location"))
+        : (value.district?.name ?? t("labels.location"));
 
   const pick = (row: Place) => {
     if (level === "province") {
@@ -115,7 +117,7 @@ export function ResumeLocationDialog({
           {level !== "province" && (
             <button
               type="button"
-              aria-label="Back"
+              aria-label={t("form.back")}
               onClick={() =>
                 setLevel(level === "commune" ? "district" : "province")
               }
@@ -128,7 +130,7 @@ export function ResumeLocationDialog({
           <DialogClose asChild>
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t("form.close")}
               className="absolute right-4 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-muted text-gray-500 transition-colors hover:bg-muted/70"
             >
               <X className="h-4 w-4" />
@@ -136,15 +138,17 @@ export function ResumeLocationDialog({
           </DialogClose>
         </div>
         <DialogDescription className="sr-only">
-          Choose province, then district, then commune.
+          {t("form.locationDescription")}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 divide-y overflow-y-auto">
           {current.isLoading && rows.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">Loading…</p>
+            <p className="px-5 py-4 text-sm text-muted-foreground">
+              {t("form.loading")}
+            </p>
           ) : rows.length === 0 ? (
             <p className="px-5 py-4 text-sm text-muted-foreground">
-              Nothing here
+              {t("form.nothingHere")}
             </p>
           ) : (
             rows.map((row) => (

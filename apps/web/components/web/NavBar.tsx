@@ -8,7 +8,7 @@ import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
 import { SessionCacheGuard } from "./SessionCacheGuard";
 import LocalSelector from "../LocalSelector";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Suspense } from "react";
 
 export type User = {
@@ -23,6 +23,7 @@ export type User = {
 
 export function NavBar({ user }: { user: User | null }) {
   const locale = useLocale();
+  const t = useTranslations("Nav");
   const isLoggedIn = !!user;
 
   return (
@@ -38,8 +39,7 @@ export function NavBar({ user }: { user: User | null }) {
               </div>
             </Link>
             <div className="flex items-center gap-1">
-              {/* <LocaleSwitcher /> */}
-              <LocalSelector defaultValue={locale} label="Language" />
+              <LocalSelector defaultValue={locale} label={t("language")} />
               <ThemeSwitcher />
             </div>
           </div>
@@ -64,7 +64,7 @@ export function NavBar({ user }: { user: User | null }) {
                   variant="ghost"
                   className="h-[42px] px-4 rounded text-base font-medium rounded text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
                 >
-                  <Link href="/login">Login</Link>
+                  <Link href="/login">{t("login")}</Link>
                 </Button>
 
                 <Button
@@ -72,7 +72,7 @@ export function NavBar({ user }: { user: User | null }) {
                   variant="ghost"
                   className="h-[42px] px-4 rounded text-base font-medium text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
                 >
-                  <Link href="/register">Register</Link>
+                  <Link href="/register">{t("register")}</Link>
                 </Button>
                 <Button
                   asChild
@@ -81,7 +81,7 @@ export function NavBar({ user }: { user: User | null }) {
                 >
                   <Link href={`/login`}>
                     <FaCamera className="scale-120" strokeWidth={2.5} />
-                    Sell
+                    {t("sell")}
                   </Link>
                 </Button>
               </div>

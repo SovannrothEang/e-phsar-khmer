@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
 import DbImage from "@/components/common/DbImage";
@@ -32,6 +33,7 @@ export default function SubcategoryGrid({
   subcategories,
   cols,
 }: Props) {
+  const t = useTranslations();
   const LIMIT = 24;
   const searchParams = useSearchParams();
   const [showAll, setShowAll] = useState(false);
@@ -83,7 +85,7 @@ export default function SubcategoryGrid({
             onClick={() => setShowAll(!showAll)}
             className="w-full border rounded py-2.5 text-sm text-muted-foreground bg-card hover:bg-gray-200"
           >
-            {showAll ? "Show Less" : "Show More"}
+            {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>
         </div>
       )}

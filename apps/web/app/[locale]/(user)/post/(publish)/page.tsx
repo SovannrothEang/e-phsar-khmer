@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { Category, Subcategory } from "@/types/post-form";
@@ -328,11 +329,12 @@ const REAL_FORM_SUBCATEGORIES = [
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: 1 | 2 }) {
+  const t = useTranslations("PostAd");
   return (
     <div className="flex items-center gap-2 ">
       {[
-        { n: 1, label: "Choose a category" },
-        { n: 2, label: "Fill Information" },
+        { n: 1, label: t("stepChooseCategory") },
+        { n: 2, label: t("stepFillInfo") },
       ].map(({ n, label }, i) => (
         <div key={n} className="flex items-center gap-2 py-2">
           {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
@@ -361,12 +363,14 @@ function CategorySelector({
 }: {
   onSelect: (cat: Category, sub: Subcategory) => void;
 }) {
+  const t = useTranslations("PostAd");
+  const locale = useLocale();
   const [hoveredCat, setHoveredCat] = useState<Category | null>(null);
   const [categories, setCategories] = useState<Category[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getPostCategories("en")
+    getPostCategories(locale)
       .then((rows) => {
         if (!cancelled) setCategories(rows);
       })
@@ -376,7 +380,7 @@ function CategorySelector({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale]);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCatEnter = (cat: Category) => {
@@ -400,7 +404,7 @@ function CategorySelector({
             <span className="w-4 h-4 rounded-full bg-[#00a0e9] text-muted text-xs flex items-center justify-center">
               1
             </span>
-            Choose a category
+            {t("chooseCategory")}
           </span>
         </div>
         <ul>
@@ -431,7 +435,7 @@ function CategorySelector({
                 />
               </div>
               <span
-                className={`text-sm flex-1 ${hoveredCat?.slug === cat.slug ? "font-semibold text-[#00a0e9]" : "font-medium text-foreground"}`}
+                className={`text-sm flex-1 ${hoveredCat?.slug === cat.slug ? "font-semibold text-[#00a0e9]" : "font-normal text-foreground"}`}
               >
                 {cat.name}
               </span>
@@ -459,7 +463,7 @@ function CategorySelector({
             >
               2
             </span>
-            Select a subcategory
+            {t("chooseSubcategory")}
           </span>
         </div>
 
@@ -478,7 +482,7 @@ function CategorySelector({
               <li key={sub.slug}>
                 <button
                   onClick={() => onSelect(hoveredCat, sub)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-100 transition-colors group text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-blue-100 transition-colors group text-left"
                 >
                   <div className="w-8 h-8 relative flex-shrink-0">
                     <DbImage
@@ -494,7 +498,7 @@ function CategorySelector({
                       }
                     />
                   </div>
-                  <span className="text-sm text-foreground group-hover:text-[#00a0e9] flex-1 transition-colors">
+                  <span className="text-sm text-foreground group-hover:text-[#00a0e9] group-hover:font-semibold flex-1 transition-colors">
                     {sub.name}
                   </span>
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#00a0e9] flex-shrink-0 transition-colors" />
@@ -505,7 +509,7 @@ function CategorySelector({
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-24">
             <ChevronRight className="w-8 h-8 text-gray-200 mb-2" />
-            <p className="text-sm">Hover a category to see options</p>
+            <p className="text-sm">{t("hoverHint")}</p>
           </div>
         )}
       </div>
@@ -1278,6 +1282,8 @@ function DynamicForm({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PostPage() {
+  const t = useTranslations("PostAd");
+  const tSearch = useTranslations("Search");
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
@@ -1301,11 +1307,14 @@ export default function PostPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <Breadcrumbs
           className="mb-6"
-          items={[{ label: "Home", href: "/" }, { label: "Post" }]}
+          items={[
+            { label: tSearch("home"), href: "/" },
+            { label: t("breadcrumb") },
+          ]}
         />
 
         <div className="bg-card border rounded-sm p-6 shadow-sm">
-          <h1 className="text-2xl font-bold  mb-1">Post an Ad</h1>
+          <h1 className="text-2xl font-bold  mb-1">{t("title")}</h1>
           <StepIndicator step={step} />
 
           {step === 1 ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { IconArrowRight, IconPencil } from "@tabler/icons-react";
 import {
   deleteResumeEntry,
@@ -70,14 +71,14 @@ import { ResumeSkillsDialog } from "@/components/profile/ResumeSkillsDialog";
  */
 
 const RESUME_STEPS = [
-  "Personal Details",
-  "Summary",
-  "Experiences",
-  "Educations",
-  "Skills",
-  "Languages",
-  "Hobbies & Interests",
-  "References",
+  "form.titles.personalWizard",
+  "form.titles.summaryWizard",
+  "form.titles.experiencesWizard",
+  "form.titles.educationsWizard",
+  "form.titles.skillsWizard",
+  "form.titles.languagesWizard",
+  "form.titles.hobbiesWizard",
+  "form.titles.referencesWizard",
 ] as const;
 
 /** The wizard step numbers that correspond to the five list sections. */
@@ -106,6 +107,7 @@ export function ResumeStartBuilding({
   lastName?: string | null;
   preferenceOptions: PreferenceOptions;
 }) {
+  const t = useTranslations("Resume");
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [editInitial, setEditInitial] = useState<ResumeEntry | null>(null);
@@ -157,7 +159,7 @@ export function ResumeStartBuilding({
   // a failure reads the same whichever form produced it).
   const savePersonal = async (data: ResumePersonalData): Promise<boolean> => {
     if (!(await saveResumePersonal(data))) {
-      toast.error("Couldn't save");
+      toast.error(t("form.saveFailed"));
       return false;
     }
     setPersonal(data);
@@ -166,7 +168,7 @@ export function ResumeStartBuilding({
   };
   const saveSummary = async (text: string): Promise<boolean> => {
     if (!(await saveResumeDocument({ summary: text }))) {
-      toast.error("Couldn't save");
+      toast.error(t("form.saveFailed"));
       return false;
     }
     setSummary(text);
@@ -175,7 +177,7 @@ export function ResumeStartBuilding({
   };
   const saveHobbies = async (text: string): Promise<boolean> => {
     if (!(await saveResumeDocument({ hobbies: text }))) {
-      toast.error("Couldn't save");
+      toast.error(t("form.saveFailed"));
       return false;
     }
     setHobbies(text);
@@ -186,7 +188,7 @@ export function ResumeStartBuilding({
     entry: JobPreferenceEntry,
   ): Promise<boolean> => {
     if (!(await saveResumeDocument({ jobPreferences: entry }))) {
-      toast.error("Couldn't save");
+      toast.error(t("form.saveFailed"));
       return false;
     }
     setJobPreference(entry);
@@ -198,7 +200,7 @@ export function ResumeStartBuilding({
     entry: ResumeEntryPayload,
   ): Promise<boolean> => {
     if (!(await saveResumeEntry(section, entry))) {
-      toast.error("Couldn't save");
+      toast.error(t("form.saveFailed"));
       return false;
     }
     if (section === "experiences")
@@ -254,7 +256,7 @@ export function ResumeStartBuilding({
    */
   const deleteEntry = async (n: EntryListStep, id: string): Promise<void> => {
     if (!(await deleteResumeEntry(ENTRY_SECTIONS[n], id))) {
-      toast.error("Couldn't delete");
+      toast.error(t("form.deleteFailed"));
       return;
     }
     if (n === 3) setExperiences((prev) => prev.filter((x) => x.id !== id));
@@ -305,7 +307,7 @@ export function ResumeStartBuilding({
         <div className="max-w-7xl mx-auto w-full px-4 pt-4">
           <div className="rounded-2xl bg-card p-6 sm:p-10">
             <h1 className="text-center text-3xl font-bold text-foreground">
-              How do you want to start?
+              {t("form.startTitle")}
             </h1>
 
             <div className="mx-auto mt-8 max-w-[560px]">
@@ -316,10 +318,10 @@ export function ResumeStartBuilding({
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-foreground">
-                      Create a New Resume(CV)
+                      {t("form.createTitle")}
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Build a professional CV step by step.
+                      {t("form.createDesc")}
                     </p>
                   </div>
                 </div>
@@ -333,7 +335,7 @@ export function ResumeStartBuilding({
                       <span className="flex h-5 w-5 items-center justify-center rounded-full border text-[11px] text-muted-foreground">
                         {i + 1}
                       </span>
-                      {label}
+                      {t(label)}
                     </li>
                   ))}
                 </ul>
@@ -343,7 +345,7 @@ export function ResumeStartBuilding({
                   onClick={openWizard}
                   className="mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90"
                 >
-                  Start building
+                  {t("form.startBuilding")}
                   <IconArrowRight size={20} />
                 </button>
               </div>

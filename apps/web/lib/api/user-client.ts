@@ -2,6 +2,7 @@ import "server-only";
 import {
   clearUserSession,
   getUserAccessToken,
+  getUserDeviceId,
   getUserRefreshToken,
   setUserSession,
 } from "@/lib/auth/session";
@@ -69,10 +70,16 @@ function rawFetch(
 async function tryRefresh(): Promise<string | null> {
   const refreshToken = await getUserRefreshToken();
   if (!refreshToken) return null;
+  // A legacy (no-`sid`) refresh token is bound to its device row on this
+  // hop; a revoked row answers 401 instead of minting a new session.
+  const deviceId = await getUserDeviceId();
 
   const res = await fetch(`${API_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(deviceId ? { "x-device-id": deviceId } : {}),
+    },
     body: JSON.stringify({ refreshToken }),
     cache: "no-store",
   });

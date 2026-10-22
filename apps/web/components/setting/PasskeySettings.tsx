@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 
+import { getTranslations } from "next-intl/server";
 import SettingSidebar from "./SettingSidebar";
 import { UserRoundKey, Plus } from "lucide-react";
 import { getSettingsUser } from "@/lib/auth/current-user";
@@ -7,6 +8,7 @@ import { getSettingsUser } from "@/lib/auth/current-user";
 export default async function PasskeySettings() {
   // Passkeys are not built yet; the rail still shows the real account.
   const me = await getSettingsUser();
+  const t = await getTranslations("Settings.passkeysPage");
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-6xl mx-auto  ">
@@ -15,7 +17,7 @@ export default async function PasskeySettings() {
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
               <h1 className="text-xl font-medium text-foreground mb-4 mt-6 px-4">
-                Passkeys
+                {t("title")}
               </h1>
               <div className="mt-2 px-4 space-y-4">
                 <div className="flex items-start gap-3 p-4 bg-[#00a0e9]/5  rounded-sm">
@@ -24,20 +26,18 @@ export default async function PasskeySettings() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <p className="text-[14px] leading-relaxed text-card-foreground">
-                      Passkeys are a safer and easier replacement for passwords.
-                      You can use them to sign in to your account without typing
-                      a password.
+                      {t("description")}
                     </p>
                   </div>
                 </div>
 
                 <Button className="bg-[#00a0e9]/80 hover:bg-[#00a0e9]/60 text-card rounded-sm w-full h-10 cursor-pointer">
                   <Plus size={18} className="block mr-1 text-lg" />
-                  <span className="text-sm">Add a Passkey</span>
+                  <span className="text-sm">{t("add")}</span>
                 </Button>
 
                 <div className=" text-center text-sm text-muted-foreground pb-6">
-                  <p>You can have multiple passkeys for different devices.</p>
+                  <p>{t("note")}</p>
                 </div>
               </div>
             </div>

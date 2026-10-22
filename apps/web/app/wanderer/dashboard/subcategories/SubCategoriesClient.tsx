@@ -72,11 +72,13 @@ type SubCategoryFormData = z.infer<typeof subCategorySchema>;
 type SubCategoryWithDates = subCategory & {
   createdAt: string;
   updatedAt: string;
+  nameKm: string;
 };
 
 type SubcategoryWithMeta = {
   subId: string;
   name: string;
+  nameKm: string;
   slug: string;
   subIcon: string;
   categoryId: string;
@@ -95,6 +97,7 @@ function AddSubCategoryForm({
   const form = useAppForm({
     defaultValues: {
       name: "",
+      nameKm: "",
       slug: "",
       subIcon: "",
       categoryId: "",
@@ -123,6 +126,10 @@ function AddSubCategoryForm({
       <FieldGroup className="py-4">
         <form.AppField name="name">
           {(field) => <field.Input label="Name" required />}
+        </form.AppField>
+
+        <form.AppField name="nameKm">
+          {(field) => <field.Input label="Khmer name" />}
         </form.AppField>
 
         <form.AppField name="slug">
@@ -184,6 +191,7 @@ function EditSubCategoryForm({
   const form = useAppForm({
     defaultValues: {
       name: category.name,
+      nameKm: category.nameKm,
       slug: category.slug,
       subIcon: category.subIcon,
       categoryId: category.categoryId,
@@ -212,6 +220,10 @@ function EditSubCategoryForm({
       <FieldGroup className="py-4">
         <form.AppField name="name">
           {(field) => <field.Input label="Name" required />}
+        </form.AppField>
+
+        <form.AppField name="nameKm">
+          {(field) => <field.Input label="Khmer name" />}
         </form.AppField>
 
         <form.AppField name="slug">
@@ -350,6 +362,7 @@ export default function SubCategoriesClient() {
   const filteredSubCategories = subCategories.filter(
     (subcategory) =>
       subcategory.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      subcategory.nameKm.toLowerCase().includes(searchQuery.toLowerCase()) ||
       subcategory.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
       subcategory.categoryId.toLowerCase().includes(searchQuery.toLowerCase()),
   );
@@ -478,7 +491,14 @@ export default function SubCategoriesClient() {
                     <TableCell className="text-center">
                       {subcategory.subId}
                     </TableCell>
-                    <TableCell>{subcategory.name}</TableCell>
+                    <TableCell>
+                      <div>{subcategory.name}</div>
+                      {subcategory.nameKm && (
+                        <div className="text-xs text-muted-foreground">
+                          {subcategory.nameKm}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{subcategory.slug}</TableCell>
                     <TableCell className="flex justify-start">
                       <DbImage

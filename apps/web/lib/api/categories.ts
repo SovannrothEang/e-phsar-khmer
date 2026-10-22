@@ -154,6 +154,8 @@ export interface BackendAttributeRow {
   type?: string;
   slug: string;
   name: string;
+  /** Khmer display name; null falls back to `name`. */
+  nameKm?: string | null;
   image: string | null;
   subcategoryIds: string[];
 }
@@ -436,8 +438,9 @@ export function toCardPost(l: BackendListing): Post {
     createdat: new Date(l.createdAt),
     proId: "",
     disId: "",
-    condition:
-      l.condition === "used" ? "Used" : l.condition === "new" ? "New" : "",
+    // Raw backend value ("new" | "used"); the card/detail translate it so the
+    // km UI renders Khmer instead of a baked-in English label.
+    condition: l.condition ?? "",
     freeDelivery: l.deliveryFree,
     // The card shows the design's short `district, province` — the commune and
     // the street address belong to the detail page (see `shortLocation`).
@@ -451,6 +454,7 @@ export function toCardPost(l: BackendListing): Post {
 export interface BackendPlace {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
 }
 

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { Briefcase } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import DbImage from "@/components/common/DbImage";
 import { formatPrice } from "@/lib/chat/format";
@@ -46,11 +46,13 @@ export function JobApplicationRow({
   chips?: ReactNode;
   actions?: ReactNode;
 }) {
+  const t = useTranslations("Me.jobsPage");
+  const tCommon = useTranslations("Common");
   const locale = useLocale();
   const price = formatPrice(listing.price, listing.currency, locale);
   const jobGone = listing.title === "";
   const jobLine = jobGone ? (
-    <span className="italic">This job is no longer available</span>
+    <span className="italic">{t("noLongerAvailable")}</span>
   ) : (
     <Link
       // The object form, not the pretty `/<slug>-adid-<id>` string every card
@@ -128,10 +130,12 @@ export function JobApplicationRow({
             ) : price ? (
               <span className="font-medium text-[#e3281b]">{price}</span>
             ) : (
-              <span>Negotiable</span>
+              <span>{tCommon("negotiable")}</span>
             )}
             <span className="whitespace-nowrap">
-              Applied {new Date(createdAt).toLocaleDateString(locale)}
+              {t("appliedAt", {
+                date: new Date(createdAt).toLocaleDateString(locale),
+              })}
             </span>
           </p>
 
@@ -168,6 +172,7 @@ function StatusBadge({
   status: JobApplicationStatus;
   view: "applied" | "received";
 }) {
+  const t = useTranslations("Me.jobsPage");
   const styles: Record<JobApplicationStatus, string> = {
     pending: "bg-amber-50 text-amber-700 border-amber-100",
     viewed: "bg-blue-50 text-[#00a0e9] border-blue-100",
@@ -175,10 +180,10 @@ function StatusBadge({
     rejected: "bg-red-50 text-[#e3281b] border-red-100",
   };
   const labels: Record<JobApplicationStatus, string> = {
-    pending: view === "received" ? "New" : "Pending",
-    viewed: "Viewed",
-    hired: "Hired",
-    rejected: "Rejected",
+    pending: view === "received" ? t("statusNew") : t("statusPending"),
+    viewed: t("statusViewed"),
+    hired: t("statusHired"),
+    rejected: t("statusRejected"),
   };
 
   return (

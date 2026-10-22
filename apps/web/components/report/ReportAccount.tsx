@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@/i18n/routing";
 import { ImagePlus, Images, Loader2, X } from "lucide-react";
@@ -56,6 +57,7 @@ export function ReportAccount({
   open,
   onOpenChange,
 }: ReportAccountProps) {
+  const t = useTranslations();
   const router = useRouter();
   const [reasonId, setReasonId] = useState("");
   const [description, setDescription] = useState("");
@@ -96,7 +98,7 @@ export function ReportAccount({
         headers: { "Content-Type": entry.file.type },
       });
       if (!res.ok) {
-        toast.error("Failed to upload a photo");
+        toast.error(t("Report.uploadFailed"));
         setEvidence((prev) => prev.filter((e) => e.id !== entry.id));
         URL.revokeObjectURL(entry.previewUrl);
         return;
@@ -155,15 +157,15 @@ export function ReportAccount({
     e.preventDefault();
     const targetId = String(user.userId);
     if (!UUID_RE.test(targetId)) {
-      toast.error("This account cannot be reported right now.");
+      toast.error(t("Report.accountCannotReport"));
       return;
     }
     if (!reasonId) {
-      toast.error("Choose a reason");
+      toast.error(t("Report.chooseReasonError"));
       return;
     }
     if (uploading > 0) {
-      toast.error("Please wait for the photos to finish uploading.");
+      toast.error(t("Report.waitForPhotos"));
       return;
     }
 
@@ -179,7 +181,7 @@ export function ReportAccount({
 
     if (!result.success) {
       if (result.status === 401) {
-        toast.error("Sign in to report this account");
+        toast.error(t("Report.signInAccount"));
         handleOpenChange(false);
         router.push("/login");
         return;
@@ -188,92 +190,100 @@ export function ReportAccount({
       return;
     }
 
-    toast.success("Report submitted");
+    toast.success(t("Report.submitted"));
     handleOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <form onSubmit={submit} className="min-w-0">
+      <DialogContent className="p-5 sm:max-w-2xl sm:p-6">
+        <form onSubmit={submit} className="min-w-0 space-y-4">
           <DialogHeader>
             <DialogTitle>
-              Report {user?.name?.toUpperCase() || "ACCOUNT"}
+              {t("Report.accountTitle", {
+                name:
+                  user?.name?.toUpperCase() || t("Report.accountFallbackTitle"),
+              })}
             </DialogTitle>
           </DialogHeader>
-          <Separator className="my-1" />
-          <h2 className="text-sm">Photo( {evidence.length}/24 )</h2>
-          <input
-            type="file"
-            ref={fileInputRef}
-            multiple
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          {/* `min-w-0` lets this strip scroll instead of widening the dialog:
-              the 24 shrink-0 slots otherwise expand the grid column past
-              `max-w-2xl` and the footer/buttons overflow the modal. */}
-          <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2">
-            {/* The mock always shows all 24 slots; filled ones scroll. */}
-            {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
-              const item = evidence[index];
-              const isNextSlot = index === evidence.length;
-              return (
-                <div key={index} className="relative h-16 w-20 shrink-0">
-                  {item ? (
-                    <div className="relative h-full w-full">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- client-side object URL preview */}
-                      <img
-                        src={item.previewUrl}
-                        alt=""
-                        className="h-full w-full rounded-md border border-muted object-cover"
-                      />
-                      {item.path === null ? (
-                        <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/40">
-                          <Loader2 className="h-5 w-5 animate-spin text-white" />
-                        </div>
-                      ) : null}
+          <Separator />
+          <div className="space-y-2">
+            <h2 className="text-sm">
+              {t("Report.photoCount", { count: evidence.length })}
+            </h2>
+            <input
+              type="file"
+              ref={fileInputRef}
+              multiple
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            {/* `min-w-0` keeps the 24 shrink-0 slots scrolling inside the
+                dialog instead of widening the grid column past `max-w-2xl`. */}
+            <div className="flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-2">
+              {/* The mock always shows all 24 slots; filled ones scroll. */}
+              {Array.from({ length: MAX_PHOTOS }).map((_, index) => {
+                const item = evidence[index];
+                const isNextSlot = index === evidence.length;
+                return (
+                  <div key={index} className="relative h-16 w-20 shrink-0">
+                    {item ? (
+                      <div className="relative h-full w-full">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- client-side object URL preview */}
+                        <img
+                          src={item.previewUrl}
+                          alt=""
+                          className="h-full w-full rounded-md border border-muted object-cover"
+                        />
+                        {item.path === null ? (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/40">
+                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                          </div>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => removeAt(index)}
+                          className="absolute -right-1 -top-1 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-none bg-red-500 text-card shadow-sm"
+                        >
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => removeAt(index)}
-                        className="absolute -right-1 -top-1 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-none bg-red-500 text-card shadow-sm"
+                        onClick={triggerUpload}
+                        className="flex h-full w-full cursor-pointer flex-col items-center justify-center rounded-md border bg-muted transition-colors hover:bg-muted/70"
                       >
-                        <X size={12} strokeWidth={3} />
+                        {isNextSlot ? (
+                          <>
+                            <Images className="h-7 w-7 text-muted-foreground" />
+                            <span className="mt-1 text-xs text-muted-foreground">
+                              {t("Common.upload")}
+                            </span>
+                          </>
+                        ) : (
+                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                        )}
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={triggerUpload}
-                      className="flex h-full w-full cursor-pointer flex-col items-center justify-center rounded-md border bg-muted transition-colors hover:bg-muted/70"
-                    >
-                      {isNextSlot ? (
-                        <>
-                          <Images className="h-7 w-7 text-muted-foreground" />
-                          <span className="mt-1 text-xs text-muted-foreground">
-                            Upload
-                          </span>
-                        </>
-                      ) : (
-                        <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
           <FieldGroup>
             <Field>
               <FieldLabel className="text-sm">
-                Reason <span className="text-red-500">*</span>
+                {t("Report.reason")} <span className="text-red-500">*</span>
               </FieldLabel>
               <Select value={reasonId} onValueChange={setReasonId}>
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
-                      isLoading ? "Loading reasons…" : "Select a reason"
+                      isLoading
+                        ? t("Report.loadingReasons")
+                        : t("Report.selectReason")
                     }
                   />
                 </SelectTrigger>
@@ -289,16 +299,16 @@ export function ReportAccount({
               </Select>
               {!isLoading && reasons.length === 0 ? (
                 <p className="text-xs text-destructive">
-                  Could not load the report reasons. Please try again.
+                  {t("Report.reasonsFailed")}
                 </p>
               ) : null}
-              <Field>
-                <FieldLabel>Description</FieldLabel>
+              <Field className="pt-2">
+                <FieldLabel>{t("Report.descriptionLabel")}</FieldLabel>
                 <Textarea
                   id="message"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter your message..."
+                  placeholder={t("Report.messagePlaceholder")}
                   className="min-h-[200px]"
                 />
               </Field>
@@ -311,7 +321,7 @@ export function ReportAccount({
                 variant="outline"
                 className="h-10 w-1/3 cursor-pointer rounded-sm bg-muted-foreground/10 text-foreground hover:bg-muted-foreground/20"
               >
-                Cancel
+                {t("Common.cancel")}
               </Button>
             </DialogClose>
             <Button
@@ -320,10 +330,10 @@ export function ReportAccount({
               className="h-10 w-2/3 cursor-pointer rounded-sm bg-orange-400 text-card hover:bg-orange-500 disabled:opacity-60"
             >
               {submitting
-                ? "Submitting…"
+                ? t("Common.submitting")
                 : uploading > 0
-                  ? "Uploading…"
-                  : "Submit"}
+                  ? t("Common.uploading")
+                  : t("Common.submit")}
             </Button>
           </DialogFooter>
         </form>

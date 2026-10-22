@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { UserCheck } from "lucide-react";
 import { Link } from "@/i18n/routing";
@@ -33,8 +34,8 @@ type FollowListCardProps = {
 );
 
 const TABS = [
-  { key: "following", label: "Following" },
-  { key: "followers", label: "Followers" },
+  { key: "following", labelKey: "following" },
+  { key: "followers", labelKey: "followers" },
 ] as const;
 
 /**
@@ -53,7 +54,8 @@ export default function FollowListCard({
   viewerId,
   hasMore,
 }: FollowListCardProps) {
-  const label = side === "following" ? "Following" : "Followers";
+  const t = useTranslations("Me.follows");
+  const label = t(side === "following" ? "following" : "followers");
 
   const tabClass = (active: boolean) =>
     `relative pb-3 text-sm font-medium transition-colors ${
@@ -77,7 +79,7 @@ export default function FollowListCard({
                 onClick={() => onSelectTab(tab.key)}
                 className={`cursor-pointer ${tabClass(active)}`}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             ) : (
               <Link
@@ -85,7 +87,7 @@ export default function FollowListCard({
                 href={hrefs[tab.key]}
                 className={tabClass(active)}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Link>
             );
           })}
@@ -139,7 +141,7 @@ export default function FollowListCard({
 
         {hasMore && (
           <p className="pt-4 text-center text-xs text-muted-foreground">
-            Showing the most recent {items.length}.
+            {t("showingRecent", { count: items.length })}
           </p>
         )}
       </div>
@@ -149,6 +151,7 @@ export default function FollowListCard({
 
 /** The house empty state: muted circle, bold heading, one muted sentence. */
 function EmptyFollowState({ side }: { side: "following" | "followers" }) {
+  const t = useTranslations("Me.follows");
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <div className="flex h-40 w-40 items-center justify-center rounded-full bg-muted">
@@ -158,12 +161,10 @@ function EmptyFollowState({ side }: { side: "following" | "followers" }) {
         />
       </div>
       <p className="mt-6 text-sm font-medium text-foreground">
-        {side === "following" ? "Not following anyone yet" : "No followers yet"}
+        {side === "following" ? t("notFollowingTitle") : t("noFollowersTitle")}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        {side === "following"
-          ? "Accounts you follow will show up here."
-          : "People who follow this account will show up here."}
+        {side === "following" ? t("notFollowingBody") : t("noFollowersBody")}
       </p>
     </div>
   );

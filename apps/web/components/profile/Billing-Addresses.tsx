@@ -1,11 +1,13 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import SettingSidebar from "../setting/SettingSidebar";
 import { MapPinHouse } from "lucide-react";
 
 export default function BillingAddresses() {
+  const t = useTranslations("Me.billing");
   const router = useRouter();
 
   const handleAddAddress = () => {
@@ -19,7 +21,7 @@ export default function BillingAddresses() {
           <SettingSidebar />
           <main className="flex-1 flex flex-col items-center">
             <h1 className="text-2xl  font-medium text-foreground mb-4 w-full">
-              Billing Address
+              {t("title")}
             </h1>
 
             <div className="bg-card  rounded-sm shadow-sm p-8 flex flex-col items-center justify-center min-h-[380px] w-[650px]">
@@ -34,10 +36,10 @@ export default function BillingAddresses() {
               </div>
               <div className="text-center space-y-2 mb-8">
                 <h2 className="text-xl font-medium text-foreground">
-                  No Address
+                  {t("noAddress")}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Seems like you haven&apos;t saved any addresses yet!
+                  {t("noAddressHint")}
                 </p>
               </div>
 
@@ -45,7 +47,7 @@ export default function BillingAddresses() {
                 onClick={handleAddAddress}
                 className="bg-[#f68b1e] hover:bg-[#e57a10] text-white rounded-sm px-10 h-10 font-medium transition-colors cursor-pointer"
               >
-                Add Address
+                {t("addAddress")}
               </Button>
             </div>
           </main>

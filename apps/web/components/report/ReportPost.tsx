@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@/i18n/routing";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -40,6 +41,7 @@ interface ReportPostProps {
 }
 
 export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
+  const t = useTranslations();
   const router = useRouter();
   const [reasonId, setReasonId] = useState("");
   const [description, setDescription] = useState("");
@@ -69,11 +71,11 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
     e.preventDefault();
     const targetId = String(post.postId);
     if (!UUID_RE.test(targetId)) {
-      toast.error("This listing cannot be reported right now.");
+      toast.error(t("Report.cannotReport"));
       return;
     }
     if (!reasonId) {
-      toast.error("Choose a reason");
+      toast.error(t("Report.chooseReasonError"));
       return;
     }
 
@@ -88,7 +90,7 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
 
     if (!result.success) {
       if (result.status === 401) {
-        toast.error("Sign in to report this listing");
+        toast.error(t("Report.signIn"));
         handleOpenChange(false);
         router.push("/login");
         return;
@@ -97,7 +99,7 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
       return;
     }
 
-    toast.success("Report submitted");
+    toast.success(t("Report.submitted"));
     handleOpenChange(false);
   };
 
@@ -107,23 +109,29 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle className="text-lg">
-              Report {post?.title ? post.title.toUpperCase() : "Post"}
+              {t("Report.title", {
+                title: post?.title
+                  ? post.title.toUpperCase()
+                  : t("Report.fallbackTitle"),
+              })}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Please provide details about why you are reporting this post.
+              {t("Report.description")}
             </DialogDescription>
           </DialogHeader>
           <Separator />
           <FieldGroup>
             <Field>
               <FieldLabel className="text-sm">
-                Reason <span className="text-red-500">*</span>
+                {t("Report.reason")} <span className="text-red-500">*</span>
               </FieldLabel>
               <Select value={reasonId} onValueChange={setReasonId}>
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
-                      isLoading ? "Loading reasons…" : "Choose Reason"
+                      isLoading
+                        ? t("Report.loadingReasons")
+                        : t("Report.chooseReason")
                     }
                   />
                 </SelectTrigger>
@@ -139,16 +147,18 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
               </Select>
               {!isLoading && reasons.length === 0 ? (
                 <p className="text-xs text-destructive">
-                  Could not load the report reasons. Please try again.
+                  {t("Report.reasonsFailed")}
                 </p>
               ) : null}
               <Field>
-                <FieldLabel className="text-sm">Description</FieldLabel>
+                <FieldLabel className="text-sm">
+                  {t("Report.descriptionLabel")}
+                </FieldLabel>
                 <Textarea
                   id="message"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter your message..."
+                  placeholder={t("Report.messagePlaceholder")}
                   className="h-[140px] overflow-y-auto resize-none rounded-sm"
                 />
               </Field>
@@ -161,7 +171,7 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
                 variant="outline"
                 className="rounded-sm cursor-pointer h-10 text-foreground bg-muted-foreground/10 hover:bg-muted-foreground/20 w-1/3"
               >
-                Cancel
+                {t("Common.cancel")}
               </Button>
             </DialogClose>
             <Button
@@ -169,7 +179,7 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
               disabled={submitting || !reasonId}
               className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3 disabled:opacity-60"
             >
-              {submitting ? "Submitting…" : "Submit"}
+              {submitting ? t("Common.submitting") : t("Common.submit")}
             </Button>
           </DialogFooter>
         </form>

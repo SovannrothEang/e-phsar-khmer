@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,15 +24,19 @@ import { userLogout } from "@/actions/logout";
  * then redirects locale-aware to /login).
  */
 export function SignOutDialog({ trigger }: { trigger: ReactNode }) {
+  const t = useTranslations("Settings.signOutDialog");
+  const tCommon = useTranslations("Common");
   return (
     <Dialog>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
       <DialogContent className="sm:max-w-[600px] rounded-sm">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">Sign Out</DialogTitle>
+          <DialogTitle className="text-lg font-semibold">
+            {t("title")}
+          </DialogTitle>
           <DialogDescription className="mt-2 text-base text-muted-foreground">
-            Are you sure that you want to sign out from your account?
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -41,7 +46,7 @@ export function SignOutDialog({ trigger }: { trigger: ReactNode }) {
               variant="ghost"
               className="flex-1 border border-border hover:bg-card cursor-pointer"
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
           </DialogClose>
 
@@ -49,7 +54,7 @@ export function SignOutDialog({ trigger }: { trigger: ReactNode }) {
             onClick={() => void userLogout()}
             className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium cursor-pointer"
           >
-            Sign Out
+            {t("button")}
           </Button>
         </DialogFooter>
       </DialogContent>

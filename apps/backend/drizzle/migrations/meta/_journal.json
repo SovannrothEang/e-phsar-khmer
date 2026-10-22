@@ -267,6 +267,55 @@
       "when": 1792222996261,
       "tag": "0037_sloppy_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792404932681,
+      "tag": "0038_lush_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792411027746,
+      "tag": "0039_pale_thunderbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792476634796,
+      "tag": "0040_tidy_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792477933828,
+      "tag": "0041_goofy_stryfe",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792580154858,
+      "tag": "0042_late_zaran",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792580817376,
+      "tag": "0043_cloudy_typhoid_mary",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792642466591,
+      "tag": "0044_lucky_old_lace",
+      "breakpoints": true
     }
   ]
 }

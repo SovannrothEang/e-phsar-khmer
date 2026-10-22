@@ -17,6 +17,8 @@ import { UserSubscriptionsController } from './subscriptions/user-subscriptions.
 import { UserSubscriptionsService } from './subscriptions/user-subscriptions.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
+import { AdminFeedbackController } from './feedback/feedback.controller';
+import { AdminFeedbackService } from './feedback/feedback.service';
 
 @Module({
   imports: [FilesModule, ChatModule],
@@ -29,6 +31,7 @@ import { ReportsService } from './reports/reports.service';
     SubscriptionConfigController,
     UserSubscriptionsController,
     ReportsController,
+    AdminFeedbackController,
   ],
   providers: [
     AdminService,
@@ -39,6 +42,7 @@ import { ReportsService } from './reports/reports.service';
     SubscriptionConfigService,
     UserSubscriptionsService,
     ReportsService,
+    AdminFeedbackService,
   ],
   exports: [AdminService],
 })

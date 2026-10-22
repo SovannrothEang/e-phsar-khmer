@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { startConversationWith } from "@/actions/chat";
 import { storeListingPreview } from "@/lib/chat/listing-handoff";
+import { trackEvent } from "@/lib/insights/queue";
 import type { ListingContext } from "@/types/chat";
 
 /**
@@ -56,6 +57,9 @@ export function ContactSellerButton({
 
   async function open() {
     if (!sellerId) return;
+    // Count the click even when it ends in a sign-in bounce or a block —
+    // the metric is "people clicked chat", not "messages sent".
+    if (listingId) trackEvent(listingId, "chat");
     setResolving(true);
     const res = await startConversationWith(sellerId);
     setResolving(false);

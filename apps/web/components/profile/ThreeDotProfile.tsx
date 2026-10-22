@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  CopyIcon,
-  ShareIcon,
-  VolumeOffIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, Bookmark, Forward, Link2 } from "lucide-react";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { EllipsisVertical } from "lucide-react";
 import { useState } from "react";
@@ -28,6 +24,7 @@ export function ThreeDotProfile({
   user: User;
   viewerId?: string | null;
 }) {
+  const t = useTranslations("Common");
   const [reportOpen, setReportOpen] = useState(false);
   // Reporting yourself is a backend 400; don't offer it on your own profile.
   const isOwnProfile = viewerId != null && String(user.userId) === viewerId;
@@ -46,16 +43,16 @@ export function ThreeDotProfile({
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuGroup>
             <DropdownMenuItem>
-              <VolumeOffIcon />
-              Save
+              <Bookmark />
+              {t("save")}
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <ShareIcon />
-              Share
+              <Forward />
+              {t("share")}
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <CopyIcon />
-              Copy Link
+              <Link2 />
+              {t("copyLink")}
             </DropdownMenuItem>
           </DropdownMenuGroup>
           {!isOwnProfile && (
@@ -67,7 +64,7 @@ export function ThreeDotProfile({
                   onSelect={() => setReportOpen(true)}
                 >
                   <AlertTriangleIcon />
-                  Report
+                  {t("report")}
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { MONTH_LABELS } from "@/lib/locale-labels";
 import type { ResumePersonalData } from "@/components/profile/ResumePreview";
 import {
   isValidEmail,
@@ -75,18 +77,19 @@ export const EDUCATION_LEVELS = [
   "Doctor",
 ] as const;
 
-/** Label prefixes for the view's "add this field" chip targets. */
-const FOCUS_LABELS: Record<string, string> = {
-  gender: "Gender",
-  dob: "Date Of Birth",
-  nationality: "Nationality",
-  email: "Email",
-  location: "Location",
-  address: "Address",
-  marital: "Marital Status",
-  education: "Education Level",
-  position: "Current Position",
-  experience: "Years of Experience",
+const GENDER_KEYS: Record<string, string> = { Male: "male", Female: "female" };
+const MARITAL_KEYS: Record<string, string> = {
+  Single: "single",
+  Married: "married",
+  Divorced: "divorced",
+};
+export const EDUCATION_KEYS: Record<string, string> = {
+  "High School": "highSchool",
+  Associate: "associate",
+  Professional: "professional",
+  "Bachelor's Degree": "bachelor",
+  Master: "master",
+  Doctor: "doctor",
 };
 
 /** A wide bordered choice button (Gender / Marital Status). */
@@ -142,6 +145,8 @@ export function ResumePersonalDetailsDialog({
   /** Resolves `true` only once the block was stored. */
   onSubmit: (data: ResumePersonalData) => Promise<boolean>;
 }) {
+  const t = useTranslations("Resume");
+  const locale = useLocale();
   const [firstName, setFirstName] = useState(defaultFirstName);
   const [lastName, setLastName] = useState(defaultLastName);
   const [gender, setGender] = useState<string | null>(null);
@@ -171,6 +176,15 @@ export function ResumePersonalDetailsDialog({
   const yoeFieldRef = useRef<HTMLDivElement>(null);
   /** An object uploaded this session but not yet part of a stored block. */
   const pendingPhoto = useRef<{ url: string; path: string } | null>(null);
+  /** Localized label prefixes for the view's "add this field" chip targets. */
+  const formatDob = (date: Date) =>
+    locale === "km"
+      ? `${date.getDate()} ${MONTH_LABELS.km[date.getMonth()]} ${date.getFullYear()}`
+      : date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        });
 
   // Opened via the view's Edit paths: load the stored block (the wizard keeps
   // whatever is on screen, so Back/Next never wipes a step in progress).
@@ -206,7 +220,7 @@ export function ResumePersonalDetailsDialog({
     e.target.value = "";
     if (!file) return;
     if (!isValidPhotoFile(file)) {
-      toast.error("Choose an image up to 5MB.");
+      toast.error(t("form.validation.photo"));
       return;
     }
 
@@ -224,7 +238,7 @@ export function ResumePersonalDetailsDialog({
     }).catch(() => null);
     setPhotoUploading(false);
     if (!uploaded?.ok) {
-      toast.error("Couldn't upload your photo. Please try again.");
+      toast.error(t("form.validation.photoUpload"));
       return;
     }
 
@@ -353,7 +367,19 @@ export function ResumePersonalDetailsDialog({
         dlg?.querySelector(".overflow-y-auto")?.scrollTo({ top: 0 });
         return;
       }
-      const wanted = FOCUS_LABELS[focusField];
+      const focusLabels: Record<string, string> = {
+        gender: t("labels.gender"),
+        dob: t("labels.dob"),
+        nationality: t("labels.nationality"),
+        email: t("labels.email"),
+        location: t("labels.location"),
+        address: t("labels.address"),
+        marital: t("labels.maritalStatus"),
+        education: t("labels.educationLevel"),
+        position: t("form.currentPosition"),
+        experience: t("labels.yearsExperience"),
+      };
+      const wanted = focusLabels[focusField];
       const fields = [
         ...(dlg?.querySelectorAll<HTMLElement>('[data-slot="field"]') ?? []),
       ];
@@ -399,7 +425,7 @@ export function ResumePersonalDetailsDialog({
       cancelAnimationFrame(raf);
       undo?.();
     };
-  }, [open, mode, focusField]);
+  }, [open, mode, focusField, t]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -409,12 +435,14 @@ export function ResumePersonalDetailsDialog({
       >
         <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit" ? "Edit Personal Details" : "Add Personal Details"}
+            {mode === "edit"
+              ? t("form.titles.personalEdit")
+              : t("form.titles.personalAdd")}
           </DialogTitle>
           <div className="flex items-center gap-4">
             {mode === "wizard" && (
               <span className="text-lg font-semibold text-[#00a0e9]">
-                Step 1 of 8
+                {t("form.step", { current: 1, total: 8 })}
               </span>
             )}
             <DialogClose asChild>
@@ -423,13 +451,17 @@ export function ResumePersonalDetailsDialog({
                 className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("form.close")}</span>
               </button>
             </DialogClose>
           </div>
         </div>
         <DialogDescription className="sr-only">
-          Step 1 of 8 of the resume builder: personal details.
+          {t("form.stepDescription", {
+            current: 1,
+            total: 8,
+            name: t("form.titles.personalWizard"),
+          })}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
@@ -441,7 +473,7 @@ export function ResumePersonalDetailsDialog({
                 {photo && !photoUploading ? (
                   <Image
                     src={photo}
-                    alt="Resume photo"
+                    alt={t("photoAlt")}
                     width={188}
                     height={213}
                     unoptimized
@@ -470,14 +502,15 @@ export function ResumePersonalDetailsDialog({
                   className="absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border bg-muted text-gray-600 transition-colors hover:bg-muted/70"
                 >
                   <IconPencil size={14} />
-                  <span className="sr-only">Upload photo</span>
+                  <span className="sr-only">{t("form.uploadPhoto")}</span>
                 </button>
               </div>
 
               <div className="flex flex-1 flex-col gap-5">
                 <Field ref={firstNameFieldRef} data-invalid={firstNameError}>
                   <FieldLabel htmlFor="rpd-first-name">
-                    First Name <span className="text-destructive">*</span>
+                    {t("form.firstName")}{" "}
+                    <span className="text-destructive">*</span>
                   </FieldLabel>
                   <Input
                     id="rpd-first-name"
@@ -488,12 +521,17 @@ export function ResumePersonalDetailsDialog({
                     className="h-11"
                   />
                   {firstNameError && (
-                    <FieldError>{"Please enter the 'First Name'"}</FieldError>
+                    <FieldError>
+                      {t("form.validation.required", {
+                        field: t("form.firstName"),
+                      })}
+                    </FieldError>
                   )}
                 </Field>
                 <Field ref={lastNameFieldRef} data-invalid={lastNameError}>
                   <FieldLabel htmlFor="rpd-last-name">
-                    Last Name <span className="text-destructive">*</span>
+                    {t("form.lastName")}{" "}
+                    <span className="text-destructive">*</span>
                   </FieldLabel>
                   <Input
                     id="rpd-last-name"
@@ -504,14 +542,18 @@ export function ResumePersonalDetailsDialog({
                     className="h-11"
                   />
                   {lastNameError && (
-                    <FieldError>{"Please enter the 'Last Name'"}</FieldError>
+                    <FieldError>
+                      {t("form.validation.required", {
+                        field: t("form.lastName"),
+                      })}
+                    </FieldError>
                   )}
                 </Field>
               </div>
             </div>
 
             <Field>
-              <FieldLabel>Gender</FieldLabel>
+              <FieldLabel>{t("labels.gender")}</FieldLabel>
               <div className="flex gap-5">
                 {GENDERS.map((option) => (
                   <ChoiceButton
@@ -519,14 +561,14 @@ export function ResumePersonalDetailsDialog({
                     selected={gender === option}
                     onClick={() => setGender(option)}
                   >
-                    {option}
+                    {t(`form.options.${GENDER_KEYS[option]}`)}
                   </ChoiceButton>
                 ))}
               </div>
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="rpd-dob">Date Of Birth</FieldLabel>
+              <FieldLabel htmlFor="rpd-dob">{t("labels.dob")}</FieldLabel>
               <div className="relative">
                 <Popover open={dobOpen} onOpenChange={setDobOpen}>
                   <PopoverTrigger asChild>
@@ -535,13 +577,7 @@ export function ResumePersonalDetailsDialog({
                       id="rpd-dob"
                       className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
                     >
-                      {dob
-                        ? dob.toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "2-digit",
-                            year: "numeric",
-                          })
-                        : ""}
+                      {dob ? formatDob(dob) : ""}
                     </button>
                   </PopoverTrigger>
                   <PopoverContent align="start" className="w-auto p-0">
@@ -559,7 +595,7 @@ export function ResumePersonalDetailsDialog({
                 {dob && (
                   <button
                     type="button"
-                    aria-label="Clear date of birth"
+                    aria-label={t("form.clearDob")}
                     onClick={() => setDob(null)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -570,7 +606,9 @@ export function ResumePersonalDetailsDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="rpd-nationality">Nationality</FieldLabel>
+              <FieldLabel htmlFor="rpd-nationality">
+                {t("labels.nationality")}
+              </FieldLabel>
               <Input
                 id="rpd-nationality"
                 value={nationality}
@@ -581,7 +619,7 @@ export function ResumePersonalDetailsDialog({
             </Field>
 
             <Field ref={emailFieldRef} data-invalid={emailError}>
-              <FieldLabel htmlFor="rpd-email">Email</FieldLabel>
+              <FieldLabel htmlFor="rpd-email">{t("labels.email")}</FieldLabel>
               <Input
                 id="rpd-email"
                 type="email"
@@ -592,7 +630,7 @@ export function ResumePersonalDetailsDialog({
                 className="h-11"
               />
               {emailError && (
-                <FieldError>Please enter a valid email address.</FieldError>
+                <FieldError>{t("form.validation.email")}</FieldError>
               )}
             </Field>
 
@@ -601,7 +639,8 @@ export function ResumePersonalDetailsDialog({
               data-invalid={phoneError || phoneFormatError}
             >
               <FieldLabel>
-                Phone Number <span className="text-destructive">*</span>
+                {t("form.phoneNumber")}{" "}
+                <span className="text-destructive">*</span>
               </FieldLabel>
               <div className="flex flex-col gap-3">
                 {phones.map((phone, index) => (
@@ -612,7 +651,9 @@ export function ResumePersonalDetailsDialog({
                         inputMode="tel"
                         value={phone}
                         onChange={(e) => updatePhone(index, e.target.value)}
-                        placeholder={`Phone Number ${index + 1}`}
+                        placeholder={t("form.phonePlaceholder", {
+                          number: index + 1,
+                        })}
                         maxLength={15}
                         aria-invalid={
                           (phoneError && index === 0) ||
@@ -625,7 +666,9 @@ export function ResumePersonalDetailsDialog({
                       {index > 0 && (
                         <button
                           type="button"
-                          aria-label={`Remove phone number ${index + 1}`}
+                          aria-label={t("form.removePhone", {
+                            number: index + 1,
+                          })}
                           onClick={() => removePhone(index)}
                           className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600"
                         >
@@ -637,7 +680,7 @@ export function ResumePersonalDetailsDialog({
                       phones.length < MAX_PHONES && (
                         <button
                           type="button"
-                          aria-label="Add another phone number"
+                          aria-label={t("form.addAnotherPhone")}
                           onClick={addPhone}
                           className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-white transition-colors hover:bg-[#00a0e9]/90"
                         >
@@ -648,15 +691,15 @@ export function ResumePersonalDetailsDialog({
                 ))}
               </div>
               {phoneError && (
-                <FieldError>At least one phone number is required.</FieldError>
+                <FieldError>{t("form.validation.phoneRequired")}</FieldError>
               )}
               {phoneFormatError && (
-                <FieldError>Please enter a valid phone number.</FieldError>
+                <FieldError>{t("form.validation.phoneInvalid")}</FieldError>
               )}
             </Field>
 
             <Field>
-              <FieldLabel>Location</FieldLabel>
+              <FieldLabel>{t("labels.location")}</FieldLabel>
               <div className="relative">
                 <button
                   type="button"
@@ -669,13 +712,13 @@ export function ResumePersonalDetailsDialog({
                   <span
                     className={place.province ? "" : "text-muted-foreground"}
                   >
-                    {resumeLocationLabel(place) || "Choose Location"}
+                    {resumeLocationLabel(place) || t("form.chooseLocation")}
                   </span>
                 </button>
                 {place.province ? (
                   <button
                     type="button"
-                    aria-label="Clear location"
+                    aria-label={t("form.clearLocation")}
                     onClick={() => setPlace(EMPTY_RESUME_LOCATION)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -698,7 +741,9 @@ export function ResumePersonalDetailsDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="rpd-address">Address</FieldLabel>
+              <FieldLabel htmlFor="rpd-address">
+                {t("labels.address")}
+              </FieldLabel>
               <Input
                 id="rpd-address"
                 value={address}
@@ -709,7 +754,9 @@ export function ResumePersonalDetailsDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="rpd-education">Education Level</FieldLabel>
+              <FieldLabel htmlFor="rpd-education">
+                {t("labels.educationLevel")}
+              </FieldLabel>
               <div className="relative">
                 <Popover open={educationOpen} onOpenChange={setEducationOpen}>
                   <PopoverTrigger asChild>
@@ -721,7 +768,9 @@ export function ResumePersonalDetailsDialog({
                       <span
                         className={education ? "" : "text-muted-foreground"}
                       >
-                        {education ?? ""}
+                        {education
+                          ? t(`form.options.${EDUCATION_KEYS[education]}`)
+                          : ""}
                       </span>
                     </button>
                   </PopoverTrigger>
@@ -741,7 +790,9 @@ export function ResumePersonalDetailsDialog({
                             }}
                             className="cursor-pointer"
                           >
-                            <span>{level}</span>
+                            <span>
+                              {t(`form.options.${EDUCATION_KEYS[level]}`)}
+                            </span>
                           </CommandItem>
                         ))}
                       </CommandList>
@@ -751,7 +802,7 @@ export function ResumePersonalDetailsDialog({
                 {education ? (
                   <button
                     type="button"
-                    aria-label="Clear Education Level"
+                    aria-label={t("form.clearEducation")}
                     onClick={() => setEducation(undefined)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -767,7 +818,9 @@ export function ResumePersonalDetailsDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="rpd-position">Current Position</FieldLabel>
+              <FieldLabel htmlFor="rpd-position">
+                {t("form.currentPosition")}
+              </FieldLabel>
               <Input
                 id="rpd-position"
                 value={position}
@@ -779,7 +832,7 @@ export function ResumePersonalDetailsDialog({
 
             <Field ref={yoeFieldRef} data-invalid={yoeError}>
               <FieldLabel htmlFor="rpd-experience">
-                Years of Experience
+                {t("labels.yearsExperience")}
               </FieldLabel>
               <Input
                 id="rpd-experience"
@@ -791,14 +844,12 @@ export function ResumePersonalDetailsDialog({
                 className="h-11"
               />
               {yoeError && (
-                <FieldError>
-                  Please enter a realistic number of years (0–60).
-                </FieldError>
+                <FieldError>{t("form.validation.years")}</FieldError>
               )}
             </Field>
 
             <Field>
-              <FieldLabel>Marital Status</FieldLabel>
+              <FieldLabel>{t("labels.maritalStatus")}</FieldLabel>
               <div className="flex gap-5">
                 {MARITAL_STATUSES.map((option) => (
                   <ChoiceButton
@@ -806,7 +857,7 @@ export function ResumePersonalDetailsDialog({
                     selected={maritalStatus === option}
                     onClick={() => setMaritalStatus(option)}
                   >
-                    {option}
+                    {t(`form.options.${MARITAL_KEYS[option]}`)}
                   </ChoiceButton>
                 ))}
               </div>
@@ -823,7 +874,7 @@ export function ResumePersonalDetailsDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Next to summary
+              {t("form.nextSummary")}
             </button>
           </div>
         ) : (
@@ -834,7 +885,7 @@ export function ResumePersonalDetailsDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {t("form.save")}
             </button>
           </div>
         )}

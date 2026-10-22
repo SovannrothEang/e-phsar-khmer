@@ -5,6 +5,7 @@ import { useAppForm } from "@/components/form/hooks";
 import { login } from "@/actions/login";
 import { requestLoginOtp } from "@/actions/otp";
 import { isLocalPhone, normalizePhone } from "@/lib/phone";
+import { getDeviceIdentity } from "@/lib/device";
 import { storeOtpRegistration } from "@/lib/otp-registration";
 import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
@@ -61,7 +62,8 @@ export function LoginForm({
         return;
       }
 
-      const result = await login(value);
+      const device = getDeviceIdentity();
+      const result = await login(value, device ?? undefined);
 
       if (result.success) {
         form.reset();

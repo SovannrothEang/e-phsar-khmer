@@ -836,6 +836,32 @@ export async function seedAttributes(db: DbClient): Promise<void> {
     byType.set(seed.type, (byType.get(seed.type) ?? 0) + 1);
   }
 
+  // Body-type Khmer names (captain's mock, 2026-10-22). Null-only: an
+  // admin-entered Khmer name is never overwritten by a later re-seed.
+  const CAR_BODY_TYPE_KM: Record<string, string> = {
+    sedan: 'សេដាន',
+    hatchback: 'កញ្ជី',
+    pickup: 'ភីកអាប់',
+    suv: 'អេសយូវី',
+    convertible: 'បើកដំបូល',
+    'mpv-minivan': 'MPV (រថយន្តគ្រួសារ)',
+    sports: 'រថយន្តស្ព័រ',
+    'station-wagon': 'គ្រឿង',
+    'other-type': 'ផ្សេងៗ',
+  };
+  for (const [slug, nameKm] of Object.entries(CAR_BODY_TYPE_KM)) {
+    await db
+      .update(attributeOptions)
+      .set({ nameKm })
+      .where(
+        and(
+          eq(attributeOptions.type, 'bodytypes'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.nameKm),
+        ),
+      );
+  }
+
   // Car body-type icons are the web app's local /sub-img design assets —
   // interim until they move to Supabase storage. Gap-fills only null icons
   // (admin-uploaded images are never overwritten); the insert-only loop

@@ -177,7 +177,11 @@ export interface ListingFormConfig {
    * (Vehicles For Rent, Parts & Accessories). See the resolver in
    * `getListingFormConfig` for why three sources feed it.
    */
-  vehicleKinds: { name: string; image: string | null }[];
+  vehicleKinds: {
+    name: string;
+    nameKm?: string | null;
+    image: string | null;
+  }[];
   colors: BackendAttributeRow[];
   /**
    * Option lists for the plain-dropdown pickers (`storage`, `accessory`,
@@ -185,7 +189,10 @@ export interface ListingFormConfig {
    * only when the subcategory declares it — see `PICKER_ATTR_TYPES` for which
    * source wins for each.
    */
-  pickLists: Record<string, { name: string; image: string | null }[]>;
+  pickLists: Record<
+    string,
+    { name: string; nameKm?: string | null; image: string | null }[]
+  >;
   years: string[];
   /**
    * The subcategory's own photo cap, read from its `photos` field (`max`).
@@ -302,9 +309,10 @@ export async function getListingFormConfig(
     pickLists[key] = managed
       ? scoped.map((r) => ({
           name: r.name,
+          nameKm: r.nameKm ?? null,
           image: textOnly ? null : r.image,
         }))
-      : inline.map((name) => ({ name, image: null }));
+      : inline.map((name) => ({ name, nameKm: null, image: null }));
   }
 
   /**
@@ -336,8 +344,12 @@ export async function getListingFormConfig(
     (sub.fieldSchema ?? []).find((f) => f.key === kindKey)?.options ?? [];
   const vehicleKinds =
     linkedKinds.length > 0
-      ? linkedKinds.map((r) => ({ name: r.name, image: r.image }))
-      : inlineKinds.map((name) => ({ name, image: null }));
+      ? linkedKinds.map((r) => ({
+          name: r.name,
+          nameKm: r.nameKm ?? null,
+          image: r.image,
+        }))
+      : inlineKinds.map((name) => ({ name, nameKm: null, image: null }));
 
   const labels: Record<string, string> = {};
   for (const field of sub.fieldSchema ?? []) {

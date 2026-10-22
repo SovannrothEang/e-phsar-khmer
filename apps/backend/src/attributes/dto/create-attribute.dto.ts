@@ -6,6 +6,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -15,6 +16,11 @@ export class CreateAttributeDto {
   @IsString()
   @MinLength(1)
   name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  nameKm?: string;
 
   @IsString()
   @Matches(SLUG_RE, {

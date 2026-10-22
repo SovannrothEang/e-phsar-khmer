@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "@/i18n/routing";
+import { Link, usePathname } from "@/i18n/routing";
+import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
@@ -20,97 +22,185 @@ import type { SettingsUser } from "@/lib/auth/current-user";
  * fabricated name.
  */
 export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
+  const t = useTranslations("Settings");
   const [autoUpdate, setAutoUpdate] = useState(false);
+  const pathname = usePathname();
+  const isActive = (href: string) => pathname === href;
+
+  /**
+   * Active: theme text + a light theme tint and border. Inactive hover: the
+   * existing neutral hover surface, but the label/chevron turn theme-colored.
+   * The two columns therefore read differently even while hovered.
+   */
+  const rowClass = (href: string, rounding: string) =>
+    cn(
+      "group flex items-center justify-between border p-3 transition-colors",
+      rounding,
+      isActive(href)
+        ? "border-[#00a0e9]/30 bg-[#00a0e9]/5 text-[#00a0e9] hover:bg-[#00a0e9]/10"
+        : "border-transparent bg-card hover:border-border hover:bg-background/50 hover:text-[#00a0e9]",
+    );
+
+  const chevronClass = (href: string) =>
+    cn(
+      "transition-colors",
+      isActive(href)
+        ? "text-[#00a0e9]"
+        : "text-gray-300 group-hover:text-[#00a0e9]",
+    );
+
   return (
     <div className="min-h-screen bg-muted pb-10 ">
       <main className="max-w-md mx-auto">
         <Link
           href={{ pathname: "/settings/edit-profile" }}
-          className="flex items-center justify-between p-2 bg-card hover:bg-background/50 rounded-sm border border-transparent hover:border-border"
+          className="group flex items-center justify-between p-2 bg-card hover:bg-background/50 rounded-sm border border-transparent hover:border-border transition-colors"
         >
           <AccountIdentity me={me} />
-          <ChevronRight size={24} className="text-gray-300" />
+          <ChevronRight
+            size={24}
+            className="text-gray-300 transition-colors group-hover:text-[#00a0e9]"
+          />
         </Link>
         <div className="mt-2">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">
-            Account
+            {t("account")}
           </h3>
           <Link
             href={{ pathname: "/settings/edit-profile" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-t-sm border border-transparent hover:border-border"
+            className={rowClass("/settings/edit-profile", "rounded-t-sm")}
           >
-            <p className="px-1">Edit Profile</p>
-            <p className="flex items-center opacity-50 gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("editProfile")}</p>
+            <p className="flex items-center gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/edit-profile")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/settings/change-password" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/change-password", "rounded-none")}
           >
-            <p className="px-1">Change Password</p>
-            <p className="flex items-center opacity-50 gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("changePassword")}</p>
+            <p className="flex items-center gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/change-password")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/settings/change-username" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/change-username", "rounded-none")}
           >
-            <p className="px-1">Username</p>
-            <p className="flex items-center opacity-50 gap-1">
-              {me?.username ?? ""}
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("username")}</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50">
+                {me?.username ?? ""}
+              </span>
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/change-username")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/settings/change-phone" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/change-phone", "rounded-none")}
           >
-            <p className="px-1">Activate Phone</p>
-            <p className="flex items-center opacity-50 gap-1">
-              {me?.primaryPhone ? formatPhoneLocal(me.primaryPhone) : "Add"}
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("activatePhone")}</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50">
+                {me?.primaryPhone ? formatPhoneLocal(me.primaryPhone) : "Add"}
+              </span>
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/change-phone")}
+              />
             </p>
           </Link>
           <Separator />
           {/* Connecting an identity needs a provider-linking flow the backend
               does not have yet, so these rows state the option and stop. */}
-          <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
+          <div className="group flex cursor-pointer items-center justify-between p-3 bg-card rounded-none border border-transparent transition-colors hover:border-border hover:bg-background/50 hover:text-[#00a0e9]">
             <p className="px-1">Facebook</p>
-            <p className="flex items-center opacity-50 gap-1 capitalize">Add</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50 capitalize">
+                {t("add")}
+              </span>
+              <ChevronRight
+                size={24}
+                className="text-gray-300 transition-colors group-hover:text-[#00a0e9]"
+              />
+            </p>
           </div>
           <Separator />
-          <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
+          <div className="group flex cursor-pointer items-center justify-between p-3 bg-card rounded-none border border-transparent transition-colors hover:border-border hover:bg-background/50 hover:text-[#00a0e9]">
             <p className="px-1">Google</p>
-            <p className="flex items-center opacity-50 gap-1 capitalize">Add</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50 capitalize">
+                {t("add")}
+              </span>
+              <ChevronRight
+                size={24}
+                className="text-gray-300 transition-colors group-hover:text-[#00a0e9]"
+              />
+            </p>
           </div>
           <Separator />
-          <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
+          <div className="group flex cursor-pointer items-center justify-between p-3 bg-card rounded-none border border-transparent transition-colors hover:border-border hover:bg-background/50 hover:text-[#00a0e9]">
             <p className="px-1">Telegram</p>
-            <p className="flex items-center opacity-50 capitalize gap-1">Add</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50 capitalize">
+                {t("add")}
+              </span>
+              <ChevronRight
+                size={24}
+                className="text-gray-300 transition-colors group-hover:text-[#00a0e9]"
+              />
+            </p>
+          </div>
+          <Separator />
+          <div className="group flex cursor-pointer items-center justify-between p-3 bg-card rounded-none border border-transparent transition-colors hover:border-border hover:bg-background/50 hover:text-[#00a0e9]">
+            <p className="px-1">Apple</p>
+            <p className="flex items-center gap-1">
+              <span className="text-foreground opacity-50 capitalize">
+                {t("add")}
+              </span>
+              <ChevronRight
+                size={24}
+                className="text-gray-300 transition-colors group-hover:text-[#00a0e9]"
+              />
+            </p>
           </div>
           <Separator />
           <Link
             href={{ pathname: "/settings/passkeys" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/passkeys", "rounded-none")}
           >
-            <p className="px-1">Passkeys</p>
-            <p className="flex items-center opacity-50 capitalize gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("passkeysRow")}</p>
+            <p className="flex items-center capitalize gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/passkeys")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/settings/devices" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/devices", "rounded-none")}
           >
-            <p className="px-1">Devices</p>
-            <p className="flex items-center opacity-50 capitalize gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("devicesRow")}</p>
+            <p className="flex items-center capitalize gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/devices")}
+              />
             </p>
           </Link>
           <Separator />
@@ -120,14 +210,13 @@ export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
               toast.promise<{ name: string }>(
                 () =>
                   new Promise((resolve) =>
-                    setTimeout(() => resolve({ name: "Your store" }), 2000),
+                    setTimeout(() => resolve({ name: t("storeName") }), 2000),
                   ),
                 {
-                  loading: "Loading...",
-                  success: (data) =>
-                    `${data.name} setting has been saved successfully`,
+                  loading: t("loading"),
+                  success: (data) => t("savedToast", { name: data.name }),
                   position: "top-right",
-                  error: "Error",
+                  error: t("error"),
                 },
               );
               setAutoUpdate(!autoUpdate);
@@ -135,7 +224,7 @@ export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
             className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border cursor-pointer transition-colors"
           >
             <FieldLabel className="px-1 font-normal text-base cursor-pointer">
-              Auto Update Profile Picture
+              {t("autoUpdate")}
             </FieldLabel>
 
             <Switch
@@ -149,38 +238,47 @@ export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
             username={me?.username ?? ""}
             trigger={
               <button className="w-full flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border cursor-pointer">
-                <p className="px-1 ">Delete Account</p>
+                <p className="px-1 ">{t("deleteAccountRow")}</p>
               </button>
             }
           />
           <Separator />
           <Link
             href={{ pathname: "/settings/privacy" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/settings/privacy", "rounded-none")}
           >
-            <p className="px-1">Privacy</p>
-            <p className="flex items-center opacity-50 gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("privacyRow")}</p>
+            <p className="flex items-center gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/settings/privacy")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/me/membership" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
+            className={rowClass("/me/membership", "rounded-none")}
           >
-            <p className="px-1">Membership Information</p>
-            <p className="flex items-center opacity-50 gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("membership")}</p>
+            <p className="flex items-center gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/me/membership")}
+              />
             </p>
           </Link>
           <Separator />
           <Link
             href={{ pathname: "/me/billing-addresses" }}
-            className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-b-sm border border-transparent hover:border-border"
+            className={rowClass("/me/billing-addresses", "rounded-b-sm")}
           >
-            <p className="px-1">Billing Address</p>
-            <p className="flex items-center opacity-50 gap-1">
-              <ChevronRight size={24} className="text-gray-300" />
+            <p className="px-1">{t("billingAddress")}</p>
+            <p className="flex items-center gap-1">
+              <ChevronRight
+                size={24}
+                className={chevronClass("/me/billing-addresses")}
+              />
             </p>
           </Link>
           <div className="mt-2">
@@ -188,7 +286,7 @@ export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
               trigger={
                 <button className="flex w-full items-center justify-center p-1.5 bg-card hover:bg-red-700/90 rounded-full border border-transparent hover:border-red-500/20 group transition-colors">
                   <p className="text-red-500 font-medium group-hover:text-white">
-                    Sign Out
+                    {t("signOutButton")}
                   </p>
                 </button>
               }

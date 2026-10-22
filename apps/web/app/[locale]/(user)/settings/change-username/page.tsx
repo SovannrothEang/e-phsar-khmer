@@ -1,12 +1,16 @@
 import ChangeUsername from "@/components/setting/Change-Username";
 import { getSettingsUser } from "@/lib/auth/current-user";
+import { getTranslations } from "next-intl/server";
 
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Edit Username - Psakhmer",
-  description: "Edit Username - Psakhmer",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("Settings.metadata");
+  return {
+    title: t("changeUsername"),
+    description: t("changeUsername"),
+  };
+}
 
 export default async function ChangeUsernamePage() {
   const me = await getSettingsUser();

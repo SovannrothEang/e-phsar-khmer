@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { MONTH_LABELS } from "@/lib/locale-labels";
 import { IconArrowLeft, IconChevronDown, IconX } from "@tabler/icons-react";
 
 import {
@@ -69,6 +71,8 @@ export function ResumeExperiencesDialog({
   /** Resolves `true` only once the entry was stored. */
   onSubmit: (entry: ExperienceEntry) => Promise<boolean>;
 }) {
+  const t = useTranslations("Resume");
+  const locale = useLocale();
   const [company, setCompany] = useState("");
   const [position, setPosition] = useState("");
   const [place, setPlace] = useState<ResumeLocation>(EMPTY_RESUME_LOCATION);
@@ -109,11 +113,13 @@ export function ResumeExperiencesDialog({
   const to = new Date();
 
   const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    });
+    locale === "km"
+      ? `${date.getDate()} ${MONTH_LABELS.km[date.getMonth()]} ${date.getFullYear()}`
+      : date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        });
 
   const companyMissing = company.trim() === "";
   const positionMissing = position.trim() === "";
@@ -180,18 +186,20 @@ export function ResumeExperiencesDialog({
             <button
               type="button"
               onClick={onBack}
-              aria-label="Back to career summary"
+              aria-label={t("form.backSummary")}
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
             >
               <IconArrowLeft size={20} />
             </button>
           )}
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit" ? "Add Experience" : "Experiences"}
+            {mode === "edit"
+              ? t("form.titles.experiencesEdit")
+              : t("form.titles.experiencesWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
             <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
-              Step 3 of 8
+              {t("form.step", { current: 3, total: 8 })}
             </span>
           ) : (
             <DialogClose asChild>
@@ -200,27 +208,30 @@ export function ResumeExperiencesDialog({
                 className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("form.close")}</span>
               </button>
             </DialogClose>
           )}
         </div>
         <DialogDescription className="sr-only">
-          Step 3 of 8 of the resume builder: work experience.
+          {t("form.stepDescription", {
+            current: 3,
+            total: 8,
+            name: t("form.titles.experiencesWizard"),
+          })}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
             <p className="text-base text-muted-foreground">
-              Show your most relevant experience from the past 10 years,
-              focusing on impact and measurable achievements.
+              {t("sections.work.desc")}
             </p>
           )}
 
           <FieldGroup className="mt-4">
             <Field ref={companyFieldRef} data-invalid={companyError}>
               <FieldLabel htmlFor="rex-company">
-                Company <span className="text-destructive">*</span>
+                {t("form.company")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rex-company"
@@ -231,13 +242,17 @@ export function ResumeExperiencesDialog({
                 className="h-11"
               />
               {companyError && (
-                <FieldError>{"Please enter the 'Company'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.company"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={positionFieldRef} data-invalid={positionError}>
               <FieldLabel htmlFor="rex-position">
-                Position <span className="text-destructive">*</span>
+                {t("form.position")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rex-position"
@@ -248,12 +263,16 @@ export function ResumeExperiencesDialog({
                 className="h-11"
               />
               {positionError && (
-                <FieldError>{"Please enter the 'Position'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.position"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field>
-              <FieldLabel>Location</FieldLabel>
+              <FieldLabel>{t("labels.location")}</FieldLabel>
               <div className="relative">
                 <button
                   type="button"
@@ -266,13 +285,13 @@ export function ResumeExperiencesDialog({
                   <span
                     className={place.province ? "" : "text-muted-foreground"}
                   >
-                    {resumeLocationLabel(place) || "Choose Location"}
+                    {resumeLocationLabel(place) || t("form.chooseLocation")}
                   </span>
                 </button>
                 {place.province ? (
                   <button
                     type="button"
-                    aria-label="Clear location"
+                    aria-label={t("form.clearLocation")}
                     onClick={() => setPlace(EMPTY_RESUME_LOCATION)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -297,7 +316,8 @@ export function ResumeExperiencesDialog({
             <div className="grid grid-cols-2 gap-5">
               <Field ref={startFieldRef} data-invalid={startError}>
                 <FieldLabel htmlFor="rex-start">
-                  Start Date <span className="text-destructive">*</span>
+                  {t("form.startDate")}{" "}
+                  <span className="text-destructive">*</span>
                 </FieldLabel>
                 <div className="relative">
                   <Popover open={startOpen} onOpenChange={setStartOpen}>
@@ -313,7 +333,7 @@ export function ResumeExperiencesDialog({
                         >
                           {startDate
                             ? formatDate(startDate)
-                            : "Select Start Date"}
+                            : t("form.selectStart")}
                         </span>
                       </button>
                     </PopoverTrigger>
@@ -332,7 +352,7 @@ export function ResumeExperiencesDialog({
                   {startDate && (
                     <button
                       type="button"
-                      aria-label="Clear start date"
+                      aria-label={t("form.clearStart")}
                       onClick={() => setStartDate(null)}
                       className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                     >
@@ -341,7 +361,11 @@ export function ResumeExperiencesDialog({
                   )}
                 </div>
                 {startError && (
-                  <FieldError>{"Please select 'Start Date'"}</FieldError>
+                  <FieldError>
+                    {t("form.validation.select", {
+                      field: t("form.startDate"),
+                    })}
+                  </FieldError>
                 )}
               </Field>
 
@@ -350,7 +374,8 @@ export function ResumeExperiencesDialog({
                 data-invalid={endError || dateOrderError}
               >
                 <FieldLabel htmlFor="rex-end">
-                  End Date <span className="text-destructive">*</span>
+                  {t("form.endDate")}{" "}
+                  <span className="text-destructive">*</span>
                 </FieldLabel>
                 <div className="relative">
                   <Popover open={endOpen} onOpenChange={setEndOpen}>
@@ -368,10 +393,10 @@ export function ResumeExperiencesDialog({
                           }
                         >
                           {current
-                            ? "Present"
+                            ? t("form.present")
                             : endDate
                               ? formatDate(endDate)
-                              : "Select End Date"}
+                              : t("form.selectEnd")}
                         </span>
                       </button>
                     </PopoverTrigger>
@@ -390,7 +415,7 @@ export function ResumeExperiencesDialog({
                   {endDate && !current && (
                     <button
                       type="button"
-                      aria-label="Clear end date"
+                      aria-label={t("form.clearEnd")}
                       onClick={() => setEndDate(null)}
                       className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                     >
@@ -399,12 +424,14 @@ export function ResumeExperiencesDialog({
                   )}
                 </div>
                 {endError && (
-                  <FieldError>{"Please select 'End Date'"}</FieldError>
+                  <FieldError>
+                    {t("form.validation.select", {
+                      field: t("form.endDate"),
+                    })}
+                  </FieldError>
                 )}
                 {dateOrderError && (
-                  <FieldError>
-                    End date must be after the start date.
-                  </FieldError>
+                  <FieldError>{t("form.validation.endBeforeStart")}</FieldError>
                 )}
               </Field>
             </div>
@@ -423,12 +450,14 @@ export function ResumeExperiencesDialog({
                 htmlFor="rex-current"
                 className="cursor-pointer text-base text-foreground"
               >
-                I currently work here
+                {t("form.currentlyWork")}
               </label>
             </div>
 
             <Field>
-              <FieldLabel htmlFor="rex-description">Description</FieldLabel>
+              <FieldLabel htmlFor="rex-description">
+                {t("form.description")}
+              </FieldLabel>
               <Textarea
                 id="rex-description"
                 value={description}
@@ -446,7 +475,7 @@ export function ResumeExperiencesDialog({
               onClick={onSkip}
               className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
             >
-              Skip
+              {t("form.skip")}
             </button>
             <button
               type="button"
@@ -454,7 +483,7 @@ export function ResumeExperiencesDialog({
               disabled={saving}
               className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Next to Educations
+              {t("form.nextEducations")}
             </button>
           </div>
         ) : (
@@ -465,7 +494,7 @@ export function ResumeExperiencesDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {t("form.save")}
             </button>
           </div>
         )}

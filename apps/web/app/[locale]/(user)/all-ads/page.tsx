@@ -2,10 +2,15 @@ import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import AllAdsCategories from "@/components/all-ads/AllAdsCategories";
 import AllAdsFeed from "@/components/all-ads/AllAdsFeed";
-import { getListingsFeed, toCardPost } from "@/lib/api/categories";
+import {
+  getListingsFeed,
+  getProvinces,
+  toCardPost,
+  type BackendPlace,
+} from "@/lib/api/categories";
 import { ALL_ADS_PAGE_SIZE, parseAllAdsFilters } from "@/lib/all-ads";
 
 export default async function AllAdsPage({
@@ -15,21 +20,36 @@ export default async function AllAdsPage({
 }) {
   const sp = await searchParams;
   const locale = await getLocale();
-  const filters = parseAllAdsFilters((key) => {
-    const value = sp[key];
-    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
-  });
+  const filters = parseAllAdsFilters(sp);
+
+  // A province-scoped visit shows the province in the heading. The name comes
+  // from the same DB list the homepage links from; an unknown slug falls back
+  // to the generic heading (the feed is empty either way).
+  const [tAll, tSearch, feed, provinces] = await Promise.all([
+    getTranslations("AllAds"),
+    getTranslations("Search"),
+    getListingsFeed({ ...filters, limit: ALL_ADS_PAGE_SIZE }, locale),
+    filters.provinceSlug
+      ? getProvinces()
+      : Promise.resolve([] as BackendPlace[]),
+  ]);
+  const province = filters.provinceSlug
+    ? (provinces.find((p) => p.slug === filters.provinceSlug) ?? null)
+    : null;
+  const provinceName = province
+    ? locale === "km"
+      ? (province.nameKm ?? province.name)
+      : province.name
+    : null;
+  const heading = provinceName
+    ? tAll("headingInPlace", { place: provinceName })
+    : tAll("heading");
 
   // The whole active catalogue, first screen only — AllAdsFeed appends the
   // rest from the feed's own cursor as the visitor reaches the bottom. There
   // are no highlight/top-ad blocks here: nothing in the data model backs one,
   // and the mock `AdsPhoto`/`HighLightAds` strips map every mock post, so they
   // can never sit in a real branch.
-  const feed = await getListingsFeed(
-    { ...filters, limit: ALL_ADS_PAGE_SIZE },
-    locale,
-  );
-
   return (
     <main className="min-h-screen flex flex-col bg-muted">
       <div className="w-full flex justify-center py-6">
@@ -53,10 +73,7 @@ export default async function AllAdsPage({
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-2">
           <Breadcrumbs
-            items={[
-              { label: "Home", href: "/" },
-              { label: "All Ads in Cambodia" },
-            ]}
+            items={[{ label: tSearch("home"), href: "/" }, { label: heading }]}
           />
         </div>
       </div>
@@ -68,6 +85,7 @@ export default async function AllAdsPage({
           initialPosts={(feed?.items ?? []).map(toCardPost)}
           initialCursor={feed?.nextCursor ?? null}
           filters={filters}
+          heading={heading}
           locale={locale}
         >
           <AllAdsCategories />

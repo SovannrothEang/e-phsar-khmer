@@ -86,7 +86,7 @@ export default function NotFoundIllustration({
         fontSize="17"
         fontWeight="700"
         fill="#ffffff"
-        fontFamily="var(--font-inter), sans-serif"
+        className="font-sans"
       >
         psakhmer
       </text>

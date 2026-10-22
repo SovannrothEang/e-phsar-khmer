@@ -62,6 +62,7 @@ import {
 
 interface FormState {
   name: string;
+  nameKm: string;
   slug: string;
   image: string;
   categoryId: string;
@@ -70,6 +71,7 @@ interface FormState {
 
 const EMPTY: FormState = {
   name: "",
+  nameKm: "",
   slug: "",
   image: "",
   categoryId: "",
@@ -138,6 +140,7 @@ export function AttributeManager({
       .join(" ");
     return (
       i.name.toLowerCase().includes(q) ||
+      (i.nameKm ?? "").toLowerCase().includes(q) ||
       i.slug.toLowerCase().includes(q) ||
       categoryName.toLowerCase().includes(q) ||
       subNames.toLowerCase().includes(q)
@@ -153,6 +156,7 @@ export function AttributeManager({
     setSaving(true);
     const input = {
       name: form.name,
+      nameKm: form.nameKm,
       slug: form.slug,
       image: hasImage ? form.image : undefined,
       categoryId: form.categoryId,
@@ -193,6 +197,7 @@ export function AttributeManager({
     setSelected(item);
     setForm({
       name: item.name,
+      nameKm: item.nameKm ?? "",
       slug: item.slug,
       image: item.image ?? "",
       categoryId: item.categoryId,
@@ -208,6 +213,14 @@ export function AttributeManager({
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label>Khmer Name</Label>
+        <Input
+          value={form.nameKm}
+          onChange={(e) => setForm({ ...form, nameKm: e.target.value })}
+          placeholder="ឈ្មោះជាភាសាខ្មែរ"
         />
       </div>
       <div className="grid gap-2">
@@ -330,6 +343,7 @@ export function AttributeManager({
                 <TableRow>
                   <TableHead className="text-center">ID</TableHead>
                   <TableHead>Name</TableHead>
+                  <TableHead>Khmer Name</TableHead>
                   <TableHead>Slug</TableHead>
                   {hasImage && <TableHead>Image</TableHead>}
                   <TableHead>Category</TableHead>
@@ -359,6 +373,7 @@ export function AttributeManager({
                         {item.id.slice(0, 8)}
                       </TableCell>
                       <TableCell>{item.name}</TableCell>
+                      <TableCell>{item.nameKm ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {item.slug}
                       </TableCell>

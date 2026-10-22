@@ -1,4 +1,5 @@
 "use client";
+import { useTranslations } from "next-intl";
 import {
   Select,
   SelectContent,
@@ -10,52 +11,45 @@ import { BadgeDollarSign } from "lucide-react";
 import { Button } from "../ui/button";
 import { useRouter } from "@/i18n/routing";
 export default function Subscription() {
+  const t = useTranslations("Me.subscriptions");
   const router = useRouter();
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <h1 className="text-2xl font-medium text-foreground">
-            Subscriptions
-          </h1>
+          <h1 className="text-2xl font-medium text-foreground">{t("title")}</h1>
 
           <div className="flex items-center gap-3">
             <Select defaultValue="all">
               <SelectTrigger className="w-[140px] bg-card ">
-                <SelectValue placeholder="Type: All" />
+                <SelectValue placeholder={t("typeAll")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Type: All</SelectItem>
-                <SelectItem value="ads">Ads</SelectItem>
-                <SelectItem value="addons">Add ons</SelectItem>
-                <SelectItem value="account">Account</SelectItem>
+                <SelectItem value="all">{t("typeAll")}</SelectItem>
+                <SelectItem value="ads">{t("ads")}</SelectItem>
+                <SelectItem value="addons">{t("addons")}</SelectItem>
+                <SelectItem value="account">{t("account")}</SelectItem>
               </SelectContent>
             </Select>
             <Select defaultValue="all">
               <SelectTrigger className="w-[140px] bg-card ">
-                <SelectValue placeholder="Status: All" />
+                <SelectValue placeholder={t("statusAll")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Status: All</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-                <SelectItem value="nearly">Nearly Expiry</SelectItem>
+                <SelectItem value="all">{t("statusAll")}</SelectItem>
+                <SelectItem value="expired">{t("expired")}</SelectItem>
+                <SelectItem value="nearly">{t("nearly")}</SelectItem>
               </SelectContent>
             </Select>
 
             <Select defaultValue="old-new">
               <SelectTrigger className="w-[180px] bg-card ">
-                <SelectValue placeholder="Sort: Start Date" />
+                <SelectValue placeholder={t("sortStart")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="old-new">
-                  Sort: Start Date: Old - New
-                </SelectItem>
-                <SelectItem value="new-old">
-                  Sort: Start Date: New - Old
-                </SelectItem>
-                <SelectItem value="end-old">
-                  Sort: End Date: Old - New
-                </SelectItem>
+                <SelectItem value="old-new">{t("sortStartOldNew")}</SelectItem>
+                <SelectItem value="new-old">{t("sortStartNewOld")}</SelectItem>
+                <SelectItem value="end-old">{t("sortEndOldNew")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -74,11 +68,9 @@ export default function Subscription() {
 
             <div className="text-center">
               <h2 className="text-xl font-medium text-foreground mb-2">
-                No Result!
+                {t("noResult")}
               </h2>
-              <p className="text-muted-foreground text-sm mb-8">
-                Oops! You do not have a subscription yet.
-              </p>
+              <p className="text-muted-foreground text-sm mb-8">{t("empty")}</p>
 
               <Button
                 onClick={() =>
@@ -89,7 +81,7 @@ export default function Subscription() {
                 }
                 className="bg-orange-400 hover:bg-orange-600 text-card font-medium h-10 px-8 rounded-sm transition-colors cursor-pointer"
               >
-                Subscribe Now
+                {t("subscribeNow")}
               </Button>
             </div>
           </div>

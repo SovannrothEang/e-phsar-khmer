@@ -9,7 +9,7 @@ import {
   toCardPost,
 } from "@/lib/api/categories";
 import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { loadJobApplyState } from "@/lib/api/job-apply";
 import { redirect } from "@/i18n/routing";
@@ -63,9 +63,10 @@ export async function generateMetadata({
   const profile = await getPublicProfile(slug);
   if (profile) {
     const name = displayName(profile);
+    const t = await getTranslations("Profile");
     return {
       title: `${name} - PsaKhmer`,
-      description: `View profile of ${name}`,
+      description: t("metaDescription", { name }),
     };
   }
   // Unknown slug — the not-found boundary renders the 404 page.
@@ -125,7 +126,7 @@ export default async function SlugPage({
   if (!profile) notFound();
 
   const locale = await getLocale();
-  const user = toProfileUser(profile);
+  const user = toProfileUser(profile, locale);
   const viewer = await getCurrentUser();
   const following = await getFollowStatus(profile.id);
 

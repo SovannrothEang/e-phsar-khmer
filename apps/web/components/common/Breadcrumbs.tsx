@@ -1,4 +1,5 @@
 import { Fragment, type ComponentProps, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronRight, House } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,10 @@ export function Breadcrumbs({
   items: Crumb[];
   className?: string;
 }) {
+  const t = useTranslations("Common");
   return (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={t("breadcrumb")}
       className={cn("flex items-center space-x-2 text-base", className)}
     >
       {items.map((item, index) => {

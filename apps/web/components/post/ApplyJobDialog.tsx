@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { FileText, Loader2 } from "lucide-react";
 import { Link, useRouter } from "@/i18n/routing";
 import {
@@ -48,6 +49,8 @@ export function ApplyJobDialog({
   listingTitle: string;
   resume: ApplyResumeSummary | null;
 }) {
+  const t = useTranslations("Post.apply");
+  const tCommon = useTranslations("Common");
   const router = useRouter();
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
@@ -64,13 +67,13 @@ export function ApplyJobDialog({
       // like a failure of the attempt that just happened.
       toast.error(
         result.code === "JOB_APPLICATION_EXISTS"
-          ? "You already applied to this job"
+          ? t("alreadyApplied")
           : result.message,
       );
       return;
     }
 
-    toast.success("Application sent");
+    toast.success(t("sent"));
     onOpenChange(false);
     setNote("");
     // The button's state is server-rendered, so the new "Applied" face
@@ -82,7 +85,7 @@ export function ApplyJobDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Apply For This Job</DialogTitle>
+          <DialogTitle>{t("button")}</DialogTitle>
           <DialogDescription className="line-clamp-2">
             {listingTitle}
           </DialogDescription>
@@ -94,16 +97,16 @@ export function ApplyJobDialog({
               htmlFor="apply-note"
               className="text-sm font-medium text-foreground"
             >
-              Message to the employer{" "}
+              {t("messageLabel")}{" "}
               <span className="text-muted-foreground font-normal">
-                (optional)
+                {t("optional")}
               </span>
             </label>
             <Textarea
               id="apply-note"
               value={note}
               onChange={(e) => setNote(e.target.value.slice(0, NOTE_MAX))}
-              placeholder="Introduce yourself and say why you're a good fit."
+              placeholder={t("placeholder")}
               className="min-h-28"
             />
           </div>
@@ -115,7 +118,7 @@ export function ApplyJobDialog({
                 {resume?.hasResume ? (
                   <>
                     <p className="font-medium text-foreground">
-                      Your résumé will be sent
+                      {t("resumeWillBeSent")}
                     </p>
                     {resume.summary ? (
                       <p className="text-muted-foreground line-clamp-2 mt-0.5">
@@ -124,18 +127,17 @@ export function ApplyJobDialog({
                     ) : null}
                     <p className="text-muted-foreground mt-0.5">
                       {resume.cvFileName
-                        ? `CV: ${resume.cvFileName}`
-                        : "No CV file attached — you can add one on your résumé page."}
+                        ? t("cvFile", { file: resume.cvFileName })
+                        : t("noCvFile")}
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="font-medium text-foreground">
-                      You haven&apos;t built a résumé yet
+                      {t("noResumeTitle")}
                     </p>
                     <p className="text-muted-foreground mt-0.5">
-                      You can still apply — but employers see more when you send
-                      one.
+                      {t("noResumeHint")}
                     </p>
                   </>
                 )}
@@ -143,9 +145,7 @@ export function ApplyJobDialog({
                   href="/me/resume"
                   className="text-[#00a0e9] hover:underline mt-1 inline-block"
                 >
-                  {resume?.hasResume
-                    ? "Review your résumé"
-                    : "Build your résumé"}
+                  {resume?.hasResume ? t("reviewResume") : t("buildResume")}
                 </Link>
               </div>
             </div>
@@ -160,7 +160,7 @@ export function ApplyJobDialog({
             disabled={sending}
             className="cursor-pointer"
           >
-            Cancel
+            {tCommon("cancel")}
           </Button>
           <Button
             type="button"
@@ -169,7 +169,7 @@ export function ApplyJobDialog({
             className="bg-[#f68b1e] hover:bg-[#e57a10] text-white cursor-pointer"
           >
             {sending ? <Loader2 className="size-4 animate-spin" /> : null}
-            Send Application
+            {t("send")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -46,10 +46,26 @@ export const MAX_QUERY_LENGTH = 100;
 // views_count yet), and "New Ads" was a duplicate of "Latest Ads".
 // "Best match" only exists while there is a keyword — and is then the default.
 export const SORT_OPTIONS = [
-  { value: "best-match", label: "Best Match", backend: "relevance" },
-  { value: "latest-ads", label: "Latest Ads", backend: "newest" },
-  { value: "price-asc", label: "Price: Low to High", backend: "price_asc" },
-  { value: "price-desc", label: "Price: High to Low", backend: "price_desc" },
+  {
+    value: "best-match",
+    labelKey: "Filters.sort.bestMatch",
+    backend: "relevance",
+  },
+  {
+    value: "latest-ads",
+    labelKey: "Filters.sort.latestAds",
+    backend: "newest",
+  },
+  {
+    value: "price-asc",
+    labelKey: "Filters.sort.priceLowToHigh",
+    backend: "price_asc",
+  },
+  {
+    value: "price-desc",
+    labelKey: "Filters.sort.priceHighToLow",
+    backend: "price_desc",
+  },
 ] as const;
 export type SortValue = (typeof SORT_OPTIONS)[number]["value"];
 export type BackendSort = (typeof SORT_OPTIONS)[number]["backend"];
@@ -84,16 +100,16 @@ export function hasQueryParam(params: URLSearchParams): boolean {
 }
 
 export const DATE_OPTIONS = [
-  { value: "", label: "All Time" },
-  { value: "today", label: "Today" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
+  { value: "", labelKey: "Filters.date.allTime" },
+  { value: "today", labelKey: "Filters.date.today" },
+  { value: "week", labelKey: "Filters.date.thisWeek" },
+  { value: "month", labelKey: "Filters.date.thisMonth" },
 ] as const;
 export type DateValue = (typeof DATE_OPTIONS)[number]["value"];
 
 export const CONDITION_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "used", label: "Used" },
+  { value: "new", labelKey: "Common.condition.new" },
+  { value: "used", labelKey: "Common.condition.used" },
 ] as const;
 export type ConditionValue = (typeof CONDITION_OPTIONS)[number]["value"];
 

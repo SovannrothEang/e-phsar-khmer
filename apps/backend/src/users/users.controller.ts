@@ -25,6 +25,7 @@ import type { RequestUser } from '../common/types/api-response.types';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AddPhoneDto } from './dto/add-phone.dto';
+import { UpdatePhoneDto } from './dto/update-phone.dto';
 import { BlockUserDto } from './dto/block-user.dto';
 import { ChangeUsernameDto } from './dto/change-username.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -109,6 +110,16 @@ export class UsersController {
   @ApiOperation({ summary: 'Add a phone to current user' })
   addPhone(@CurrentUser() user: RequestUser, @Body() dto: AddPhoneDto) {
     return this.usersService.addPhone(user.id, dto);
+  }
+
+  @Patch('me/phones/:phoneId')
+  @ApiOperation({ summary: 'Edit a saved contact phone number' })
+  updatePhone(
+    @CurrentUser() user: RequestUser,
+    @Param('phoneId', ParseUUIDPipe) phoneId: string,
+    @Body() dto: UpdatePhoneDto,
+  ) {
+    return this.usersService.updatePhone(user.id, phoneId, dto);
   }
 
   @Patch('me/phones/:phoneId/primary')

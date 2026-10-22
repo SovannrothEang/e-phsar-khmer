@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -22,6 +23,7 @@ export interface AdminSubcategory {
   categoryId: string;
   slug: string;
   name: string;
+  nameKm: string | null;
   icon: string | null;
   sortOrder: number;
   isActive: boolean;
@@ -37,6 +39,7 @@ export class AdminSubcategoriesService {
   ) {}
 
   async list(categoryId?: string): Promise<AdminSubcategory[]> {
+    const kmTr = alias(subcategoryTranslations, 'km_sub_tr');
     const rows = await this.db
       .select({
         id: subcategories.id,
@@ -48,6 +51,7 @@ export class AdminSubcategoriesService {
         createdAt: subcategories.createdAt,
         updatedAt: subcategories.updatedAt,
         name: subcategoryTranslations.name,
+        nameKm: kmTr.name,
       })
       .from(subcategories)
       .leftJoin(
@@ -57,10 +61,18 @@ export class AdminSubcategoriesService {
           eq(subcategoryTranslations.locale, 'en'),
         ),
       )
+      .leftJoin(
+        kmTr,
+        and(eq(kmTr.subcategoryId, subcategories.id), eq(kmTr.locale, 'km')),
+      )
       .where(categoryId ? eq(subcategories.categoryId, categoryId) : undefined)
       .orderBy(asc(subcategories.sortOrder));
 
-    return rows.map((r) => ({ ...r, name: r.name ?? r.slug }));
+    return rows.map((r) => ({
+      ...r,
+      name: r.name ?? r.slug,
+      nameKm: r.nameKm ?? null,
+    }));
   }
 
   async create(dto: CreateSubcategoryDto): Promise<AdminSubcategory> {
@@ -83,7 +95,16 @@ export class AdminSubcategoriesService {
           name: dto.name,
         });
 
-        return this.shape(sub, dto.name);
+        const nameKm = dto.nameKm?.trim() || null;
+        if (nameKm) {
+          await tx.insert(subcategoryTranslations).values({
+            subcategoryId: sub.id,
+            locale: 'km',
+            name: nameKm,
+          });
+        }
+
+        return this.shape(sub, dto.name, nameKm);
       });
     } catch (err) {
       this.rethrow(err);
@@ -131,6 +152,31 @@ export class AdminSubcategoriesService {
             });
         }
 
+        if (dto.nameKm !== undefined) {
+          const nameKm = dto.nameKm.trim();
+          if (nameKm) {
+            await tx
+              .insert(subcategoryTranslations)
+              .values({ subcategoryId: id, locale: 'km', name: nameKm })
+              .onConflictDoUpdate({
+                target: [
+                  subcategoryTranslations.subcategoryId,
+                  subcategoryTranslations.locale,
+                ],
+                set: { name: nameKm },
+              });
+          } else {
+            await tx
+              .delete(subcategoryTranslations)
+              .where(
+                and(
+                  eq(subcategoryTranslations.subcategoryId, id),
+                  eq(subcategoryTranslations.locale, 'km'),
+                ),
+              );
+          }
+        }
+
         const [sub] = await tx
           .select()
           .from(subcategories)
@@ -146,7 +192,17 @@ export class AdminSubcategoriesService {
             ),
           )
           .limit(1);
-        return this.shape(sub, t?.name ?? sub.slug);
+        const [km] = await tx
+          .select({ name: subcategoryTranslations.name })
+          .from(subcategoryTranslations)
+          .where(
+            and(
+              eq(subcategoryTranslations.subcategoryId, id),
+              eq(subcategoryTranslations.locale, 'km'),
+            ),
+          )
+          .limit(1);
+        return this.shape(sub, t?.name ?? sub.slug, km?.name ?? null);
       });
       if (dto.icon !== undefined && oldIcon && dto.icon !== oldIcon) {
         await this.files.removeByPublicUrl(oldIcon);
@@ -170,12 +226,17 @@ export class AdminSubcategoriesService {
     return { id };
   }
 
-  private shape(sub: SubcategoryRow, name: string): AdminSubcategory {
+  private shape(
+    sub: SubcategoryRow,
+    name: string,
+    nameKm: string | null,
+  ): AdminSubcategory {
     return {
       id: sub.id,
       categoryId: sub.categoryId,
       slug: sub.slug,
       name,
+      nameKm,
       icon: sub.icon,
       sortOrder: sub.sortOrder,
       isActive: sub.isActive,

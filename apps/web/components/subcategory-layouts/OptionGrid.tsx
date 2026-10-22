@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import DbImage from "@/components/common/DbImage";
 
 /** Minimal option row (brand/bodyType/model) — local type, web is standalone. */
@@ -30,6 +31,7 @@ export default function OptionGrid({
   title,
   imageTiles,
 }: Props) {
+  const t = useTranslations();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
@@ -143,7 +145,7 @@ export default function OptionGrid({
             onClick={() => setShowAll(!showAll)}
             className="w-full border rounded py-2 text-sm bg-muted hover:bg-gray-200"
           >
-            {showAll ? "Show Less" : "Show More"}
+            {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>
         </div>
       )}

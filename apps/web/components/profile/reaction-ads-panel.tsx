@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Bookmark, Heart } from "lucide-react";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { loadMyReactionPage } from "@/actions/reactions";
@@ -17,16 +18,8 @@ import type { Post } from "@/lib/posts";
  * is the design these pages shipped with; only the list branch is new.
  */
 const COPY = {
-  likes: {
-    title: "Liked",
-    Icon: Heart,
-    body: "Oops! Looks like you haven't liked any posts yet.",
-  },
-  saves: {
-    title: "Saved",
-    Icon: Bookmark,
-    body: "Oops! Looks like you haven't saved any posts yet.",
-  },
+  likes: { titleKey: "liked", Icon: Heart, bodyKey: "likedEmpty" },
+  saves: { titleKey: "saved", Icon: Bookmark, bodyKey: "savedEmpty" },
 } as const;
 
 export default function ReactionAdsPanel({
@@ -34,7 +27,9 @@ export default function ReactionAdsPanel({
 }: {
   side: "likes" | "saves";
 }) {
-  const { title, Icon, body } = COPY[side];
+  const t = useTranslations("Me.reactions");
+  const tCommon = useTranslations("Common");
+  const { titleKey, Icon, bodyKey } = COPY[side];
   const { isToggledOff } = useReactions();
   const [items, setItems] = React.useState<Post[] | null>(null);
   const [page, setPage] = React.useState(1);
@@ -105,11 +100,13 @@ export default function ReactionAdsPanel({
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-medium text-foreground mb-4">{title}</h1>
+        <h1 className="text-2xl font-medium text-foreground mb-4">
+          {t(titleKey)}
+        </h1>
         {error ? (
           messageCard(error)
         ) : items === null ? (
-          messageCard("Loading…")
+          messageCard(tCommon("loading"))
         ) : visible.length === 0 ? (
           <main className="max-w-2xl mx-auto mt-3">
             <div className="bg-card rounded-xs shadow-sm  min-h-[500px] flex flex-col items-center justify-center p-6">
@@ -118,9 +115,9 @@ export default function ReactionAdsPanel({
               </div>
               <div className="text-center">
                 <h2 className="text-lg font-medium text-foreground mb-2">
-                  No Result!
+                  {t("noResult")}
                 </h2>
-                <p className="text-muted-foreground text-sm">{body}</p>
+                <p className="text-muted-foreground text-sm">{t(bodyKey)}</p>
               </div>
             </div>
           </main>
@@ -139,7 +136,7 @@ export default function ReactionAdsPanel({
                   disabled={loadingMore}
                   className="rounded-sm border bg-card px-6 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
                 >
-                  {loadingMore ? "Loading…" : "Load more"}
+                  {loadingMore ? tCommon("loading") : tCommon("loadMore")}
                 </button>
               </div>
             )}

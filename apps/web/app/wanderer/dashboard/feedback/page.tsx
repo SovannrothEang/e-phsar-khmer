@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -40,11 +41,49 @@ import {
 } from "@/components/ui/select";
 import { Trash2, Search, MoreHorizontal } from "lucide-react";
 import { Feedback } from "@/types/feedback";
-// Renamed the import to avoid confusing variable naming conflicts inside the scope
-import { feedbacks as initialFeedbacks } from "@/lib/feedbacks";
+import { deleteFeedback, getFeedbacks } from "@/actions/admin-feedback";
+import { toast } from "@/components/ui/sonner";
+import DbImage, { NoImageCell } from "@/components/common/DbImage";
+import { formatPhoneLocal } from "@/lib/phone";
 
 export default function FeedbackPage() {
-  const [Feedbacks, setFeedback] = useState<Feedback[]>(initialFeedbacks);
+  const queryClient = useQueryClient();
+  const {
+    data: feedbacks = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin", "feedback"],
+    queryFn: async (): Promise<Feedback[]> => {
+      const rows = await getFeedbacks();
+      return rows.map((f) => ({
+        FeedbackID: f.id,
+        userId: f.userId ?? undefined,
+        name: f.name,
+        phone: f.phone,
+        email: f.email ?? undefined,
+        description: f.description,
+        images: f.imageUrls,
+        CreatedAt: f.createdAt,
+      }));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFeedback(id),
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.error ?? "Delete failed");
+        return;
+      }
+      void queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });
+      setSelectedFeedback(null);
+      setIsDeleteDialogOpen(false);
+      toast.success("Feedback deleted");
+    },
+  });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -52,23 +91,26 @@ export default function FeedbackPage() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
+  // The table clamps long descriptions; this opens the untruncated text.
+  const [viewFeedback, setViewFeedback] = useState<Feedback | null>(null);
 
-  // ✅ FIXED: Now filtering from the 'Feedbacks' state variable instead of the static import file
-  const filteredFeedbacks = Feedbacks.filter(
+  const filteredFeedbacks = feedbacks.filter(
     (f) =>
       f.FeedbackID.toLowerCase().includes(searchQuery.toLowerCase()) ||
       f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.phone || "").toLocaleString().includes(searchQuery.toLowerCase()) ||
+      f.phone.includes(searchQuery.toLowerCase()) ||
       (f.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (f.description || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Added Math.max to prevent totalPages from evaluating to 0 when filtered array is empty
   const totalPages = Math.max(
     1,
     Math.ceil(filteredFeedbacks.length / rowsPerPage),
   );
-  const startIndex = (currentPage - 1) * rowsPerPage;
+  // Deleting the last row of the last page shrinks the set; clamp rather than
+  // rendering an empty page until the pagination buttons are touched.
+  const page = Math.min(currentPage, totalPages);
+  const startIndex = (page - 1) * rowsPerPage;
 
   const paginatedFeedbacks = filteredFeedbacks.slice(
     startIndex,
@@ -77,21 +119,7 @@ export default function FeedbackPage() {
 
   const handleDelete = () => {
     if (!selectedFeedback) return;
-
-    // Filter out the item from the state array
-    const updatedFeedbacks = Feedbacks.filter(
-      (f) => f.FeedbackID !== selectedFeedback.FeedbackID,
-    );
-    setFeedback(updatedFeedbacks);
-
-    setSelectedFeedback(null);
-    setIsDeleteDialogOpen(false);
-
-    // Safe Guard: If you delete the last remaining item on a page (e.g. page 3),
-    // kick the pagination view backward so you don't look at an empty page.
-    if (paginatedFeedbacks.length === 1 && currentPage > 1) {
-      setCurrentPage((p) => p - 1);
-    }
+    deleteMutation.mutate(selectedFeedback.FeedbackID);
   };
 
   const openDeleteDialog = (feedback: Feedback) => {
@@ -138,7 +166,31 @@ export default function FeedbackPage() {
           </TableHeader>
 
           <TableBody>
-            {paginatedFeedbacks.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={9}
+                  className="text-center py-6 text-muted-foreground"
+                >
+                  Loading feedbacks...
+                </TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-6">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
+                    <p>Could not load feedbacks.</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : paginatedFeedbacks.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-6">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
@@ -158,22 +210,40 @@ export default function FeedbackPage() {
                     {feedback.FeedbackID}
                   </TableCell>
                   <TableCell className="text-center">
-                    {feedback.userId || "null"}
+                    {feedback.userId || "anonymous"}
                   </TableCell>
-                  <TableCell>{feedback.name || "null"}</TableCell>
-                  <TableCell>+{feedback.phone || "null"}</TableCell>
-                  <TableCell>{feedback.email || "null"}</TableCell>
+                  <TableCell className="max-w-[160px]">
+                    <span
+                      className="line-clamp-2 break-words"
+                      title={feedback.name}
+                    >
+                      {feedback.name || "null"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {feedback.phone ? formatPhoneLocal(feedback.phone) : "null"}
+                  </TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <span
+                      className="line-clamp-1 break-all"
+                      title={feedback.email}
+                    >
+                      {feedback.email || "null"}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-center max-w-[200px]">
                     {feedback.images && feedback.images.length > 0 ? (
                       <div className="flex flex-wrap gap-1 justify-center max-h-[90px] overflow-y-auto p-0.5">
                         {feedback.images.slice(0, 24).map((image, index) => (
-                          // eslint-disable-next-line @next/next/no-img-element -- dynamic attachment URL
-                          <img
+                          <DbImage
                             key={index}
                             src={image}
-                            alt={`Report attachment ${index + 1}`}
+                            alt={`Feedback attachment ${index + 1}`}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded object-cover border border-muted cursor-pointer"
                             onClick={() => window.open(image, "_blank")}
+                            fallback={<NoImageCell />}
                           />
                         ))}
                       </div>
@@ -181,7 +251,23 @@ export default function FeedbackPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell>{feedback.description}</TableCell>
+                  <TableCell className="max-w-[320px]">
+                    <p
+                      className="line-clamp-3 whitespace-pre-wrap break-words"
+                      title={feedback.description}
+                    >
+                      {feedback.description}
+                    </p>
+                    {feedback.description.length > 140 && (
+                      <button
+                        type="button"
+                        onClick={() => setViewFeedback(feedback)}
+                        className="mt-1 text-xs text-sky-500 hover:underline cursor-pointer"
+                      >
+                        Read full text
+                      </button>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {new Date(feedback.CreatedAt).toLocaleString()}
                   </TableCell>
@@ -237,7 +323,7 @@ export default function FeedbackPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+              Page {page} of {totalPages}
             </span>
             <div className="flex items-center gap-1">
               <Button
@@ -245,7 +331,7 @@ export default function FeedbackPage() {
                 size="icon"
                 className="size-8"
                 onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
+                disabled={page === 1}
               >
                 <ChevronsLeft className="size-4" />
               </Button>
@@ -254,7 +340,7 @@ export default function FeedbackPage() {
                 size="icon"
                 className="size-8"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                disabled={page === 1}
               >
                 <ChevronLeft className="size-4" />
               </Button>
@@ -265,7 +351,7 @@ export default function FeedbackPage() {
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
-                disabled={currentPage === totalPages}
+                disabled={page === totalPages}
               >
                 <ChevronRight className="size-4" />
               </Button>
@@ -274,7 +360,7 @@ export default function FeedbackPage() {
                 size="icon"
                 className="size-8"
                 onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
+                disabled={page === totalPages}
               >
                 <ChevronsRight className="size-4" />
               </Button>
@@ -301,10 +387,35 @@ export default function FeedbackPage() {
               <Button
                 className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
                 onClick={handleDelete}
+                disabled={deleteMutation.isPending}
               >
-                Delete
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Full text for a clamped description — the table stays scannable. */}
+        <Dialog
+          open={Boolean(viewFeedback)}
+          onOpenChange={(open) => {
+            if (!open) setViewFeedback(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Feedback details</DialogTitle>
+              <DialogDescription>
+                {viewFeedback?.name}
+                {viewFeedback
+                  ? ` · ${formatPhoneLocal(viewFeedback.phone)}`
+                  : ""}
+                {viewFeedback?.email ? ` · ${viewFeedback.email}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm text-foreground">
+              {viewFeedback?.description}
+            </div>
           </DialogContent>
         </Dialog>
       </div>

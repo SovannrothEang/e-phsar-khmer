@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,14 +74,14 @@ function SelectField({
   onChange,
   options,
   disabled = false,
-  placeholder = "Select...",
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
   disabled?: boolean;
-  placeholder?: string;
+  placeholder: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -125,6 +126,7 @@ function SelectField({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MoreFilters() {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -247,7 +249,7 @@ export default function MoreFilters() {
           className="relative bg-muted rounded-sm h-12 px-3 text-sm cursor-pointer gap-2"
         >
           <IconFilterCog className="h-4 w-4 shrink-0" />
-          <span>More Filters</span>
+          <span>{t("Filters.more.title")}</span>
           {activeCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white leading-none">
               {activeCount}
@@ -263,14 +265,14 @@ export default function MoreFilters() {
         {/* Header */}
         <DialogHeader className="flex-row items-center justify-between px-5 py-4 border-b shrink-0 gap-0">
           <DialogTitle className="text-base font-semibold">
-            More Filters
+            {t("Filters.more.title")}
           </DialogTitle>
           <div className="flex items-center gap-4">
             <button
               onClick={clearAll}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              Clear all
+              {t("Filters.more.clearAll")}
             </button>
             <DialogClose className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer rounded-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
@@ -281,10 +283,10 @@ export default function MoreFilters() {
           {/* Search */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">
-              Search
+              {t("Filters.more.search")}
             </label>
             <Input
-              placeholder="Search keywords..."
+              placeholder={t("Filters.more.searchPlaceholder")}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && applyFilters()}
@@ -293,81 +295,85 @@ export default function MoreFilters() {
           </div>
           {/* Sort */}
           <SelectField
-            label="Sort"
+            label={t("Filters.sort.label")}
             value={sort}
             onChange={(v) => setSort(v as SortValue)}
             options={sortOptionsFor(draftHasQuery).map((o) => ({
               value: o.value,
-              label: o.label,
+              label: t(o.labelKey),
             }))}
-            placeholder="Default"
+            placeholder={t("Filters.more.default")}
           />
           {/* Date */}
           <SelectField
-            label="Date"
+            label={t("Filters.date.label")}
             value={date}
             onChange={(v) => setDate(v as DateValue)}
             options={DATE_OPTIONS.filter((o) => o.value !== "").map((o) => ({
               value: o.value,
-              label: o.label,
+              label: t(o.labelKey),
             }))}
-            placeholder="All Time"
+            placeholder={t("Filters.date.allTime")}
           />
           {/* Location — cascading */}
           <div className="space-y-3">
             <SelectField
-              label="City / Province"
+              label={t("Filters.more.cityProvince")}
               value={proId}
               onChange={handleProvinceChange}
               options={provinceOptions}
-              placeholder="Select province..."
+              placeholder={t("Filters.more.selectProvince")}
             />
             <SelectField
-              label="Khan / District"
+              label={t("Filters.more.khanDistrict")}
               value={disId}
               onChange={handleDistrictChange}
               options={districtOptions}
               disabled={!proId}
               placeholder={
-                proId ? "Select district..." : "Select province first"
+                proId
+                  ? t("Filters.more.selectDistrict")
+                  : t("Filters.more.selectProvinceFirst")
               }
             />
             <SelectField
-              label="Sangkat / Commune"
+              label={t("Filters.more.sangkatCommune")}
               value={comId}
               onChange={setComId}
               options={communeOptions}
               disabled={!disId}
               placeholder={
-                disId ? "Select commune..." : "Select district first"
+                disId
+                  ? t("Filters.more.selectCommune")
+                  : t("Filters.more.selectDistrictFirst")
               }
             />
           </div>
           {/* Condition */}
           <SelectField
-            label="Condition"
+            label={t("Filters.condition.label")}
             value={condition}
             onChange={setCondition}
             options={CONDITION_OPTIONS.map((o) => ({
               value: o.value,
-              label: o.label,
+              label: t(o.labelKey),
             }))}
-            placeholder="Any"
+            placeholder={t("Filters.more.any")}
           />
           {/* Free delivery */}
           <label className="flex items-center justify-between gap-3 text-sm font-medium text-foreground cursor-pointer">
-            Free delivery only
+            {t("Filters.more.freeDeliveryOnly")}
             <Switch checked={delivery} onCheckedChange={setDelivery} />
           </label>
           {/* Price */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground ">
-              Price
+              {t("Filters.price.label")}
             </label>
             <div className="flex gap-3 mt-2">
               <Input
                 type="number"
-                placeholder="Minimum $"
+                placeholder={t("Filters.price.min")}
                 value={minPrice}
                 min={0}
                 onChange={(e) => setMinPrice(e.target.value)}
@@ -375,7 +381,7 @@ export default function MoreFilters() {
               />
               <Input
                 type="number"
-                placeholder="Maximum $"
+                placeholder={t("Filters.price.max")}
                 value={maxPrice}
                 min={0}
                 onChange={(e) => setMaxPrice(e.target.value)}
@@ -390,7 +396,7 @@ export default function MoreFilters() {
             onClick={applyFilters}
             className="w-full h-10 rounded-sm bg-orange-500 hover:bg-orange-600 text-white cursor-pointer font-semibold"
           >
-            Apply Filter
+            {t("Common.applyFilter")}
           </Button>
         </DialogFooter>
       </DialogContent>

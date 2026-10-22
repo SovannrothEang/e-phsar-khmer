@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Download, FileText, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -37,6 +38,7 @@ export function ApplicantResumeDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations("Me.applicantResume");
   const [detail, setDetail] = useState<ApplicationDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [cvBusy, setCvBusy] = useState(false);
@@ -95,11 +97,8 @@ export function ApplicantResumeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{applicantName}&apos;s résumé</DialogTitle>
-          <DialogDescription>
-            As it was when they applied — later edits to their résumé are not
-            reflected here.
-          </DialogDescription>
+          <DialogTitle>{t("title", { name: applicantName })}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
 
         {loading || !detail ? (
@@ -108,7 +107,7 @@ export function ApplicantResumeDialog({
           </div>
         ) : detail.resume === null ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            This application carried no résumé.
+            {t("noResume")}
           </p>
         ) : (
           <ResumeSnapshotView
@@ -135,6 +134,7 @@ function ResumeSnapshotView({
   cvBusy: boolean;
   onDownload: () => void;
 }) {
+  const t = useTranslations("Me.applicantResume");
   const personal = snapshot.personal;
   const place = personal?.place;
   const location = [
@@ -158,44 +158,44 @@ function ResumeSnapshotView({
               .join(" · ")}
           </p>
           <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-            <Field label="Email" value={personal.email} />
-            <Field label="Phone" value={personal.phones.join(", ")} />
-            <Field label="Location" value={location || null} />
+            <Field label={t("email")} value={personal.email} />
+            <Field label={t("phone")} value={personal.phones.join(", ")} />
+            <Field label={t("location")} value={location || null} />
             <Field
-              label="Experience"
+              label={t("experience")}
               value={
                 personal.yearsOfExperience === null
                   ? null
-                  : `${personal.yearsOfExperience} years`
+                  : t("years", { count: personal.yearsOfExperience })
               }
             />
-            <Field label="Education" value={personal.educationLevel} />
-            <Field label="Nationality" value={personal.nationality} />
+            <Field label={t("education")} value={personal.educationLevel} />
+            <Field label={t("nationality")} value={personal.nationality} />
           </dl>
         </section>
       ) : null}
 
-      <Block title="Summary" body={snapshot.summary} />
+      <Block title={t("summary")} body={snapshot.summary} />
       <List
-        title="Experience"
+        title={t("experience")}
         rows={snapshot.experiences.map((e) => ({
           id: e.id,
           lead: `${e.position} — ${e.company}`,
-          meta: `${e.startDate} → ${e.current ? "Present" : (e.endDate ?? "")}`,
+          meta: `${e.startDate} → ${e.current ? t("present") : (e.endDate ?? "")}`,
           body: e.description,
         }))}
       />
       <List
-        title="Education"
+        title={t("education")}
         rows={snapshot.educations.map((e) => ({
           id: e.id,
           lead: `${e.degree} — ${e.school}`,
-          meta: `${e.startDate} → ${e.current ? "Present" : (e.endDate ?? "")}`,
+          meta: `${e.startDate} → ${e.current ? t("present") : (e.endDate ?? "")}`,
           body: [e.major, e.description].filter(Boolean).join(" · "),
         }))}
       />
       <List
-        title="Skills"
+        title={t("skills")}
         rows={snapshot.skills.map((s) => ({
           id: s.id,
           lead: s.title,
@@ -204,7 +204,7 @@ function ResumeSnapshotView({
         }))}
       />
       <List
-        title="Languages"
+        title={t("languages")}
         rows={snapshot.languages.map((l) => ({
           id: l.id,
           lead: l.title,
@@ -213,7 +213,7 @@ function ResumeSnapshotView({
         }))}
       />
       <List
-        title="References"
+        title={t("references")}
         rows={snapshot.references.map((r) => ({
           id: r.id,
           lead: `${r.name} — ${r.company}`,
@@ -221,7 +221,7 @@ function ResumeSnapshotView({
           body: [r.phones.join(", "), r.email].filter(Boolean).join(" · "),
         }))}
       />
-      <Block title="Hobbies & Interests" body={snapshot.hobbies} />
+      <Block title={t("hobbies")} body={snapshot.hobbies} />
 
       {snapshot.attachment ? (
         <section className="rounded-sm border bg-muted/40 p-3">
@@ -237,7 +237,7 @@ function ResumeSnapshotView({
             </div>
             {cvGone ? (
               <span className="text-xs text-muted-foreground">
-                No longer available
+                {t("noLongerAvailable")}
               </span>
             ) : (
               <Button
@@ -253,7 +253,7 @@ function ResumeSnapshotView({
                 ) : (
                   <Download className="size-4" />
                 )}
-                Download
+                {t("download")}
               </Button>
             )}
           </div>

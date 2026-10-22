@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { getUserById } from "@/lib/data";
 import { type User } from "@/lib/user";
@@ -14,6 +15,7 @@ import CarrierBadge from "./CarrierBadge";
 import { ContactSellerButton } from "@/components/chat/contact-seller-button";
 import { FollowButton } from "@/components/profile/FollowButton";
 import type { ListingContext } from "@/types/chat";
+import { trackEvent } from "@/lib/insights/queue";
 
 export default function ProfileSidebar({
   userId,
@@ -34,6 +36,8 @@ export default function ProfileSidebar({
   /** Whether `viewerId` already follows the seller. */
   initialFollowing?: boolean;
 }) {
+  const t = useTranslations("Post");
+  const format = useFormatter();
   const user = userProp ?? getUserById(userId);
   if (!user) return null;
   const isOwnAd = !!viewerId && viewerId === userId;
@@ -66,13 +70,15 @@ export default function ProfileSidebar({
           <p className="text-sm opacity-90">@{user.username}</p>
         )}
         <p className="text-xs">
-          Members Since{" "}
-          {user?.joinDate &&
-            new Date(user.joinDate).toLocaleDateString("en-US", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+          {t("membersSince", {
+            date: user?.joinDate
+              ? format.dateTime(new Date(user.joinDate), {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "",
+          })}
         </p>
       </div>
     </>
@@ -174,7 +180,15 @@ export default function ProfileSidebar({
                             </span>
                           }
                         />
-                        {phone0}
+                        <a
+                          href={`tel:${phone0}`}
+                          onClick={() => {
+                            if (listingId) trackEvent(listingId, "call");
+                          }}
+                          className="hover:underline"
+                        >
+                          {phone0}
+                        </a>
                       </span>
                     ) : null}
                     {phone1 ? (
@@ -187,12 +201,26 @@ export default function ProfileSidebar({
                             </span>
                           }
                         />
-                        {phone1}
+                        <a
+                          href={`tel:${phone1}`}
+                          onClick={() => {
+                            if (listingId) trackEvent(listingId, "call");
+                          }}
+                          className="hover:underline"
+                        >
+                          {phone1}
+                        </a>
                       </span>
                     ) : null}
                   </div>
-                  <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
-                    Show Phone Number
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (listingId) trackEvent(listingId, "show_contact");
+                    }}
+                    className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer"
+                  >
+                    {t("showPhone")}
                   </button>
                 </div>
               </div>
@@ -210,8 +238,14 @@ export default function ProfileSidebar({
                 </div>
                 <div className="space-y-1">
                   <p className="font-medium text-foreground">{user.email}</p>
-                  <button className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer">
-                    Show Email Address
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (listingId) trackEvent(listingId, "show_contact");
+                    }}
+                    className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer"
+                  >
+                    {t("showEmail")}
                   </button>
                 </div>
               </div>
@@ -221,7 +255,7 @@ export default function ProfileSidebar({
 
           {isOwnAd ? (
             <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm font-medium text-sm flex items-center justify-center text-center px-2">
-              This is your own ad — buyers will see Message Seller here
+              {t("ownAdNote")}
             </div>
           ) : (
             <ContactSellerButton
@@ -244,14 +278,14 @@ export default function ProfileSidebar({
             unoptimized
           />
           <h2 className="text-[#e3281b] text-lg font-bold">
-            Safety Tips for Buyers
+            {t("safetyTips.title")}
           </h2>
         </div>
         <ol className="space-y-3 text-sm text-foreground list-decimal pl-6 pb-3">
-          <li className="px-2">Do not send money before receiving the goods</li>
-          <li className="px-2">Check the item before you buy</li>
-          <li className="px-2">Payment after receiving the goods</li>
-          <li className="px-2">Meet the seller at a safe location</li>
+          <li className="px-2">{t("safetyTips.noMoney")}</li>
+          <li className="px-2">{t("safetyTips.checkItem")}</li>
+          <li className="px-2">{t("safetyTips.payAfter")}</li>
+          <li className="px-2">{t("safetyTips.meetSafe")}</li>
         </ol>
       </div>
     </div>

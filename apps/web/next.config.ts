@@ -10,8 +10,16 @@ const supabaseHost = process.env.SUPABASE_URL
   ? new URL(process.env.SUPABASE_URL).hostname
   : null;
 
+// A per-build stamp for the devices page ("Browser 2026.10.20"). Evaluated
+// when the config is loaded — at image build time in Docker, at server start
+// in dev. An explicit env var wins so CI can pin the release date.
+const buildStamp = new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+
 /** @type {import('next').NextConfig} */
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || buildStamp,
+  },
   // Emits .next/standalone: a minimal server.js plus only the node_modules it
   // traces, which is what apps/web/Dockerfile ships. Vercel ignores it.
   output: "standalone",

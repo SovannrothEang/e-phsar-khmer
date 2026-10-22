@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { BriefcaseBusiness } from "lucide-react";
 import {
   Select,
@@ -17,14 +18,16 @@ import { JobApplicationRow } from "./JobApplicationRow";
 import { loadMyAppliedJobs } from "@/actions/applications";
 import type { AppliedJob, JobApplicationStatus } from "@/types/applications";
 
-const STATUS_FILTERS: { value: "all" | JobApplicationStatus; label: string }[] =
-  [
-    { value: "all", label: "All" },
-    { value: "pending", label: "Pending" },
-    { value: "viewed", label: "Viewed" },
-    { value: "hired", label: "Hired" },
-    { value: "rejected", label: "Rejected" },
-  ];
+const STATUS_FILTERS: {
+  value: "all" | JobApplicationStatus;
+  labelKey: string;
+}[] = [
+  { value: "all", labelKey: "statusAll" },
+  { value: "pending", labelKey: "statusPending" },
+  { value: "viewed", labelKey: "statusViewed" },
+  { value: "hired", labelKey: "statusHired" },
+  { value: "rejected", labelKey: "statusRejected" },
+];
 
 /**
  * `/me/applied-jobs` — the jobs this account applied to, fetched in the
@@ -36,6 +39,8 @@ const STATUS_FILTERS: { value: "all" | JobApplicationStatus; label: string }[] =
  * outage must never read as "you haven't applied to anything".
  */
 export default function AppliedJobs() {
+  const t = useTranslations("Me.jobsPage");
+  const tCommon = useTranslations("Common");
   const router = useRouter();
   const [status, setStatus] = React.useState<"all" | JobApplicationStatus>(
     "all",
@@ -103,18 +108,22 @@ export default function AppliedJobs() {
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-medium text-foreground mb-6">Jobs</h1>
+        <h1 className="text-2xl font-medium text-foreground mb-6">
+          {t("title")}
+        </h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div className="flex items-center">
             <Tabs defaultValue="applied">
               <TabsList variant="line">
                 <TabsTrigger value="applications" className="asChild">
                   <Link href={{ pathname: "/me/job-applications" }}>
-                    Applications
+                    {t("applications")}
                   </Link>
                 </TabsTrigger>
                 <TabsTrigger value="applied" className="asChild">
-                  <Link href={{ pathname: "/me/applied-jobs" }}>Applied</Link>
+                  <Link href={{ pathname: "/me/applied-jobs" }}>
+                    {t("applied")}
+                  </Link>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -128,7 +137,7 @@ export default function AppliedJobs() {
               }
             >
               <SelectTrigger className="w-[180px] bg-card">
-                <SelectValue placeholder="Status: All" />
+                <SelectValue placeholder={t("statusAll")} />
               </SelectTrigger>
               <SelectContent>
                 {STATUS_FILTERS.map((option) => (
@@ -138,8 +147,8 @@ export default function AppliedJobs() {
                     className="cursor-pointer"
                   >
                     {option.value === "all"
-                      ? "Status: All"
-                      : `Status: ${option.label}`}
+                      ? t("statusAll")
+                      : t("statusPrefix", { status: t(option.labelKey) })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -150,14 +159,14 @@ export default function AppliedJobs() {
               onValueChange={(value) => setSort(value as "newest" | "oldest")}
             >
               <SelectTrigger className="w-[180px] bg-card">
-                <SelectValue placeholder="Sort: Newest" />
+                <SelectValue placeholder={t("sortNewest")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="newest" className="cursor-pointer">
-                  Sort: Newest
+                  {t("sortNewest")}
                 </SelectItem>
                 <SelectItem value="oldest" className="cursor-pointer">
-                  Sort: Oldest
+                  {t("sortOldest")}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -168,7 +177,7 @@ export default function AppliedJobs() {
           <main className="max-w-2xl mx-auto mt-4">
             <div className="bg-card rounded-sm shadow-sm min-h-[240px] flex flex-col items-center justify-center p-8 text-center">
               <h2 className="text-lg font-medium text-foreground mb-2">
-                Couldn&apos;t load your applications
+                {t("loadFailed")}
               </h2>
               <p className="text-muted-foreground text-sm">{error}</p>
             </div>
@@ -191,10 +200,10 @@ export default function AppliedJobs() {
 
               <div className="text-center">
                 <h2 className="text-xl font-medium text-foreground mb-2">
-                  No Result!
+                  {t("noResult")}
                 </h2>
                 <p className="text-muted-foreground text-sm mb-8">
-                  You don&apos;t have any job applied right now.
+                  {t("noApplied")}
                 </p>
                 <Button
                   onClick={() =>
@@ -205,7 +214,7 @@ export default function AppliedJobs() {
                   }
                   className="bg-orange-400 hover:bg-orange-600 text-card font-medium h-10 px-8 rounded-sm transition-colors cursor-pointer"
                 >
-                  See Job Available
+                  {t("seeJobs")}
                 </Button>
               </div>
             </div>
@@ -221,7 +230,7 @@ export default function AppliedJobs() {
                     listing={row.listing}
                     status={row.status}
                     createdAt={row.createdAt}
-                    title={row.listing.title || "This job"}
+                    title={row.listing.title || t("thisJob")}
                     subtitle={
                       [
                         row.listing.company,
@@ -242,7 +251,7 @@ export default function AppliedJobs() {
                   variant="outline"
                   className="cursor-pointer"
                 >
-                  {loadingMore ? "Loading..." : "Load more"}
+                  {loadingMore ? tCommon("loading") : tCommon("loadMore")}
                 </Button>
               </div>
             ) : null}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { IconArrowLeft, IconMinus, IconPlus, IconX } from "@tabler/icons-react";
 
 import {
@@ -60,6 +61,7 @@ export function ResumeReferencesDialog({
   /** Resolves `true` only once the entry was stored. */
   onSubmit: (entry: ReferenceEntry) => Promise<boolean>;
 }) {
+  const t = useTranslations("Resume");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [position, setPosition] = useState("");
@@ -169,18 +171,20 @@ export function ResumeReferencesDialog({
             <button
               type="button"
               onClick={onBack}
-              aria-label="Back to hobbies and interests"
+              aria-label={t("form.backHobbies")}
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
             >
               <IconArrowLeft size={20} />
             </button>
           )}
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit" ? "Add Reference" : "References"}
+            {mode === "edit"
+              ? t("form.titles.referencesEdit")
+              : t("form.titles.referencesWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
             <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
-              Step 8 of 8
+              {t("form.step", { current: 8, total: 8 })}
             </span>
           ) : (
             <DialogClose asChild>
@@ -189,27 +193,30 @@ export function ResumeReferencesDialog({
                 className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("form.close")}</span>
               </button>
             </DialogClose>
           )}
         </div>
         <DialogDescription className="sr-only">
-          Step 8 of 8 of the resume builder: references.
+          {t("form.stepDescription", {
+            current: 8,
+            total: 8,
+            name: t("form.titles.referencesWizard"),
+          })}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
             <p className="text-base text-muted-foreground">
-              Add professional references to support your experience and
-              increase employer confidence.
+              {t("sections.references.desc")}
             </p>
           )}
 
           <FieldGroup className="mt-4">
             <Field ref={nameFieldRef} data-invalid={nameError}>
               <FieldLabel htmlFor="rrf-name">
-                Name <span className="text-destructive">*</span>
+                {t("form.name")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rrf-name"
@@ -220,13 +227,17 @@ export function ResumeReferencesDialog({
                 className="h-11"
               />
               {nameError && (
-                <FieldError>{"Please enter the 'Name'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.name"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={companyFieldRef} data-invalid={companyError}>
               <FieldLabel htmlFor="rrf-company">
-                Company <span className="text-destructive">*</span>
+                {t("form.company")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rrf-company"
@@ -237,13 +248,17 @@ export function ResumeReferencesDialog({
                 className="h-11"
               />
               {companyError && (
-                <FieldError>{"Please enter the 'Company'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.company"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={positionFieldRef} data-invalid={positionError}>
               <FieldLabel htmlFor="rrf-position">
-                Position <span className="text-destructive">*</span>
+                {t("form.position")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rrf-position"
@@ -254,7 +269,11 @@ export function ResumeReferencesDialog({
                 className="h-11"
               />
               {positionError && (
-                <FieldError>{"Please enter the 'Position'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.position"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
@@ -263,7 +282,8 @@ export function ResumeReferencesDialog({
               data-invalid={phoneError || phoneFormatError}
             >
               <FieldLabel>
-                Phone Number <span className="text-destructive">*</span>
+                {t("form.phoneNumber")}{" "}
+                <span className="text-destructive">*</span>
               </FieldLabel>
               <div className="flex flex-col gap-3">
                 {phones.map((phone, index) => (
@@ -274,7 +294,9 @@ export function ResumeReferencesDialog({
                         inputMode="tel"
                         value={phone}
                         onChange={(e) => updatePhone(index, e.target.value)}
-                        placeholder={`Phone Number ${index + 1}`}
+                        placeholder={t("form.phonePlaceholder", {
+                          number: index + 1,
+                        })}
                         maxLength={15}
                         aria-invalid={
                           (phoneError && index === 0) ||
@@ -287,7 +309,9 @@ export function ResumeReferencesDialog({
                       {index > 0 && (
                         <button
                           type="button"
-                          aria-label={`Remove phone number ${index + 1}`}
+                          aria-label={t("form.removePhone", {
+                            number: index + 1,
+                          })}
                           onClick={() => removePhone(index)}
                           className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600"
                         >
@@ -299,7 +323,7 @@ export function ResumeReferencesDialog({
                       phones.length < MAX_PHONES && (
                         <button
                           type="button"
-                          aria-label="Add another phone number"
+                          aria-label={t("form.addAnotherPhone")}
                           onClick={addPhone}
                           className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-white transition-colors hover:bg-[#00a0e9]/90"
                         >
@@ -310,15 +334,15 @@ export function ResumeReferencesDialog({
                 ))}
               </div>
               {phoneError && (
-                <FieldError>At least one phone number is required.</FieldError>
+                <FieldError>{t("form.validation.phoneRequired")}</FieldError>
               )}
               {phoneFormatError && (
-                <FieldError>Please enter a valid phone number.</FieldError>
+                <FieldError>{t("form.validation.phoneInvalid")}</FieldError>
               )}
             </Field>
 
             <Field ref={emailFieldRef} data-invalid={emailError}>
-              <FieldLabel htmlFor="rrf-email">Email</FieldLabel>
+              <FieldLabel htmlFor="rrf-email">{t("form.email")}</FieldLabel>
               <Input
                 id="rrf-email"
                 type="email"
@@ -329,7 +353,7 @@ export function ResumeReferencesDialog({
                 className="h-11"
               />
               {emailError && (
-                <FieldError>Please enter a valid email address.</FieldError>
+                <FieldError>{t("form.validation.email")}</FieldError>
               )}
             </Field>
           </FieldGroup>
@@ -342,7 +366,7 @@ export function ResumeReferencesDialog({
               onClick={onSkip}
               className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
             >
-              Skip
+              {t("form.skip")}
             </button>
             <button
               type="button"
@@ -350,7 +374,7 @@ export function ResumeReferencesDialog({
               disabled={saving}
               className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Finish
+              {t("form.finish")}
             </button>
           </div>
         ) : (
@@ -361,7 +385,7 @@ export function ResumeReferencesDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {t("form.save")}
             </button>
           </div>
         )}

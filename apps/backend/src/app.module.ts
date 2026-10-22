@@ -29,10 +29,12 @@ import { ResumeModule } from './resume/resume.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { InsightsModule } from './insights/insights.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { AdminModule } from './admin/admin.module';
@@ -89,10 +91,12 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     ApplicationsModule,
     BrandsModule,
     FilesModule,
+    FeedbackModule,
     HealthModule,
     ActivityModule,
     ChatModule,
     NotificationsModule,
+    InsightsModule,
     OutboxModule,
     AttributesModule,
     AdminModule,

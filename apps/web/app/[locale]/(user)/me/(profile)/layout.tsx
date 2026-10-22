@@ -2,27 +2,29 @@ import {
   MyProfileHeader,
   type ProfileUser,
 } from "@/components/profile/MyProfileHeader";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/routing";
 import { getCurrentUser, type SessionUser } from "@/lib/auth/current-user";
 import { getMyFollowCounts } from "@/lib/api/users";
+import { MONTH_LABELS } from "@/lib/locale-labels";
 
 function toProfileUser(
   me: SessionUser,
   counts: { followers: number; following: number } | null,
+  locale: string,
+  fallbackName: string,
 ): ProfileUser {
   const name =
     [me.firstName, me.lastName].filter(Boolean).join(" ").trim() ||
     me.username ||
-    "My Account";
+    fallbackName;
   const avatar =
     me.profilePhotoUrl ??
     `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`;
-  const joinDate = new Date(me.createdAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const created = new Date(me.createdAt);
+  const month =
+    (MONTH_LABELS[locale] ?? MONTH_LABELS.en)[created.getMonth()] ?? "";
+  const joinDate = `${created.getDate()} ${month} ${created.getFullYear()}`;
   return {
     name,
     username: me.username ?? "",
@@ -45,11 +47,17 @@ export default async function MyProfileLayout({
   const locale = await getLocale();
   if (!me) return redirect({ href: "/login", locale });
 
-  const counts = await getMyFollowCounts();
+  const [counts, t] = await Promise.all([
+    getMyFollowCounts(),
+    getTranslations("Nav"),
+  ]);
 
   return (
     <>
-      <MyProfileHeader user={toProfileUser(me, counts)} isOwnProfile />
+      <MyProfileHeader
+        user={toProfileUser(me, counts, locale, t("myAccount"))}
+        isOwnProfile
+      />
       {children}
     </>
   );

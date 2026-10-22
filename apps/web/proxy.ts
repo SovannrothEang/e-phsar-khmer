@@ -5,7 +5,7 @@ import { ACCESS_TOKEN_COOKIE } from "./lib/auth/session";
 
 const intlMiddleware = createMiddleware(routing);
 
-const LOCALE_RE = new RegExp(`^/(en|km|zh|ko|id|vi)(?=/wanderer(?:/|$))`);
+const LOCALE_RE = new RegExp(`^/(en|km)(?=/wanderer(?:/|$))`);
 
 export default function proxy(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
@@ -43,5 +43,5 @@ export default function proxy(req: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/", "/(en|km|zh|ko|id|vi)/:path*", "/wanderer/:path*"],
+  matcher: ["/", "/(en|km)/:path*", "/wanderer/:path*"],
 };

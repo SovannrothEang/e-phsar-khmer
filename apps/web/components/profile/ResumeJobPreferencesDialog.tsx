@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { IconCheck, IconChevronDown, IconX } from "@tabler/icons-react";
 
 import type { JobPreferenceEntry } from "@/components/profile/ResumePreview";
@@ -60,6 +61,7 @@ export function ResumeJobPreferencesDialog({
   onSubmit: (entry: JobPreferenceEntry) => Promise<boolean>;
   onSave: () => void;
 }) {
+  const t = useTranslations("Resume");
   const [openJob, setOpenJob] = useState(false);
   const [position, setPosition] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
@@ -136,7 +138,9 @@ export function ResumeJobPreferencesDialog({
                 className="flex min-h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 py-1.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
               >
                 {values.length === 0 ? (
-                  <span className="text-muted-foreground">Select...</span>
+                  <span className="text-muted-foreground">
+                    {t("form.selectPlaceholder")}
+                  </span>
                 ) : (
                   <span className="flex flex-wrap items-center gap-1.5">
                     {values.map((value) => (
@@ -148,7 +152,7 @@ export function ResumeJobPreferencesDialog({
                         <span
                           role="button"
                           tabIndex={-1}
-                          aria-label={`Remove ${value}`}
+                          aria-label={t("form.removeValue", { value })}
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleValue(value);
@@ -206,7 +210,7 @@ export function ResumeJobPreferencesDialog({
           {values.length > 0 ? (
             <button
               type="button"
-              aria-label={`Clear ${label}`}
+              aria-label={t("form.clearField", { label })}
               onClick={() => setValues([])}
               className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
             >
@@ -231,7 +235,7 @@ export function ResumeJobPreferencesDialog({
       >
         <div className="flex shrink-0 items-center gap-3 border-b px-6 py-4">
           <DialogTitle className="text-2xl font-semibold">
-            Add Preference
+            {t("form.titles.jobPrefs")}
           </DialogTitle>
           <DialogClose asChild>
             <button
@@ -239,18 +243,20 @@ export function ResumeJobPreferencesDialog({
               className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
             >
               <IconX size={18} />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t("form.close")}</span>
             </button>
           </DialogClose>
         </div>
         <DialogDescription className="sr-only">
-          Job preferences: the kind of job the user is looking for.
+          {t("sections.jobPreferences.desc")}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <FieldGroup>
             <div className="flex h-11 items-center justify-between rounded-sm border border-input px-3">
-              <span className="text-base text-foreground">Open Job</span>
+              <span className="text-base text-foreground">
+                {t("form.openJob")}
+              </span>
               <Switch
                 checked={openJob}
                 onCheckedChange={setOpenJob}
@@ -263,7 +269,7 @@ export function ResumeJobPreferencesDialog({
               data-invalid={showErrors && positionMissing}
             >
               <FieldLabel htmlFor="rjp-position">
-                Preferred Position
+                {t("form.preferredPosition")}
                 {openJob && <span className="text-destructive"> *</span>}
               </FieldLabel>
               <Input
@@ -274,13 +280,17 @@ export function ResumeJobPreferencesDialog({
                 className="h-11"
               />
               {showErrors && positionMissing && (
-                <FieldError>{"Please enter the 'Position'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.position"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             {renderMultiSelect(
               "rjp-category",
-              "Categories",
+              t("form.categories"),
               categories,
               setCategories,
               categoryOpen,
@@ -289,7 +299,7 @@ export function ResumeJobPreferencesDialog({
             )}
             {renderMultiSelect(
               "rjp-location",
-              "Locations",
+              t("form.locations"),
               locations,
               setLocations,
               locationOpen,
@@ -298,7 +308,7 @@ export function ResumeJobPreferencesDialog({
             )}
             {renderMultiSelect(
               "rjp-jobtype",
-              "Job Type",
+              t("form.jobType"),
               jobTypes,
               setJobTypes,
               jobTypeOpen,
@@ -315,7 +325,7 @@ export function ResumeJobPreferencesDialog({
             disabled={saving}
             className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Save
+            {t("form.save")}
           </button>
         </div>
       </DialogContent>

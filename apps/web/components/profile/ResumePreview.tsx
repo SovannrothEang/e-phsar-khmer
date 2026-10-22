@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   IconBriefcase,
   IconCalendar,
@@ -36,6 +37,7 @@ import {
 } from "@/actions/resume";
 import DbImage from "@/components/common/DbImage";
 import { toast } from "@/components/ui/sonner";
+import { MONTH_LABELS } from "@/lib/locale-labels";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -157,20 +159,31 @@ type SectionStep = 2 | ListStep;
  */
 export type EntryListStep = 3 | 4 | 5 | 6 | 8;
 
-const formatDate = (date: Date) =>
-  date.toLocaleDateString("en-US", {
+const formatDate = (date: Date, locale: string) => {
+  if (locale === "km") {
+    const month = (MONTH_LABELS.km ?? MONTH_LABELS.en)[date.getMonth()] ?? "";
+    return `${date.getDate()} ${month} ${date.getFullYear()}`;
+  }
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "2-digit",
     year: "numeric",
   });
+};
 
 /** The mock's date format: 2022-Feb. */
-const formatMonthYear = (date: Date) =>
-  `${date.getFullYear()}-${date.toLocaleDateString("en-US", { month: "short" })}`;
+const formatMonthYear = (date: Date, locale: string) =>
+  `${date.getFullYear()}-${(MONTH_LABELS[locale] ?? MONTH_LABELS.en)[date.getMonth()] ?? ""}`;
 
-const formatRange = (start: Date, end: Date | null, current: boolean) =>
-  `${formatMonthYear(start)} - ${
-    current || !end ? "Present" : formatMonthYear(end)
+const formatRange = (
+  start: Date,
+  end: Date | null,
+  current: boolean,
+  locale: string,
+  present: string,
+) =>
+  `${formatMonthYear(start, locale)} - ${
+    current || !end ? present : formatMonthYear(end, locale)
   }`;
 
 const byStartDesc = <T extends { startDate: Date }>(a: T, b: T) =>
@@ -190,12 +203,13 @@ function EntryMenu({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("Resume");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Entry actions"
+          aria-label={t("entryActions")}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted"
         >
           <IconDotsVertical size={18} />
@@ -203,14 +217,14 @@ function EntryMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
-          Edit
+          {t("edit")}
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
           onClick={onDelete}
           className="cursor-pointer"
         >
-          Delete
+          {t("delete")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -224,6 +238,7 @@ function EntryMenu({
  * offers to reveal nothing, so it shows no link at all.
  */
 function ClampedText({ text }: { text: string }) {
+  const t = useTranslations("Resume");
   const [expanded, setExpanded] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);
@@ -262,7 +277,7 @@ function ClampedText({ text }: { text: string }) {
           onClick={() => setExpanded((value) => !value)}
           className="mt-1 cursor-pointer text-sm font-medium text-[#00a0e9] transition-colors hover:text-[#00a0e9]/80"
         >
-          {expanded ? "Show less" : "Show more"}
+          {expanded ? t("showLess") : t("showMore")}
         </button>
       )}
     </div>
@@ -299,6 +314,8 @@ export function ResumePreview({
   /** The CV card owns the upload flow and reports the new file upward. */
   onAttachmentChange?: (attachment: ResumeAttachment | null) => void;
 }) {
+  const t = useTranslations("Resume");
+  const locale = useLocale();
   const [cvNoticed, setCvNoticed] = useState(false);
   const [cvUploading, setCvUploading] = useState(false);
   const [cvRemoving, setCvRemoving] = useState(false);
@@ -310,7 +327,7 @@ export function ResumePreview({
     [data?.firstName || fallbackFirstName, data?.lastName || fallbackLastName]
       .filter(Boolean)
       .join(" ")
-      .trim() || "Your Name";
+      .trim() || t("yourName");
   const phone = data?.phones.find((p) => p.trim() !== "") ?? "";
   const location = data?.place ? resumeLocationLabel(data.place) : "";
 
@@ -320,30 +337,47 @@ export function ResumePreview({
     value: string | null;
     link?: boolean;
   }[] = [
-    { icon: IconGenderBigender, label: "Gender", value: data?.gender ?? null },
+    {
+      icon: IconGenderBigender,
+      label: t("labels.gender"),
+      value: data?.gender ?? null,
+    },
     {
       icon: IconCalendar,
-      label: "Date Of Birth",
-      value: data?.dob ? formatDate(data.dob) : null,
+      label: t("labels.dob"),
+      value: data?.dob ? formatDate(data.dob, locale) : null,
     },
     {
       icon: IconWorld,
-      label: "Nationality",
+      label: t("labels.nationality"),
       value: data?.nationality?.trim() || null,
     },
     {
       icon: IconHeart,
-      label: "Marital Status",
+      label: t("labels.maritalStatus"),
       value: data?.maritalStatus ?? null,
     },
-    { icon: IconPhone, label: "Phone", value: phone || null, link: true },
-    { icon: IconMail, label: "Email", value: data?.email?.trim() || null },
+    {
+      icon: IconPhone,
+      label: t("labels.phone"),
+      value: phone || null,
+      link: true,
+    },
+    {
+      icon: IconMail,
+      label: t("labels.email"),
+      value: data?.email?.trim() || null,
+    },
     {
       icon: IconSchool,
-      label: "Education Level",
+      label: t("labels.educationLevel"),
       value: data?.education ?? null,
     },
-    { icon: IconMapPin, label: "Location", value: location || null },
+    {
+      icon: IconMapPin,
+      label: t("labels.location"),
+      value: location || null,
+    },
   ];
 
   type MissingItem = { label: string; filled: boolean } & (
@@ -355,101 +389,125 @@ export function ResumePreview({
   const summaryFilled = doc.summary.trim() !== "";
   const hobbiesFilled = doc.hobbies.trim() !== "";
   const items: MissingItem[] = [
-    { label: "Photo", filled: !!data?.photo, kind: "field", field: "photo" },
-    { label: "Gender", filled: !!data?.gender, kind: "field", field: "gender" },
     {
-      label: "Date Of Birth",
+      label: t("labels.photo"),
+      filled: !!data?.photo,
+      kind: "field",
+      field: "photo",
+    },
+    {
+      label: t("labels.gender"),
+      filled: !!data?.gender,
+      kind: "field",
+      field: "gender",
+    },
+    {
+      label: t("labels.dob"),
       filled: !!data?.dob,
       kind: "field",
       field: "dob",
     },
     {
-      label: "Nationality",
+      label: t("labels.nationality"),
       filled: !!(data?.nationality?.trim() ?? ""),
       kind: "field",
       field: "nationality",
     },
     {
-      label: "Email",
+      label: t("labels.email"),
       filled: !!(data?.email?.trim() ?? ""),
       kind: "field",
       field: "email",
     },
     {
-      label: "Location",
+      label: t("labels.location"),
       filled: !!(data?.place?.province ?? ""),
       kind: "field",
       field: "location",
     },
     {
-      label: "Address",
+      label: t("labels.address"),
       filled: !!(data?.address?.trim() ?? ""),
       kind: "field",
       field: "address",
     },
-    { label: "Phone", filled: !!phone, kind: "field", field: "phone" },
     {
-      label: "Marital Status",
+      label: t("labels.phone"),
+      filled: !!phone,
+      kind: "field",
+      field: "phone",
+    },
+    {
+      label: t("labels.maritalStatus"),
       filled: !!data?.maritalStatus,
       kind: "field",
       field: "marital",
     },
     {
-      label: "Education Level",
+      label: t("labels.educationLevel"),
       filled: !!data?.education,
       kind: "field",
       field: "education",
     },
     {
-      label: "Position",
+      label: t("labels.position"),
       filled: !!(data?.position?.trim() ?? ""),
       kind: "field",
       field: "position",
     },
     {
-      label: "Years of Experience",
+      label: t("labels.yearsExperience"),
       filled: !!(data?.yearsOfExperience?.trim() ?? ""),
       kind: "field",
       field: "experience",
     },
-    { label: "Summary", filled: summaryFilled, kind: "section", step: 2 },
     {
-      label: "Educations",
+      label: t("labels.summary"),
+      filled: summaryFilled,
+      kind: "section",
+      step: 2,
+    },
+    {
+      label: t("labels.educations"),
       filled: doc.educations.length > 0,
       kind: "section",
       step: 4,
     },
     {
-      label: "Work experience",
+      label: t("labels.workExperience"),
       filled: doc.experiences.length > 0,
       kind: "section",
       step: 3,
     },
     {
-      label: "Skills",
+      label: t("labels.skills"),
       filled: doc.skills.length > 0,
       kind: "section",
       step: 5,
     },
     {
-      label: "Hobbies & Interests",
+      label: t("labels.hobbies"),
       filled: hobbiesFilled,
       kind: "section",
       step: 7,
     },
     {
-      label: "Languages",
+      label: t("labels.languages"),
       filled: doc.languages.length > 0,
       kind: "section",
       step: 6,
     },
     {
-      label: "References",
+      label: t("labels.references"),
       filled: doc.references.length > 0,
       kind: "section",
       step: 8,
     },
-    { label: "Attachment", filled: !!doc.attachment, kind: "attachment" },
+    {
+      label: t("labels.attachment"),
+      filled: !!doc.attachment,
+      kind: "attachment",
+    },
   ];
   const filledCount = items.filter((item) => item.filled).length;
   const percent = Math.round((filledCount / items.length) * 100);
@@ -460,30 +518,32 @@ export function ResumePreview({
   const jobPrefRows: { label: string; value: string }[] = [];
   if (doc.jobPreference) {
     jobPrefRows.push({
-      label: "Open Job",
-      value: doc.jobPreference.openJob ? "Enable" : "Disable",
+      label: t("labels.openJob"),
+      value: doc.jobPreference.openJob
+        ? t("values.enable")
+        : t("values.disable"),
     });
     jobPrefRows.push({
-      label: "Preferred Position",
-      value: doc.jobPreference.position.trim() || "Not defined",
+      label: t("labels.preferredPosition"),
+      value: doc.jobPreference.position.trim() || t("values.notDefined"),
     });
     jobPrefRows.push({
-      label: "Categories",
+      label: t("labels.categories"),
       value: doc.jobPreference.category.length
         ? doc.jobPreference.category.join(" , ")
-        : "Not defined",
+        : t("values.notDefined"),
     });
     jobPrefRows.push({
-      label: "Locations",
+      label: t("labels.locations"),
       value: doc.jobPreference.location.length
         ? doc.jobPreference.location.join(" , ")
-        : "Not defined",
+        : t("values.notDefined"),
     });
     jobPrefRows.push({
-      label: "Job Type",
+      label: t("labels.jobType"),
       value: doc.jobPreference.jobType.length
         ? doc.jobPreference.jobType.join(" , ")
-        : "Not defined",
+        : t("values.notDefined"),
     });
   }
 
@@ -505,7 +565,7 @@ export function ResumePreview({
     event.target.value = "";
     if (!file) return;
     if (!isValidCvFile(file)) {
-      toast.error("Choose a doc, DOCX, PDF or txt file (max 5MB).");
+      toast.error(t("errors.invalidFile"));
       return;
     }
 
@@ -531,7 +591,7 @@ export function ResumePreview({
       }).catch(() => null);
       if (!uploaded?.ok) {
         setCvUploading(false);
-        toast.error("Couldn't upload your CV. Please try again.");
+        toast.error(t("errors.uploadFailed"));
         return;
       }
     }
@@ -549,7 +609,7 @@ export function ResumePreview({
       size: completed.data.size,
       uploadedAt: new Date().toISOString(),
     });
-    toast.success("CV uploaded");
+    toast.success(t("toasts.uploaded"));
   }
 
   /** Open the uploaded CV through a short-lived signed URL, owner only. */
@@ -562,7 +622,7 @@ export function ResumePreview({
       return;
     }
     if (!signed.url) {
-      toast.error("There is no CV to download yet.");
+      toast.error(t("errors.noCv"));
       return;
     }
     window.open(signed.url, "_blank", "noopener");
@@ -582,7 +642,7 @@ export function ResumePreview({
       return;
     }
     onAttachmentChange?.(null);
-    toast.success("CV removed");
+    toast.success(t("toasts.removed"));
   }
 
   function handleItem(item: MissingItem) {
@@ -647,7 +707,7 @@ export function ResumePreview({
       <h2 className="text-xl font-bold text-foreground">{title}</h2>
       <button
         type="button"
-        aria-label={`Edit ${title}`}
+        aria-label={t("editAria", { name: title })}
         onClick={onEditClick}
         className="ml-auto flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/10"
       >
@@ -673,12 +733,12 @@ export function ResumePreview({
       {/* Resume (CV) */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         <div className="flex items-center justify-between border-b pb-4">
-          <h1 className="text-xl font-bold text-foreground">Resume (CV)</h1>
+          <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
           {/* Hidden, never inert: nothing to download means no control. */}
           {doc.attachment && (
             <button
               type="button"
-              aria-label="Download resume"
+              aria-label={t("download")}
               onClick={handleDownload}
               disabled={downloading}
               className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/10 disabled:cursor-not-allowed disabled:opacity-40"
@@ -701,7 +761,7 @@ export function ResumePreview({
                       link && value ? "text-[#00a0e9]" : "text-foreground"
                     }
                   >
-                    {value ?? "N/A"}
+                    {value ?? t("na")}
                   </span>
                 </div>
               ))}
@@ -712,7 +772,7 @@ export function ResumePreview({
           <div className="relative h-[215px] w-[190px] shrink-0 overflow-hidden rounded-sm border">
             <DbImage
               src={data?.photo ?? ""}
-              alt="Resume photo"
+              alt={t("photoAlt")}
               width={188}
               height={213}
               className="h-full w-full object-cover"
@@ -735,14 +795,18 @@ export function ResumePreview({
           onClick={onEdit}
           className="mt-6 h-11 w-full cursor-pointer rounded-sm bg-[#00a0e9]/10 text-base font-medium text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/20"
         >
-          Edit Personal Details
+          {t("editPersonal")}
         </button>
       </div>
 
       {/* Completed Profile */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        <h2 className="text-xl font-bold text-foreground">Completed Profile</h2>
-        <p className="mt-3 text-base text-foreground">{percent}% Completed</p>
+        <h2 className="text-xl font-bold text-foreground">
+          {t("completedProfile")}
+        </h2>
+        <p className="mt-3 text-base text-foreground">
+          {t("completedPercent", { percent })}
+        </p>
         <div className="mt-3 h-1.5 w-full rounded-full bg-red-500/15">
           <div
             className="h-full rounded-full bg-red-500"
@@ -769,28 +833,31 @@ export function ResumePreview({
       {/* Summary */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         {summaryFilled
-          ? cardHeaderFilled(IconFileDescription, "Summary", () =>
-              onEditEntry(2, doc.summary),
+          ? cardHeaderFilled(
+              IconFileDescription,
+              t("sections.summary.title"),
+              () => onEditEntry(2, doc.summary),
             )
           : cardHeader(
               IconFileDescription,
-              "Summary",
+              t("sections.summary.title"),
               () => onAdd(2),
-              "Add summary",
+              t("sections.summary.add"),
             )}
         <div className="mt-4 border-t" />
         {summaryFilled ? (
           <div className="mt-4">
             <ClampedText text={doc.summary} />
-            {editLink("Edit Summary", () => onEditEntry(2, doc.summary))}
+            {editLink(t("sections.summary.edit"), () =>
+              onEditEntry(2, doc.summary),
+            )}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Write 2–4 concise, energetic sentences that highlight your role,
-              experience, key achievements, and strongest qualities.
+              {t("sections.summary.desc")}
             </p>
-            {addLink("Add Summary", () => onAdd(2))}
+            {addLink(t("sections.summary.add"), () => onAdd(2))}
           </>
         )}
       </div>
@@ -799,9 +866,9 @@ export function ResumePreview({
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         {cardHeader(
           IconBriefcase,
-          "Work Experiences",
+          t("sections.work.title"),
           () => onAdd(3),
-          "Add experience",
+          t("sections.work.add"),
         )}
         <div className="mt-4 border-t" />
         {doc.experiences.length > 0 ? (
@@ -817,7 +884,13 @@ export function ResumePreview({
                       {x.company}
                     </p>
                     <p className="text-sm italic text-muted-foreground">
-                      {formatRange(x.startDate, x.endDate, x.current)}
+                      {formatRange(
+                        x.startDate,
+                        x.endDate,
+                        x.current,
+                        locale,
+                        t("present"),
+                      )}
                     </p>
                     <p className="text-base text-foreground">
                       {x.position}
@@ -838,22 +911,26 @@ export function ResumePreview({
                 </div>
               ))}
             </div>
-            {addLink("Add Experience", () => onAdd(3))}
+            {addLink(t("sections.work.add"), () => onAdd(3))}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Show your most relevant experience from the past 10 years,
-              focusing on impact and measurable achievements.
+              {t("sections.work.desc")}
             </p>
-            {addLink("Add Experience", () => onAdd(3))}
+            {addLink(t("sections.work.add"), () => onAdd(3))}
           </>
         )}
       </div>
 
       {/* Educations */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        {cardHeader(IconSchool, "Educations", () => onAdd(4), "Add education")}
+        {cardHeader(
+          IconSchool,
+          t("sections.educations.title"),
+          () => onAdd(4),
+          t("sections.educations.add"),
+        )}
         <div className="mt-4 border-t" />
         {doc.educations.length > 0 ? (
           <div>
@@ -868,10 +945,19 @@ export function ResumePreview({
                       {x.school}
                     </p>
                     <p className="text-sm italic text-muted-foreground">
-                      {formatRange(x.startDate, x.endDate, x.current)}
+                      {formatRange(
+                        x.startDate,
+                        x.endDate,
+                        x.current,
+                        locale,
+                        t("present"),
+                      )}
                     </p>
                     <p className="text-base text-foreground">
-                      {x.degree} in {x.major}
+                      {t("values.degreeIn", {
+                        degree: x.degree,
+                        major: x.major,
+                      })}
                     </p>
                     {x.description && (
                       <p className="mt-1 line-clamp-2 text-sm whitespace-pre-wrap text-muted-foreground">
@@ -886,22 +972,26 @@ export function ResumePreview({
                 </div>
               ))}
             </div>
-            {addLink("Add Education", () => onAdd(4))}
+            {addLink(t("sections.educations.add"), () => onAdd(4))}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Present your educational background to demonstrate the knowledge
-              and value you bring to the role.
+              {t("sections.educations.desc")}
             </p>
-            {addLink("Add Education", () => onAdd(4))}
+            {addLink(t("sections.educations.add"), () => onAdd(4))}
           </>
         )}
       </div>
 
       {/* Skills */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        {cardHeader(IconStar, "Skills", () => onAdd(5), "Add skill")}
+        {cardHeader(
+          IconStar,
+          t("sections.skills.title"),
+          () => onAdd(5),
+          t("sections.skills.add"),
+        )}
         <div className="mt-4 border-t" />
         {doc.skills.length > 0 ? (
           <div>
@@ -923,22 +1013,26 @@ export function ResumePreview({
                 </div>
               ))}
             </div>
-            {addLink("Add Skill", () => onAdd(5))}
+            {addLink(t("sections.skills.add"), () => onAdd(5))}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              List the skills that best represent your strengths and help you
-              stand out from other candidates.
+              {t("sections.skills.desc")}
             </p>
-            {addLink("Add Skill", () => onAdd(5))}
+            {addLink(t("sections.skills.add"), () => onAdd(5))}
           </>
         )}
       </div>
 
       {/* Languages */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        {cardHeader(IconWorld, "Languages", () => onAdd(6), "Add language")}
+        {cardHeader(
+          IconWorld,
+          t("sections.languages.title"),
+          () => onAdd(6),
+          t("sections.languages.add"),
+        )}
         <div className="mt-4 border-t" />
         {doc.languages.length > 0 ? (
           <div>
@@ -960,15 +1054,14 @@ export function ResumePreview({
                 </div>
               ))}
             </div>
-            {addLink("Add Language", () => onAdd(6))}
+            {addLink(t("sections.languages.add"), () => onAdd(6))}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Add the languages you speak to increase your opportunities with
-              more companies and employers.
+              {t("sections.languages.desc")}
             </p>
-            {addLink("Add Language", () => onAdd(6))}
+            {addLink(t("sections.languages.add"), () => onAdd(6))}
           </>
         )}
       </div>
@@ -976,37 +1069,41 @@ export function ResumePreview({
       {/* Hobbies & Interests */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         {hobbiesFilled
-          ? cardHeaderFilled(IconHeart, "Hobbies & Interests", () =>
+          ? cardHeaderFilled(IconHeart, t("sections.hobbies.title"), () =>
               onEditEntry(7, doc.hobbies),
             )
           : cardHeader(
               IconHeart,
-              "Hobbies & Interests",
+              t("sections.hobbies.title"),
               () => onAdd(7),
-              "Add hobbies and interests",
+              t("sections.hobbies.add"),
             )}
         <div className="mt-4 border-t" />
         {hobbiesFilled ? (
           <div className="mt-4">
             <ClampedText text={doc.hobbies} />
-            {editLink("Edit Hobbies & Interests", () =>
+            {editLink(t("sections.hobbies.edit"), () =>
               onEditEntry(7, doc.hobbies),
             )}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Share what you enjoy doing to give employers a sense of your
-              personality.
+              {t("sections.hobbies.desc")}
             </p>
-            {addLink("Add Hobbies & Interests", () => onAdd(7))}
+            {addLink(t("sections.hobbies.add"), () => onAdd(7))}
           </>
         )}
       </div>
 
       {/* References */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        {cardHeader(IconUsers, "References", () => onAdd(8), "Add reference")}
+        {cardHeader(
+          IconUsers,
+          t("sections.references.title"),
+          () => onAdd(8),
+          t("sections.references.add"),
+        )}
         <div className="mt-4 border-t" />
         {doc.references.length > 0 ? (
           <div>
@@ -1044,15 +1141,14 @@ export function ResumePreview({
                 );
               })}
             </div>
-            {addLink("Add Reference", () => onAdd(8))}
+            {addLink(t("sections.references.add"), () => onAdd(8))}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Add professional references to support your experience and
-              increase employer confidence.
+              {t("sections.references.desc")}
             </p>
-            {addLink("Add Reference", () => onAdd(8))}
+            {addLink(t("sections.references.add"), () => onAdd(8))}
           </>
         )}
       </div>
@@ -1073,15 +1169,14 @@ export function ResumePreview({
               cvNoticed ? "text-amber-500" : "text-foreground",
             )}
           >
-            CV / Resume
+            {t("sections.cv.title")}
           </h2>
         </div>
         <p className="mt-4 text-base text-foreground">
-          Uploading a new file will replace your current resume details.
-          You&apos;ll get to review everything before it&apos;s saved.
+          {t("sections.cv.desc")}
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Support file types: doc, DOCX, PDF, txt. (Max size: 5MB)
+          {t("sections.cv.types")}
         </p>
         {doc.attachment && (
           <div className="mt-4 flex items-center gap-3 rounded-sm border px-3 py-2.5">
@@ -1097,7 +1192,7 @@ export function ResumePreview({
             </span>
             <button
               type="button"
-              aria-label="Remove CV"
+              aria-label={t("sections.cv.removeAria")}
               onClick={handleCvRemove}
               disabled={cvRemoving}
               className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1121,22 +1216,26 @@ export function ResumePreview({
         >
           <IconPaperclip size={18} />
           {cvUploading
-            ? "Uploading…"
+            ? t("sections.cv.uploading")
             : doc.attachment
-              ? "Replace file (CV)"
-              : "Upload file (CV)"}
+              ? t("sections.cv.replace")
+              : t("sections.cv.upload")}
         </button>
       </div>
 
       {/* Job Preferences */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         {doc.jobPreference
-          ? cardHeaderFilled(IconBriefcase, "Job Preferences", onJobPreference)
+          ? cardHeaderFilled(
+              IconBriefcase,
+              t("sections.jobPreferences.title"),
+              onJobPreference,
+            )
           : cardHeader(
               IconBriefcase,
-              "Job Preferences",
+              t("sections.jobPreferences.title"),
               onJobPreference,
-              "Add preference",
+              t("sections.jobPreferences.add"),
             )}
         <div className="mt-4 border-t" />
         {doc.jobPreference ? (
@@ -1152,15 +1251,14 @@ export function ResumePreview({
                 </p>
               </div>
             ))}
-            {editLink("Edit Preference", onJobPreference)}
+            {editLink(t("sections.jobPreferences.edit"), onJobPreference)}
           </div>
         ) : (
           <>
             <p className="mt-4 text-base text-muted-foreground">
-              Tell us about the type of job you&apos;re looking for so we can
-              help you find the right match faster.
+              {t("sections.jobPreferences.desc")}
             </p>
-            {addLink("Add Preference", onJobPreference)}
+            {addLink(t("sections.jobPreferences.add"), onJobPreference)}
           </>
         )}
       </div>

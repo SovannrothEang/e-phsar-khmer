@@ -18,6 +18,7 @@ function makeUser(overrides: Partial<UserRow> = {}): UserRow {
     firstName: null,
     lastName: null,
     gender: null,
+    dateOfBirth: null,
     yearOfBirth: null,
     company: null,
     coverPhotoUrl: null,
@@ -32,6 +33,11 @@ function makeUser(overrides: Partial<UserRow> = {}): UserRow {
     role: 'user',
     status: 'active',
     isBusiness: false,
+    discoverableByGender: false,
+    discoverableByDateOfBirth: false,
+    discoverableByPhone: true,
+    discoverableByEmail: true,
+    discoverableByLocation: true,
     lastSeenAt: null,
     emailVerifiedAt: null,
     phoneVerifiedAt: null,
@@ -64,16 +70,28 @@ function makeConfigService(values: Record<string, string> = {}) {
   };
 }
 
+function makeLoginDevices() {
+  return {
+    recordLogin: jest
+      .fn()
+      .mockResolvedValue({ isNewDevice: false, sessionId: null }),
+    findSessionByDeviceId: jest.fn().mockResolvedValue(null),
+    touchActiveSession: jest.fn().mockResolvedValue(true),
+  };
+}
+
 function makeService(
   db: ReturnType<typeof makeDb>,
   jwtService: ReturnType<typeof makeJwtService>,
   configService: ReturnType<typeof makeConfigService>,
+  loginDevices = makeLoginDevices(),
 ) {
   return new AuthService(
     db as never,
     jwtService as never,
     configService as never,
     {} as never,
+    loginDevices as never,
   );
 }
 
@@ -99,6 +117,33 @@ describe('AuthService', () => {
       const firstCallPayload = jwtService.sign.mock.calls[0][0];
       expect(firstCallPayload).toEqual({ sub: 'user-uuid', role: 'user' });
       expect(firstCallPayload).not.toHaveProperty('provider');
+    });
+
+    it('adds the device session id as sid when one is recorded', () => {
+      const jwtService = makeJwtService();
+      const service = makeService(
+        makeDb(),
+        jwtService,
+        makeConfigService({
+          'jwt.accessExpiresIn': '15m',
+          'jwt.refreshExpiresIn': '30d',
+          'jwt.refreshSecret': 'refresh-secret',
+        }),
+      );
+
+      (
+        service as unknown as {
+          issueTokens(u: UserRow, sessionId: string | null): unknown;
+        }
+      ).issueTokens(makeUser(), 'session-1');
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const firstCallPayload = jwtService.sign.mock.calls[0][0];
+      expect(firstCallPayload).toEqual({
+        sub: 'user-uuid',
+        role: 'user',
+        sid: 'session-1',
+      });
     });
   });
 
@@ -142,6 +187,208 @@ describe('AuthService', () => {
         service.loginWithPassword({ identifier: 'testuser', password: 'pass' }),
       ).rejects.toThrow('Account deactivated');
     });
+
+    it('records the device and returns newDevice from the login result', async () => {
+      const user = makeUser();
+      const db = makeDb();
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([user]) }),
+        }),
+      });
+      const loginDevices = makeLoginDevices();
+      loginDevices.recordLogin.mockResolvedValue({
+        isNewDevice: true,
+        sessionId: 'session-1',
+      });
+      const service = makeService(
+        db,
+        makeJwtService(),
+        makeConfigService(),
+        loginDevices,
+      );
+      const device = { id: 'device-12345678', name: 'Chrome on Linux' };
+
+      const result = await service.loginWithPassword(
+        { identifier: 'testuser', password: 'pass' },
+        device,
+      );
+
+      expect(result.newDevice).toBe(true);
+      expect(result.user).not.toHaveProperty('passwordHash');
+      expect(loginDevices.recordLogin).toHaveBeenCalledWith(user.id, device);
+    });
+
+    it('does not record a device when the password is wrong', async () => {
+      const user = makeUser();
+      const db = makeDb();
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([user]) }),
+        }),
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      const loginDevices = makeLoginDevices();
+      const service = makeService(
+        db,
+        makeJwtService(),
+        makeConfigService(),
+        loginDevices,
+      );
+
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'wrong-pass',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(loginDevices.recordLogin).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('AuthService refresh', () => {
+  const SID = '00000000-0000-4000-8000-000000000001';
+
+  function makeRefreshService() {
+    const db = makeDb();
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([makeUser()]) }),
+      }),
+    });
+    const jwtService = makeJwtService();
+    const loginDevices = makeLoginDevices();
+    const service = makeService(
+      db,
+      jwtService,
+      makeConfigService({
+        'jwt.accessExpiresIn': '15m',
+        'jwt.refreshExpiresIn': '30d',
+        'jwt.refreshSecret': 'refresh-secret',
+      }),
+      loginDevices,
+    );
+    return { service, jwtService, loginDevices };
+  }
+
+  it('reissues tokens with the same sid and touches the row', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+    });
+
+    await service.refresh({ refreshToken: 'token' });
+
+    expect(loginDevices.touchActiveSession).toHaveBeenCalledWith(
+      'user-uuid',
+      SID,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toEqual({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+    });
+  });
+
+  it('rejects a sid whose device row was revoked', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+    });
+    loginDevices.touchActiveSession.mockResolvedValue(false);
+
+    await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+      'Session revoked',
+    );
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed sid before querying', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: 'not-a-uuid',
+    });
+
+    await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+      'Invalid session',
+    );
+    expect(loginDevices.touchActiveSession).not.toHaveBeenCalled();
+  });
+
+  it('binds a legacy refresh token to an active device row', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+    });
+    loginDevices.findSessionByDeviceId.mockResolvedValue({
+      sessionId: SID,
+      revokedAt: null,
+    });
+
+    await service.refresh(
+      { refreshToken: 'token' },
+      { id: 'device-12345678', name: null },
+    );
+
+    expect(loginDevices.findSessionByDeviceId).toHaveBeenCalledWith(
+      'user-uuid',
+      'device-12345678',
+    );
+    expect(loginDevices.touchActiveSession).toHaveBeenCalledWith(
+      'user-uuid',
+      SID,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toMatchObject({ sid: SID });
+  });
+
+  it('rejects a legacy token whose known device row was revoked', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+    });
+    loginDevices.findSessionByDeviceId.mockResolvedValue({
+      sessionId: SID,
+      revokedAt: new Date(),
+    });
+
+    await expect(
+      service.refresh(
+        { refreshToken: 'token' },
+        { id: 'device-12345678', name: null },
+      ),
+    ).rejects.toThrow('Session revoked');
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('grandfathers a legacy token with an unknown device', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+    });
+    loginDevices.findSessionByDeviceId.mockResolvedValue(null);
+
+    await service.refresh(
+      { refreshToken: 'token' },
+      { id: 'device-12345678', name: null },
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toEqual({ sub: 'user-uuid', role: 'user' });
   });
 });
 
@@ -161,12 +408,14 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
   function makeAuthService(
     db: ReturnType<typeof makeDb>,
     supabase: ReturnType<typeof makeSupabase>,
+    loginDevices = makeLoginDevices(),
   ) {
     return new AuthService(
       db as never,
       makeJwtService() as never,
       makeConfigService() as never,
       supabase as never,
+      loginDevices as never,
     );
   }
 
@@ -300,6 +549,47 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       });
       expect(bcrypt.hash).not.toHaveBeenCalled();
       expect(selectCall).toBe(3); // no username probes
+    });
+
+    it('propagates newDevice from the device recorder', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const existing = makeUser({
+        primaryPhone: PHONE,
+        passwordHash: '$2b$10$hash',
+      });
+      let selectCall = 0;
+      const db = makeDb();
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: existing-user fetch;
+        // 3: the mirror's own ban re-check → not banned
+        const rows = selectCall === 2 ? [existing] : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      const supabase = makeSupabase();
+      const loginDevices = makeLoginDevices();
+      loginDevices.recordLogin.mockResolvedValue({
+        isNewDevice: true,
+        sessionId: 'session-1',
+      });
+      const service = makeAuthService(db, supabase, loginDevices);
+      mockInsert(db, existing);
+      const device = { id: 'device-12345678', name: 'Chrome on Linux' };
+
+      const result = await service.verifyPhoneOtp(
+        { phone: PHONE, token: '000000', password: 'password123' },
+        device,
+      );
+
+      expect(result.newDevice).toBe(true);
+      expect(loginDevices.recordLogin).toHaveBeenCalledWith(
+        existing.id,
+        device,
+      );
     });
 
     it('wrong password → 401 and Supabase OTP is never consumed', async () => {

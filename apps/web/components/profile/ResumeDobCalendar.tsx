@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   addDays,
   addMonths,
@@ -14,6 +15,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { MONTH_LABELS, WEEKDAY_LABELS } from "@/lib/locale-labels";
 
 /**
  * The resume DOB calendar: a days view ⇄ months view toggled by the middle of
@@ -53,10 +55,18 @@ export function ResumeDobCalendar({
   to: Date;
   onSelect: (date: Date) => void;
 }) {
+  const t = useTranslations("Resume");
+  const locale = useLocale();
   const [view, setView] = useState<"days" | "months">("days");
   const [cursor, setCursor] = useState<Date>(selected ?? new Date(2000, 0, 1));
 
   const year = cursor.getFullYear();
+  const weekdays = WEEKDAY_LABELS[locale] ?? WEEKDAYS;
+  const monthLabels = locale === "km" ? MONTH_LABELS.km : MONTHS;
+  const monthTitle =
+    locale === "km"
+      ? `${MONTH_LABELS.km[cursor.getMonth()]} ${year}`
+      : format(cursor, "MMMM yyyy");
   const canPrevMonth = startOfMonth(cursor) > startOfMonth(from);
   const canNextMonth = startOfMonth(cursor) < startOfMonth(to);
   const canPrevYear = year > from.getFullYear();
@@ -70,7 +80,9 @@ export function ResumeDobCalendar({
       <div className="flex items-center">
         <button
           type="button"
-          aria-label={view === "days" ? "Previous month" : "Previous year"}
+          aria-label={
+            view === "days" ? t("form.previousMonth") : t("form.previousYear")
+          }
           disabled={view === "days" ? !canPrevMonth : !canPrevYear}
           onClick={() =>
             setCursor((c) =>
@@ -87,7 +99,7 @@ export function ResumeDobCalendar({
             onClick={() => setView("months")}
             className="h-10 min-w-0 flex-1 cursor-pointer rounded-md text-center text-base font-semibold text-foreground transition-colors hover:bg-muted"
           >
-            {format(cursor, "MMMM yyyy")}
+            {monthTitle}
           </button>
         ) : (
           <span className="flex h-10 flex-1 items-center justify-center text-base font-bold text-foreground">
@@ -96,7 +108,9 @@ export function ResumeDobCalendar({
         )}
         <button
           type="button"
-          aria-label={view === "days" ? "Next month" : "Next year"}
+          aria-label={
+            view === "days" ? t("form.nextMonth") : t("form.nextYear")
+          }
           disabled={view === "days" ? !canNextMonth : !canNextYear}
           onClick={() =>
             setCursor((c) =>
@@ -112,7 +126,7 @@ export function ResumeDobCalendar({
       {view === "days" ? (
         <>
           <div className="mt-3 grid grid-cols-7">
-            {WEEKDAYS.map((day) => (
+            {weekdays.map((day) => (
               <span
                 key={day}
                 className="flex h-9 items-center justify-center text-sm font-medium text-foreground"
@@ -149,7 +163,7 @@ export function ResumeDobCalendar({
         </>
       ) : (
         <div className="mt-3 grid grid-cols-3 gap-y-1">
-          {MONTHS.map((label, month) => {
+          {monthLabels.map((label, month) => {
             const isCursorMonth = month === cursor.getMonth();
             const outOfRange =
               (year === from.getFullYear() && month < from.getMonth()) ||

@@ -1,0 +1,1 @@
+ALTER TABLE "attribute_options" ADD COLUMN "name_km" varchar(160);

@@ -1,10 +1,11 @@
 import Subscription from "@/components/profile/Subscription";
+import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Subscriptions - Psakhmer",
-  description: "Subscriptions",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("Me.metadata");
+  return { title: t("subscriptions"), description: t("subscriptions") };
+}
 
 export default function SubscriptionsPage() {
   return <Subscription />;

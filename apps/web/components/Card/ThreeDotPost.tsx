@@ -1,3 +1,5 @@
+"use client";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +18,7 @@ import { IconShare3, IconUser, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 import ShareModal from "@/components/share/ShareModel";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useTranslations } from "next-intl";
 
 /**
  * Every row in this menu shares one shape — the same box, gap and padding —
@@ -32,6 +35,7 @@ const ITEM =
 const ICON = "size-[18px] shrink-0";
 
 export function ThreeDotPost({ post }: { post: Post }) {
+  const t = useTranslations();
   const router = useRouter();
   // The real feed carries the seller's handle; mock posts fall back to the
   // mock users array. It used to come from that array alone, so on a real
@@ -73,7 +77,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
                 className={ITEM}
               >
                 <IconUser className={ICON} strokeWidth={1.5} />
-                <span>View Profile</span>
+                <span>{t("Common.viewProfile")}</span>
               </button>
             </DropdownMenuItem>
           )}
@@ -95,7 +99,11 @@ export function ThreeDotPost({ post }: { post: Post }) {
                     : "text-foreground"
                 }`}
               />
-              <span>{reactions.isSaved(listingId) ? "Unsave" : "Save"}</span>
+              <span>
+                {reactions.isSaved(listingId)
+                  ? t("Common.unsave")
+                  : t("Common.save")}
+              </span>
             </Toggle>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="p-0">
@@ -105,7 +113,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
               className={ITEM}
             >
               <IconShare3 className={ICON} strokeWidth={1.5} />
-              <span>Share</span>
+              <span>{t("Common.share")}</span>
             </button>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="p-0">
@@ -115,7 +123,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
               className={`${ITEM} text-destructive hover:bg-destructive/10`}
             >
               <IconAlertTriangle className={ICON} strokeWidth={1.5} />
-              <span>Report</span>
+              <span>{t("Common.report")}</span>
             </button>
           </DropdownMenuItem>
         </DropdownMenuContent>

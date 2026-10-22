@@ -1,6 +1,10 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { IconMapPin, IconPhoneCall } from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
 import ListingLocationMap from "./ListingLocationMap";
+import { trackEvent } from "@/lib/insights/queue";
 
 export default function ContactUser({
   user,
@@ -9,6 +13,7 @@ export default function ContactUser({
   coords,
   locationLine,
   addressLine,
+  listingId,
 }: {
   user: { phone?: string[] };
   district?: { name?: string };
@@ -19,7 +24,10 @@ export default function ContactUser({
   locationLine?: string;
   /** The seller's street address — printed under the location. */
   addressLine?: string;
+  /** Present on a real listing; drives call/show-contact tracking. */
+  listingId?: string;
 }) {
+  const t = useTranslations("Post");
   const phone0 = user?.phone?.[0];
   const phone1 = user?.phone?.[1];
   const heading =
@@ -30,13 +38,10 @@ export default function ContactUser({
   return (
     <>
       <div className="mt-4">
-        <h1 className="text-sm text-foreground mb-3">
-          Please click on phone number to show and don&apos;t forget to mention
-          that you found this ad on PsaKhmer.com.
-        </h1>
+        <h1 className="text-sm text-foreground mb-3">{t("contactHint")}</h1>
         <h3 className="text-base font-medium flex items-center mb-2">
           <IconPhoneCall className="scale-80 mr-2 text-muted-foreground" />
-          Contact Phones
+          {t("contactPhones")}
         </h3>
         <div className="flex flex-wrap items-center gap-5 text-sm font-bold ml-[26px]">
           {phone1 ? (
@@ -50,7 +55,15 @@ export default function ContactUser({
                   </span>
                 }
               />
-              {phone1}
+              <a
+                href={`tel:${phone1}`}
+                onClick={() => {
+                  if (listingId) trackEvent(listingId, "call");
+                }}
+                className="hover:underline"
+              >
+                {phone1}
+              </a>
             </span>
           ) : null}
           {phone0 ? (
@@ -64,12 +77,26 @@ export default function ContactUser({
                   </span>
                 }
               />
-              {phone0}
+              <a
+                href={`tel:${phone0}`}
+                onClick={() => {
+                  if (listingId) trackEvent(listingId, "call");
+                }}
+                className="hover:underline"
+              >
+                {phone0}
+              </a>
             </span>
           ) : null}
         </div>
-        <button className="text-[#00a0e9] text-[13px] italic hover:underline mt-2 ml-[26px] inline-block">
-          Show Phone Number
+        <button
+          type="button"
+          onClick={() => {
+            if (listingId) trackEvent(listingId, "show_contact");
+          }}
+          className="text-[#00a0e9] text-[13px] italic hover:underline mt-2 ml-[26px] inline-block"
+        >
+          {t("showPhone")}
         </button>
       </div>
       <div className="mt-4">

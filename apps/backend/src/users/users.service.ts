@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, count, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import {
   buildUsernameBase,
@@ -15,7 +15,8 @@ import {
 } from './username.util';
 import { randomUUID } from 'node:crypto';
 import { DRIZZLE } from '../db/drizzle.provider';
-import type { DbClient } from '../db/drizzle.provider';
+import type { DbClient, DbExecutor } from '../db/drizzle.provider';
+import { listings } from '../db/schema/listings.schema';
 import {
   communes,
   districts,
@@ -32,6 +33,7 @@ import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ConfigService } from '@nestjs/config';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import type { AddPhoneDto } from './dto/add-phone.dto';
+import type { UpdatePhoneDto } from './dto/update-phone.dto';
 import type { BlockUserDto } from './dto/block-user.dto';
 import type { ChangeUsernameDto } from './dto/change-username.dto';
 import type { ChangePasswordDto } from './dto/change-password.dto';
@@ -155,17 +157,46 @@ export class UsersService {
     if (dto.lastName !== undefined) updateData.lastName = dto.lastName;
     if (dto.gender !== undefined) updateData.gender = dto.gender;
     if (dto.yearOfBirth !== undefined) updateData.yearOfBirth = dto.yearOfBirth;
+    // The full birthday is authoritative when sent; the legacy year column is
+    // derived from it so the two representations cannot disagree.
+    if (dto.dateOfBirth !== undefined) {
+      if (dto.dateOfBirth === null) {
+        updateData.dateOfBirth = null;
+        updateData.yearOfBirth = null;
+      } else {
+        if (new Date(dto.dateOfBirth) > new Date())
+          throw new BadRequestException('INVALID_DATE_OF_BIRTH');
+        updateData.dateOfBirth = dto.dateOfBirth;
+        updateData.yearOfBirth = Number(dto.dateOfBirth.slice(0, 4));
+      }
+    }
     if (dto.company !== undefined) updateData.company = dto.company;
     if (dto.email !== undefined) updateData.email = dto.email;
     if (dto.provinceId !== undefined) updateData.provinceId = dto.provinceId;
     if (dto.districtId !== undefined) updateData.districtId = dto.districtId;
     if (dto.communeId !== undefined) updateData.communeId = dto.communeId;
     if (dto.address !== undefined) updateData.address = dto.address;
-    if (dto.latitude !== undefined) updateData.latitude = String(dto.latitude);
+    // null clears the pin; `String(null)` would write the literal "null" and
+    // fail the numeric column.
+    if (dto.latitude !== undefined)
+      updateData.latitude = dto.latitude != null ? String(dto.latitude) : null;
     if (dto.longitude !== undefined)
-      updateData.longitude = String(dto.longitude);
+      updateData.longitude =
+        dto.longitude != null ? String(dto.longitude) : null;
     if (dto.preferredLanguage !== undefined)
       updateData.preferredLanguage = dto.preferredLanguage;
+    // Privacy toggles are independent: only the keys this PATCH carried are
+    // written, so flipping "Email" cannot clobber a concurrent "Phone" change.
+    if (dto.discoverableByGender !== undefined)
+      updateData.discoverableByGender = dto.discoverableByGender;
+    if (dto.discoverableByDateOfBirth !== undefined)
+      updateData.discoverableByDateOfBirth = dto.discoverableByDateOfBirth;
+    if (dto.discoverableByPhone !== undefined)
+      updateData.discoverableByPhone = dto.discoverableByPhone;
+    if (dto.discoverableByEmail !== undefined)
+      updateData.discoverableByEmail = dto.discoverableByEmail;
+    if (dto.discoverableByLocation !== undefined)
+      updateData.discoverableByLocation = dto.discoverableByLocation;
 
     if (hasNameChange && currentUser && currentUser.username === null) {
       const effFirst = dto.firstName ?? currentUser.firstName;
@@ -179,13 +210,20 @@ export class UsersService {
     updateData.updatedAt = new Date();
 
     try {
-      const [updated] = await this.db
-        .update(users)
-        .set(updateData)
-        .where(eq(users.id, userId))
-        .returning();
+      // One transaction so "Update this contact to your ads" can never leave
+      // the profile saved but the listings half-rewritten.
+      const updated = await this.db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(users)
+          .set(updateData)
+          .where(eq(users.id, userId))
+          .returning();
 
-      if (!updated) throw new NotFoundException('User not found');
+        if (!row) throw new NotFoundException('User not found');
+        if (dto.updateAdsContact) await this.copyContactToAds(tx, row);
+        return row;
+      });
+
       return this.toPublicUser(updated);
     } catch (err) {
       // The settings form edits `email`, which is unique among active users —
@@ -198,6 +236,46 @@ export class UsersService {
       }
       throw err;
     }
+  }
+
+  /**
+   * "Update this contact to your ads": copy the profile's contact trio onto
+   * every non-deleted listing the user owns. Only the contact fields move —
+   * address and coordinates stay listing-specific, because rewriting every
+   * ad's location from a profile edit would be a far larger footprint.
+   */
+  private async copyContactToAds(tx: DbExecutor, user: UserRow): Promise<void> {
+    const phoneRows = await tx
+      .select({ phone: userPhones.phone, isPrimary: userPhones.isPrimary })
+      .from(userPhones)
+      .where(eq(userPhones.userId, user.id));
+
+    // Primary first, then the rest; the listing contact block caps at 3.
+    const phones = [
+      ...phoneRows.filter((p) => p.isPrimary),
+      ...phoneRows.filter((p) => !p.isPrimary),
+    ]
+      .map((p) => p.phone)
+      .slice(0, 3);
+    // An account can have a primaryPhone but no user_phones row (the known
+    // soft-delete gap) — never blank a listing's phones in that case.
+    if (phones.length === 0 && user.primaryPhone)
+      phones.push(user.primaryPhone);
+
+    const contactName =
+      [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+      user.username ||
+      null;
+
+    await tx
+      .update(listings)
+      .set({
+        contactName,
+        contactPhones: phones,
+        contactEmail: user.email,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(listings.userId, user.id), ne(listings.status, 'deleted')));
   }
 
   async listPhones(userId: string): Promise<UserPhoneRow[]> {
@@ -235,6 +313,42 @@ export class UsersService {
       .values({ userId, phone: dto.phone, isPrimary: makePrimary })
       .returning();
     return created;
+  }
+
+  /**
+   * Edits one saved contact number in place. Deliberately does NOT touch
+   * `users.primaryPhone`: the active (login) phone is a separate concept from
+   * the contact numbers shown on ads, and only the OTP-gated change-phone
+   * flow may move it.
+   */
+  async updatePhone(
+    userId: string,
+    phoneId: string,
+    dto: UpdatePhoneDto,
+  ): Promise<UserPhoneRow> {
+    await this.assertPhoneNotBanned(dto.phone);
+
+    const [existing] = await this.db
+      .select()
+      .from(userPhones)
+      .where(and(eq(userPhones.id, phoneId), eq(userPhones.userId, userId)))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Phone not found');
+    if (existing.phone === dto.phone) return existing;
+
+    const [owner] = await this.db
+      .select({ id: userPhones.id })
+      .from(userPhones)
+      .where(eq(userPhones.phone, dto.phone))
+      .limit(1);
+    if (owner) throw new ConflictException('Phone already in use');
+
+    const [updated] = await this.db
+      .update(userPhones)
+      .set({ phone: dto.phone })
+      .where(and(eq(userPhones.id, phoneId), eq(userPhones.userId, userId)))
+      .returning();
+    return updated;
   }
 
   async removePhone(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { IconLayoutGridFilled, IconListFilled } from "@tabler/icons-react";
 import { Check } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -109,22 +110,22 @@ function ChipSelect({
  */
 function yearOptions(): {
   key: string;
-  label: string;
   min?: number;
   max?: number;
+  kind: "all" | "single" | "older";
 }[] {
   const newest = new Date().getFullYear() + 1; // next model year is sold already
   const singles = Array.from({ length: 8 }, (_, i) => newest - i).map((y) => ({
     key: `${y}-${y}`,
-    label: String(y),
     min: y,
     max: y,
+    kind: "single" as const,
   }));
   const older = newest - 8;
   return [
-    { key: "", label: "All Years" },
+    { key: "", kind: "all" },
     ...singles,
-    { key: `-${older}`, label: `${older} & Older`, max: older },
+    { key: `-${older}`, max: older, kind: "older" },
   ];
 }
 
@@ -134,9 +135,11 @@ export default function LSPYCEHeader({
   engine = true,
   condition = true,
   price = true,
-  priceLabel = "Price",
+  priceLabel,
   engineOptions = [],
 }: LSPCYEHeaderProps) {
+  const t = useTranslations();
+  const resolvedPriceLabel = priceLabel ?? t("Filters.price.label");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -159,21 +162,32 @@ export default function LSPYCEHeader({
   const yearMin = searchParams.get(YEAR_MIN_PARAM) ?? "";
   const yearMax = searchParams.get(YEAR_MAX_PARAM) ?? "";
   const yearKey = yearMin || yearMax ? `${yearMin}-${yearMax}` : "";
-  const years = yearOptions();
+  const conditionOption = CONDITION_OPTIONS.find(
+    (o) => o.value === conditionValue,
+  );
+  const years = yearOptions().map((o) => ({
+    ...o,
+    label:
+      o.kind === "all"
+        ? t("Filters.year.all")
+        : o.kind === "older"
+          ? t("Filters.year.older", { year: o.max ?? "" })
+          : o.key,
+  }));
   const yearLabel =
     years.find((o) => o.key === yearKey)?.label ??
     (yearMin && yearMax
       ? `${yearMin}–${yearMax}`
       : yearMin
-        ? `${yearMin}+`
-        : `${yearMax} & Older`);
+        ? t("Filters.year.from", { year: yearMin })
+        : t("Filters.year.older", { year: yearMax }));
 
   return (
     <>
       {/* HEADER */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
         <h1 className="font-semibold text-lg md:text-lg">
-          {title} <span className="font-semibold text-lg">in Cambodia</span>
+          {t("Common.inCambodia", { name: title })}
         </h1>
       </div>
 
@@ -185,11 +199,11 @@ export default function LSPYCEHeader({
         <div className="flex items-center gap-2 flex-wrap">
           <LocationSelectorFilter />
           <SortFilter />
-          {price && <PriceFilter label={priceLabel} />}
+          {price && <PriceFilter label={resolvedPriceLabel} />}
 
           {year && (
             <ChipSelect
-              label="Year"
+              label={t("Filters.year.label")}
               activeLabel={yearLabel}
               value={yearKey}
               options={years}
@@ -205,16 +219,16 @@ export default function LSPYCEHeader({
 
           {condition && (
             <ChipSelect
-              label="Condition"
+              label={t("Filters.condition.label")}
               activeLabel={
-                CONDITION_OPTIONS.find((o) => o.value === conditionValue)?.label
+                conditionOption ? t(conditionOption.labelKey) : undefined
               }
               value={conditionValue}
               options={[
-                { key: "", label: "All Conditions" },
+                { key: "", label: t("Filters.condition.all") },
                 ...CONDITION_OPTIONS.map((o) => ({
                   key: o.value,
-                  label: o.label,
+                  label: t(o.labelKey),
                 })),
               ]}
               onSelect={(key) => replaceParams({ [CONDITION_PARAM]: key })}
@@ -223,11 +237,11 @@ export default function LSPYCEHeader({
 
           {engine && engineOptions.length > 0 && (
             <ChipSelect
-              label="Engine Type"
+              label={t("Filters.engine.label")}
               activeLabel={engineValue}
               value={engineValue}
               options={[
-                { key: "", label: "All Engine Types" },
+                { key: "", label: t("Filters.engine.all") },
                 ...engineOptions.map((name) => ({ key: name, label: name })),
               ]}
               onSelect={(key) => replaceParams({ [ENGINE_PARAM]: key })}

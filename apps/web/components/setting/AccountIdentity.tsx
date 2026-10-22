@@ -1,6 +1,7 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { useTranslations } from "next-intl";
 import type { SettingsUser } from "@/lib/auth/current-user";
 
 /** "Sok Dara", falling back to the handle for an account with no name yet. */
@@ -22,6 +23,7 @@ function initials(name: string): string {
  * bundled stand-in.
  */
 export function AccountIdentity({ me }: { me?: SettingsUser | null }) {
+  const t = useTranslations("Settings");
   const name = displayName(me);
 
   return (
@@ -30,7 +32,7 @@ export function AccountIdentity({ me }: { me?: SettingsUser | null }) {
         src={me?.profilePhotoUrl ?? ""}
         width={100}
         height={100}
-        alt={name || "Profile picture"}
+        alt={name || t("profilePicture")}
         className="rounded-full border border-gray-100 object-cover size-[50px] aspect-square flex-shrink-0"
         fallback={
           <span className="flex size-[50px] flex-shrink-0 items-center justify-center rounded-full border border-gray-100 bg-[#00a0e9] text-sm font-medium text-white">
@@ -39,7 +41,11 @@ export function AccountIdentity({ me }: { me?: SettingsUser | null }) {
         }
       />
       <div>
-        <p className="font-medium text-foreground">{name}</p>
+        {/* The card's link carries `group`; only the display name picks up
+            the theme on hover — the @handle stays muted. */}
+        <p className="font-medium text-foreground transition-colors group-hover:text-[#00a0e9]">
+          {name}
+        </p>
         <p className="text-sm text-muted-foreground">
           {me?.username ? `@${me.username}` : ""}
         </p>

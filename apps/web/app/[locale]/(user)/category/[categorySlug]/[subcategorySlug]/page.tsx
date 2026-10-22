@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { notFound } from "next/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 // ─── Header: one component; chip flags come from the maps below ──────────────
@@ -33,7 +33,7 @@ import type { Post } from "@/lib/posts";
 //     family has per-subcategory chip sets. All chips default to true (cars).
 type HeaderFlags = Pick<
   LSPCYEHeaderProps,
-  "year" | "engine" | "condition" | "price" | "priceLabel"
+  "year" | "engine" | "condition" | "price"
 >;
 const CATEGORY_HEADER_FLAGS: Record<string, HeaderFlags> = {
   "phones-and-tablets": { year: false, engine: false },
@@ -50,7 +50,6 @@ const CATEGORY_HEADER_FLAGS: Record<string, HeaderFlags> = {
     year: false,
     engine: false,
     condition: false,
-    priceLabel: "Salary",
   },
   "fashion-and-beauty": { year: false, engine: false, condition: false },
   "furniture-and-decor": { year: false, engine: false, condition: false },
@@ -86,12 +85,12 @@ const DEFAULT_HEADER_FLAGS: HeaderFlags = {
 // ─── Attribute sets rendered as option grids on the browse pages; the rows
 //     carry subcategoryIds (UUIDs) — the page filters by the subcategory id. ──
 const ATTRIBUTE_SET_TITLES: Record<string, string> = {
-  bodytypes: "Body Type",
-  types: "Type",
-  accessories: "Accessories",
-  networks: "Network",
-  jobtypes: "Job Type",
-  enginetypes: "Engine Type",
+  bodytypes: "Specs.attributes.bodyType",
+  types: "Specs.attributes.type",
+  accessories: "Specs.attributes.accessories",
+  networks: "Specs.attributes.network",
+  jobtypes: "Specs.attributes.jobType",
+  enginetypes: "Specs.attributes.engineType",
   // `vehicletypes` is deliberately absent (2026-09-16): it duplicated
   // `bodytypes`, and Vehicles For Rent rendered both grids with 5 values
   // appearing twice. The duplicate set is retired; rent's grid is Body Type.
@@ -102,17 +101,17 @@ const ATTRIBUTE_SET_TITLES: Record<string, string> = {
   // leaving the rows unlinked — but they had to be scoped to make unticking
   // work in the form, and a linked set whose type is listed here renders a
   // grid. This map is now the control, not the absence of links.
-  bedrooms: "Bedroom",
-  bathrooms: "Bathroom",
-  facings: "Facing",
-  experiences: "Experience",
-  rams: "RAM",
-  cpus: "CPU",
-  storage_phone: "Storage",
-  storage_computer: "Storage",
-  screensize_laptop: "Screen Size",
-  screensize_monitor: "Screen Size",
-  vgas: "VGA",
+  bedrooms: "Specs.attributes.bedroom",
+  bathrooms: "Specs.attributes.bathroom",
+  facings: "Specs.attributes.facing",
+  experiences: "Specs.attributes.experience",
+  rams: "Specs.attributes.ram",
+  cpus: "Specs.attributes.cpu",
+  storage_phone: "Specs.attributes.storage",
+  storage_computer: "Specs.attributes.storage",
+  screensize_laptop: "Specs.attributes.screenSize",
+  screensize_monitor: "Specs.attributes.screenSize",
+  vgas: "Specs.attributes.vga",
 };
 const ATTRIBUTE_SET_TYPES = Object.keys(ATTRIBUTE_SET_TITLES);
 
@@ -199,6 +198,7 @@ export default async function SubcategoryPage({
   const { categorySlug, subcategorySlug } = await params;
   const sp = await searchParams;
   const locale = await getLocale();
+  const t = await getTranslations();
 
   // Single category fetch covers both sides: breadcrumb names + subcategory
   // identity (id/slug/name/icon). The backend localizes names via
@@ -235,7 +235,7 @@ export default async function SubcategoryPage({
   const textTileSets = TEXT_TILE_SETS_BY_CATEGORY[category.slug];
   const sets = ATTRIBUTE_SET_TYPES.map((type) => ({
     slug: type,
-    title: ATTRIBUTE_SET_TITLES[type],
+    title: t(ATTRIBUTE_SET_TITLES[type]),
     // Declared design — never sniffed from the rows (see IMAGE_TILE_SETS).
     imageTiles: IMAGE_TILE_SETS.has(type) && !textTileSets?.has(type),
     options: linkedRows
@@ -310,6 +310,8 @@ export default async function SubcategoryPage({
     headerFlags.engine !== false
       ? (await getAttributeOptions("enginetypes")).map((row) => row.name)
       : [];
+  const priceLabel =
+    category.slug === "jobs" ? t("Filters.price.salary") : undefined;
 
   // ── Active filter label — display names when available (slug-derived
   //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
@@ -320,7 +322,8 @@ export default async function SubcategoryPage({
     brandName ??
     clickedOption?.name ??
     bodyTypeName ??
-    (brand ?? adType)?.replace(/-/g, " ");
+    (brand ?? adType)?.replace(/-/g, " ") ??
+    "";
 
   return (
     <main className="min-h-screen flex flex-col bg-gray-100">
@@ -348,7 +351,7 @@ export default async function SubcategoryPage({
         <div className="max-w-7xl mx-auto w-full pb-1">
           <Breadcrumbs
             items={[
-              { label: "Home", href: "/" },
+              { label: t("Search.home"), href: "/" },
               {
                 label: category.name,
                 href: {
@@ -370,11 +373,17 @@ export default async function SubcategoryPage({
                       },
                     },
                     {
-                      label: `${filterLabel} in Cambodia`,
+                      label: t("Common.inCambodia", { name: filterLabel }),
                       className: "capitalize",
                     },
                   ]
-                : [{ label: `${subcategory.name} in Cambodia` }]),
+                : [
+                    {
+                      label: t("Common.inCambodia", {
+                        name: subcategory.name,
+                      }),
+                    },
+                  ]),
             ]}
           />
         </div>
@@ -390,6 +399,7 @@ export default async function SubcategoryPage({
           title={subcategory.name}
           {...headerFlags}
           engineOptions={engineOptions}
+          priceLabel={priceLabel}
         />
         {/* Main listing content (visible in both grid/list views — same as
             SubcategoryGrid on the category page) */}

@@ -1,7 +1,9 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { ConditionLabel } from "@/components/common/ConditionLabel";
 import { ReportPost } from "@/components/report/ReportPost";
+import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
@@ -33,13 +35,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useListingImpression } from "@/hooks/use-listing-impression";
 
 export function ListCardPost({ post }: { post: Post }) {
+  const t = useTranslations();
+  const format = useFormatter();
   // See GridCardPost — a "Negotiable" listing has no price to subtract from.
   const discountAmount =
     post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
   const reactions = useReactions();
+  const impressionRef = useListingImpression(post.postId);
   const listingId = String(post.postId);
   // No photo at all, or a stored photo missing from storage → empty area (the
   // DB is the only image source: no static stand-in, no broken <img>).
@@ -54,7 +60,10 @@ export function ListCardPost({ post }: { post: Post }) {
 
   return (
     <>
-      <div className="relative flex items-stretch bg-card rounded-sm hover:bg-muted/20 transition-colors border cursor-pointer select-none w-full mt-4">
+      <div
+        ref={impressionRef}
+        className="relative flex items-stretch bg-card rounded-sm hover:bg-muted/20 transition-colors border cursor-pointer select-none w-full mt-4"
+      >
         {/* Full-card link */}
         <Link
           // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
@@ -86,7 +95,7 @@ export function ListCardPost({ post }: { post: Post }) {
                 ${discountAmount.toLocaleString()}
               </span>
               <span className="bg-amber-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full leading-tight">
-                Off
+                {t("ListingCard.offShort")}
               </span>
             </div>
           )}
@@ -115,7 +124,7 @@ export function ListCardPost({ post }: { post: Post }) {
                     className="flex items-center gap-3 px-3 py-2 cursor-pointer"
                   >
                     <User size={15} />
-                    <span>View Profile</span>
+                    <span>{t("Common.viewProfile")}</span>
                   </Link>
                 </DropdownMenuItem>
 
@@ -139,7 +148,9 @@ export function ListCardPost({ post }: { post: Post }) {
                       }
                     />
                     <span>
-                      {reactions.isSaved(listingId) ? "Unsave" : "Save"}
+                      {reactions.isSaved(listingId)
+                        ? t("Common.unsave")
+                        : t("Common.save")}
                     </span>
                   </Toggle>
                 </DropdownMenuItem>
@@ -152,7 +163,7 @@ export function ListCardPost({ post }: { post: Post }) {
                   }}
                 >
                   <Forward size={15} />
-                  <span>Share</span>
+                  <span>{t("Common.share")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
@@ -163,7 +174,7 @@ export function ListCardPost({ post }: { post: Post }) {
                   }}
                 >
                   <AlertTriangle size={15} />
-                  <span>Report</span>
+                  <span>{t("Common.report")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -189,7 +200,7 @@ export function ListCardPost({ post }: { post: Post }) {
             {/* Time · Location */}
             <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
               <span className="shrink-0">
-                {new Date(post.createdat).toLocaleString([], {
+                {format.dateTime(new Date(post.createdat), {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
@@ -201,13 +212,15 @@ export function ListCardPost({ post }: { post: Post }) {
             </div>
 
             {/* Condition · Year · etc */}
-            <p className="text-xs text-muted-foreground">{post.condition}</p>
+            <p className="text-xs text-muted-foreground">
+              <ConditionLabel value={post.condition} />
+            </p>
 
             {/* Free delivery — styled like khmer24: icon + text, muted blue */}
             {post.freeDelivery && (
               <span className="inline-flex items-center gap-1 text-xs text-sky-600 w-fit mt-0.5">
                 <TruckIcon size={12} />
-                <span>Free Delivery</span>
+                <span>{t("Common.freeDelivery")}</span>
               </span>
             )}
           </div>
@@ -216,7 +229,7 @@ export function ListCardPost({ post }: { post: Post }) {
           <div className="flex items-center gap-2 mt-1">
             <span className="text-red-500 font-bold text-lg leading-none">
               {post.price === null
-                ? "Negotiable"
+                ? t("Common.negotiable")
                 : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (
@@ -257,10 +270,8 @@ export function ListCardPost({ post }: { post: Post }) {
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader>
-            <DialogTitle>Share link</DialogTitle>
-            <DialogDescription>
-              Anyone who has this link will be able to view this.
-            </DialogDescription>
+            <DialogTitle>{t("Share.linkTitle")}</DialogTitle>
+            <DialogDescription>{t("Share.linkDescription")}</DialogDescription>
           </DialogHeader>
           <div className="grid flex-1 gap-2">
             <Input

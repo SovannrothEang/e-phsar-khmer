@@ -3,14 +3,10 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-/** Phnom Penh — the view before anything is picked. */
-export const DEFAULT_CENTER = { lat: 11.5564, lng: 104.9282 };
-
-export interface MapCoords {
-  lat: number;
-  lng: number;
-}
+import {
+  DEFAULT_CENTER,
+  type MapCoords,
+} from "@/components/post/location-map.constants";
 
 /** Red teardrop pin, inlined so no bundler-resolved image URL can break it. */
 const PIN_SVG =

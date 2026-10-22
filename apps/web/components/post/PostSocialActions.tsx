@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "../ui/button";
 import { IconHeartPlus, IconShare3 } from "@tabler/icons-react";
 import { useReactions } from "@/components/reactions/reactions-provider";
@@ -23,6 +24,7 @@ export function PostSocialActions({
   post: Pick<Post, "title" | "postId" | "likeCount">;
   className?: string;
 }) {
+  const t = useTranslations();
   const [shareOpen, setShareOpen] = useState(false);
   // Seeded from the listing; each toggle response replaces it with the
   // backend's fresh count, so the control never needs a refetch.
@@ -50,7 +52,7 @@ export function PostSocialActions({
             stroke={2}
           />
           <p className="text-foreground pl-1 pt-0.5">
-            {likes} {likes === 1 ? "Like" : "Likes"}
+            {t("ListingCard.likes", { count: likes })}
           </p>
         </Button>
         <Button
@@ -58,7 +60,7 @@ export function PostSocialActions({
             e.stopPropagation();
             setShareOpen(true);
           }}
-          aria-label="Share"
+          aria-label={t("Common.share")}
           className="bg-card px-2 py-1.5 h-10 w-15 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
         >
           <IconShare3 className="scale-160 text-foreground" stroke={1.5} />

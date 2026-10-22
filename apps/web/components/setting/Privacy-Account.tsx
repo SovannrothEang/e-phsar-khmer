@@ -1,16 +1,41 @@
 "use client";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Lock, Globe } from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "@/i18n/routing";
 import SettingSidebar from "./SettingSidebar";
 import { Switch } from "@/components/ui/switch";
+import { updateMyPrivacy, type PrivacyKey } from "@/actions/settings";
 import type { SettingsUser } from "@/lib/auth/current-user";
 
 interface PrivacyRowProps {
   title: string;
-  initialState?: boolean;
+  settingKey: PrivacyKey;
+  initialState: boolean;
 }
-const PrivacyRow = ({ title, initialState = false }: PrivacyRowProps) => {
+
+const PrivacyRow = ({ title, settingKey, initialState }: PrivacyRowProps) => {
+  const t = useTranslations("Settings.privacyPage");
+  const router = useRouter();
   const [isPublic, setIsPublic] = React.useState(initialState);
+  const [pending, setPending] = React.useState(false);
+
+  async function handleCheckedChange(next: boolean) {
+    const previous = isPublic;
+    setIsPublic(next);
+    setPending(true);
+
+    const result = await updateMyPrivacy(settingKey, next);
+
+    setPending(false);
+    if (!result.success) {
+      setIsPublic(previous);
+      toast.error(result.error ?? t("updateFailed"));
+      return;
+    }
+    router.refresh();
+  }
 
   return (
     <div className="flex items-center justify-between p-4 bg-muted rounded-sm transition-all">
@@ -21,12 +46,12 @@ const PrivacyRow = ({ title, initialState = false }: PrivacyRowProps) => {
           {isPublic ? (
             <>
               <Globe size={16} className="text-[#00a0e9]" />
-              <span className="text-sm text-[#00a0e9]">Public</span>
+              <span className="text-sm text-[#00a0e9]">{t("public")}</span>
             </>
           ) : (
             <>
               <Lock size={16} className="text-[#00a0e9]" />
-              <span className="text-sm text-[#00a0e9]">Only Me</span>
+              <span className="text-sm text-[#00a0e9]">{t("onlyMe")}</span>
             </>
           )}
         </div>
@@ -34,13 +59,16 @@ const PrivacyRow = ({ title, initialState = false }: PrivacyRowProps) => {
 
       <Switch
         checked={isPublic}
-        onCheckedChange={setIsPublic}
+        disabled={pending}
+        onCheckedChange={(next) => void handleCheckedChange(next)}
         className="data-[state=checked]:bg-[#00a0e9] data-[state=unchecked]:bg-gray-300 scale-120"
       />
     </div>
   );
 };
-export default function AccountPrivacy({ me }: { me?: SettingsUser | null }) {
+
+export default function AccountPrivacy({ me }: { me: SettingsUser }) {
+  const t = useTranslations("Settings.privacyPage");
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
       <div className="max-w-6xl mx-auto  ">
@@ -50,29 +78,34 @@ export default function AccountPrivacy({ me }: { me?: SettingsUser | null }) {
             <div className="bg-card border border-border rounded-sm">
               <div>
                 <h2 className="text-2xl font-medium text-foreground mb-4 mt-6 px-6">
-                  Privacy
+                  {t("title")}
                 </h2>
 
                 <div className="px-6 pb-6 space-y-3">
                   <PrivacyRow
-                    title="Who can look you up using the Gender you provided?"
-                    initialState={false}
+                    title={t("qGender")}
+                    settingKey="discoverableByGender"
+                    initialState={me.discoverableByGender}
                   />
                   <PrivacyRow
-                    title="Who can look you up using the Date Of Birth you provided?"
-                    initialState={false}
+                    title={t("qDob")}
+                    settingKey="discoverableByDateOfBirth"
+                    initialState={me.discoverableByDateOfBirth}
                   />
                   <PrivacyRow
-                    title="Who can look you up using the Phone you provided?"
-                    initialState={true}
+                    title={t("qPhone")}
+                    settingKey="discoverableByPhone"
+                    initialState={me.discoverableByPhone}
                   />
                   <PrivacyRow
-                    title="Who can look you up using the Email you provided?"
-                    initialState={true}
+                    title={t("qEmail")}
+                    settingKey="discoverableByEmail"
+                    initialState={me.discoverableByEmail}
                   />
                   <PrivacyRow
-                    title="Who can look you up using the Location you provided?"
-                    initialState={true}
+                    title={t("qLocation")}
+                    settingKey="discoverableByLocation"
+                    initialState={me.discoverableByLocation}
                   />
                 </div>
               </div>

@@ -31,6 +31,8 @@ import {
 } from '../users/username.util';
 import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
+import type { ClientDeviceInfo } from './client-device.decorator';
+import { LoginDevicesService } from './login-devices.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -41,7 +43,18 @@ export interface AuthTokens {
 /** Mirrors AdminService.createUser bcrypt cost. */
 const PASSWORD_SALT_ROUNDS = 10;
 
+/** A `sid` is a row UUID; reject anything else before it reaches Postgres. */
+const SESSION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export type PublicUser = Omit<UserRow, 'passwordHash'>;
+
+/** Every successful login path returns this shape. */
+export interface AuthResult extends AuthTokens {
+  user: PublicUser;
+  /** True when this login came from a new, non-first device. */
+  newDevice: boolean;
+}
 
 export interface TelegramAuthPayload {
   id: number;
@@ -60,11 +73,13 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
+    private readonly loginDevices: LoginDevicesService,
   ) {}
 
   async loginWithPassword(
     dto: LoginDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     const [user] = await this.db
       .select()
       .from(users)
@@ -96,8 +111,7 @@ export class AuthService {
       if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
 
       const revived = await this.revive(recoverable.id);
-      const revivedTokens = this.issueTokens(revived);
-      return { ...revivedTokens, user: this.toPublicUser(revived) };
+      return this.finishLogin(revived, device);
     }
 
     if (!user.passwordHash) {
@@ -114,8 +128,7 @@ export class AuthService {
     if (user.status !== 'active')
       throw new UnauthorizedException('Account suspended');
 
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    return this.finishLogin(user, device);
   }
 
   async registerWithPhone(dto: RegisterDto): Promise<{ otpSent: true }> {
@@ -126,7 +139,8 @@ export class AuthService {
 
   async verifyPhoneOtp(
     dto: VerifyOtpDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     // Moderation ban first: a banned number must not even burn an OTP.
     await this.assertPhoneNotBanned(dto.phone);
     // Password is checked BEFORE the Supabase call so a wrong password
@@ -180,8 +194,7 @@ export class AuthService {
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
-      const revivedTokens = this.issueTokens(revived);
-      return { ...revivedTokens, user: this.toPublicUser(revived) };
+      return this.finishLogin(revived, device);
     }
 
     if (completingBareAccount) {
@@ -207,8 +220,7 @@ export class AuthService {
         .where(and(eq(users.id, existing.id), isNull(users.deletedAt)))
         .returning();
 
-      const tokens = this.issueTokens(row);
-      return { ...tokens, user: this.toPublicUser(row) };
+      return this.finishLogin(row, device);
     }
 
     // Extras land ONLY in the INSERT values — the conflict path (existing
@@ -234,8 +246,7 @@ export class AuthService {
       insertExtras,
     );
     this.assertAccountActive(user);
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    return this.finishLogin(user, device);
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
@@ -278,7 +289,8 @@ export class AuthService {
 
   async handleSocialCallback(
     dto: SocialLoginDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     if (!dto.accessToken)
       throw new UnauthorizedException(
         'accessToken is required for social callback',
@@ -289,13 +301,13 @@ export class AuthService {
 
     const user = await this.mirrorSupabaseUser(data.user, dto.provider);
     this.assertAccountActive(user);
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    return this.finishLogin(user, device);
   }
 
   async loginWithTelegram(
     payload: TelegramAuthPayload,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     const botToken = this.configService.get<string>('telegram.botToken');
     if (!botToken)
       throw new UnauthorizedException('Telegram login not configured');
@@ -369,18 +381,28 @@ export class AuthService {
     }
 
     this.assertAccountActive(user);
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    return this.finishLogin(user, device);
   }
 
-  async refresh(dto: RefreshDto): Promise<AuthTokens> {
-    let payload: { sub: string; role: 'user' | 'admin' | 'super_admin' };
+  async refresh(
+    dto: RefreshDto,
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthTokens> {
+    let payload: {
+      sub: string;
+      role: 'user' | 'admin' | 'super_admin';
+      sid?: string;
+    };
     try {
       payload = await this.jwtService.verifyAsync(dto.refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (payload.sid !== undefined && !SESSION_ID_PATTERN.test(payload.sid)) {
+      throw new UnauthorizedException('Invalid session');
     }
 
     const [user] = await this.db
@@ -391,6 +413,37 @@ export class AuthService {
 
     if (!user || user.status !== 'active' || user.deletedAt)
       throw new UnauthorizedException('User not found');
+
+    // New tokens carry the row's revocation epoch. A rotated id means the
+    // device was revoked, so the refresh token dies with the access token.
+    if (payload.sid) {
+      const active = await this.loginDevices.touchActiveSession(
+        user.id,
+        payload.sid,
+      );
+      if (!active) throw new UnauthorizedException('Session revoked');
+      return this.issueTokens(user, payload.sid);
+    }
+
+    // A legacy (no-`sid`) refresh token can be bound on its first refresh.
+    // A row that exists but was revoked must reject — never fall back to a
+    // sid-less token for a device we know was signed out.
+    if (device) {
+      const row = await this.loginDevices.findSessionByDeviceId(
+        user.id,
+        device.id,
+      );
+      if (row) {
+        if (row.revokedAt) throw new UnauthorizedException('Session revoked');
+        const active = await this.loginDevices.touchActiveSession(
+          user.id,
+          row.sessionId,
+        );
+        if (!active) throw new UnauthorizedException('Session revoked');
+        return this.issueTokens(user, row.sessionId);
+      }
+    }
+
     return this.issueTokens(user);
   }
 
@@ -470,8 +523,35 @@ export class AuthService {
     }
   }
 
-  private issueTokens(user: UserRow): AuthTokens {
-    const jwtPayload = { sub: user.id, role: user.role };
+  /**
+   * The single success exit for every login path: records the device first,
+   * then signs tokens carrying its revocation epoch (`sid`). `recordLogin`
+   * never throws, so a device or notification failure cannot turn a valid
+   * credential check into a 500; a row that could not be written yields a
+   * token without `sid`, exactly like a legacy session.
+   */
+  private async finishLogin(
+    user: UserRow,
+    device: ClientDeviceInfo | null,
+  ): Promise<AuthResult> {
+    const recorded = await this.loginDevices.recordLogin(user.id, device);
+    const tokens = this.issueTokens(user, recorded.sessionId);
+    return {
+      ...tokens,
+      user: this.toPublicUser(user),
+      newDevice: recorded.isNewDevice,
+    };
+  }
+
+  private issueTokens(
+    user: UserRow,
+    sessionId: string | null = null,
+  ): AuthTokens {
+    const jwtPayload = {
+      sub: user.id,
+      role: user.role,
+      ...(sessionId ? { sid: sessionId } : {}),
+    };
     const accessExpiresIn = (this.configService.get<string>(
       'jwt.accessExpiresIn',
     ) ?? '15m') as unknown as number;

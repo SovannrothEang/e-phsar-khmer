@@ -18,10 +18,6 @@ import { updateAdminLocale } from "@/actions/admin-locale";
 const LOCALE_LABELS: Record<string, string> = {
   en: "English",
   km: "ខ្មែរ",
-  zh: "中文",
-  ko: "한국어",
-  id: "Bahasa Indonesia",
-  vi: "Tiếng Việt",
 };
 
 const LOCALES = Object.keys(LOCALE_LABELS);

@@ -31,13 +31,13 @@ export class AdminSubcategoriesController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a subcategory (+ en translation)' })
+  @ApiOperation({ summary: 'Create a subcategory (+ en/km translations)' })
   create(@Body() dto: CreateSubcategoryDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a subcategory (+ en name)' })
+  @ApiOperation({ summary: 'Update a subcategory (+ en/km names)' })
   update(@Param('id') id: string, @Body() dto: UpdateSubcategoryDto) {
     return this.service.update(id, dto);
   }

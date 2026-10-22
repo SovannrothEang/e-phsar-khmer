@@ -1,45 +1,48 @@
 "use client";
 
 import { IconChevronRight } from "@tabler/icons-react";
+import { useTranslations } from "next-intl";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
 
-const insights = [
-  { label: "Photo", value: 8 },
-  { label: "Videos", value: "None" },
-  { label: "Cars for sale", value: 2 },
-  { label: "Vehicles for rent", value: 2 },
-  { label: "Motorcycles for sale", value: 2 },
-  { label: "Fashion & Beauty", value: 50 },
-  { label: "Foods", value: 50 },
-  { label: "Other Ads", value: 5 },
-  { label: "Renews", value: 5 },
-  { label: "Auto-Renews", value: "None" },
-];
-
 export default function Membership() {
+  const t = useTranslations("Me.membership");
+  const tMe = useTranslations("Me");
+  const tSearch = useTranslations("Search");
   const router = useRouter();
+  const insights = [
+    { label: t("photo"), value: 8 },
+    { label: t("videos"), value: t("none") },
+    { label: t("carsForSale"), value: 2 },
+    { label: t("vehiclesForRent"), value: 2 },
+    { label: t("motorcyclesForSale"), value: 2 },
+    { label: t("fashion"), value: 50 },
+    { label: t("foods"), value: 50 },
+    { label: t("otherAds"), value: 5 },
+    { label: t("renews"), value: 5 },
+    { label: t("autoRenews"), value: t("none") },
+  ];
   return (
     <div className="min-h-screen bg-muted pb-2">
       <div className="max-w-7xl mx-auto py-4">
         <Breadcrumbs
           items={[
-            { label: "Home", href: "/" },
-            { label: "Profile", href: "/me" },
-            { label: "Membership" },
+            { label: tSearch("home"), href: "/" },
+            { label: tMe("profile"), href: "/me" },
+            { label: t("title") },
           ]}
         />
       </div>
       <main className="max-w-4xl mx-auto px-4">
         <h1 className="text-2xl font-medium text-foreground mb-4">
-          Membership
+          {t("title")}
         </h1>
         <div className="bg-card border  rounded-sm  overflow-hidden">
           <div className="px-4 py-4">
             <h2 className="text-lg text-center font-medium text-foreground">
-              Free
+              {t("free")}
             </h2>
           </div>
           <div className="divide-y divide-muted">
@@ -62,9 +65,11 @@ export default function Membership() {
         >
           <div className="bg-card border flex items-center justify-between rounded-sm overflow-hidden mt-2">
             <div className="space-y-1">
-              <p className="text-lg font-semibold  px-4 pt-3">Need More?</p>
+              <p className="text-lg font-semibold  px-4 pt-3">
+                {t("needMore")}
+              </p>
               <span className="text-sm px-4 block pb-3">
-                Upgrade to he right plan that better suits your bussiness.
+                {t("upgradeText")}
               </span>
             </div>
             <div className="flex items-center justify-center mr-3">
@@ -81,7 +86,7 @@ export default function Membership() {
           }
           className="text-card text-center cursor-pointer w-full rounded-sm h-9 mt-4 bg-[#00a0e9] hover:bg-[#00a0e9]/80"
         >
-          Upgrade Now
+          {t("upgradeNow")}
         </Button>
       </main>
     </div>

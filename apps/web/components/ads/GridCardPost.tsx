@@ -1,6 +1,8 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { ConditionLabel } from "@/components/common/ConditionLabel";
+import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
@@ -13,10 +15,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useListingImpression } from "@/hooks/use-listing-impression";
 import { ThreeDotPost } from "../Card/ThreeDotPost";
 
 export function GridCardPost({ post }: { post: Post }) {
+  const t = useTranslations();
+  const format = useFormatter();
   const reactions = useReactions();
+  const impressionRef = useListingImpression(post.postId);
   const listingId = String(post.postId);
   // No photo at all, or a stored photo missing from storage → empty area. The
   // DB is the only image source: no static stand-in, no broken <img>.
@@ -40,7 +46,10 @@ export function GridCardPost({ post }: { post: Post }) {
     : 0;
 
   return (
-    <Card className="relative select-none cursor-pointer  min-w-[260px] bg-card rounded-sm shadow-sm hover:shadow-md transition overflow-hidden pt-0 border-none">
+    <Card
+      ref={impressionRef}
+      className="relative select-none cursor-pointer  min-w-[260px] bg-card rounded-sm shadow-sm hover:shadow-md transition overflow-hidden pt-0 border-none"
+    >
       <Link
         // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
         href={`/${toSlug(post.title)}-adid-${post.postId}`}
@@ -68,7 +77,9 @@ export function GridCardPost({ post }: { post: Post }) {
             </span>
             {/* $ OFF */}
             <span className="bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
-              ${discountAmount.toLocaleString()} OFF
+              {t("ListingCard.amountOff", {
+                amount: discountAmount.toLocaleString(),
+              })}
             </span>
           </div>
         )}
@@ -88,7 +99,7 @@ export function GridCardPost({ post }: { post: Post }) {
           {post.freeDelivery && (
             <span className="bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
               <TruckIcon size={14} />
-              <span>Free Delivery</span>
+              <span>{t("Common.freeDelivery")}</span>
             </span>
           )}
           {post.video && (
@@ -108,10 +119,10 @@ export function GridCardPost({ post }: { post: Post }) {
         <CardDescription className="flex min-w-0 flex-col text-xs text-muted-foreground">
           <div className="flex min-w-0 items-center">
             <span className="shrink-0">
-              {new Intl.DateTimeFormat("en-US", {
+              {format.dateTime(new Date(post.createdat), {
                 hour: "2-digit",
                 minute: "2-digit",
-              }).format(new Date(post.createdat))}
+              })}
             </span>
             <DotIcon className="scale-120" />
             <span className="truncate">
@@ -120,7 +131,7 @@ export function GridCardPost({ post }: { post: Post }) {
             </span>
           </div>
           <div className="text-sm font-medium text-muted-foreground">
-            {post.condition}
+            <ConditionLabel value={post.condition} />
           </div>
         </CardDescription>
         {/* `mt-auto`: with the header stretched (flex-1), the price + heart row
@@ -131,7 +142,7 @@ export function GridCardPost({ post }: { post: Post }) {
           <div className="flex items-center gap-3">
             <span className="text-red-600 font-semibold text-lg">
               {post.price === null
-                ? "Negotiable"
+                ? t("Common.negotiable")
                 : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { IconArrowLeft, IconChevronDown, IconX } from "@tabler/icons-react";
 
 import {
@@ -35,6 +36,12 @@ import { Command, CommandItem, CommandList } from "@/components/ui/command";
  */
 
 const LEVELS = ["Basic", "Intermediate", "Advanced", "Expert"] as const;
+const LEVEL_KEYS: Record<string, string> = {
+  Basic: "basic",
+  Intermediate: "intermediate",
+  Advanced: "advanced",
+  Expert: "expert",
+};
 
 export function ResumeSkillsDialog({
   open,
@@ -60,6 +67,7 @@ export function ResumeSkillsDialog({
   /** Resolves `true` only once the entry was stored. */
   onSubmit: (entry: SkillEntry) => Promise<boolean>;
 }) {
+  const t = useTranslations("Resume");
   const [title, setTitle] = useState("");
   const [level, setLevel] = useState<string | undefined>(undefined);
   const [levelOpen, setLevelOpen] = useState(false);
@@ -120,18 +128,20 @@ export function ResumeSkillsDialog({
             <button
               type="button"
               onClick={onBack}
-              aria-label="Back to educations"
+              aria-label={t("form.backEducations")}
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
             >
               <IconArrowLeft size={20} />
             </button>
           )}
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit" ? "Add Skill" : "Skills"}
+            {mode === "edit"
+              ? t("form.titles.skillsEdit")
+              : t("form.titles.skillsWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
             <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
-              Step 5 of 8
+              {t("form.step", { current: 5, total: 8 })}
             </span>
           ) : (
             <DialogClose asChild>
@@ -140,27 +150,31 @@ export function ResumeSkillsDialog({
                 className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("form.close")}</span>
               </button>
             </DialogClose>
           )}
         </div>
         <DialogDescription className="sr-only">
-          Step 5 of 8 of the resume builder: skills.
+          {t("form.stepDescription", {
+            current: 5,
+            total: 8,
+            name: t("form.titles.skillsWizard"),
+          })}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
             <p className="text-base text-muted-foreground">
-              List the skills that best represent your strengths and help you
-              stand out from other candidates.
+              {t("sections.skills.desc")}
             </p>
           )}
 
           <FieldGroup className="mt-4">
             <Field ref={titleFieldRef} data-invalid={titleError}>
               <FieldLabel htmlFor="rsk-title">
-                Title <span className="text-destructive">*</span>
+                {t("form.titleLabel")}{" "}
+                <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="rsk-title"
@@ -171,13 +185,17 @@ export function ResumeSkillsDialog({
                 className="h-11"
               />
               {titleError && (
-                <FieldError>{"Please enter the 'Title'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.titleLabel"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={levelFieldRef} data-invalid={levelError}>
               <FieldLabel htmlFor="rsk-level">
-                Level <span className="text-destructive">*</span>
+                {t("form.level")} <span className="text-destructive">*</span>
               </FieldLabel>
               <div className="relative">
                 <Popover open={levelOpen} onOpenChange={setLevelOpen}>
@@ -209,7 +227,9 @@ export function ResumeSkillsDialog({
                             }}
                             className="cursor-pointer"
                           >
-                            <span>{option}</span>
+                            <span>
+                              {t(`form.options.${LEVEL_KEYS[option]}`)}
+                            </span>
                           </CommandItem>
                         ))}
                       </CommandList>
@@ -219,7 +239,7 @@ export function ResumeSkillsDialog({
                 {level ? (
                   <button
                     type="button"
-                    aria-label="Clear Level"
+                    aria-label={t("form.clearLevel")}
                     onClick={() => setLevel(undefined)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -232,7 +252,11 @@ export function ResumeSkillsDialog({
                   />
                 )}
               </div>
-              {levelError && <FieldError>{"Please select 'Level'"}</FieldError>}
+              {levelError && (
+                <FieldError>
+                  {t("form.validation.select", { field: t("form.level") })}
+                </FieldError>
+              )}
             </Field>
           </FieldGroup>
         </div>
@@ -244,7 +268,7 @@ export function ResumeSkillsDialog({
               onClick={onSkip}
               className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
             >
-              Skip
+              {t("form.skip")}
             </button>
             <button
               type="button"
@@ -252,7 +276,7 @@ export function ResumeSkillsDialog({
               disabled={saving}
               className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Next to Languages
+              {t("form.nextLanguages")}
             </button>
           </div>
         ) : (
@@ -263,7 +287,7 @@ export function ResumeSkillsDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {t("form.save")}
             </button>
           </div>
         )}

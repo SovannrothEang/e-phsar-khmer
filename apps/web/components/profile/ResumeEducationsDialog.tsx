@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { MONTH_LABELS } from "@/lib/locale-labels";
 import { IconArrowLeft, IconChevronDown, IconX } from "@tabler/icons-react";
 
 import { ResumeDobCalendar } from "@/components/profile/ResumeDobCalendar";
-import { EDUCATION_LEVELS } from "@/components/profile/ResumePersonalDetailsDialog";
+import {
+  EDUCATION_KEYS,
+  EDUCATION_LEVELS,
+} from "@/components/profile/ResumePersonalDetailsDialog";
 import {
   Dialog,
   DialogClose,
@@ -64,6 +69,8 @@ export function ResumeEducationsDialog({
   /** Resolves `true` only once the entry was stored. */
   onSubmit: (entry: EducationEntry) => Promise<boolean>;
 }) {
+  const t = useTranslations("Resume");
+  const locale = useLocale();
   const [school, setSchool] = useState("");
   const [degree, setDegree] = useState<string | undefined>(undefined);
   const [degreeOpen, setDegreeOpen] = useState(false);
@@ -104,11 +111,13 @@ export function ResumeEducationsDialog({
   const to = new Date();
 
   const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    });
+    locale === "km"
+      ? `${date.getDate()} ${MONTH_LABELS.km[date.getMonth()]} ${date.getFullYear()}`
+      : date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        });
 
   const schoolMissing = school.trim() === "";
   const degreeMissing = !degree;
@@ -180,18 +189,20 @@ export function ResumeEducationsDialog({
             <button
               type="button"
               onClick={onBack}
-              aria-label="Back to experiences"
+              aria-label={t("form.backExperiences")}
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
             >
               <IconArrowLeft size={20} />
             </button>
           )}
           <DialogTitle className="text-2xl font-semibold">
-            {mode === "edit" ? "Add Education" : "Educations"}
+            {mode === "edit"
+              ? t("form.titles.educationsEdit")
+              : t("form.titles.educationsWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
             <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
-              Step 4 of 8
+              {t("form.step", { current: 4, total: 8 })}
             </span>
           ) : (
             <DialogClose asChild>
@@ -200,27 +211,30 @@ export function ResumeEducationsDialog({
                 className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t("form.close")}</span>
               </button>
             </DialogClose>
           )}
         </div>
         <DialogDescription className="sr-only">
-          Step 4 of 8 of the resume builder: education.
+          {t("form.stepDescription", {
+            current: 4,
+            total: 8,
+            name: t("form.titles.educationsWizard"),
+          })}
         </DialogDescription>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
             <p className="text-base text-muted-foreground">
-              Present your educational background to demonstrate the knowledge
-              and value you bring to the role.
+              {t("sections.educations.desc")}
             </p>
           )}
 
           <FieldGroup className="mt-4">
             <Field ref={schoolFieldRef} data-invalid={schoolError}>
               <FieldLabel htmlFor="red-school">
-                School <span className="text-destructive">*</span>
+                {t("form.school")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="red-school"
@@ -231,13 +245,17 @@ export function ResumeEducationsDialog({
                 className="h-11"
               />
               {schoolError && (
-                <FieldError>{"Please enter the 'School'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.school"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={degreeFieldRef} data-invalid={degreeError}>
               <FieldLabel htmlFor="red-degree">
-                Degree <span className="text-destructive">*</span>
+                {t("form.degree")} <span className="text-destructive">*</span>
               </FieldLabel>
               <div className="relative">
                 <Popover open={degreeOpen} onOpenChange={setDegreeOpen}>
@@ -249,7 +267,9 @@ export function ResumeEducationsDialog({
                       className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20 md:text-sm"
                     >
                       <span className={degree ? "" : "text-muted-foreground"}>
-                        {degree ?? ""}
+                        {degree
+                          ? t(`form.options.${EDUCATION_KEYS[degree]}`)
+                          : ""}
                       </span>
                     </button>
                   </PopoverTrigger>
@@ -269,7 +289,9 @@ export function ResumeEducationsDialog({
                             }}
                             className="cursor-pointer"
                           >
-                            <span>{level}</span>
+                            <span>
+                              {t(`form.options.${EDUCATION_KEYS[level]}`)}
+                            </span>
                           </CommandItem>
                         ))}
                       </CommandList>
@@ -279,7 +301,7 @@ export function ResumeEducationsDialog({
                 {degree ? (
                   <button
                     type="button"
-                    aria-label="Clear Degree"
+                    aria-label={t("form.clearDegree")}
                     onClick={() => setDegree(undefined)}
                     className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                   >
@@ -293,13 +315,15 @@ export function ResumeEducationsDialog({
                 )}
               </div>
               {degreeError && (
-                <FieldError>{"Please select 'Degree'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.select", { field: t("form.degree") })}
+                </FieldError>
               )}
             </Field>
 
             <Field ref={majorFieldRef} data-invalid={majorError}>
               <FieldLabel htmlFor="red-major">
-                Major <span className="text-destructive">*</span>
+                {t("form.major")} <span className="text-destructive">*</span>
               </FieldLabel>
               <Input
                 id="red-major"
@@ -310,14 +334,19 @@ export function ResumeEducationsDialog({
                 className="h-11"
               />
               {majorError && (
-                <FieldError>{"Please enter the 'Major'"}</FieldError>
+                <FieldError>
+                  {t("form.validation.required", {
+                    field: t("form.major"),
+                  })}
+                </FieldError>
               )}
             </Field>
 
             <div className="grid grid-cols-2 gap-5">
               <Field ref={startFieldRef} data-invalid={startError}>
                 <FieldLabel htmlFor="red-start">
-                  Start Date <span className="text-destructive">*</span>
+                  {t("form.startDate")}{" "}
+                  <span className="text-destructive">*</span>
                 </FieldLabel>
                 <div className="relative">
                   <Popover open={startOpen} onOpenChange={setStartOpen}>
@@ -333,7 +362,7 @@ export function ResumeEducationsDialog({
                         >
                           {startDate
                             ? formatDate(startDate)
-                            : "Select Start Date"}
+                            : t("form.selectStart")}
                         </span>
                       </button>
                     </PopoverTrigger>
@@ -352,7 +381,7 @@ export function ResumeEducationsDialog({
                   {startDate && (
                     <button
                       type="button"
-                      aria-label="Clear start date"
+                      aria-label={t("form.clearStart")}
                       onClick={() => setStartDate(null)}
                       className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                     >
@@ -361,7 +390,11 @@ export function ResumeEducationsDialog({
                   )}
                 </div>
                 {startError && (
-                  <FieldError>{"Please select 'Start Date'"}</FieldError>
+                  <FieldError>
+                    {t("form.validation.select", {
+                      field: t("form.startDate"),
+                    })}
+                  </FieldError>
                 )}
               </Field>
 
@@ -370,7 +403,8 @@ export function ResumeEducationsDialog({
                 data-invalid={endError || dateOrderError}
               >
                 <FieldLabel htmlFor="red-end">
-                  End Date <span className="text-destructive">*</span>
+                  {t("form.endDate")}{" "}
+                  <span className="text-destructive">*</span>
                 </FieldLabel>
                 <div className="relative">
                   <Popover open={endOpen} onOpenChange={setEndOpen}>
@@ -388,10 +422,10 @@ export function ResumeEducationsDialog({
                           }
                         >
                           {current
-                            ? "Present"
+                            ? t("form.present")
                             : endDate
                               ? formatDate(endDate)
-                              : "Select End Date"}
+                              : t("form.selectEnd")}
                         </span>
                       </button>
                     </PopoverTrigger>
@@ -410,7 +444,7 @@ export function ResumeEducationsDialog({
                   {endDate && !current && (
                     <button
                       type="button"
-                      aria-label="Clear end date"
+                      aria-label={t("form.clearEnd")}
                       onClick={() => setEndDate(null)}
                       className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
                     >
@@ -419,12 +453,14 @@ export function ResumeEducationsDialog({
                   )}
                 </div>
                 {endError && (
-                  <FieldError>{"Please select 'End Date'"}</FieldError>
+                  <FieldError>
+                    {t("form.validation.select", {
+                      field: t("form.endDate"),
+                    })}
+                  </FieldError>
                 )}
                 {dateOrderError && (
-                  <FieldError>
-                    End date must be after the start date.
-                  </FieldError>
+                  <FieldError>{t("form.validation.endBeforeStart")}</FieldError>
                 )}
               </Field>
             </div>
@@ -443,12 +479,14 @@ export function ResumeEducationsDialog({
                 htmlFor="red-current"
                 className="cursor-pointer text-base text-foreground"
               >
-                I currently attend here
+                {t("form.currentlyAttend")}
               </label>
             </div>
 
             <Field>
-              <FieldLabel htmlFor="red-description">Description</FieldLabel>
+              <FieldLabel htmlFor="red-description">
+                {t("form.description")}
+              </FieldLabel>
               <Textarea
                 id="red-description"
                 value={description}
@@ -466,7 +504,7 @@ export function ResumeEducationsDialog({
               onClick={onSkip}
               className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
             >
-              Skip
+              {t("form.skip")}
             </button>
             <button
               type="button"
@@ -474,7 +512,7 @@ export function ResumeEducationsDialog({
               disabled={saving}
               className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Next to Skills
+              {t("form.nextSkills")}
             </button>
           </div>
         ) : (
@@ -485,7 +523,7 @@ export function ResumeEducationsDialog({
               disabled={saving}
               className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Save
+              {t("form.save")}
             </button>
           </div>
         )}

@@ -104,7 +104,7 @@ GET /api/v1/listings?categorySlug=… → resolveQueryFilters (slug→id, unknow
 
 ### Missing features (all 13 CLAUDE.md known gaps verified still true)
 
-Feedback table, km/zh seed translations, idempotency completed-hash check, primary-phone reassignment, delete-account flow, geography i18n, `PublicUser` over-exposure, communes, models seed, car brands, push notifications, chat private bucket, `field_schema` unused at runtime.
+Feedback table, zh seed translations, idempotency completed-hash check, primary-phone reassignment, delete-account flow, geography i18n, `PublicUser` over-exposure, communes, models seed, car brands, push notifications, chat private bucket, `field_schema` unused at runtime.
 
 ### Operational debt
 
@@ -121,7 +121,7 @@ Feedback table, km/zh seed translations, idempotency completed-hash check, prima
 2. **Never import `DbModule`/`SupabaseModule`** — they are `@Global()`; inject `@Inject(DRIZZLE)`/`@Inject(PG_CLIENT)`/`SupabaseService` directly.
 3. **Keep the auth model intact.** JWT payload is exactly `{sub, role}`; `req.user` is `RequestUser {id, role}`; `@Public()` is the only bypass; soft-delete enforced at login/refresh/`JwtStrategy.validate`; admin via `@Roles('admin')` + `RolesGuard` per-controller.
 4. **Idempotency middleware stays unconditional** on POST/PATCH/PUT — do not add new `@Idempotent()` gates; fix the completed-hash gap inside the middleware only.
-5. **Slug + i18n conventions.** `SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/` everywhere; locales `en|km|zh` (backend) — the web's 6 locales is an artifact, not a contract; category lookups use the dual-JOIN + COALESCE pattern; slug-unknown → `[]` (not 404) for list feeds, 404 for single lookups.
+5. **Slug + i18n conventions.** `SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/` everywhere; locales `en|km|zh` (backend) — the web ships `en|km` (2026-10-21), a subset of the backend's storage locales, not a contract; category lookups use the dual-JOIN + COALESCE pattern; slug-unknown → `[]` (not 404) for list feeds, 404 for single lookups.
 6. **Cursor pagination invariant.** Cursors encode `{createdAt, id}`; ordering `(createdAt desc, id desc)`; always `lt/gt` with `and(eq, lt)` tie-break; timestamps must stay `timestamp(3)` for delta polling; invalid cursors are ignored, never error.
 7. **Soft-delete semantics.** `users` partial uniques `WHERE deleted_at is null`; upserts must pass `targetWhere: isNull(users.deletedAt)`; lookups must filter it; `user_phones.phone` is globally unique and never freed.
 8. **Seeds are upserts, never truncate** — `onConflictDoUpdate` on slugs / `onConflictDoNothing` on composites; re-running `db:seed` must be a no-op.
@@ -148,8 +148,8 @@ Feedback table, km/zh seed translations, idempotency completed-hash check, prima
 | 10  | Premium derivation "via EXISTS"                                                   | Batch `inArray` + `selectDistinct` over the page's users                                                                  |
 | 11  | Seed order "geography → categories → brands"                                      | Also runs admin + reports seeds                                                                                           |
 | 12  | Dev OTP fake user "deterministic SHA-256 UUID from phone"                         | Literal `{ id: 'dev', phone }` — same id for every phone                                                                  |
-| 13  | Seed doc "12 categories" table says "12,155-line file" (implied)                  | 146 subcategories, 146 `fieldSchema:` blocks, en-only (`km:`/`zh:` count = 0)                                             |
+| 13  | Seed doc "12 categories" table says "12,155-line file" (implied)                  | 146 subcategories, 146 `fieldSchema:` blocks; `en` + `km` names (158 `km:` entries since 2026-10-21), `zh` absent         |
 | 14  | `apps/backend/.env.example` has documented vars                                   | File exists but is **0 bytes**                                                                                            |
 | 15  | ValidationPipe "whitelist + transform"                                            | Also `forbidNonWhitelisted: true` + `enableImplicitConversion: true` (stricter)                                           |
 
-Additional findings not in CLAUDE.md: `@Idempotent()` decorator is dead metadata (middleware is unconditional); `SupabaseStrategy` registered but never wired to a guard (latent `const token = ''` bug); idempotency `cleanupExpired()` never scheduled; no logout endpoint (stateless refresh tokens); `apps/web/README.md` has unresolved merge-conflict markers; `app/api/api.ts` is an empty file; web i18n has 6 locales (en, km, zh, ko, id, vi) while backend supports 3.
+Additional findings not in CLAUDE.md: `@Idempotent()` decorator is dead metadata (middleware is unconditional); `SupabaseStrategy` registered but never wired to a guard (latent `const token = ''` bug); idempotency `cleanupExpired()` never scheduled; no logout endpoint (stateless refresh tokens); `apps/web/README.md` has unresolved merge-conflict markers; `app/api/api.ts` is an empty file; web i18n ships en/km while the backend's category translations support en/km/zh.

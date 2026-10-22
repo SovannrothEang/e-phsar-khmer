@@ -1,7 +1,7 @@
 import { getResume } from "@/actions/resume";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { ResumeStartBuilding } from "@/components/profile/ResumeStartBuilding";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/routing";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
@@ -43,6 +43,7 @@ export default async function Resume() {
   const me = await getCurrentUser();
   const locale = await getLocale();
   if (!me) return redirect({ href: "/login", locale });
+  const t = await getTranslations();
 
   const [jobsCategory, jobTypes, provinces, resume] = await Promise.all([
     getCategoryWithSubcategories("jobs", locale),
@@ -60,9 +61,9 @@ export default async function Resume() {
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
         <Breadcrumbs
           items={[
-            { label: "Home", href: "/" },
-            { label: "Profile", href: "/me" },
-            { label: "Resume (CV)" },
+            { label: t("Search.home"), href: "/" },
+            { label: t("Resume.accountBreadcrumb"), href: "/me" },
+            { label: t("Resume.title") },
           ]}
         />
       </div>
@@ -84,7 +85,7 @@ export default async function Resume() {
         <div className="max-w-7xl mx-auto w-full px-4 pt-4">
           <div className="rounded-2xl border bg-card p-6 text-center sm:p-10">
             <p className="text-base text-foreground">
-              Couldn&apos;t load your resume. Refresh the page to try again.
+              {t("Me.resumeLoadFailed")}
             </p>
           </div>
         </div>

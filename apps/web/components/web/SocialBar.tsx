@@ -23,8 +23,10 @@ import {
 import { FaCamera } from "react-icons/fa";
 import { ChartNoAxesCombined, ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/routing";
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
+import { NotificationUnreadBadge } from "./NotificationUnreadBadge";
 import { userLogout } from "@/actions/logout";
 import { useQueryClient } from "@tanstack/react-query";
 import { markSignedOut } from "./SessionCacheGuard";
@@ -42,13 +44,14 @@ interface SocialBarUser {
 }
 
 export function SocialBar({ user }: { user: SocialBarUser }) {
+  const t = useTranslations("Nav");
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
     user.username ||
-    "My Account";
+    t("myAccount");
   const handle = user.username ? `@${user.username}` : "";
   const avatarUrl =
     user.profilePhotoUrl ??
@@ -62,9 +65,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
         className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconBellFilled className="scale-150 " />
-        {/* <span className="absolute top-0 right-0 flex h-[10px] w-[10px] items-center justify-center rounded-full bg-[#f04d4e] text-[10px] font-bold text-white border-2 border-white">
-                    4
-                </span> */}
+        <NotificationUnreadBadge />
       </Button>
       {/* Messages */}
       <Button
@@ -135,7 +136,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  My Ads
+                  {t("myAds")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -146,7 +147,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Likes
+                  {t("likes")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -157,7 +158,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Saved
+                  {t("saved")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -169,7 +170,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Applied Jobs
+                  {t("appliedJobs")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -180,7 +181,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Job Applications
+                  {t("jobApplications")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -191,7 +192,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Resume (CV)
+                  {t("resume")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -203,7 +204,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-sm text-foreground font-medium">
-                  Subscriptions
+                  {t("subscriptions")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -215,7 +216,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-[14px] text-foreground font-medium">
-                  Insight
+                  {t("insight")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -227,7 +228,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   strokeWidth={1.5}
                 />
                 <span className="text-[14px] text-foreground font-medium">
-                  Settings
+                  {t("settings")}
                 </span>
               </Link>
             </DropdownMenuItem>
@@ -247,7 +248,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                 strokeWidth={1.5}
               />
               <span className="text-sm text-foreground font-medium">
-                Sign out
+                {t("signOut")}
               </span>
             </DropdownMenuItem>
           </div>
@@ -260,7 +261,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       >
         <Link href={`/post`}>
           <FaCamera className="scale-120" strokeWidth={2.5} />
-          Sell
+          {t("sell")}
         </Link>
       </Button>
     </div>

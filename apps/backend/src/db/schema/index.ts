@@ -13,4 +13,7 @@ export * from './notifications.schema';
 export * from './reactions.schema';
 export * from './resume.schema';
 export * from './applications.schema';
+export * from './insights.schema';
+export * from './feedback.schema';
+export * from './login-devices.schema';
 export * from '../../payment/entity';

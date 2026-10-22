@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { ApplyJobDialog } from "./ApplyJobDialog";
 import type { ApplyResumeSummary } from "./ApplyJobDialog";
+import { trackEvent } from "@/lib/insights/queue";
 
 /**
  * "Apply For This Job" — the job detail page's one orange call to action.
@@ -34,6 +36,7 @@ export function ApplyJobButton({
   appliedApplicationId: string | null;
   className?: string;
 }) {
+  const t = useTranslations("Post.apply");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -45,13 +48,15 @@ export function ApplyJobButton({
         disabled
         className={`bg-muted text-muted-foreground h-10 px-5 rounded-sm font-medium cursor-default ${className ?? ""}`}
       >
-        Applied
+        {t("applied")}
       </Button>
     );
 
   function openOrSignIn() {
+    // The metric is the click on Apply — the signed-out bounce counts too.
+    trackEvent(listingId, "apply_job");
     if (!viewerId) {
-      toast.error("Sign in to apply for this job");
+      toast.error(t("signIn"));
       startTransition(() => router.push("/login"));
       return;
     }
@@ -67,7 +72,7 @@ export function ApplyJobButton({
         className={`bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 px-5 rounded-sm font-medium transition-colors cursor-pointer ${className ?? ""}`}
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        Apply For This Job
+        {t("button")}
       </Button>
       {viewerId ? (
         <ApplyJobDialog

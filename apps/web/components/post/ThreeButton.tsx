@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "../ui/button";
 import {
   IconBookmark,
@@ -10,6 +12,7 @@ import { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import { ReportPost } from "../report/ReportPost";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useTranslations } from "next-intl";
 export function ThreeButton({
   post,
   viewerId,
@@ -17,6 +20,7 @@ export function ThreeButton({
   post: Post;
   viewerId?: string | null;
 }) {
+  const t = useTranslations("Common");
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const reactions = useReactions();
@@ -42,7 +46,7 @@ export function ThreeButton({
             }`}
             strokeWidth={1.5}
           />{" "}
-          {saved ? "Unsave" : "Save"}
+          {saved ? t("unsave") : t("save")}
         </Button>
         {!isOwnListing && (
           <Button
@@ -53,7 +57,7 @@ export function ThreeButton({
               className="scale-150 mr-2 text-destructive focus:text-destructive"
               strokeWidth={1.5}
             />{" "}
-            Report
+            {t("report")}
           </Button>
         )}
         <Button
@@ -61,7 +65,7 @@ export function ThreeButton({
           className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer"
         >
           <IconShare3 className="scale-150 mr-2 text-foreground" stroke={1.5} />{" "}
-          Share
+          {t("share")}
         </Button>
       </div>
       <ReportPost open={reportOpen} onOpenChange={setReportOpen} post={post} />
