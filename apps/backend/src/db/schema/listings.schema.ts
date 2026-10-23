@@ -105,6 +105,15 @@ export const listings = pgTable(
     ),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    // Set when staff take the ad down (directly or by approving a report).
+    // Separate from `status`, which the owner and plan reconciliation both
+    // drive: a moderated ad stays 'deleted' and the owner cannot republish or
+    // edit it until staff restore it (which clears these three).
+    moderatedAt: timestamp('moderated_at', { withTimezone: true }),
+    moderatedById: uuid('moderated_by_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    moderationReason: varchar('moderation_reason', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

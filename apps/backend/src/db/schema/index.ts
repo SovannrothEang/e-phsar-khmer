@@ -11,4 +11,5 @@ export * from './chat.schema';
 export * from './outbox.schema';
 export * from './notifications.schema';
 export * from './reactions.schema';
+export * from './feedback.schema';
 export * from '../../payment/entity';

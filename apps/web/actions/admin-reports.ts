@@ -17,6 +17,8 @@ export interface UserReportView {
   reasonText: string | null;
   description: string | null;
   imagePaths: string[];
+  /** Public URLs for imagePaths — what the dashboard renders. */
+  imageUrls: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
   createdAt: string;
@@ -31,6 +33,8 @@ interface BackendUserReport {
   reasonText: string | null;
   description: string | null;
   imagePaths: string[];
+  /** Public URLs for imagePaths — what the dashboard renders. */
+  imageUrls: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
   createdAt: string;

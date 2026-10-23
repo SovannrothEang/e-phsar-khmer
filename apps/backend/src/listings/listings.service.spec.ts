@@ -1,5 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { BadRequestException } from '@nestjs/common';
 import { ListingsService } from './listings.service';
+import { FilesService } from '../files/files.service';
 
 function makeDb() {
   return {
@@ -818,5 +820,58 @@ describe('ListingsService plan enforcement', () => {
       response: { code: 'PLAN_RESTRICTED' },
     });
     expect(set).not.toHaveBeenCalled();
+  });
+});
+
+describe('ListingsService photo ownership', () => {
+  type Photo = { url: string; path: string };
+  const url = (path: string) =>
+    `https://x.supabase.co/storage/v1/object/public/listings/${path}`;
+  const real = new FilesService(
+    {} as never,
+    { get: () => 'listings' } as never,
+  );
+  const service = new ListingsService(
+    {} as never,
+    {
+      isOwnedPath: (path: string, userId: string) =>
+        real.isOwnedPath(path, userId),
+      publicUrlFor: url,
+    } as never,
+    {} as never,
+    {} as never,
+  ) as unknown as {
+    assertPhotosOwned(u: string, p: Photo[], kept?: Photo[]): void;
+  };
+  const own = { path: 'listing/u1/a.png', url: url('listing/u1/a.png') };
+
+  it('accepts the caller’s own uploads', () => {
+    expect(() => service.assertPhotosOwned('u1', [own])).not.toThrow();
+  });
+
+  it.each([
+    [
+      'another user’s object',
+      { path: 'listing/u2/a.png', url: url('listing/u2/a.png') },
+    ],
+    [
+      'a URL that does not match its path',
+      { path: own.path, url: url('listing/u2/b.png') },
+    ],
+    [
+      'an avatar path',
+      { path: 'avatar/u1/a.png', url: url('avatar/u1/a.png') },
+    ],
+  ])('rejects %s', (_label, photo) => {
+    expect(() => service.assertPhotosOwned('u1', [photo])).toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('keeps legacy photos already on the listing', () => {
+    const legacy = { path: 'listing/old.png', url: url('listing/old.png') };
+    expect(() =>
+      service.assertPhotosOwned('u1', [legacy, own], [legacy]),
+    ).not.toThrow();
   });
 });

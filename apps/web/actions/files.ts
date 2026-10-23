@@ -12,6 +12,7 @@ export type UploadScope =
   | "cover"
   | "listing"
   | "chat"
+  | "report"
   | "category"
   | "subcategory"
   | "brand"

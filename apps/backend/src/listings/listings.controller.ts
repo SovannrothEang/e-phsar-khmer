@@ -43,7 +43,7 @@ export class ListingsController {
   @Public()
   @ApiOperation({ summary: 'Get listing by ID' })
   getOne(@Param('id') id: string) {
-    return this.listingsService.findById(id);
+    return this.listingsService.findPublicById(id);
   }
 
   @Post()

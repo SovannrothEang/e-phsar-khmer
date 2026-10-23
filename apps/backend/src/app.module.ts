@@ -24,6 +24,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { ListingsModule } from './listings/listings.module';
 import { ReactionsModule } from './reactions/reactions.module';
+import { UserReportsModule } from './reports/reports.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
@@ -92,6 +94,8 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     LocationsModule,
     ListingsModule,
     ReactionsModule,
+    UserReportsModule,
+    FeedbackModule,
     BrandsModule,
     FilesModule,
     HealthModule,
