@@ -26,10 +26,9 @@ import type { Post } from "@/lib/posts";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
-import {
-  getMyEntitlements,
-  type PlanEntitlements,
-} from "@/actions/subscriptions";
+import { describeBucket } from "@/lib/subscription-pricing";
+import { getMyEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import { ALL_ADS_PAGE_SIZE, type AllAdsFilters } from "@/lib/all-ads";
 
@@ -558,9 +557,10 @@ export async function createListing(
   // Limits are per category bucket, so ask for the one this ad lands in.
   const plan = await getMyEntitlements(payload.subcategoryId).catch(() => null);
   if (plan && plan.usage.ads >= plan.limits.ads) {
+    const bucketCopy = describeBucket(plan.bucket);
     return {
       success: false,
-      error: `Your ${plan.bucket?.kind === "group" ? `${plan.bucket.name} subscription` : "free plan"} allows ${plan.limits.ads} active ads ${plan.bucket?.kind === "group" ? "in its categories" : `in ${plan.bucket?.name ?? "this category"}`} and you have ${plan.usage.ads}. Upgrade your subscription or remove an ad to post another.`,
+      error: `Your ${bucketCopy.planLabel} allows ${plan.limits.ads} active ads ${bucketCopy.scopeLabel} and you have ${plan.usage.ads}. ${bucketCopy.ctaLabel} or remove an ad to post another.`,
     };
   }
 

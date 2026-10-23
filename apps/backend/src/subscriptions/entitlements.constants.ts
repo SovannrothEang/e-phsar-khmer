@@ -33,6 +33,20 @@ export const DEFAULT_FREE_PLAN: Readonly<FreePlanSettings> = {
   otherAds: 5,
 };
 
+export function toFreePlanSettings(
+  row: FreePlanSettings | null | undefined,
+): FreePlanSettings {
+  return row
+    ? {
+        photos: row.photos,
+        renews: row.renews,
+        autoRenews: row.autoRenews,
+        videos: row.videos,
+        otherAds: row.otherAds,
+      }
+    : { ...DEFAULT_FREE_PLAN };
+}
+
 /** Seed values for `free_plan_ad_limits`, by subcategory or category slug. */
 export const DEFAULT_FREE_AD_CAPS: readonly {
   subcategorySlug?: string;
@@ -45,3 +59,6 @@ export const DEFAULT_FREE_AD_CAPS: readonly {
   { categorySlug: 'fashion-and-beauty', ads: 50 },
   { categorySlug: 'foods', ads: 50 },
 ];
+
+export const ENTITLEMENTS_QUEUE = 'entitlements';
+export const LISTING_SWEEP_JOB = 'listing-restriction-sweep';

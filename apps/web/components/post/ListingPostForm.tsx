@@ -24,6 +24,7 @@ import {
   type ListingFormConfig,
 } from "@/actions/listings";
 import type { BackendModel } from "@/lib/api/categories";
+import { describeBucket } from "@/lib/subscription-pricing";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -674,6 +675,7 @@ export default function ListingPostForm({
       onChange={setCondition}
     />
   ) : null;
+  const bucketCopy = describeBucket(config.plan?.bucket ?? null);
 
   return (
     <div className="space-y-8">
@@ -700,21 +702,17 @@ export default function ListingPostForm({
             {/* Limits are per bucket: the group subscription covering this
                 subcategory, else the free cap for where it is posted. */}
             <strong className="font-semibold text-foreground">
-              {config.plan.bucket?.kind === "group"
-                ? `${config.plan.bucket.name} plan`
-                : "Free plan"}
+              {bucketCopy.planLabel}
             </strong>{" "}
-            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used
-            {config.plan.bucket?.kind === "free"
-              ? ` in ${config.plan.bucket.name}`
-              : ""}{" "}
-            · up to {config.plan.limits.photos} photos per ad
+            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used ·{" "}
+            {bucketCopy.scopeLabel} · up to {config.plan.limits.photos} photos
+            per ad
           </span>
           <Link
             href="/premium-account"
             className="font-semibold text-[#0089c8] hover:underline"
           >
-            {config.plan.bucket?.kind === "group" ? "See plans" : "Upgrade"}
+            {bucketCopy.ctaLabel}
           </Link>
         </div>
       )}

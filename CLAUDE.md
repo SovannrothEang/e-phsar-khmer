@@ -374,8 +374,8 @@ The admin dashboard originally lived at `apps/admin` and was renamed to `apps/we
 | `AdminBrandsController`                                | CRUD `GET/POST/PATCH/DELETE /admin/brands`                                                                      |
 | `AdminModelsController`                                | CRUD `GET/POST/PATCH/DELETE /admin/models`                                                                      |
 | `AttributesController` (own module, `src/attributes/`) | `GET/POST/PATCH/DELETE /admin/attributes/:type` (generic — `type` discriminates; see the Attributes section)    |
-| `SubscriptionConfigController`                         | CRUD for subscription categories/plans/packages/terms (4-tier cascade)                                          |
-| `UserSubscriptionsController`                          | `GET /admin/user-subscriptions`, `POST` grant, `DELETE :id`                                                     |
+| `SubscriptionConfigController`                         | CRUD for subscription groups/plans/packages/terms, group scope, and free-plan config                            |
+| `UserSubscriptionsController`                          | `GET /admin/user-subscriptions`, `POST` grant, `POST :id/revoke`                                                |
 | `ReportsController`                                    | `GET /admin/reports/reasons`, `GET/PATCH/DELETE /admin/reports/users`, `/admin/reports/listings`                |
 
 **Admin stats** (`AdminService.getStats`): 4 card metrics (`totalUsers`, `newUsers`, `totalListings`, `activeListings`), each with `{value, changePct, trend}` comparing current 30d vs prior 30d. `getTimeseries(range)` returns daily `{date, newUsers, newListings}` bucketed in ICT (UTC+7) via `date_trunc(... AT TIME ZONE 'Asia/Phnom_Penh')`.
@@ -506,16 +506,15 @@ Admin pages under `app/wanderer/dashboard/` are `"use client"` components using:
 
 ### Subscriptions (`subscriptions.schema.ts`)
 
-4-tier config hierarchy — cascading parent selects in the admin UI:
+The admin UI manages a four-level catalog (`subscription_categories → subscription_plans → subscription_packages → subscription_terms`), but a subscription category is a **group** in the API and entitlement model. `subscription_category_subcategories` assigns each listing subcategory to at most one group; a held subscription grants the package limits across that group's scope, while unheld/out-of-scope ads use the configured free plan.
 
-```
-subscription_categories → subscription_plans → subscription_packages → subscription_terms
-```
-
-- `subscription_plans` unique on `(categoryId, slug)`; FK cascade on parent delete.
-- `subscription_packages` feature fields are **integers** (`photos`, `ads`, `renews`, `autoRenews`, `videos`) — admin forms use number inputs.
-- `subscription_terms`: `durationValue` (int) + `durationUnit` (`day|month|year`) + `price` (numeric) + `discount`/`discountType` (reuses `discountTypeEnum` from listings).
-- `user_subscriptions`: `userId` FK cascade, `termId` FK set null on delete, `priceUsd` (snapshot at grant time), `paymentMethod`, `subscribedAt`, `expiresAt`. Status is **derived** (`expiresAt < now → expired`), not stored.
+- `subscription_plans` is unique on `(categoryId, slug)`; its parent group deletion cascades through plans, packages, and terms.
+- `subscription_packages` feature fields are **integers** (`photos`, `ads`, `renews`, `autoRenews`, `videos`). `autoRenews` and `videos` are stored but are not enforced by current listing features.
+- `subscription_terms` holds `durationValue` + `durationUnit` (`day|month|year`), numeric `price`, and `discount`/`discountType`.
+- The free plan is admin configuration: singleton `free_plan_settings` plus `free_plan_ad_limits` caps for one listing category or subcategory. Public `GET /subscriptions/free-plan` exposes the current sheet.
+- `user_subscriptions` stores a purchase-time `priceUsd`, `subscription_category_id` group, `expiresAt`, `superseded_at`, and typed `superseded_reason` (`upgrade|replaced|expired|revoked`). A partial unique index enforces one current row per `(user_id, non-null group)`; different groups can coexist. Status is **derived** from expiry/supersede fields, not stored.
+- Admin `POST /admin/user-subscriptions/:id/revoke` conditionally marks a current row `revoked`, keeps history, and reconciles the user's listings. Group-scope and free-plan edits enqueue a BullMQ reconciliation (a burst collapses into one waiting job; an edit during a running sweep queues one more behind it); the recurring 10-minute sweep is the backstop. There is no outbox handoff for this recomputable work.
+- Deleting a group nulls existing subscriptions' group FK and cascades its catalog. Entitlement loading ignores null-group rows, so group deletion can remove a holder's allowance; confirm/migrate or revoke those subscriptions before deleting a live group. See [`apps/backend/src/admin/subscriptions/README.md`](apps/backend/src/admin/subscriptions/README.md) for lifecycle and remaining gaps.
 
 ### Reports (`reports.schema.ts`)
 

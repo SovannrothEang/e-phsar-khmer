@@ -46,7 +46,7 @@ export interface AdScope {
   subcategoryId: string;
 }
 
-function freeLimits(free: FreePlanSettings, ads: number): PlanLimits {
+export function freeLimits(free: FreePlanSettings, ads: number): PlanLimits {
   return {
     photos: free.photos,
     ads,
@@ -56,30 +56,38 @@ function freeLimits(free: FreePlanSettings, ads: number): PlanLimits {
   };
 }
 
+export function groupBucket(
+  groupId: string,
+  config: AllowanceConfig,
+  held: ReadonlyMap<string, HeldGroup>,
+): Bucket | undefined {
+  const group = held.get(groupId);
+  if (!group) return undefined;
+  const { free } = config;
+  return {
+    key: `group:${group.groupId}`,
+    kind: 'group',
+    groupId: group.groupId,
+    // A subscriber is never worse off per ad than the free plan; the ad
+    // pool is the package's own number, since it replaces the free caps.
+    limits: {
+      photos: Math.max(free.photos, group.limits.photos),
+      ads: group.limits.ads,
+      renews: Math.max(free.renews, group.limits.renews),
+      autoRenews: Math.max(free.autoRenews, group.limits.autoRenews),
+      videos: Math.max(free.videos, group.limits.videos),
+    },
+  };
+}
+
 export function bucketOf(
   ad: AdScope,
   config: AllowanceConfig,
   held: ReadonlyMap<string, HeldGroup>,
 ): Bucket {
   const groupId = config.subcategoryGroup.get(ad.subcategoryId);
-  const group = groupId ? held.get(groupId) : undefined;
-  if (group) {
-    const { free } = config;
-    return {
-      key: `group:${group.groupId}`,
-      kind: 'group',
-      groupId: group.groupId,
-      // A subscriber is never worse off per ad than the free plan; the ad
-      // pool is the package's own number, since it replaces the free caps.
-      limits: {
-        photos: Math.max(free.photos, group.limits.photos),
-        ads: group.limits.ads,
-        renews: Math.max(free.renews, group.limits.renews),
-        autoRenews: Math.max(free.autoRenews, group.limits.autoRenews),
-        videos: Math.max(free.videos, group.limits.videos),
-      },
-    };
-  }
+  const group = groupId ? groupBucket(groupId, config, held) : undefined;
+  if (group) return group;
 
   const subCap = config.subcategoryCaps.get(ad.subcategoryId);
   if (subCap !== undefined) {

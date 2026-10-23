@@ -1,7 +1,8 @@
 import type {
+  EntitlementBucket,
   SubscriptionCatalogItem,
   UserSubscription,
-} from "@/actions/subscriptions";
+} from "@/types/subscription";
 
 // Client mirror of the backend checkout math (subscriptions.service.ts:
 // calculatePrice / calculateUpgradeCredit / prorateToRemaining). Used only to
@@ -25,14 +26,14 @@ export function priceFor(item: SubscriptionCatalogItem): number {
  */
 export function currentSubscription(
   subscriptions: UserSubscription[],
-  categoryId?: string | null,
+  groupId?: string | null,
 ): UserSubscription | null {
   return (
     subscriptions
       .filter(
         (item) =>
           item.status === "active" &&
-          (categoryId === undefined || item.categoryId === categoryId),
+          (groupId === undefined || item.groupId === groupId),
       )
       .sort(
         (a, b) =>
@@ -48,7 +49,7 @@ export function activeSubscriptions(
   const byGroup = new Map<string, UserSubscription>();
   for (const item of subscriptions) {
     if (item.status !== "active") continue;
-    const key = item.categoryId ?? item.id;
+    const key = item.groupId ?? item.id;
     const kept = byGroup.get(key);
     if (!kept || new Date(item.expiresAt) > new Date(kept.expiresAt)) {
       byGroup.set(key, item);
@@ -57,6 +58,24 @@ export function activeSubscriptions(
   return [...byGroup.values()].sort(
     (a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime(),
   );
+}
+
+/** Shared plan/scope/CTA wording for subscription allowance buckets. */
+export function describeBucket(
+  bucket: Pick<EntitlementBucket, "kind" | "name"> | null,
+): { planLabel: string; scopeLabel: string; ctaLabel: string } {
+  if (bucket?.kind === "group") {
+    return {
+      planLabel: `${bucket.name} plan`,
+      scopeLabel: "in its categories",
+      ctaLabel: "See plans",
+    };
+  }
+  return {
+    planLabel: "Free plan",
+    scopeLabel: bucket ? `in ${bucket.name}` : "in this category",
+    ctaLabel: "Upgrade",
+  };
 }
 
 /** Package id of a subscription, resolved through its term in the catalog. */

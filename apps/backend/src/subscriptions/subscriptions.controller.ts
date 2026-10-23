@@ -33,6 +33,16 @@ export class SubscriptionsController {
     return this.subscriptions.catalog();
   }
 
+  @Public()
+  @Get('free-plan')
+  @ApiOperation({
+    summary:
+      'What every account gets without a subscription: limits and per-category ad caps',
+  })
+  freePlan() {
+    return this.entitlements.freePlan();
+  }
+
   @Get('me')
   @ApiBearerAuth()
   mine(@CurrentUser() user: RequestUser) {

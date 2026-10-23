@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -13,8 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/sonner";
-import { getAdminCategories } from "@/actions/admin-categories";
-import { getAdminSubcategories } from "@/actions/admin-subcategories";
+import { useAdminCategoryTree } from "@/hooks/use-admin-category-tree";
 import {
   updateSubCategoryScope,
   type SubCategory,
@@ -37,14 +35,7 @@ export function SubscriptionScopeDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { data: categories = [] } = useQuery({
-    queryKey: ["admin", "categories"],
-    queryFn: getAdminCategories,
-  });
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["admin", "subcategories"],
-    queryFn: getAdminSubcategories,
-  });
+  const { tree: categoryTree } = useAdminCategoryTree();
   const [selected, setSelected] = useState(
     () => new Set(group.subcategoryIds ?? []),
   );
@@ -59,19 +50,7 @@ export function SubscriptionScopeDialog({
     return map;
   }, [groups, group.id]);
 
-  const tree = useMemo(
-    () =>
-      [...categories]
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((category) => ({
-          ...category,
-          subs: subcategories
-            .filter((sub) => sub.categoryId === category.cateId)
-            .sort((a, b) => a.sortOrder - b.sortOrder),
-        }))
-        .filter((category) => category.subs.length > 0),
-    [categories, subcategories],
-  );
+  const tree = categoryTree.filter((category) => category.subs.length > 0);
 
   const toggle = (ids: string[], on: boolean) =>
     setSelected((current) => {

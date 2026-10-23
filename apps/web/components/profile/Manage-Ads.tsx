@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { loadMyAds } from "@/actions/my-ads";
-import type { PlanEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
 
 type Tab = "active" | "expired";

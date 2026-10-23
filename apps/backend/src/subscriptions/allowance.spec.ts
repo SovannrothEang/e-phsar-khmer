@@ -1,4 +1,4 @@
-import { bucketOf, partitionByAllowance } from './allowance';
+import { bucketOf, groupBucket, partitionByAllowance } from './allowance';
 import type { AllowanceConfig, HeldGroup } from './allowance';
 import { DEFAULT_FREE_PLAN } from './entitlements.constants';
 
@@ -64,6 +64,20 @@ describe('bucketOf', () => {
     expect(limits.photos).toBe(8);
     expect(limits.renews).toBe(5);
     expect(limits.ads).toBe(30);
+  });
+});
+
+describe('groupBucket', () => {
+  it('builds a held group bucket without an ad scope', () => {
+    expect(groupBucket('auto', config, holding(auto))).toMatchObject({
+      key: 'group:auto',
+      groupId: 'auto',
+      limits: auto.limits,
+    });
+  });
+
+  it('returns undefined for a group the user does not hold', () => {
+    expect(groupBucket('auto', config, holding())).toBeUndefined();
   });
 });
 

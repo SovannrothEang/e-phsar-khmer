@@ -17,6 +17,7 @@ import {
 } from '../db/schema/subscriptions.schema';
 import { users } from '../db/schema/users.schema';
 import { EntitlementsService } from './entitlements.service';
+import type { SupersededReason } from './subscription-status';
 
 export interface PaidPurchaseSettlement {
   purchaseId: string;
@@ -102,30 +103,6 @@ function durationFromSnapshot(snapshot: unknown): {
     );
   }
   return { value, unit };
-}
-
-export type SupersededReason = 'upgrade' | 'replaced' | 'expired' | 'revoked';
-
-export type SubscriptionStatus =
-  | 'active'
-  | 'expired'
-  | 'superseded'
-  | 'revoked';
-
-export function subscriptionStatus(
-  row: {
-    expiresAt: Date;
-    supersededAt: Date | null;
-    supersededReason: string | null;
-  },
-  now = Date.now(),
-): SubscriptionStatus {
-  if (row.supersededAt) {
-    if (row.supersededReason === 'revoked') return 'revoked';
-    if (row.supersededReason === 'expired') return 'expired';
-    return 'superseded';
-  }
-  return row.expiresAt.getTime() > now ? 'active' : 'expired';
 }
 
 export interface ActivationPlan {

@@ -11,26 +11,26 @@ export default async function PremiumAccountPage() {
     getSubscriptionCatalog().catch(() => []),
     getMySubscriptions().catch(() => []),
   ]);
-  // One subscription per category, held side by side.
-  const heldByCategory = new Map(
+  // One subscription per group, held side by side.
+  const heldByGroup = new Map(
     activeSubscriptions(subscriptions).flatMap((item) =>
-      item.categoryId ? [[item.categoryId, item]] : [],
+      item.groupId ? [[item.groupId, item]] : [],
     ),
   );
 
   // The catalog arrives in admin sort order, so first-seen order is the
-  // order the categories are listed in.
-  const categories = new Map<
+  // order the groups are listed in.
+  const groups = new Map<
     string,
     { id: string; name: string; slug: string; description: string | null }
   >();
   for (const item of catalog) {
-    if (!categories.has(item.categoryId)) {
-      categories.set(item.categoryId, {
-        id: item.categoryId,
-        name: item.categoryName,
-        slug: item.categorySlug,
-        description: item.categoryDescription,
+    if (!groups.has(item.groupId)) {
+      groups.set(item.groupId, {
+        id: item.groupId,
+        name: item.groupName,
+        slug: item.groupSlug,
+        description: item.groupDescription,
       });
     }
   }
@@ -64,7 +64,7 @@ export default async function PremiumAccountPage() {
           Choose the right category for your ads and start selling faster.
         </p>
 
-        {categories.size === 0 ? (
+        {groups.size === 0 ? (
           <div className="mt-6 rounded-md bg-card p-12 text-center ring-1 ring-border">
             <h2 className="font-semibold text-foreground">
               No plans available
@@ -75,16 +75,16 @@ export default async function PremiumAccountPage() {
           </div>
         ) : (
           <div className="mt-6 space-y-6">
-            {[...categories.values()].map((category) => {
-              const mine = heldByCategory.get(category.id);
+            {[...groups.values()].map((group) => {
+              const mine = heldByGroup.get(group.id);
               return (
                 <article
-                  key={category.id}
+                  key={group.id}
                   className="rounded-md bg-card px-6 py-6 ring-1 ring-border"
                 >
                   <div className="flex flex-wrap items-center gap-3">
                     <h2 className="text-xl font-semibold text-foreground">
-                      {category.name}
+                      {group.name}
                     </h2>
                     {mine && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
@@ -94,15 +94,13 @@ export default async function PremiumAccountPage() {
                       </span>
                     )}
                   </div>
-                  {category.description && (
-                    <p className="mt-4 text-foreground">
-                      {category.description}
-                    </p>
+                  {group.description && (
+                    <p className="mt-4 text-foreground">{group.description}</p>
                   )}
                   <Link
                     href={{
                       pathname: "/premium-account/[category]",
-                      params: { category: category.slug },
+                      params: { category: group.slug },
                     }}
                     className="mt-5 inline-flex items-center gap-1 font-medium text-[#00a0e9] underline underline-offset-4 hover:text-[#0089c8]"
                   >

@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { EntitlementsService } from './entitlements.service';
 import { DEFAULT_FREE_PLAN } from './entitlements.constants';
 
@@ -46,12 +47,14 @@ function makeService(setup: Setup, withLive = false) {
     ...(withLive ? [setup.live ?? []] : []),
   ];
   for (const rows of batches) select.mockReturnValueOnce(query(rows));
-  const set = jest.fn(() => ({
-    where: jest.fn().mockResolvedValue(undefined),
+  const returning = jest.fn().mockResolvedValue([]);
+  const where = jest.fn<{ returning: typeof returning }, [unknown?]>(() => ({
+    returning,
   }));
+  const set = jest.fn(() => ({ where }));
   const update = jest.fn(() => ({ set }));
   const service = new EntitlementsService({ select, update } as never);
-  return { service, update, set };
+  return { service, update, set, where, returning };
 }
 
 const future = new Date(Date.now() + 10 * 24 * 3600 * 1000);
@@ -170,7 +173,11 @@ describe('EntitlementsService.reconcileListings', () => {
       status: 'active',
       ...cars,
     }));
-    const { service, update, set } = makeService({ caps, live }, true);
+    const { service, update, set, returning } = makeService(
+      { caps, live },
+      true,
+    );
+    returning.mockResolvedValueOnce([{ id: 'c' }]);
     const result = await service.reconcileListings('u1');
     expect(result).toEqual({ restricted: 1, restored: 0 });
     expect(update).toHaveBeenCalledTimes(1);
@@ -185,10 +192,11 @@ describe('EntitlementsService.reconcileListings', () => {
       { id: 'b', status: 'active', ...cars },
       { id: 'c', status: 'restricted', ...cars },
     ];
-    const { service, set } = makeService(
+    const { service, set, returning } = makeService(
       { scopes, caps, held: [autoSub], live },
       true,
     );
+    returning.mockResolvedValueOnce([{ id: 'c' }]);
     const result = await service.reconcileListings('u1');
     expect(result).toEqual({ restricted: 0, restored: 1 });
     expect(set).toHaveBeenCalledWith(
@@ -196,10 +204,75 @@ describe('EntitlementsService.reconcileListings', () => {
     );
   });
 
+  it('guards both writes by owner and expected status and counts only returned rows', async () => {
+    const live = [
+      { id: 'a', status: 'active', ...cars },
+      { id: 'b', status: 'restricted', ...cars },
+      { id: 'c', status: 'active', ...cars },
+    ];
+    const { service, where, returning } = makeService({ caps, live }, true);
+    // Simulate both rows changing status after the read; guarded UPDATEs match none.
+    returning.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await expect(service.reconcileListings('u1')).resolves.toEqual({
+      restricted: 0,
+      restored: 0,
+    });
+
+    expect(where).toHaveBeenCalledTimes(2);
+    const dialect = new PgDialect();
+    const clauses = where.mock.calls.map(([condition]) =>
+      dialect.sqlToQuery(condition as never),
+    );
+    expect(clauses[0].sql).toContain('"status" =');
+    expect(clauses[0].params).toContain('restricted');
+    expect(clauses[0].params).toContain('u1');
+    expect(clauses[1].sql).toContain('"status" =');
+    expect(clauses[1].params).toContain('active');
+    expect(clauses[1].params).toContain('u1');
+  });
+
   it('does nothing when the ads already match the allowance', async () => {
     const live = [{ id: 'a', status: 'active', ...cars }];
     const { service, update } = makeService({ caps, live }, true);
     await service.reconcileListings('u1');
     expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe('EntitlementsService.freePlan', () => {
+  it('lists every cap by name in catalog order', async () => {
+    const select = jest.fn();
+    const rows = [
+      [{ photos: 8, renews: 5, autoRenews: 0, videos: 0, otherAds: 5 }],
+      [],
+      [
+        { categoryId: null, subcategoryId: 'rent', ads: 2 },
+        { categoryId: null, subcategoryId: 'cars', ads: 2 },
+        { categoryId: 'foods', subcategoryId: null, ads: 50 },
+      ],
+      // subcategory sort orders, category sort orders
+      [
+        { id: 'rent', sub: 3, cat: 0 },
+        { id: 'cars', sub: 0, cat: 0 },
+      ],
+      [{ id: 'foods', cat: 11 }],
+      // names: groups (none), subcategories, categories
+      [
+        { id: 'cars', slug: 'cars-for-sale', name: 'Cars For Sale' },
+        { id: 'rent', slug: 'vehicles-for-rent', name: null },
+      ],
+      [{ id: 'foods', name: 'Foods' }],
+    ];
+    for (const r of rows) select.mockReturnValueOnce(query(r));
+    const service = new EntitlementsService({ select } as never);
+
+    const plan = await service.freePlan();
+    expect(plan).toMatchObject({ photos: 8, renews: 5, otherAds: 5 });
+    expect(plan.caps).toEqual([
+      { key: 'sub:cars', name: 'Cars For Sale', ads: 2 },
+      { key: 'sub:rent', name: 'vehicles-for-rent', ads: 2 },
+      { key: 'cat:foods', name: 'Foods', ads: 50 },
+    ]);
   });
 });

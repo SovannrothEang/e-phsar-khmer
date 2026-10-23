@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,7 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { toast } from "@/components/ui/sonner";
-import { getAdminCategories } from "@/actions/admin-categories";
-import { getAdminSubcategories } from "@/actions/admin-subcategories";
+import { useAdminCategoryTree } from "@/hooks/use-admin-category-tree";
 import {
   getFreePlan,
   updateFreePlan,
@@ -50,14 +49,7 @@ function toRows(plan: FreePlan): Row[] {
 
 function FreePlanForm({ plan }: { plan: FreePlan }) {
   const queryClient = useQueryClient();
-  const { data: categories = [] } = useQuery({
-    queryKey: ["admin", "categories"],
-    queryFn: getAdminCategories,
-  });
-  const { data: subcategories = [] } = useQuery({
-    queryKey: ["admin", "subcategories"],
-    queryFn: getAdminSubcategories,
-  });
+  const { tree } = useAdminCategoryTree();
   const [settings, setSettings] = useState(() => ({
     photos: plan.photos,
     renews: plan.renews,
@@ -67,19 +59,6 @@ function FreePlanForm({ plan }: { plan: FreePlan }) {
   }));
   const [rows, setRows] = useState<Row[]>(() => toRows(plan));
   const [saving, setSaving] = useState(false);
-
-  const tree = useMemo(
-    () =>
-      [...categories]
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((category) => ({
-          ...category,
-          subs: subcategories
-            .filter((s) => s.categoryId === category.cateId)
-            .sort((a, b) => a.sortOrder - b.sortOrder),
-        })),
-    [categories, subcategories],
-  );
 
   const used = new Set(rows.map((row) => row.scope));
   const duplicate = rows.some(

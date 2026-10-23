@@ -17,8 +17,8 @@ import {
   subscriptionPackages,
   subscriptionTerms,
 } from '../../db/schema/subscriptions.schema';
-import { EntitlementsService } from '../../subscriptions/entitlements.service';
-import { DEFAULT_FREE_PLAN } from '../../subscriptions/entitlements.constants';
+import { EntitlementsScheduler } from '../../subscriptions/entitlements.scheduler';
+import { toFreePlanSettings } from '../../subscriptions/entitlements.constants';
 import type {
   SubscriptionCategoryRow,
   SubscriptionPlanRow,
@@ -42,7 +42,7 @@ import type {
 export class SubscriptionConfigService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
-    private readonly entitlements: EntitlementsService,
+    private readonly entitlementsScheduler: EntitlementsScheduler,
   ) {}
 
   // ── Categories ──────────────────────────────────────────
@@ -144,7 +144,7 @@ export class SubscriptionConfigService {
         this.rethrow(err);
       });
 
-    this.entitlements.reconcileAllInBackground('a group scope edit');
+    await this.entitlementsScheduler.enqueueConfigReconcile();
     return { id, subcategoryIds };
   }
 
@@ -429,9 +429,7 @@ export class SubscriptionConfigService {
         })
         .from(freePlanAdLimits),
     ]);
-    const { photos, renews, autoRenews, videos, otherAds } =
-      settings ?? DEFAULT_FREE_PLAN;
-    return { photos, renews, autoRenews, videos, otherAds, adLimits };
+    return { ...toFreePlanSettings(settings), adLimits };
   }
 
   /** Replaces the whole free plan in one transaction, then reconciles ads. */
@@ -476,9 +474,16 @@ export class SubscriptionConfigService {
           );
         }
       })
-      .catch((err: unknown) => this.rethrow(err));
+      .catch((err: unknown) => {
+        if ((err as { code?: string } | null)?.code === '23505') {
+          throw new ConflictException(
+            'The free plan was just changed by someone else. Reload and try again.',
+          );
+        }
+        this.rethrow(err);
+      });
 
-    this.entitlements.reconcileAllInBackground('a free plan edit');
+    await this.entitlementsScheduler.enqueueConfigReconcile();
     return this.getFreePlan();
   }
 

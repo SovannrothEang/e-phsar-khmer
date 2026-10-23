@@ -7,9 +7,11 @@ import { Link } from "@/i18n/routing";
 import {
   getMySubscriptions,
   getSubscriptionCatalog,
-  type SubscriptionCatalogItem,
-  type UserSubscription,
 } from "@/actions/subscriptions";
+import type {
+  SubscriptionCatalogItem,
+  UserSubscription,
+} from "@/types/subscription";
 import {
   currentSubscription,
   offerState,
@@ -294,7 +296,7 @@ export default function PremiumPlanPage() {
   }, []);
 
   const offers = useMemo(
-    () => catalog.filter((item) => item.categorySlug === categorySlug),
+    () => catalog.filter((item) => item.groupSlug === categorySlug),
     [catalog, categorySlug],
   );
   // The catalog arrives in admin sort order (plans, then terms), which is the
@@ -308,14 +310,11 @@ export default function PremiumPlanPage() {
     }
     return [...grouped.values()];
   }, [offers]);
-  // Only this category's subscription matters here: buying into another
-  // category is a separate, side-by-side subscription, never an upgrade.
-  const active = currentSubscription(
-    subscriptions,
-    offers[0]?.categoryId ?? null,
-  );
+  // Only this group's subscription matters here: buying into another
+  // group is a separate, side-by-side subscription, never an upgrade.
+  const active = currentSubscription(subscriptions, offers[0]?.groupId ?? null);
   const activePackageId = packageIdOf(active, catalog);
-  const categoryName = offers[0]?.categoryName ?? categorySlug;
+  const groupName = offers[0]?.groupName ?? categorySlug;
 
   const selectedTerms =
     packages.find((terms) => terms[0].packageId === selectedPackageId) ??
@@ -354,7 +353,7 @@ export default function PremiumPlanPage() {
             Premium Account
           </Link>
           <ChevronRight className="size-4 text-muted-foreground" />
-          <span className="text-muted-foreground">{categoryName}</span>
+          <span className="text-muted-foreground">{groupName}</span>
         </nav>
 
         <h1 className="mb-6 text-2xl font-semibold text-foreground">

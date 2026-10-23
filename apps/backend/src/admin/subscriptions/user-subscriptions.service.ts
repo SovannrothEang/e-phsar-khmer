@@ -17,11 +17,12 @@ import {
 } from '../../db/schema/subscriptions.schema';
 import type { GrantSubscriptionDto } from './dto/grant-subscription.dto';
 import { EntitlementsService } from '../../subscriptions/entitlements.service';
-import {
-  SubscriptionActivationService,
-  subscriptionStatus,
-} from '../../subscriptions/subscription-activation.service';
-import type { SubscriptionStatus } from '../../subscriptions/subscription-activation.service';
+import { SubscriptionActivationService } from '../../subscriptions/subscription-activation.service';
+import { subscriptionStatus } from '../../subscriptions/subscription-status';
+import type {
+  SubscriptionStatus,
+  SupersededReason,
+} from '../../subscriptions/subscription-status';
 
 export interface UserSubscriptionView {
   id: string;
@@ -30,7 +31,7 @@ export interface UserSubscriptionView {
   name: string;
   email: string | null;
   phone: string | null;
-  category: string | null;
+  group: string | null;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
@@ -40,7 +41,7 @@ export interface UserSubscriptionView {
   subscribedAt: Date;
   expiresAt: Date;
   supersededAt: Date | null;
-  supersededReason: string | null;
+  supersededReason: SupersededReason | null;
   status: SubscriptionStatus;
 }
 
@@ -66,7 +67,7 @@ export class UserSubscriptionsService {
         username: users.username,
         email: users.email,
         phone: users.primaryPhone,
-        category: subscriptionCategories.name,
+        group: subscriptionCategories.name,
         ads: subscriptionPackages.ads,
         renews: subscriptionPackages.renews,
         autoRenews: subscriptionPackages.autoRenews,
@@ -110,7 +111,7 @@ export class UserSubscriptionsService {
         'Unknown',
       email: r.email,
       phone: r.phone,
-      category: r.category,
+      group: r.group,
       totalAds: r.ads ?? 0,
       totalRenew: r.renews ?? 0,
       autoRenew: r.autoRenews ?? 0,

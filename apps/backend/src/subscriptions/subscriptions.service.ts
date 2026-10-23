@@ -22,10 +22,8 @@ import { PaymentEffectRunner } from '../payment/payment-effect-runner.service';
 import { PaymentGatewayRegistry } from '../payment/providers';
 import { createPaymentTransaction } from '../payment/use-cases';
 import { CreateSubscriptionCheckoutDto } from './dto/create-subscription-checkout.dto';
-import {
-  addDuration,
-  subscriptionStatus,
-} from './subscription-activation.service';
+import { addDuration } from './subscription-activation.service';
+import { subscriptionStatus } from './subscription-status';
 
 function calculatePrice(
   price: string,
@@ -91,10 +89,10 @@ export class SubscriptionsService {
   async catalog() {
     return this.db
       .select({
-        categoryId: subscriptionCategories.id,
-        categoryName: subscriptionCategories.name,
-        categorySlug: subscriptionCategories.slug,
-        categoryDescription: subscriptionCategories.description,
+        groupId: subscriptionCategories.id,
+        groupName: subscriptionCategories.name,
+        groupSlug: subscriptionCategories.slug,
+        groupDescription: subscriptionCategories.description,
         planId: subscriptionPlans.id,
         planName: subscriptionPlans.name,
         packageId: subscriptionPackages.id,
@@ -149,8 +147,8 @@ export class SubscriptionsService {
         id: userSubscriptions.id,
         termId: userSubscriptions.termId,
         termName: subscriptionTerms.name,
-        categoryId: userSubscriptions.subscriptionCategoryId,
-        categoryName: subscriptionCategories.name,
+        groupId: userSubscriptions.subscriptionCategoryId,
+        groupName: subscriptionCategories.name,
         planName: subscriptionPlans.name,
         packageName: subscriptionPackages.name,
         photos: subscriptionPackages.photos,
@@ -203,8 +201,8 @@ export class SubscriptionsService {
         purchaseId: row.purchaseId,
         termId: row.termId,
         termName: snapshotString('termName', row.termName),
-        categoryId: row.categoryId,
-        categoryName: row.categoryName,
+        groupId: row.groupId,
+        groupName: row.groupName,
         planName: row.planName,
         packageName: snapshotString('packageName', row.packageName),
         photos: snapshotNumber('photos', row.photos),

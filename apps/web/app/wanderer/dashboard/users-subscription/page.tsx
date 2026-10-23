@@ -53,6 +53,7 @@ import {
   revokeUserSubscription,
   type UserSubscriptionRow,
 } from "@/actions/admin-user-subscriptions";
+import type { SupersededReason } from "@/types/subscription";
 import { getAdminUsers } from "@/actions/admin-users";
 import {
   getSubCategories,
@@ -67,7 +68,7 @@ type Subscription = {
   name: string;
   email: string;
   phone: string;
-  category: string;
+  group: string;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
@@ -77,7 +78,7 @@ type Subscription = {
   subscribedAt: string;
   expiredAt: string;
   status: UserSubscriptionRow["status"];
-  supersededReason: string | null;
+  supersededReason: SupersededReason | null;
 };
 
 // A superseded row is history, not a second subscription: label it by why it
@@ -116,7 +117,7 @@ export default function SubscriptionPage() {
         name: r.name,
         email: r.email ?? "",
         phone: r.phone ?? "",
-        category: r.category ?? "—",
+        group: r.group ?? "—",
         totalAds: r.totalAds,
         totalRenew: r.totalRenew,
         autoRenew: r.autoRenew,
@@ -213,21 +214,21 @@ export default function SubscriptionPage() {
       sub.accountId.toLowerCase().includes(q) ||
       sub.name.toLowerCase().includes(q) ||
       sub.email.toLowerCase().includes(q) ||
-      sub.category.toLowerCase().includes(q);
+      sub.group.toLowerCase().includes(q);
 
     const matchesTab =
       tab === "all"
         ? true
         : tab === "auto"
-          ? sub.category === "Auto"
+          ? sub.group === "Auto"
           : tab === "food"
-            ? sub.category === "Food"
+            ? sub.group === "Food"
             : tab === "general"
-              ? sub.category === "General"
+              ? sub.group === "General"
               : tab === "property"
-                ? sub.category === "Property"
+                ? sub.group === "Property"
                 : tab === "services"
-                  ? sub.category === "Services"
+                  ? sub.group === "Services"
                   : true;
 
     return matchesSearch && matchesTab;
@@ -319,40 +320,31 @@ export default function SubscriptionPage() {
                 <TabsTrigger value="auto" className="cursor-pointer">
                   Auto
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Auto").length}
+                    {subscription.filter((s) => s.group === "Auto").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="food" className="cursor-pointer">
                   Food
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Food").length}
+                    {subscription.filter((s) => s.group === "Food").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="general" className="cursor-pointer">
                   General
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "General")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "General").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="property" className="cursor-pointer">
                   Property
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Property")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "Property").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="services" className="cursor-pointer">
                   Services
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Services")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "Services").length}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
@@ -403,7 +395,7 @@ export default function SubscriptionPage() {
                   <TableCell>{sub.phone}</TableCell>
 
                   <TableCell>
-                    <Badge variant="outline">{sub.category}</Badge>
+                    <Badge variant="outline">{sub.group}</Badge>
                   </TableCell>
 
                   <TableCell>{sub.totalAds}</TableCell>

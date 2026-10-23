@@ -21,11 +21,13 @@ import {
   getPaymentProviders,
   getPaymentTransactionStatus,
   getSubscriptionCatalog,
-  type PaymentProvider,
-  type PaymentTransactionStatus,
-  type SubscriptionCatalogItem,
-  type UserSubscription,
 } from "@/actions/subscriptions";
+import type {
+  PaymentProvider,
+  PaymentTransactionStatus,
+  SubscriptionCatalogItem,
+  UserSubscription,
+} from "@/types/subscription";
 import {
   currentSubscription,
   offerState,
@@ -196,10 +198,10 @@ export default function CheckoutPage() {
     () => catalog.find((item) => item.termId === termId),
     [catalog, termId],
   );
-  // The offer's own category: a purchase there replaces (upgrades) that
-  // category's subscription and leaves the others alone.
+  // The offer's own group: a purchase there replaces (upgrades) that
+  // group's subscription and leaves the others alone.
   const active = useMemo(
-    () => currentSubscription(subscriptions, offer?.categoryId ?? null),
+    () => currentSubscription(subscriptions, offer?.groupId ?? null),
     [subscriptions, offer],
   );
 
@@ -449,7 +451,7 @@ export default function CheckoutPage() {
             offer
               ? {
                   pathname: "/premium-account/[category]",
-                  params: { category: offer.categorySlug },
+                  params: { category: offer.groupSlug },
                 }
               : "/premium-account"
           }
@@ -558,7 +560,7 @@ export default function CheckoutPage() {
                   <Link
                     href={{
                       pathname: "/premium-account/[category]",
-                      params: { category: offer.categorySlug },
+                      params: { category: offer.groupSlug },
                     }}
                     className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
                   >
@@ -780,7 +782,7 @@ export default function CheckoutPage() {
                 <>
                   <div className="mt-4">
                     <span className="text-xs font-medium text-[#0089c8]">
-                      {offer.categoryName}
+                      {offer.groupName}
                     </span>
                     <p className="mt-1 text-lg font-semibold text-foreground">
                       {offer.packageName}

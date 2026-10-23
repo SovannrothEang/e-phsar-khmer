@@ -1,8 +1,11 @@
 import {
   planActivation,
-  subscriptionStatus,
   SubscriptionActivationService,
 } from './subscription-activation.service';
+import {
+  subscriptionStatus,
+  type SubscriptionStatus,
+} from './subscription-status';
 
 function makePurchase(overrides: Record<string, unknown> = {}) {
   return {
@@ -381,7 +384,7 @@ describe('subscriptionStatus', () => {
   const future = new Date(now + 1000);
   const past = new Date(now - 1000);
 
-  it.each([
+  it.each<[Parameters<typeof subscriptionStatus>[0], SubscriptionStatus]>([
     [
       { expiresAt: future, supersededAt: null, supersededReason: null },
       'active',

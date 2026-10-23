@@ -1,5 +1,9 @@
 "use server";
 
+import type {
+  SubscriptionStatus,
+  SupersededReason,
+} from "@/types/subscription";
 import { serverFetch, ApiError } from "@/lib/api/client";
 
 export interface UserSubscriptionRow {
@@ -9,7 +13,7 @@ export interface UserSubscriptionRow {
   name: string;
   email: string | null;
   phone: string | null;
-  category: string | null;
+  group: string | null;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
@@ -19,8 +23,8 @@ export interface UserSubscriptionRow {
   subscribedAt: string;
   expiresAt: string;
   supersededAt: string | null;
-  supersededReason: string | null;
-  status: "active" | "expired" | "superseded" | "revoked";
+  supersededReason: SupersededReason | null;
+  status: SubscriptionStatus;
 }
 
 /** Current subscriptions (one per user); `history` adds superseded rows. */

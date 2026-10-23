@@ -14,6 +14,7 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { listings } from '../db/schema/listings.schema';
 import {
+  categories,
   categoryTranslations,
   subcategories,
   subcategoryTranslations,
@@ -28,9 +29,14 @@ import {
   subscriptionTerms,
   userSubscriptions,
 } from '../db/schema/subscriptions.schema';
-import { DEFAULT_FREE_PLAN } from './entitlements.constants';
-import type { PlanLimits } from './entitlements.constants';
-import { bucketOf, partitionByAllowance } from './allowance';
+import { toFreePlanSettings } from './entitlements.constants';
+import type { FreePlanSettings, PlanLimits } from './entitlements.constants';
+import {
+  bucketOf,
+  freeLimits,
+  groupBucket,
+  partitionByAllowance,
+} from './allowance';
 import type {
   AdScope,
   AllowanceConfig,
@@ -64,6 +70,11 @@ export interface EntitlementsView extends Entitlements {
   bucket: BucketView | null;
   /** Every group the user holds, plus every free bucket they have ads in. */
   buckets: BucketView[];
+}
+
+export interface FreePlanView extends FreePlanSettings {
+  /** Every free ad cap, named, in catalog order. */
+  caps: { key: BucketKey; name: string; ads: number }[];
 }
 
 const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
@@ -122,15 +133,7 @@ export class EntitlementsService {
     ]);
     const row = settings[0];
     return {
-      free: row
-        ? {
-            photos: row.photos,
-            renews: row.renews,
-            autoRenews: row.autoRenews,
-            videos: row.videos,
-            otherAds: row.otherAds,
-          }
-        : { ...DEFAULT_FREE_PLAN },
+      free: toFreePlanSettings(row),
       subcategoryGroup: new Map(
         scopes.map((s) => [s.subcategoryId, s.groupId]),
       ),
@@ -279,24 +282,8 @@ export class EntitlementsService {
     for (const group of held.values()) {
       const key: BucketKey = `group:${group.groupId}`;
       if (!buckets.has(key)) {
-        const anySub = [...config.subcategoryGroup].find(
-          ([, groupId]) => groupId === group.groupId,
-        );
-        buckets.set(
-          key,
-          anySub
-            ? bucketOf(
-                { categoryId: '', subcategoryId: anySub[0] },
-                config,
-                held,
-              )
-            : {
-                key,
-                kind: 'group',
-                groupId: group.groupId,
-                limits: group.limits,
-              },
-        );
+        const bucket = groupBucket(group.groupId, config, held);
+        if (bucket) buckets.set(key, bucket);
       }
     }
     const requested = scope ? bucketOf(scope, config, held) : null;
@@ -340,18 +327,66 @@ export class EntitlementsService {
     // Overview: the account-wide free numbers, every live ad counted.
     return {
       plan,
-      limits: {
-        photos: config.free.photos,
-        ads: config.free.otherAds,
-        renews: config.free.renews,
-        autoRenews: config.free.autoRenews,
-        videos: config.free.videos,
-      },
+      limits: freeLimits(config.free, config.free.otherAds),
       expiresAt: null,
       usage: { ads: live.length },
       bucket: null,
       buckets: views,
     };
+  }
+
+  /**
+   * The free plan as a public price sheet: account-wide numbers plus every ad
+   * cap with its display name, in catalog order (category, then subcategory;
+   * a category-wide cap before that category's subcategory caps).
+   */
+  async freePlan(): Promise<FreePlanView> {
+    const config = await this.loadConfig();
+    const subIds = [...config.subcategoryCaps.keys()];
+    const catIds = [...config.categoryCaps.keys()];
+    const [subOrder, catOrder, names] = await Promise.all([
+      subIds.length
+        ? this.db
+            .select({
+              id: subcategories.id,
+              sub: subcategories.sortOrder,
+              cat: categories.sortOrder,
+            })
+            .from(subcategories)
+            .innerJoin(categories, eq(categories.id, subcategories.categoryId))
+            .where(inArray(subcategories.id, subIds))
+        : [],
+      catIds.length
+        ? this.db
+            .select({ id: categories.id, cat: categories.sortOrder })
+            .from(categories)
+            .where(inArray(categories.id, catIds))
+        : [],
+      this.bucketNames([
+        ...subIds.map((id): BucketKey => `sub:${id}`),
+        ...catIds.map((id): BucketKey => `cat:${id}`),
+      ]),
+    ]);
+    const caps = [
+      ...subOrder.map((row) => ({
+        key: `sub:${row.id}` as BucketKey,
+        order: [row.cat, 1, row.sub],
+        ads: config.subcategoryCaps.get(row.id) ?? 0,
+      })),
+      ...catOrder.map((row) => ({
+        key: `cat:${row.id}` as BucketKey,
+        order: [row.cat, 0, 0],
+        ads: config.categoryCaps.get(row.id) ?? 0,
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          a.order[0] - b.order[0] ||
+          a.order[1] - b.order[1] ||
+          a.order[2] - b.order[2],
+      )
+      .map(({ key, ads }) => ({ key, name: names.get(key) ?? key, ads }));
+    return { ...config.free, caps };
   }
 
   private async scopeOf(subcategoryId: string): Promise<AdScope | null> {
@@ -510,19 +545,37 @@ export class EntitlementsService {
       .filter((row) => row.status === 'active')
       .map((row) => row.id);
 
+    let restored = 0;
+    let restricted = 0;
     if (toRestore.length > 0) {
-      await this.db
+      const rows = await this.db
         .update(listings)
         .set({ status: 'active', updatedAt: new Date() })
-        .where(inArray(listings.id, toRestore));
+        .where(
+          and(
+            inArray(listings.id, toRestore),
+            eq(listings.userId, userId),
+            eq(listings.status, 'restricted'),
+          ),
+        )
+        .returning({ id: listings.id });
+      restored = rows.length;
     }
     if (toRestrict.length > 0) {
-      await this.db
+      const rows = await this.db
         .update(listings)
         .set({ status: 'restricted', updatedAt: new Date() })
-        .where(inArray(listings.id, toRestrict));
+        .where(
+          and(
+            inArray(listings.id, toRestrict),
+            eq(listings.userId, userId),
+            eq(listings.status, 'active'),
+          ),
+        )
+        .returning({ id: listings.id });
+      restricted = rows.length;
     }
-    return { restricted: toRestrict.length, restored: toRestore.length };
+    return { restricted, restored };
   }
 
   /** Best-effort wrapper for callers that must not fail because of it; the sweep heals. */
@@ -567,14 +620,5 @@ export class EntitlementsService {
       await this.reconcileListingsSafely(userId);
     }
     return candidates.length;
-  }
-
-  /** Fire-and-forget `reconcileAll` for admin edits; the 10-minute sweep is the backstop. */
-  reconcileAllInBackground(reason: string): void {
-    void this.reconcileAll().catch((err: unknown) =>
-      this.logger.warn(
-        `Reconcile after ${reason} failed: ${err instanceof Error ? err.message : String(err)}`,
-      ),
-    );
   }
 }

@@ -19,6 +19,9 @@ import { users } from './users.schema';
 import { discountTypeEnum } from './listings.schema';
 import { categories, subcategories } from './categories.schema';
 
+/** Why a `user_subscriptions` row stopped being current (TS-only column type). */
+export type SupersededReason = 'upgrade' | 'replaced' | 'expired' | 'revoked';
+
 export const subscriptionDurationUnitEnum = pgEnum(
   'subscription_duration_unit',
   ['day', 'month', 'year'],
@@ -181,7 +184,9 @@ export const userSubscriptions = pgTable(
       .notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     supersededAt: timestamp('superseded_at', { withTimezone: true }),
-    supersededReason: varchar('superseded_reason', { length: 40 }),
+    supersededReason: varchar('superseded_reason', {
+      length: 40,
+    }).$type<SupersededReason>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
