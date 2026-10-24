@@ -1,0 +1,327 @@
+# Changelog
+
+All notable changes to this monorepo (`apps/backend`, `apps/web`, `apps/mobile`) are recorded here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). The project has no
+version tags yet, so releases are grouped by **ship date** (the commit dates on `main`/feature
+branches) instead of version numbers.
+
+How to use this file:
+
+- New work goes under **Unreleased** while it is uncommitted or unmerged; move it under a dated
+  heading when it ships.
+- The detailed per-ship notes (verification steps, data repairs, open questions) still go in
+  `tasks/todo.md`. Once an entry has shipped, fold its outcome into this file and drop it from
+  the log. The full historical log up to 2026-10-24 is in git (`git show fd824a0:tasks/todo.md`).
+- Migrations are named by their file prefix in `apps/backend/drizzle/migrations/`.
+
+## [Unreleased]
+
+### Changed
+
+- **Chat is encrypted-only for new messages.** `ChatService.sendMessage` rejects a payload
+  with neither `e2eHeader` (v1) nor `e2e` (v2) (`Encrypted messages are required`), requires a
+  body, and refuses the legacy public-bucket `imagePath`
+  (`Unencrypted chat images are not accepted`). The public-image path (`SupabaseService`/`ConfigService` dependency, `bucket`
+  getter, `assertOwnedChatImagePath`) is removed. Historical plaintext and image rows still
+  read normally.
+- **Web send path has no plaintext fallback.** Images and voice notes need
+  `E2E_ATTACHMENTS_ENABLED` and a registered v2 device; otherwise the bubble fails visibly with
+  `E2E_UNAVAILABLE`. `createOutboxEntry` (images + optional voice blob) replaces
+  `createImageOutboxEntry` in `lib/e2e/attachments/send.ts`.
+- **Chat thread redesign.** The workspace stays inside the normal app shell (the `(chat)`
+  layout still mounts `NavBar`) and takes the viewport minus the navbar, as a dark two-pane
+  panel. The thread pane gains quick replies above the composer and a compact pending-listing
+  row with immediate send. The inbox column keeps its previous design ("Inbox" title, chevron
+  collapse, 300/340px default width). Only its portaled menu and delete dialog pick up the
+  panel's dark scope.
+
+### Added
+
+- **Encrypted rich content** (`lib/e2e/chat-content.ts`, marker `khmer24-chat-content` v1):
+  shared locations and listing-only messages are sealed inside the ciphertext. New
+  `location-card.tsx` (OSM link, no map tiles).
+- **Voice notes**: MediaRecorder capture in the composer (60 s / 8 MB caps, MIME negotiation,
+  tracks stopped on stop/unmount), sent as an encrypted `kind: "file"` with
+  `purpose: "voice-note"` and `durationMs`. Inbox previews read "Voice note" / "Shared
+  location" instead of the decrypted JSON.
+- **Voice note controls** (`components/chat/voice-player.tsx`, shared by the received bubble and
+  the composer preview):
+  - play/pause, a draggable seek bar, elapsed/total time and a 1× / 1.5× / 2× speed toggle;
+  - download on received notes;
+  - only one note plays at a time;
+  - a duration probe so MediaRecorder WebM files (which report `duration = Infinity`) can seek.
+
+  Recording shows `0:12 / 1:00` against the cap and has a Cancel button that discards the take.
+  New i18n keys `Chat.voice.*` and `Chat.composer.cancelRecording` in all six locales.
+
+- **Location sharing** on an explicit click only (`enableHighAccuracy`, 10 s timeout), with a
+  staged preview like images and voice.
+- **"Last active …"** in the thread header from `ChatUserSummary.lastSeenAt`
+  (`users.last_seen_at`, coarse — 5-minute activity throttle).
+
+### Fixed
+
+- A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
+  first inbound message created it. `chat-workspace.tsx` now reconciles the cached
+  `GET /chats/with/:userId` lookup against the inbox.
+
+### Removed
+
+- The no-op Archive menu item and the unused i18n keys `Chat.inbox.archive`,
+  `Chat.thread.emptyTitle`, `Chat.thread.attachingListing` and `Chat.thread.sendingVoice` (all six
+  locales).
+
+### Docs
+
+- `docs/admin-backoffice-audit-2026-10-24.md`: the admin vs super_admin backoffice audit
+  (read-only, no code changes).
+- `CHANGELOG.md` introduced. `tasks/todo.md` was reset to open items only, and its history
+  rolled up here.
+
+### Known issues
+
+- The attachment daily quota sums the client's `declaredSize`; only the per-kind cap is
+  re-checked against the stored object size.
+- A v2 envelope's `wrappedKey`/`header` is stored verbatim, with nothing binding it to the device
+  key it claims to target. No safety-number / key-substitution protection yet.
+
+## 2026-10-23 — Security audit, moderation, reports, feedback
+
+### Security
+
+- **Admin escalation closed.** A plain admin could reset a super_admin's password, demote,
+  suspend or delete one. Every admin user mutation now goes through `assertCanManageUser`
+  (`admin/admin-user-policy.ts`): only super_admin manages staff accounts, nobody can
+  delete/demote/suspend themselves, and the last active super_admin can't be removed (counted
+  under a row lock).
+- **Auth throttles per route**: login/verify/social/telegram 10/min; register, OTP request and
+  OTP login 5/min (each sends a paid SMS); refresh 30/min. Telegram payloads are shape-checked.
+  Login also matches the lowercased username.
+- **Uploads**: user scopes sign into `{scope}/{userId}/`; catalog scopes are staff-only;
+  `DELETE /files` is owner-only for non-staff with traversal rejected. Listing photos must be the
+  owner's own uploads. Multipart uploads are capped at 5 MB and limited to raster types (SVG was
+  accepted before, a stored-XSS risk).
+- **Idempotency**: 422 for a different body on completed rows too, 5xx recorded as `failed`
+  (not cached), and reclaim of failed/stale rows conditional on `lockedAt`.
+
+### Added
+
+- **Listing moderation** (migration `0040_moderation_feedback`): `GET /admin/listings`,
+  `POST /admin/listings/:id/remove|restore`, and the `/wanderer/dashboard/listings` page. Approving
+  a listing report removes the listing; approving a user report suspends the account.
+- **User reports**: `GET /reports/reasons`, `POST /reports/listings|users`. The report dialogs on
+  the storefront submit for real (they were mock).
+- **Feedback**: `src/feedback/` (public multipart `POST /feedback`, admin list/delete), with the
+  public form and admin page wired.
+
+### Changed
+
+- **Phones**: `addPhone` is transactional and syncs `users.primaryPhone`; `removePhone` promotes
+  another phone and refuses to remove the last one.
+- Listing create/update are transactional; dropped-photo cleanup touches only the owner's folder.
+- Web `serverActions.bodySizeLimit` raised to 32 MB (avatars over 1 MB were rejected by Next).
+- **Subscription review fixes**: reconciliation updates are guarded by owner + expected state;
+  admin edits enqueue a coalesced BullMQ sweep (`EntitlementsScheduler`); status types live in
+  `subscription-status.ts`; user-facing fields renamed to `group*`.
+- **Outbox**: `Channel` replaced with `WakeupSignal`; the fallback poll is decoupled.
+- **CI**: the deploy workflow deploys only the apps the push affects.
+
+### Fixed
+
+- Admin Report Users rendered storage paths as `<img src>`; it now receives `imageUrls`. Report
+  Posts "View" opened post `0`; it now opens the real listing.
+
+## 2026-10-14 → 2026-10-21 — Subscriptions and payments
+
+### Added
+
+- **Subscription entitlements** (`entitlements.service.ts`): photo, active-ad and renew limits
+  enforced on create/update/publish with `PLAN_LIMIT_*` 403s. A lapsed plan restricts ads instead
+  of deleting them (new `restricted` listing status, migration `0037`), with a 10-minute
+  reconciliation sweep. `GET /subscriptions/entitlements`.
+- **Subscription purchases + KHQR checkout** (migration `0035`), Manage Ads, and plan-aware
+  subscription screens. Membership is folded into Subscriptions.
+- **Per-group subscriptions (Khmer24 model)** (migrations `0038`, `0039`): one current
+  subscription per (user, group); admin-ticked group scope
+  (`PUT /admin/subscriptions/categories/:id/scope`); admin-configured free plan with per-category
+  ad caps (`GET/PUT /admin/subscriptions/free-plan`); seed `db:seed:subscriptions`.
+- **`PaymentReconciler`**: a 15-second Postgres sweep that activates settled-but-pending
+  purchases, reconciles Bakong attempts, accepts late payments within 24 h, and expires
+  webhook-only attempts. Runs once at boot.
+- **Push notifications over the shared WebSocket** (`RealtimeNotificationChannel`); checkout
+  settles on push instead of status polling.
+- **ABA PayWay**: webhook-only settlement with a checkout `lifetime`
+  (`ABA_PAYWAY_LIFETIME_MINUTES`); on a phone, checkout opens ABA Mobile via deeplink.
+- Data-driven subscription filters in the admin.
+
+### Changed
+
+- Upgrade checkout charges the target term prorated to the remaining time, minus unused-value
+  credit. Purchases are final (no refunds).
+- The ABA webhook moved into `PaymentModule` at `POST /api/v1/payments/webhooks/aba-payway`.
+  The old `/api/v1/webhooks/aba-payway` path stays as an alias. **Set `ABA_PAYWAY_WEBHOOK_URL` in
+  every environment.**
+- Premium account pages follow Khmer24's layout. Web fonts are self-hosted.
+- `payment_transactions.tenant_id` dropped (migration `0036`).
+
+### Fixed
+
+- ABA webhooks were all settled `ignored_unconfirmed`: `reconcile()` read `status` under `data`
+  when the live API returns it as a sibling.
+- The Bakong poll checked expiry before asking the provider, so a payment made at the deadline was
+  lost.
+- Long-lived WebSocket sessions held stale state. Completed BullMQ jobs are now removed, and queue
+  config is centralised.
+
+## 2026-10-02 → 2026-10-06 — Social features, profiles, deployment
+
+### Added
+
+- **Likes & saves** (`src/reactions/`, migration `0034_acoustic_chat`): idempotent toggles,
+  `/users/me/likes|saves|reactions`, and real `/me/likes` + `/me/saved` panels.
+- **Follow / unfollow** (migration `0033_add_user_follows`): public profile by username,
+  followers/following lists, and `follow.created` notifications. Followers and following swap in
+  place on a profile.
+- **A seller's post history on the public profile**, with a category strip modelled on the
+  homepage tiles.
+- **Expo mobile app** (`apps/mobile`).
+- **Deployment**: backend Dockerfile, Vercel deploy, a CI deploy workflow with smoke tests, and a
+  backoffice subdomain.
+- super_admin docs (`docs/super-admin-*.md`).
+
+### Changed
+
+- Account menu items link to their pages. The card "…" menu rows are aligned, and View Profile
+  goes to the real seller.
+- The grid card heart is red, the list heart is bottom-aligned, and price rows line up across a
+  row.
+- The "Your Ad" badge was removed from the detail seller card.
+
+### Fixed
+
+- The seller card invented a handle from the contact name, so every profile link 404'd. It now
+  shows the seller's actual profile.
+- Chat no longer gets stuck on "Decrypting…", and the page reloads when E2E becomes unavailable.
+- The backend Jest version skew is fixed workspace-wide (the suite is green on the plain command).
+
+## 2026-09-27 → 2026-09-30 — Full post-form catalogue, search, chat E2E v2
+
+### Added
+
+- **The real post form covers the whole catalogue (146/146 subcategories)**: Services, Fashion &
+  Beauty, Furniture & Decor, Books/Sports/Hobbies, Pets and Foods all opted in.
+- **Search**: the `/search?q=` page, header search bar, tokenised title + description matching
+  with trigram indexes (migration `0031_listing_search`), `effective_price` (price after
+  discount) filters, sorts including Best match, a typo fallback, date-posted and delivery
+  filters, per-category facet counts, and a sort-aware keyset cursor. The filter bar now drives the
+  feed on every page (it was UI-only before), and All Ads uses the real feed.
+- **`/settings` made real**: profile, password, username and phone change via OTP, delete account
+  with a 90-day purge (`AccountPurgeService`).
+- **Designed storefront 404 page.**
+- **Chat E2E v2**: multi-device (migration `0027`), encrypted history backup with a passcode or
+  device approval (`0028`, `0029`), WebSocket ack/error frames and live read receipts.
+- **Encrypted chat attachments** (migration `0030`): a private `chat-files` bucket, AES-256-GCM
+  per file, 5-minute signed URLs, an hourly cleanup job, a download button, and a resizable chat
+  sidebar.
+- **Outbox retention sweep** (`OUTBOX_RETENTION_DAYS` was parsed but never read).
+- Ledger amount rules plus a DB `CHECK (amount > 0)` (migration `0032`).
+- A Job Type grid on the Jobs category page.
+
+### Fixed
+
+- E2E chat could not decrypt after an identity rotation (stale one-time prekeys).
+- The chat composer deleted its own image draft, so images could not be sent.
+- Duplicate message keys when the WebSocket echo arrived before the send response.
+- "Upgrade Account" pointed at a `/membership` route that never existed.
+- Search: date-posted hid listings without `published_at`; expired ads now leave the feed.
+- The Show More bars are equal on the left and right.
+
+## 2026-09-21 → 2026-09-24 — Post form families, notifications, chat
+
+### Added
+
+- **Real post form for Phones & Tablets, Computers & Accessories, Electronics & Appliances, Home &
+  Land and Jobs.** New blocks: storage/accessory/network, the computers spec cluster,
+  bedroom/bathroom/facing/size, and jobType/experience/company. Labels, photo max and Type options
+  are read from each subcategory's `field_schema`.
+- **Models scoped to subcategories** (`model_subcategory_links`, migrations `0019`, `0020`); a
+  slug-collision guard in the model seed.
+- **Attribute-grid filters**: `GET /listings` gained `attrKey` + `attrValue`, so clicking a Type,
+  Accessory or other tile filters the feed (it used to return nothing).
+- **In-app notifications** (migration `0024`).
+- **Chat**: E2E encryption (X3DH + Double Ratchet over `@noble/curves`, migrations `0021`,
+  `0022`), cross-instance realtime push over Redis pub/sub, WebSocket auth/rate-limit parity,
+  user-keyed throttling, WebSocket tickets, attached-ad cards, draft image management, grouped
+  images (`0026`), per-side conversation delete (`0025`), and `clientMessageId` dedupe (`0023`).
+- Listings without a price read "Negotiable" instead of `$0`.
+
+### Changed
+
+- The category name is "Phones & Tablets" (it was singular, which broke its i18n lookup).
+- A job's company sits on the seller card, not the specs grid. The seller card hides rows with no
+  data.
+- The icon-vs-text tile design is declared per attribute set instead of sniffed from the rows.
+
+### Fixed
+
+- Description, Location and Address were starred but not enforced, so a listing could publish
+  with no location and be invisible to location search.
+- Plain Galaxy S21–S25 models were dropped by a `+` slug collision.
+
+## 2026-09-08 → 2026-09-17 — Payments, geography, post form
+
+### Added
+
+- **Payment module** (Effect use-cases, double-entry ledger, `payment` Postgres schema via
+  migrations `0014`, `0015`): ABA PayWay and Bakong providers, outbox-driven queue processing,
+  and `payment.succeeded` announced on settlement. Fails closed when a provider is unconfigured.
+- **Transactional outbox** (`src/outbox/`, migration `0013`).
+- Chat tables moved to a `chat` Postgres schema (migration `0016`).
+- **Cambodian geography**: 25 provinces, 208 districts and 1,652 communes with Khmer names
+  (migrations `0017`, `0018` — geo FKs are `ON DELETE RESTRICT`), and the three-level Location
+  picker on the post form.
+- **Location map picker** on Leaflet + OpenStreetMap (no Google key), with the pin re-rendered
+  on the listing detail.
+- **Schema-gated `ListingPostForm`** for all 10 Cars & Vehicles subcategories, plus a cars form
+  redesign and real categories in post step 1.
+- `DbImage`: only Supabase Storage objects render as images; anything else shows the "no image"
+  state.
+
+### Changed
+
+- `vehicletypes` is retired in favour of `bodytypes`. Unticking an attribute in the admin is
+  authoritative (`forSub` managed-set rule). Colours are scoped to the subcategories that
+  declare them.
+- An applied attribute set steps aside, a pick scrolls to the top, and Back walks the drill-down.
+- Searchable-picker scrolling: whole rows, a visible scrollbar, and no page scroll-through.
+
+## 2026-08-17 → 2026-09-05 — Storefront goes real
+
+### Added
+
+- **Phone OTP registration and login**: OTP verify page, Cambodia-local phone input,
+  phone + password → OTP login, password/names/username set at registration, and `/me` as the
+  post-login landing page.
+- **Backend-driven storefront**: homepage Browse By Category, category and subcategory pages,
+  live brand/model/body-type grids (91 car brands, 31 motorcycle brands), real listing feeds for
+  every category, real listing detail with a specs grid and carrier icons, and the unified sticky
+  filter bar with grid/list toggle.
+- **Ad creation**: `POST /listings` + publish, photo uploads through signed URLs, and a demo
+  listings seed.
+- Split admin (`/wanderer/*`) and user sessions with separate httpOnly cookies.
+
+### Fixed
+
+- `db:seed` wiped category icons and polluted them with placeholders.
+
+## 2026-06-19 → 2026-08-16 — Foundation
+
+### Added
+
+- Turborepo + pnpm monorepo scaffold.
+- **NestJS backend**: Drizzle ORM + Supabase, JWT access/refresh auth, `@Public()`, global
+  response envelope and exception filter, idempotency middleware, categories with translations,
+  users and phones, listings, brands, files, and the admin API.
+- **Chat**: 1:1 conversations, inbox, messages and read receipts over REST.
+- **Admin dashboard** (Next.js, later moved from `apps/admin` to `apps/web`): stats, users,
+  categories, subcategories, brands, models, attributes, subscription config and reports.
