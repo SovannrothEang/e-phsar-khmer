@@ -73,7 +73,6 @@
       "previewListing": "Tin đăng",
       "unreadCount": "{count} tin nhắn chưa đọc",
       "actionsLabel": "Thao tác cuộc trò chuyện",
-      "archive": "Lưu trữ",
       "delete": "Xóa",
       "deleteConfirmTitle": "Xóa cuộc trò chuyện này?",
       "deleteConfirmDescription": "Cuộc trò chuyện sẽ bị xóa khỏi hộp thư của bạn. {name} vẫn có thể thấy phía của họ.",
@@ -87,14 +86,27 @@
     "thread": {
       "back": "Quay lại",
       "selectPrompt": "Chọn một cuộc trò chuyện để bắt đầu đọc",
-      "emptyTitle": "Bắt đầu trò chuyện với {name}",
       "loadOlder": "Tải tin nhắn cũ hơn",
-      "attachingListing": "Về tin đăng này",
       "removeListing": "Xóa tin đăng",
       "blocked": "Bạn không thể nhắn tin cho người dùng này nữa.",
       "blockedByMe": "Bạn đã chặn người dùng này.",
       "notFoundTitle": "Không tìm thấy cuộc trò chuyện",
-      "notFoundDescription": "Cuộc trò chuyện không tồn tại hoặc bạn không có quyền truy cập."
+      "notFoundDescription": "Cuộc trò chuyện không tồn tại hoặc bạn không có quyền truy cập.",
+      "lastActive": "Hoạt động lần cuối {time}",
+      "viewProfile": "Xem hồ sơ",
+      "locationShared": "Đã chia sẻ vị trí",
+      "viewOnMap": "Xem trên bản đồ",
+      "voiceNote": "Tin nhắn thoại",
+      "quickReplies": {
+        "label": "Trả lời nhanh",
+        "hide": "Ẩn trả lời nhanh",
+        "hi": "Xin chào!",
+        "available": "Vâng, vẫn còn hàng",
+        "offer": "Bạn trả bao nhiêu?",
+        "sold": "Xin lỗi! sản phẩm đã được bán!",
+        "negotiable": "Vâng, có thể thương lượng",
+        "notNegotiable": "Không, không thể thương lượng"
+      }
     },
     "message": {
       "imageAlt": "Ảnh đã gửi",
@@ -121,7 +133,21 @@
       "uploadFailed": "Tải ảnh lên thất bại.",
       "imageSizeError": "Ảnh quá lớn.",
       "imageTypeError": "Định dạng ảnh không được hỗ trợ.",
-      "imageLimitError": "Tối đa {max} ảnh."
+      "imageLimitError": "Tối đa {max} ảnh.",
+      "shareLocation": "Chia sẻ vị trí",
+      "locationLocating": "Đang lấy vị trí của bạn…",
+      "locationUnsupported": "Trình duyệt này không hỗ trợ chia sẻ vị trí.",
+      "locationError": "Không thể lấy vị trí của bạn. Hãy kiểm tra quyền của trình duyệt.",
+      "locationReady": "Vị trí sẵn sàng để gửi",
+      "cancelLocation": "Hủy vị trí",
+      "recordVoice": "Ghi tin nhắn thoại",
+      "stopRecording": "Dừng ghi âm",
+      "recording": "Đang ghi âm…",
+      "voiceUnsupported": "Trình duyệt này không hỗ trợ tin nhắn thoại.",
+      "voicePermissionError": "Quyền truy cập micrô đã bị từ chối.",
+      "voiceTooLong": "Tin nhắn thoại tối đa {seconds} giây.",
+      "voiceReady": "Tin nhắn thoại sẵn sàng",
+      "cancelVoice": "Hủy tin nhắn thoại"
     },
     "listing": {
       "noPrice": "Giá thương lượng",

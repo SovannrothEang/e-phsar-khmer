@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Download, FileText, ImageOff, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Download,
+  FileText,
+  ImageOff,
+  Loader2,
+  Pause,
+  Play,
+  TriangleAlert,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
@@ -136,6 +144,98 @@ function EncryptedImage({
   );
 }
 
+/** `0:07` — voice notes are capped at a minute, so mm:ss is enough. */
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/**
+ * A voice note is an encrypted audio file: the sender's duration rides in the
+ * plaintext metadata, while the bytes only exist as a blob URL decrypted
+ * locally (revoked on unmount by `useAttachmentUrl`).
+ */
+function EncryptedVoiceNote({ meta }: { meta: AttachmentMeta }) {
+  const t = useTranslations("Chat");
+  const state = useAttachmentUrl(meta);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  const durationMs = meta.durationMs ?? 0;
+  const progress =
+    durationMs > 0 ? Math.min(100, (elapsedMs / durationMs) * 100) : 0;
+
+  function togglePlayback() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) void audio.play().catch(() => setPlaying(false));
+    else audio.pause();
+  }
+
+  return (
+    <div
+      role="group"
+      aria-label={t("thread.voiceNote")}
+      className="flex w-56 max-w-full items-center gap-2.5 rounded-2xl border border-border bg-muted px-2.5 py-2"
+    >
+      <button
+        type="button"
+        onClick={togglePlayback}
+        disabled={state.status !== "ready"}
+        aria-label={t("thread.voiceNote")}
+        aria-pressed={playing}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+      >
+        {state.status === "loading" ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : state.status === "error" ? (
+          <TriangleAlert className="size-4" />
+        ) : playing ? (
+          <Pause className="size-4" />
+        ) : (
+          <Play className="size-4" />
+        )}
+      </button>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-[11px] font-medium">
+          {state.status === "error"
+            ? t("message.decryptFailed")
+            : t("thread.voiceNote")}
+        </span>
+        {state.status !== "error" && (
+          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted-foreground/25">
+            <div
+              className="h-full rounded-full bg-sky-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </div>
+      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+        {formatDuration(durationMs)}
+      </span>
+      {state.status === "ready" && (
+        <audio
+          ref={audioRef}
+          src={state.url}
+          preload="metadata"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false);
+            setElapsedMs(0);
+          }}
+          onTimeUpdate={(e) => setElapsedMs(e.currentTarget.currentTime * 1000)}
+          className="hidden"
+        />
+      )}
+    </div>
+  );
+}
+
 function EncryptedFile({ meta }: { meta: AttachmentMeta }) {
   const t = useTranslations("Chat");
   const [busy, setBusy] = useState(false);
@@ -190,7 +290,12 @@ export function EncryptedAttachments({
   onOpenImage?: (url: string) => void;
 }) {
   const images = files.filter((f) => f.kind === "image");
-  const others = files.filter((f) => f.kind === "file");
+  // The purpose is stored only inside the encrypted body, so it is the only
+  // thing that separates a voice note from a generic file chip.
+  const voices = files.filter((f) => f.purpose === "voice-note");
+  const others = files.filter(
+    (f) => f.kind === "file" && f.purpose !== "voice-note",
+  );
   return (
     <div className="flex flex-col gap-1">
       {images.length > 0 && (
@@ -209,6 +314,9 @@ export function EncryptedAttachments({
           ))}
         </div>
       )}
+      {voices.map((m) => (
+        <EncryptedVoiceNote key={m.id} meta={m} />
+      ))}
       {others.map((m) => (
         <EncryptedFile key={m.id} meta={m} />
       ))}

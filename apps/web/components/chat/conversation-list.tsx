@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Archive,
-  Loader2,
-  MessagesSquare,
-  MoreVertical,
-  Trash2,
-} from "lucide-react";
+import { Loader2, MessagesSquare, MoreVertical, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { previewOf } from "@/lib/chat/format";
+import { parseStructuredChatContent } from "@/lib/e2e/chat-content";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useE2eInboxPreviews } from "@/hooks/use-e2e-inbox-previews";
 import type { InboxItem } from "@/types/chat";
@@ -163,6 +158,9 @@ export function ConversationList({
       {items.map((item) => {
         const name = item.otherUser?.username ?? t("unknownUser");
         const deleting = deletingId === item.id;
+        const plaintext = item.lastMessage
+          ? (e2ePreviews.get(item.lastMessage.id) ?? null)
+          : null;
         return (
           <div
             key={item.id}
@@ -210,10 +208,13 @@ export function ConversationList({
                         image: t("inbox.previewImage"),
                         listing: t("inbox.previewListing"),
                         none: t("inbox.previewEmpty"),
+                        voice: t("thread.voiceNote"),
+                        location: t("thread.locationShared"),
                       },
-                      item.lastMessage
-                        ? e2ePreviews.get(item.lastMessage.id)
-                        : null,
+                      plaintext,
+                      // Structured content carries no human text — without this
+                      // the row would render the decrypted JSON blob.
+                      plaintext ? parseStructuredChatContent(plaintext) : null,
                     )}
                   </p>
                   {item.unreadCount > 0 && (
@@ -249,16 +250,12 @@ export function ConversationList({
                   )}
                 </button>
               </DropdownMenuTrigger>
+              {/* Portaled out of the dark panel — re-apply the token scope. */}
               <DropdownMenuContent
                 align="end"
+                className="dark"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Archive isn't built yet — kept visible so the affordance
-                    is discoverable, but it deliberately does nothing. */}
-                <DropdownMenuItem>
-                  <Archive className="size-4" />
-                  {t("inbox.archive")}
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => setPendingDelete(item)}
@@ -291,7 +288,7 @@ export function ConversationList({
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
       >
-        <DialogContent>
+        <DialogContent className="dark">
           <DialogHeader>
             <DialogTitle>{t("inbox.deleteConfirmTitle")}</DialogTitle>
             <DialogDescription>

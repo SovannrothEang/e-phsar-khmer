@@ -241,6 +241,26 @@ export function ChatWorkspace({
 
   const handleBack = useCallback(() => setSelectedPeerId(null), []);
 
+  // Reconcile the SELECTED peer's cached `with` lookup against the inbox.
+  // A deep-linked thread (opened before any conversation existed) caches
+  // `conversation: null` for 5 minutes; when the peer then sends the first
+  // message, the inbox refreshes (socket push or fallback poll) but the stale
+  // lookup would keep the pane empty until the row is clicked. This effect
+  // covers both paths. It cannot loop: after the refetch the cached id equals
+  // `item.id`, so the condition goes false.
+  useEffect(() => {
+    if (!selectedPeerId) return;
+    const item = items.find((i) => i.otherUser?.id === selectedPeerId);
+    if (!item) return;
+    const cached = queryClient.getQueryData<ConversationWithUser>(
+      chatKeys.with(selectedPeerId),
+    );
+    if (!cached || cached.conversation?.id !== item.id)
+      void queryClient.invalidateQueries({
+        queryKey: chatKeys.with(selectedPeerId),
+      });
+  }, [items, selectedPeerId, queryClient]);
+
   // ── Sidebar collapse (desktop only — mobile already toggles list/thread
   // via threadOpen, so there's no room to also collapse there) ──────────────
   // useSyncExternalStore, not useState+effect: reading localStorage during an
@@ -514,8 +534,10 @@ export function ChatWorkspace({
       >
         <E2eBackupPanel engine={e2eEngine} />
         {!threadOpen && (
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-            <MessagesSquare className="size-8 text-muted-foreground" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+            <div className="flex size-20 items-center justify-center rounded-full bg-white/5">
+              <MessagesSquare className="size-8 text-muted-foreground" />
+            </div>
             <p className="text-sm text-muted-foreground">
               {t("thread.selectPrompt")}
             </p>
@@ -571,7 +593,12 @@ export function ChatWorkspace({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] overflow-hidden border border-border bg-background ">
+    // The `dark` class scopes the dark token set to chat only, so the rest of
+    // the site keeps the visitor's theme. Portaled menus/dialogs mount outside
+    // this subtree and re-apply the scope themselves.
+    // Height is the viewport minus the 3.5rem site navbar and this page's 1rem
+    // top padding — the workspace sits inside the normal app shell.
+    <div className="dark flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] overflow-hidden rounded-lg border border-white/10 bg-[#1b1b1b] text-foreground">
       {children}
     </div>
   );

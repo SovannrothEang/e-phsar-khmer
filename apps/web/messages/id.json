@@ -73,7 +73,6 @@
       "previewListing": "Iklan",
       "unreadCount": "{count} pesan belum dibaca",
       "actionsLabel": "Tindakan percakapan",
-      "archive": "Arsipkan",
       "delete": "Hapus",
       "deleteConfirmTitle": "Hapus percakapan ini?",
       "deleteConfirmDescription": "Percakapan akan dihapus dari kotak masuk Anda. {name} masih dapat melihat sisi mereka.",
@@ -87,14 +86,27 @@
     "thread": {
       "back": "Kembali",
       "selectPrompt": "Pilih percakapan untuk mulai membaca",
-      "emptyTitle": "Mulai percakapan dengan {name}",
       "loadOlder": "Muat pesan sebelumnya",
-      "attachingListing": "Tentang iklan ini",
       "removeListing": "Hapus iklan",
       "blocked": "Anda tidak dapat lagi mengirim pesan ke pengguna ini.",
       "blockedByMe": "Anda memblokir pengguna ini.",
       "notFoundTitle": "Percakapan tidak ditemukan",
-      "notFoundDescription": "Percakapan ini tidak ada atau Anda tidak memiliki akses."
+      "notFoundDescription": "Percakapan ini tidak ada atau Anda tidak memiliki akses.",
+      "lastActive": "Terakhir aktif {time}",
+      "viewProfile": "Lihat profil",
+      "locationShared": "Membagikan lokasi",
+      "viewOnMap": "Lihat di peta",
+      "voiceNote": "Pesan suara",
+      "quickReplies": {
+        "label": "Balasan cepat",
+        "hide": "Sembunyikan balasan cepat",
+        "hi": "Halo!",
+        "available": "Ya, masih dijual",
+        "offer": "Berapa tawaran Anda?",
+        "sold": "Maaf! produk ini sudah terjual!",
+        "negotiable": "Ya, bisa ditawar",
+        "notNegotiable": "Tidak, tidak bisa ditawar"
+      }
     },
     "message": {
       "imageAlt": "Foto terkirim",
@@ -121,7 +133,21 @@
       "uploadFailed": "Gagal mengunggah gambar.",
       "imageSizeError": "Gambar terlalu besar.",
       "imageTypeError": "Jenis gambar tidak didukung.",
-      "imageLimitError": "Maksimal {max} gambar."
+      "imageLimitError": "Maksimal {max} gambar.",
+      "shareLocation": "Bagikan lokasi",
+      "locationLocating": "Mengambil lokasi Anda…",
+      "locationUnsupported": "Berbagi lokasi tidak didukung oleh browser ini.",
+      "locationError": "Tidak dapat mengambil lokasi Anda. Periksa izin browser.",
+      "locationReady": "Lokasi siap dikirim",
+      "cancelLocation": "Batalkan lokasi",
+      "recordVoice": "Rekam pesan suara",
+      "stopRecording": "Hentikan rekaman",
+      "recording": "Merekam…",
+      "voiceUnsupported": "Pesan suara tidak didukung oleh browser ini.",
+      "voicePermissionError": "Akses mikrofon ditolak.",
+      "voiceTooLong": "Pesan suara maksimal {seconds} detik.",
+      "voiceReady": "Pesan suara siap",
+      "cancelVoice": "Batalkan pesan suara"
     },
     "listing": {
       "noPrice": "Harga nego",
