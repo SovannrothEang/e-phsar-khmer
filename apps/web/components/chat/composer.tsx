@@ -8,11 +8,10 @@ import {
   Lock,
   MapPin,
   Mic,
-  Pause,
-  Play,
   Plus,
   SendHorizonal,
   Square,
+  Trash2,
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -20,6 +19,10 @@ import { useTranslations } from "next-intl";
 import { toast } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { storeDraftImage, removeDraftImage } from "@/lib/chat-draft-images";
+import {
+  VoicePlayer,
+  formatVoiceDuration,
+} from "@/components/chat/voice-player";
 
 export interface ComposerDraft {
   body?: string;
@@ -71,13 +74,6 @@ function voiceExtension(mime: string): string {
   return "webm";
 }
 
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
 export function Composer({
   disabled,
   disabledReason,
@@ -98,14 +94,12 @@ export function Composer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedImage[]>([]);
   const [location, setLocation] = useState<StagedLocation | null>(null);
   const [locating, setLocating] = useState(false);
   const [voice, setVoice] = useState<StagedVoice | null>(null);
-  const [previewPlaying, setPreviewPlaying] = useState(false);
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
 
@@ -118,6 +112,8 @@ export function Composer({
   const elapsedTimerRef = useRef<number | null>(null);
   const maxTimerRef = useRef<number | null>(null);
   const voiceUrlRef = useRef<string | null>(null);
+  // Set by "cancel recording": the next onstop throws the take away.
+  const discardTakeRef = useRef(false);
   // Cleared on unmount so a late recorder callback never touches React state.
   const aliveRef = useRef(true);
   // Read inside async callbacks that outlive the render they started in.
@@ -163,12 +159,11 @@ export function Composer({
   }, []);
 
   const discardVoice = useCallback(() => {
-    audioRef.current?.pause();
+    // Unmounting the preview's <audio> stops it; only the URL needs releasing.
     if (voiceUrlRef.current) {
       URL.revokeObjectURL(voiceUrlRef.current);
       voiceUrlRef.current = null;
     }
-    setPreviewPlaying(false);
     setVoice(null);
   }, []);
 
@@ -225,6 +220,11 @@ export function Composer({
     }
   }
 
+  function cancelRecording() {
+    discardTakeRef.current = true;
+    stopRecording();
+  }
+
   async function startRecording() {
     if (startingRef.current || recorderRef.current) return;
     if (
@@ -269,6 +269,7 @@ export function Composer({
     recorderRef.current = recorder;
     streamRef.current = stream;
     chunksRef.current = [];
+    discardTakeRef.current = false;
     startedAtRef.current = Date.now();
 
     recorder.ondataavailable = (event) => {
@@ -285,6 +286,10 @@ export function Composer({
 
       const chunks = chunksRef.current;
       chunksRef.current = [];
+      if (discardTakeRef.current) {
+        discardTakeRef.current = false;
+        return;
+      }
       // A thread that became unavailable mid-recording must not stage a note
       // the user can never see or send.
       if (!aliveRef.current || disabledRef.current) return;
@@ -299,15 +304,13 @@ export function Composer({
         return;
       }
 
-      // Replace any earlier take, releasing the audio element's old URL.
-      audioRef.current?.pause();
+      // Replace any earlier take, releasing its old URL.
       if (voiceUrlRef.current) URL.revokeObjectURL(voiceUrlRef.current);
       const file = new File([blob], `voice-note.${voiceExtension(type)}`, {
         type,
       });
       const previewUrl = URL.createObjectURL(file);
       voiceUrlRef.current = previewUrl;
-      setPreviewPlaying(false);
       setVoice({ file, durationMs, previewUrl });
     };
     recorder.start();
@@ -356,17 +359,6 @@ export function Composer({
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
   }
-
-  const togglePreview = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (audio.paused) {
-      if (audio.ended) audio.currentTime = 0;
-      void audio.play().catch(() => setPreviewPlaying(false));
-    } else {
-      audio.pause();
-    }
-  }, []);
 
   function addFiles(files: File[]) {
     if (files.length === 0) return;
@@ -453,8 +445,18 @@ export function Composer({
           <span className="size-2 animate-pulse rounded-full bg-destructive" />
           <span>{t("composer.recording")}</span>
           <span aria-hidden="true" className="tabular-nums">
-            {formatDuration(elapsedMs)}
+            {formatVoiceDuration(elapsedMs)} /{" "}
+            {formatVoiceDuration(MAX_VOICE_MS)}
           </span>
+          <button
+            type="button"
+            onClick={cancelRecording}
+            aria-label={t("composer.cancelRecording")}
+            className="ml-auto flex items-center gap-1 rounded-full px-2 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Trash2 className="size-3.5" />
+            <span>{t("composer.cancelRecording")}</span>
+          </button>
         </div>
       )}
 
@@ -618,23 +620,13 @@ export function Composer({
           )}
 
           {voice && (
-            <div className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted/50 py-1 pl-1 pr-1">
-              <button
-                type="button"
-                onClick={togglePreview}
-                aria-pressed={previewPlaying}
-                className="flex items-center gap-1 rounded-full px-1.5 py-0.5 text-foreground transition-colors hover:bg-background"
-              >
-                {previewPlaying ? (
-                  <Pause className="size-3 fill-current" />
-                ) : (
-                  <Play className="size-3 fill-current" />
-                )}
-                <span className="text-xs tabular-nums">
-                  {formatDuration(voice.durationMs)}
-                </span>
-                <span className="sr-only">{t("composer.voiceReady")}</span>
-              </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="sr-only">{t("composer.voiceReady")}</span>
+              <VoicePlayer
+                compact
+                src={voice.previewUrl}
+                durationMs={voice.durationMs}
+              />
               <button
                 type="button"
                 onClick={discardVoice}
@@ -657,18 +649,6 @@ export function Composer({
             </span>
           )}
         </div>
-      )}
-
-      {voice && (
-        <audio
-          ref={audioRef}
-          src={voice.previewUrl}
-          preload="metadata"
-          onPlay={() => setPreviewPlaying(true)}
-          onPause={() => setPreviewPlaying(false)}
-          onEnded={() => setPreviewPlaying(false)}
-          className="hidden"
-        />
       )}
 
       <input

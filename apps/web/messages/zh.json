@@ -147,7 +147,8 @@
       "voicePermissionError": "麦克风访问被拒绝。",
       "voiceTooLong": "语音消息最长 {seconds} 秒。",
       "voiceReady": "语音消息已准备好",
-      "cancelVoice": "取消语音消息"
+      "cancelVoice": "取消语音消息",
+      "cancelRecording": "取消"
     },
     "listing": {
       "noPrice": "价格面议",
@@ -205,6 +206,12 @@
       "setTitle": "设置备份密码",
       "setDescription": "至少 {count} 个字符。在新设备上查看聊天记录时需要它。我们无法为您找回。",
       "save": "保存密码"
+    },
+    "voice": {
+      "play": "播放语音消息",
+      "pause": "暂停语音消息",
+      "seek": "拖动语音进度",
+      "speed": "播放速度 {rate}×"
     }
   },
   "Search": {

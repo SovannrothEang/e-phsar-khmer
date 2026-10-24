@@ -147,7 +147,8 @@
       "voicePermissionError": "마이크 접근이 거부되었습니다.",
       "voiceTooLong": "음성 메시지는 최대 {seconds}초까지 가능합니다.",
       "voiceReady": "음성 메시지 준비 완료",
-      "cancelVoice": "음성 메시지 취소"
+      "cancelVoice": "음성 메시지 취소",
+      "cancelRecording": "취소"
     },
     "listing": {
       "noPrice": "가격 문의",
@@ -205,6 +206,12 @@
       "setTitle": "백업 암호 설정",
       "setDescription": "{count}자 이상. 새 기기에서 채팅을 읽을 때 필요합니다. 분실 시 복구할 수 없습니다.",
       "save": "암호 저장"
+    },
+    "voice": {
+      "play": "음성 메시지 재생",
+      "pause": "음성 메시지 일시정지",
+      "seek": "음성 메시지 탐색",
+      "speed": "재생 속도 {rate}×"
     }
   },
   "Search": {

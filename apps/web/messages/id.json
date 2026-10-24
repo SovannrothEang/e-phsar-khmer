@@ -147,7 +147,8 @@
       "voicePermissionError": "Akses mikrofon ditolak.",
       "voiceTooLong": "Pesan suara maksimal {seconds} detik.",
       "voiceReady": "Pesan suara siap",
-      "cancelVoice": "Batalkan pesan suara"
+      "cancelVoice": "Batalkan pesan suara",
+      "cancelRecording": "Batal"
     },
     "listing": {
       "noPrice": "Harga nego",
@@ -205,6 +206,12 @@
       "setTitle": "Atur kode sandi cadangan",
       "setDescription": "Minimal {count} karakter. Anda memerlukannya untuk membaca chat di perangkat baru. Kami tidak dapat memulihkannya.",
       "save": "Simpan kode sandi"
+    },
+    "voice": {
+      "play": "Putar pesan suara",
+      "pause": "Jeda pesan suara",
+      "seek": "Geser pesan suara",
+      "speed": "Kecepatan putar {rate}×"
     }
   },
   "Search": {

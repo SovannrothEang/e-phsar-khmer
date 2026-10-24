@@ -147,7 +147,8 @@
       "voicePermissionError": "Microphone access was denied.",
       "voiceTooLong": "Voice notes can be up to {seconds} seconds.",
       "voiceReady": "Voice note ready",
-      "cancelVoice": "Cancel voice note"
+      "cancelVoice": "Cancel voice note",
+      "cancelRecording": "Cancel"
     },
     "listing": {
       "noPrice": "Price on request",
@@ -205,6 +206,12 @@
       "setTitle": "Set a backup passcode",
       "setDescription": "At least {count} characters. You will need it to read your chats on a new device. We cannot recover it for you.",
       "save": "Save passcode"
+    },
+    "voice": {
+      "play": "Play voice note",
+      "pause": "Pause voice note",
+      "seek": "Seek voice note",
+      "speed": "Playback speed {rate}×"
     }
   },
   "Search": {

@@ -147,7 +147,8 @@
       "voicePermissionError": "Quyền truy cập micrô đã bị từ chối.",
       "voiceTooLong": "Tin nhắn thoại tối đa {seconds} giây.",
       "voiceReady": "Tin nhắn thoại sẵn sàng",
-      "cancelVoice": "Hủy tin nhắn thoại"
+      "cancelVoice": "Hủy tin nhắn thoại",
+      "cancelRecording": "Hủy"
     },
     "listing": {
       "noPrice": "Giá thương lượng",
@@ -205,6 +206,12 @@
       "setTitle": "Đặt mã khóa sao lưu",
       "setDescription": "Ít nhất {count} ký tự. Bạn cần nó để đọc trò chuyện trên thiết bị mới. Chúng tôi không thể khôi phục giúp bạn.",
       "save": "Lưu mã khóa"
+    },
+    "voice": {
+      "play": "Phát tin nhắn thoại",
+      "pause": "Tạm dừng tin nhắn thoại",
+      "seek": "Tua tin nhắn thoại",
+      "speed": "Tốc độ phát {rate}×"
     }
   },
   "Search": {
