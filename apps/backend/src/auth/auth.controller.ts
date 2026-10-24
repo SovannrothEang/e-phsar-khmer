@@ -10,6 +10,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
@@ -26,6 +27,13 @@ import { RequestOtpDto } from './dto/request-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
 
+// Per-route limits on top of the global 100/min. Every route here is @Public,
+// so the throttler keys on IP: these bound password guessing (login,
+// otp/login, otp/verify) and SMS pumping (register, otp/request, otp/login —
+// each call sends a paid SMS).
+const SMS_LIMIT = { default: { limit: 5, ttl: 60_000 } };
+const CREDENTIAL_LIMIT = { default: { limit: 10, ttl: 60_000 } };
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -35,6 +43,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Throttle(CREDENTIAL_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Login with username/phone + password' })
   login(
@@ -45,6 +54,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle(SMS_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Register with phone number (sends OTP)' })
   register(@Body() dto: RegisterDto) {
@@ -52,6 +62,7 @@ export class AuthController {
   }
 
   @Post('otp/request')
+  @Throttle(SMS_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Request OTP for phone' })
   requestOtp(@Body() dto: RequestOtpDto) {
@@ -59,6 +70,7 @@ export class AuthController {
   }
 
   @Post('otp/login')
+  @Throttle(SMS_LIMIT)
   @Public()
   @ApiOperation({
     summary: 'Login with phone + password (validates password, then sends OTP)',
@@ -68,6 +80,7 @@ export class AuthController {
   }
 
   @Post('otp/verify')
+  @Throttle(CREDENTIAL_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Verify phone OTP and get tokens' })
   verifyOtp(
@@ -85,6 +98,7 @@ export class AuthController {
   }
 
   @Post('social/callback')
+  @Throttle(CREDENTIAL_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Handle social OAuth callback' })
   socialCallback(
@@ -95,6 +109,7 @@ export class AuthController {
   }
 
   @Post('telegram')
+  @Throttle(CREDENTIAL_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Login via Telegram widget' })
   telegramLogin(
@@ -105,6 +120,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Public()
   @ApiOperation({ summary: 'Refresh access token' })
   refresh(

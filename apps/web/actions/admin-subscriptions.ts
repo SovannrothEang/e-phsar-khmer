@@ -12,6 +12,8 @@ export interface SubCategory {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Listing subcategories this group covers (empty on plans). */
+  subcategoryIds?: string[];
 }
 export interface SubPlan extends SubCategory {
   categoryId: string;
@@ -49,7 +51,7 @@ type Result = { success: true } | { success: false; error: string };
 
 async function mutate(
   path: string,
-  method: "POST" | "PATCH" | "DELETE",
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
   bodyObj?: unknown,
 ): Promise<Result> {
   try {
@@ -135,4 +137,48 @@ export async function updateSubTerm(id: string, b: unknown) {
 }
 export async function deleteSubTerm(id: string) {
   return mutate(`/admin/subscriptions/terms/${id}`, "DELETE");
+}
+
+// ── Group scope ─────────────────────────────────────────────
+/** Which listing subcategories a subscription category (group) covers. */
+export async function updateSubCategoryScope(
+  id: string,
+  subcategoryIds: string[],
+) {
+  return mutate(`/admin/subscriptions/categories/${id}/scope`, "PUT", {
+    subcategoryIds,
+  });
+}
+
+// ── Free plan ───────────────────────────────────────────────
+export interface FreePlanAdLimit {
+  categoryId: string | null;
+  subcategoryId: string | null;
+  ads: number;
+}
+export interface FreePlan {
+  photos: number;
+  renews: number;
+  autoRenews: number;
+  videos: number;
+  /** Ads across every category with no group or cap of its own. */
+  otherAds: number;
+  adLimits: FreePlanAdLimit[];
+}
+
+export async function getFreePlan(): Promise<FreePlan> {
+  const { data } = await serverFetch<FreePlan>(
+    "/admin/subscriptions/free-plan",
+  );
+  return data;
+}
+export async function updateFreePlan(plan: FreePlan) {
+  return mutate("/admin/subscriptions/free-plan", "PUT", {
+    ...plan,
+    adLimits: plan.adLimits.map((limit) =>
+      limit.subcategoryId
+        ? { subcategoryId: limit.subcategoryId, ads: limit.ads }
+        : { categoryId: limit.categoryId, ads: limit.ads },
+    ),
+  });
 }

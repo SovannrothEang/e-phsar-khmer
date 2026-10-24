@@ -32,7 +32,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { ReportPost } from "@/types/reportpost";
@@ -41,14 +41,6 @@ import {
   updateListingReportStatus,
 } from "@/actions/admin-reports";
 import { toast } from "@/components/ui/sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 type ReportPostRow = ReportPost & {
   _reporterName: string;
@@ -57,51 +49,56 @@ type ReportPostRow = ReportPost & {
 
 export default function ReportPostsPage() {
   const queryClient = useQueryClient();
-  const {
-    data: reports = [],
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data: reports = [] } = useQuery({
     queryKey: ["admin", "reports", "listings"],
-    queryFn: async (): Promise<ReportPostRow[]> => {
+    queryFn: async (): Promise<ReportPost[]> => {
       const rows = await getListingReports();
-      return rows.map((r) => ({
-        ReportPostID: r.id,
-        postId: r.listingId,
-        userId: r.reporterId,
-        ReportReasonID: r.reasonText ?? "",
-        ReportPostDescription: r.description ?? "",
-        Status: (r.status.charAt(0).toUpperCase() +
-          r.status.slice(1)) as ReportPost["Status"],
-        CreatedAt: r.createdAt,
-        ReviewedBy: r.reviewerName ?? undefined,
-        _reporterName: r.reporterName,
-        _listingTitle: r.listingTitle ?? "—",
-      }));
+      return rows.map(
+        (r) =>
+          ({
+            ReportPostID: r.id,
+            // A UUID — Number(uuid) was NaN → 0, so every View opened post 0.
+            postId: r.listingId,
+            userId: r.reporterId,
+            ReportReasonID: r.reasonText ?? "",
+            ReportPostDescription: r.description ?? "",
+            Status: (r.status.charAt(0).toUpperCase() +
+              r.status.slice(1)) as ReportPost["Status"],
+            CreatedAt: r.createdAt,
+            ReviewedBy: r.reviewedById ?? undefined,
+            _reporterName: r.reporterName,
+            _listingTitle: r.listingTitle ?? "—",
+          }) as ReportPostRow,
+      );
     },
   });
+  const refresh = () =>
+    queryClient.invalidateQueries({
+      queryKey: ["admin", "reports", "listings"],
+    });
 
-  const statusMutation = useMutation({
-    mutationFn: (input: { id: string; status: "approved" | "rejected" }) =>
-      updateListingReportStatus(input.id, input.status),
-    onSuccess: (res, input) => {
-      if (!res.success) {
-        toast.error(res.error ?? "Update failed");
-        return;
-      }
-      void queryClient.invalidateQueries({
-        queryKey: ["admin", "reports", "listings"],
-      });
-      toast.success(`Report ${input.status}`);
-    },
-  });
-
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [tab, setTab] = useState("all");
+
+  const updateStatus = async (id: string, status: ReportPost["Status"]) => {
+    if (
+      status === "Approved" &&
+      !window.confirm(
+        "Approving takes this listing down (you can restore it from Listings). Continue?",
+      )
+    )
+      return;
+    const s = status.toLowerCase() as "pending" | "approved" | "rejected";
+    const res = await updateListingReportStatus(id, s);
+    if (res.success) {
+      refresh();
+      toast.success(`Report ${status}`);
+    } else {
+      toast.error(res.error ?? "Update failed");
+    }
+  };
 
   // ✅ SEARCH
   const filteredReports = (reports as Array<ReportPostRow>).filter((r) => {
@@ -203,37 +200,13 @@ export default function ReportPostsPage() {
               <TableHead>Description</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created At</TableHead>
-              <TableHead>ReviewedBy</TableHead>
+              <TableHead>ReviewdBy</TableHead>
               <TableHead className="text-center">Action</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="h-32 text-center text-muted-foreground"
-                >
-                  Loading reports…
-                </TableCell>
-              </TableRow>
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <p>Could not load reports.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void refetch()}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : paginatedReports.length === 0 ? (
+            {paginatedReports.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="h-32 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -301,14 +274,14 @@ export default function ReportPostsPage() {
 
                   <TableCell>{report.CreatedAt}</TableCell>
 
-                  <TableCell>{report.ReviewedBy ?? "-"}</TableCell>
+                  <TableCell>{report.ReviewdBy ?? "-"}</TableCell>
 
                   <TableCell className="flex gap-2 justify-center">
                     <Button
                       size="sm"
                       onClick={() => {
                         router.push(
-                          `/${locale}/${listingTitle.replace(/\s+/g, "-").toLowerCase()}-adid-${report.postId}`,
+                          `/${locale}/${encodeURIComponent(listingTitle.replace(/\s+/g, "-").toLowerCase())}-adid-${report.postId}`,
                         );
                       }}
                       className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"
@@ -317,10 +290,10 @@ export default function ReportPostsPage() {
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() => setConfirmId(report.ReportPostID)}
-                      disabled={
-                        report.Status === "Approved" || statusMutation.isPending
+                      onClick={() =>
+                        updateStatus(report.ReportPostID, "Approved")
                       }
+                      disabled={report.Status === "Approved"}
                       className="text-white bg-green-500 rounded-sm hover:bg-green-600 hover:text-white cursor-pointer"
                     >
                       Approve
@@ -329,14 +302,9 @@ export default function ReportPostsPage() {
                     <Button
                       size="sm"
                       onClick={() =>
-                        statusMutation.mutate({
-                          id: report.ReportPostID,
-                          status: "rejected",
-                        })
+                        updateStatus(report.ReportPostID, "Rejected")
                       }
-                      disabled={
-                        report.Status === "Rejected" || statusMutation.isPending
-                      }
+                      disabled={report.Status === "Rejected"}
                       className="text-white bg-red-500 rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
                     >
                       Reject
@@ -415,41 +383,6 @@ export default function ReportPostsPage() {
           </div>
         </div>
       </div>
-
-      <Dialog
-        open={confirmId !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Approve this report?</DialogTitle>
-            <DialogDescription>
-              The listing is removed from the marketplace immediately. Rejecting
-              the report later will not restore it.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirmId(null)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-green-500 text-white hover:bg-green-600"
-              onClick={() => {
-                if (confirmId)
-                  statusMutation.mutate({
-                    id: confirmId,
-                    status: "approved",
-                  });
-                setConfirmId(null);
-              }}
-            >
-              Approve and take down
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

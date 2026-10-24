@@ -5,6 +5,7 @@
  */
 
 import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
+import type { SharedLocation } from "@/lib/e2e/chat-content";
 
 export type ListingStatus = "draft" | "active" | "expired" | "deleted";
 
@@ -12,6 +13,12 @@ export interface ChatUserSummary {
   id: string;
   username: string | null;
   profilePhotoUrl: string | null;
+  /**
+   * ISO over JSON. Coarse last activity ("last active 25 minutes ago"), not
+   * live presence — `null` when the user has never been active. Only ever
+   * shown to a participant of the conversation.
+   */
+  lastSeenAt?: string | null;
 }
 
 /** Listing context card attached to a message. Null when the ad was deleted. */
@@ -134,7 +141,6 @@ export interface SendMessageInput {
   recipientId: string;
   body?: string;
   listingId?: string;
-  imagePath?: string;
   groupId?: string;
   e2eHeader?: E2eHeader;
   /** v1: the identity key the session was built against (server 409s if it changed). */
@@ -183,6 +189,13 @@ export interface ThreadMessage extends ChatMessage {
    * its plaintext by the thread (the bubble renders `body` as the caption).
    */
   e2eFiles?: AttachmentMeta[];
+  /**
+   * Decrypted position of a structured location body. Its plaintext JSON is
+   * consumed here, never rendered as text (lib/e2e/chat-content.ts).
+   */
+  sharedLocation?: SharedLocation;
+  /** Decrypted body is the structured "listing card only" marker. */
+  listingOnly?: boolean;
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */

@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { kantumruyPro } from "@/lib/fonts";
+import { inter, kantumruyPro } from "@/lib/fonts";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -36,7 +36,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={kantumruyPro.variable}
+      className={`${kantumruyPro.variable} ${inter.variable}`}
       suppressHydrationWarning
     >
       <body>

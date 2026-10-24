@@ -320,30 +320,82 @@ describe('UsersService phone management', () => {
   });
 
   describe('removePhone', () => {
-    it('throws NotFoundException when delete returns no rows', async () => {
-      db.delete.mockReturnValue({
-        where: () => ({ returning: () => Promise.resolve([]) }),
-      });
+    const phone = (id: string, isPrimary: boolean) => ({
+      id,
+      userId: 'u1',
+      phone: `+855${id}`,
+      isPrimary,
+    });
+    const phonesQuery = (rows: object[]) => ({
+      from: () => ({ where: () => ({ for: () => Promise.resolve(rows) }) }),
+    });
+
+    it('throws NotFoundException for a phone the user does not own', async () => {
+      db.select.mockReturnValue(phonesQuery([phone('p2', true)]));
 
       await expect(service.removePhone('u1', 'p1')).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it('returns { removed: true } when phone deleted', async () => {
-      const deleted = {
-        id: 'p1',
-        userId: 'u1',
-        phone: '+855123',
-        isPrimary: false,
-      };
-      db.delete.mockReturnValue({
-        where: () => ({ returning: () => Promise.resolve([deleted]) }),
+    it('refuses to remove the only phone', async () => {
+      db.select.mockReturnValue(phonesQuery([phone('p1', true)]));
+
+      await expect(service.removePhone('u1', 'p1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('removes a secondary phone without touching the primary', async () => {
+      db.select.mockReturnValue(
+        phonesQuery([phone('p1', true), phone('p2', false)]),
+      );
+      db.delete.mockReturnValue({ where: () => Promise.resolve([]) });
+
+      const result = await service.removePhone('u1', 'p2');
+      expect(result).toEqual({ removed: true });
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('promotes another phone and moves primaryPhone when the primary goes', async () => {
+      db.select.mockReturnValue(
+        phonesQuery([phone('p1', true), phone('p2', false)]),
+      );
+      db.delete.mockReturnValue({ where: () => Promise.resolve([]) });
+      const sets: unknown[] = [];
+      db.update.mockReturnValue({
+        set: (v: unknown) => {
+          sets.push(v);
+          return { where: () => Promise.resolve([]) };
+        },
       });
 
-      const result = await service.removePhone('u1', 'p1');
-      expect(result).toEqual({ removed: true });
+      await service.removePhone('u1', 'p1');
+      expect(sets[0]).toEqual({ isPrimary: true });
+      expect(sets[1]).toMatchObject({ primaryPhone: '+855p2' });
     });
+  });
+
+  it('addPhone maps a concurrent duplicate (23505) to ConflictException', async () => {
+    db.select.mockReturnValue({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    });
+    db.update.mockReturnValue({
+      set: () => ({ where: () => Promise.resolve([]) }),
+    });
+    db.insert.mockReturnValue({
+      values: () => ({
+        returning: () =>
+          Promise.reject(
+            Object.assign(new Error('duplicate'), { code: '23505' }),
+          ),
+      }),
+    });
+
+    await expect(service.addPhone('u1', { phone: '+855123' })).rejects.toThrow(
+      ConflictException,
+    );
   });
 });
 

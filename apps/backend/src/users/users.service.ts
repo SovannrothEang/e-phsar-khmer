@@ -287,34 +287,60 @@ export class UsersService {
 
   async addPhone(userId: string, dto: AddPhoneDto): Promise<UserPhoneRow> {
     await this.assertPhoneNotBanned(dto.phone);
-    const [existing] = await this.db
-      .select()
-      .from(userPhones)
-      .where(eq(userPhones.phone, dto.phone))
-      .limit(1);
-    if (existing) throw new ConflictException('Phone already in use');
 
-    const [hasAny] = await this.db
-      .select({ id: userPhones.id })
-      .from(userPhones)
-      .where(eq(userPhones.userId, userId))
-      .limit(1);
-    const makePrimary = dto.isPrimary ?? !hasAny;
+    try {
+      return await this.db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(userPhones)
+          .where(eq(userPhones.phone, dto.phone))
+          .limit(1);
+        if (existing) throw new ConflictException('Phone already in use');
 
-    if (makePrimary) {
-      await this.db
-        .update(userPhones)
-        .set({ isPrimary: false })
-        .where(eq(userPhones.userId, userId));
+        const [hasAny] = await tx
+          .select({ id: userPhones.id })
+          .from(userPhones)
+          .where(eq(userPhones.userId, userId))
+          .limit(1);
+        const makePrimary = dto.isPrimary ?? !hasAny;
+
+        if (makePrimary) {
+          await tx
+            .update(userPhones)
+            .set({ isPrimary: false })
+            .where(eq(userPhones.userId, userId));
+        }
+
+        const [created] = await tx
+          .insert(userPhones)
+          .values({ userId, phone: dto.phone, isPrimary: makePrimary })
+          .returning();
+
+        if (makePrimary) {
+          // Same rule as setPrimaryPhone: the primary row and the login
+          // identifier must never disagree.
+          await tx
+            .update(users)
+            .set({ primaryPhone: dto.phone, updatedAt: new Date() })
+            .where(eq(users.id, userId));
+        }
+        return created;
+      });
+    } catch (err) {
+      // The check above is not atomic with the insert: a concurrent add of
+      // the same number (or of a second primary) lands here as 23505.
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: unknown }).code === '23505'
+      ) {
+        throw new ConflictException('Phone already in use');
+      }
+      throw err;
     }
-
-    const [created] = await this.db
-      .insert(userPhones)
-      .values({ userId, phone: dto.phone, isPrimary: makePrimary })
-      .returning();
-    return created;
   }
 
+  /**
   /**
    * Edits one saved contact number in place. Deliberately does NOT touch
    * `users.primaryPhone`: the active (login) phone is a separate concept from
@@ -351,16 +377,44 @@ export class UsersService {
     return updated;
   }
 
+  /**
+   * Removing the primary promotes another phone (and moves the login
+   * identifier with it); removing the only phone is refused, since for a
+   * phone-registered account it is the way they sign in.
+   */
   async removePhone(
     userId: string,
     phoneId: string,
   ): Promise<{ removed: true }> {
-    const [deleted] = await this.db
-      .delete(userPhones)
-      .where(and(eq(userPhones.id, phoneId), eq(userPhones.userId, userId)))
-      .returning();
-    if (!deleted) throw new NotFoundException('Phone not found');
-    return { removed: true };
+    return this.db.transaction(async (tx) => {
+      const phones = await tx
+        .select()
+        .from(userPhones)
+        .where(eq(userPhones.userId, userId))
+        .for('update');
+      const target = phones.find((p) => p.id === phoneId);
+      if (!target) throw new NotFoundException('Phone not found');
+      if (phones.length === 1) {
+        throw new BadRequestException('CANNOT_REMOVE_LAST_PHONE');
+      }
+
+      await tx
+        .delete(userPhones)
+        .where(and(eq(userPhones.id, phoneId), eq(userPhones.userId, userId)));
+
+      if (target.isPrimary) {
+        const next = phones.find((p) => p.id !== phoneId)!;
+        await tx
+          .update(userPhones)
+          .set({ isPrimary: true })
+          .where(eq(userPhones.id, next.id));
+        await tx
+          .update(users)
+          .set({ primaryPhone: next.phone, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+      }
+      return { removed: true as const };
+    });
   }
 
   async setPrimaryPhone(
@@ -1117,12 +1171,13 @@ export class UsersService {
     }
   }
 
-  private validateImageFile(file: Express.Multer.File) {
-    if (!file.mimetype.startsWith('image/')) {
-      throw new ForbiddenException('Only image files are allowed');
+  private validateImageFile(file: Express.Multer.File | undefined) {
+    if (!file) throw new BadRequestException('A file is required');
+    if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(file.mimetype)) {
+      throw new BadRequestException('Only image files are allowed');
     }
     if (file.size > 5 * 1024 * 1024) {
-      throw new ForbiddenException('File size must not exceed 5MB');
+      throw new BadRequestException('File size must not exceed 5MB');
     }
   }
 

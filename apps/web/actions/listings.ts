@@ -26,6 +26,9 @@ import type { Post } from "@/lib/posts";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
+import { describeBucket } from "@/lib/subscription-pricing";
+import { getMyEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import { ALL_ADS_PAGE_SIZE, type AllAdsFilters } from "@/lib/all-ads";
 
@@ -202,6 +205,12 @@ export interface ListingFormConfig {
    * `@ArrayMaxSize(8)` is category-agnostic.
    */
   photoMax: number;
+  /**
+   * The seller's plan allowance, so the form can cap photos and warn before
+   * the backend refuses. Null when it could not be read — the backend still
+   * enforces, this only keeps the UI honest.
+   */
+  plan: PlanEntitlements | null;
   /** Province rows for the Location cascade (public lookup). */
   provinces: BackendPlace[];
   contact: ContactPrefill;
@@ -360,8 +369,12 @@ export async function getListingFormConfig(
   // The photo cap is per-subcategory data, not a constant: the 36 jobs forms
   // declare `max: 1` (the single "Logo" slot) while every other subcategory
   // declares 8.
-  const photoMax =
+  const schemaPhotoMax =
     (sub.fieldSchema ?? []).find((f) => f.key === "photos")?.max ?? 8;
+  const plan = await getMyEntitlements(sub.id).catch(() => null);
+  const photoMax = plan
+    ? Math.min(schemaPhotoMax, plan.limits.photos)
+    : schemaPhotoMax;
 
   return {
     categoryId: category.id,
@@ -374,6 +387,7 @@ export async function getListingFormConfig(
     pickLists,
     years: years.map((y) => y.name),
     photoMax,
+    plan,
     provinces,
     contact,
   };
@@ -550,6 +564,18 @@ export type CreateListingResult =
 export async function createListing(
   payload: CreateListingPayload,
 ): Promise<CreateListingResult> {
+  // Refuse up front when the plan has no free ad slot, so a failed publish
+  // doesn't leave an orphaned draft behind.
+  // Limits are per category bucket, so ask for the one this ad lands in.
+  const plan = await getMyEntitlements(payload.subcategoryId).catch(() => null);
+  if (plan && plan.usage.ads >= plan.limits.ads) {
+    const bucketCopy = describeBucket(plan.bucket);
+    return {
+      success: false,
+      error: `Your ${bucketCopy.planLabel} allows ${plan.limits.ads} active ads ${bucketCopy.scopeLabel} and you have ${plan.usage.ads}. ${bucketCopy.ctaLabel} or remove an ad to post another.`,
+    };
+  }
+
   try {
     const { data } = await userServerFetch<BackendListing>("/listings", {
       method: "POST",
@@ -560,11 +586,14 @@ export async function createListing(
       await userServerFetch(`/listings/${data.id}/publish`, {
         method: "POST",
       });
-    } catch {
+    } catch (err) {
       return {
         success: true,
         listingId: data.id,
-        warning: "Your ad was saved as a draft but could not be published yet.",
+        warning:
+          err instanceof ApiError && err.code.startsWith("PLAN_")
+            ? `Your ad was saved as a draft. ${err.message}`
+            : "Your ad was saved as a draft but could not be published yet.",
       };
     }
     return { success: true, listingId: data.id };

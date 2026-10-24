@@ -13,11 +13,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MoreVertical, Search, Trash2, Plus, Pencil } from "lucide-react";
+import {
+  Filter,
+  MoreVertical,
+  Search,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -27,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -59,8 +67,6 @@ import {
   type SubCategory,
   type SubPackage,
 } from "@/actions/admin-subscriptions";
-
-type PackageTier = "Bronze" | "Siliver" | "Gold";
 
 type PackageRow = SubscriptionPackageOption & {
   subscriptionCateId: string;
@@ -140,7 +146,7 @@ export default function SubscriptionPackagePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState("all");
+  const [packageNameFilter, setPackageNameFilter] = useState("__all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -187,6 +193,10 @@ export default function SubscriptionPackagePage() {
     [rawPlans, formData.categoryId],
   );
 
+  const packageNames = Array.from(
+    new Set(allPackages.map((pkg) => pkg.subscriptionPackagename)),
+  ).sort((a, b) => a.localeCompare(b));
+
   const filteredPackages = allPackages.filter((pkg) => {
     const q = searchQuery.toLowerCase();
 
@@ -205,18 +215,11 @@ export default function SubscriptionPackagePage() {
       formatDate(pkg.createdAt).toLowerCase().includes(q) ||
       formatDate(pkg.updatedAt).toLowerCase().includes(q);
 
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "bronze"
-          ? pkg.subscriptionPackagename === "Bronze"
-          : tab === "siliver"
-            ? pkg.subscriptionPackagename === "Siliver"
-            : tab === "gold"
-              ? pkg.subscriptionPackagename === "Gold"
-              : true;
+    const matchesFilter =
+      packageNameFilter === "__all" ||
+      pkg.subscriptionPackagename === packageNameFilter;
 
-    return matchesSearch && matchesTab;
+    return matchesSearch && matchesFilter;
   });
 
   const totalPages = Math.max(
@@ -358,7 +361,7 @@ export default function SubscriptionPackagePage() {
         <Label htmlFor={`${idPrefix}-name`}>Package name</Label>
         <Input
           id={`${idPrefix}-name`}
-          placeholder="e.g. Bronze"
+          placeholder="Enter a package name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
         />
@@ -431,23 +434,9 @@ export default function SubscriptionPackagePage() {
     </div>
   );
 
-  const getPackageBadge = (name: string) => {
-    const tier = name as PackageTier;
-    const colors: Record<PackageTier, string> = {
-      Bronze: "text-foreground border-amber-950/30 bg-amber-950/10",
-      Siliver: "text-slate-500 border-slate-500/30 bg-slate-500/10",
-      Gold: "text-amber-500 border-amber-500/30 bg-amber-500/10",
-    };
-    const className = colors[tier] ?? "text-muted-foreground";
-    return (
-      <Badge variant="outline" className={className}>
-        {name}
-      </Badge>
-    );
-  };
-
-  const countByTier = (tier: PackageTier) =>
-    allPackages.filter((p) => p.subscriptionPackagename === tier).length;
+  const getPackageBadge = (name: string) => (
+    <Badge variant="outline">{name}</Badge>
+  );
 
   const isFormValid =
     formData.name.trim().length > 0 &&
@@ -508,50 +497,51 @@ export default function SubscriptionPackagePage() {
         </Dialog>
       </div>
 
-      <div className="relative w-90">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search packages..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-90">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search packages..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="size-4" />
+              Filter
+              {packageNameFilter !== "__all" && (
+                <span className="max-w-40 truncate text-muted-foreground">
+                  {packageNameFilter}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={packageNameFilter}
+              onValueChange={(value) => {
+                setPackageNameFilter(value);
+                setCurrentPage(1);
+              }}
+            >
+              <DropdownMenuRadioItem value="__all">
+                All packages ({allPackages.length})
+              </DropdownMenuRadioItem>
+              {packageNames.map((name) => (
+                <DropdownMenuRadioItem key={name} value={name}>
+                  {`${name} (${allPackages.filter((pkg) => pkg.subscriptionPackagename === name).length})`}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(value);
-          setCurrentPage(1);
-        }}
-      >
-        <TabsList className="gap-1">
-          <TabsTrigger value="all" className="cursor-pointer">
-            All Packages
-          </TabsTrigger>
-          <TabsTrigger value="bronze" className="cursor-pointer">
-            Bronze
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-amber-950/30 bg-amber-950/10">
-              {countByTier("Bronze")}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="siliver" className="cursor-pointer">
-            Siliver
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-slate-500/30 bg-slate-500/10">
-              {countByTier("Siliver")}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="gold" className="cursor-pointer">
-            Gold
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-amber-500/30 bg-amber-500/10">
-              {countByTier("Gold")}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <div className="border rounded-lg overflow-x-auto">
         <Table>

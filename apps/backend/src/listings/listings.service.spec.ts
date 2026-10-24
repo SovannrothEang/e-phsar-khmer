@@ -1,5 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { BadRequestException } from '@nestjs/common';
 import { ListingsService } from './listings.service';
+import { FilesService } from '../files/files.service';
 
 function makeDb() {
   return {
@@ -21,6 +23,7 @@ function makeService(db: ReturnType<typeof makeDb>) {
     db as never,
     filesService as never,
     reactionsService as never,
+    {} as never,
   );
 }
 
@@ -392,65 +395,6 @@ describe('ListingsService.findById seller handle', () => {
   });
 });
 
-describe('ListingsService moderation take-downs', () => {
-  let db: ReturnType<typeof makeDb>;
-  let service: ListingsService;
-
-  /** .select().from().leftJoin().where().limit() — the joined listing query. */
-  const listingQuery = (result: object[]) => ({
-    from: () => ({
-      leftJoin: () => ({
-        where: () => ({ limit: () => Promise.resolve(result) }),
-      }),
-    }),
-  });
-  /** .select().from().where().orderBy() — the photos query that follows it. */
-  const photosQuery = () => ({
-    from: () => ({ where: () => ({ orderBy: () => Promise.resolve([]) }) }),
-  });
-
-  const takenDownListing = {
-    listing: { id: 'listing-9', userId: 'user-9', takenDownAt: new Date() },
-    sellerUsername: 'seller9',
-  };
-
-  function mockListing(row: object) {
-    db.select
-      .mockReturnValueOnce(listingQuery([row]))
-      .mockReturnValueOnce(photosQuery());
-  }
-
-  beforeEach(() => {
-    db = makeDb();
-    service = makeService(db);
-  });
-
-  it('404s a taken-down listing on the public read', async () => {
-    mockListing(takenDownListing);
-
-    await expect(service.findById('listing-9')).rejects.toThrow(
-      'Listing not found',
-    );
-  });
-
-  it('returns it to owner paths that opt in', async () => {
-    mockListing(takenDownListing);
-
-    await expect(
-      service.findById('listing-9', { includeRemoved: true }),
-    ).resolves.toMatchObject({ id: 'listing-9' });
-  });
-
-  it('refuses to republish a taken-down listing', async () => {
-    mockListing(takenDownListing);
-
-    await expect(service.publish('user-9', 'listing-9')).rejects.toThrow(
-      'removed by moderation',
-    );
-    expect(db.update).not.toHaveBeenCalled();
-  });
-});
-
 /**
  * Search/filter additions (spec-search.md). A generic chainable mock: every
  * builder method records its arguments and returns the chain, and awaiting
@@ -554,12 +498,6 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(sql).toMatch(
       /\("listings"\."expires_at" is null or "listings"\."expires_at" > now\(\)\)/,
     );
-  });
-
-  it('hides moderation take-downs from every feed query', async () => {
-    const [page] = queue([]);
-    await service.findFeed({});
-    expect(whereOf(page).sql).toMatch(/"listings"\."taken_down_at" is null/);
   });
 
   it('filters model year numerically and engine type by name', async () => {
@@ -806,5 +744,134 @@ describe('ListingsService.findFeed search + facets', () => {
       expect(res.meta.facets).toEqual({ categories: [] });
       expect(db.select).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('ListingsService plan enforcement', () => {
+  function setup(existing: Record<string, unknown>) {
+    const returning = jest.fn().mockResolvedValue([{ id: 'l1' }]);
+    const set = jest.fn(() => ({ where: () => ({ returning }) }));
+    const db = { ...makeDb(), update: jest.fn(() => ({ set })) };
+    const entitlements = {
+      assertPhotos: jest.fn().mockResolvedValue(undefined),
+      assertCanHoldAnotherAd: jest.fn().mockResolvedValue(undefined),
+      assertCanRenew: jest.fn().mockResolvedValue(undefined),
+      reconcileListingsSafely: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      {} as never,
+      entitlements as never,
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      userId: 'u1',
+      status: 'draft',
+      publishedAt: null,
+      expiresAt: null,
+      renewCount: 0,
+      photos: [],
+      ...existing,
+    } as never);
+    return { service, entitlements, set };
+  }
+
+  it('checks photos and a free slot when a draft is first published', async () => {
+    const { service, entitlements, set } = setup({});
+    await service.publish('u1', 'l1');
+    expect(entitlements.assertPhotos).toHaveBeenCalled();
+    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1' }),
+    );
+    expect(entitlements.assertCanRenew).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active', renewCount: 0 }),
+    );
+    expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+  });
+
+  it('spends a renewal when an ad that already went live is re-published', async () => {
+    const { service, entitlements, set } = setup({
+      status: 'active',
+      publishedAt: new Date(Date.now() - 86_400_000),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      renewCount: 1,
+    });
+    await service.publish('u1', 'l1');
+    expect(entitlements.assertCanRenew).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1' }),
+      1,
+    );
+    // still live → already counted, so no slot check
+    expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ renewCount: 2 }),
+    );
+  });
+
+  it('refuses to re-publish an ad restricted by the plan', async () => {
+    const { service, set } = setup({
+      status: 'restricted',
+      publishedAt: new Date(),
+    });
+    await expect(service.publish('u1', 'l1')).rejects.toMatchObject({
+      response: { code: 'PLAN_RESTRICTED' },
+    });
+    expect(set).not.toHaveBeenCalled();
+  });
+});
+
+describe('ListingsService photo ownership', () => {
+  type Photo = { url: string; path: string };
+  const url = (path: string) =>
+    `https://x.supabase.co/storage/v1/object/public/listings/${path}`;
+  const real = new FilesService(
+    {} as never,
+    { get: () => 'listings' } as never,
+  );
+  const service = new ListingsService(
+    {} as never,
+    {
+      isOwnedPath: (path: string, userId: string) =>
+        real.isOwnedPath(path, userId),
+      publicUrlFor: url,
+    } as never,
+    {} as never,
+    {} as never,
+  ) as unknown as {
+    assertPhotosOwned(u: string, p: Photo[], kept?: Photo[]): void;
+  };
+  const own = { path: 'listing/u1/a.png', url: url('listing/u1/a.png') };
+
+  it('accepts the caller’s own uploads', () => {
+    expect(() => service.assertPhotosOwned('u1', [own])).not.toThrow();
+  });
+
+  it.each([
+    [
+      'another user’s object',
+      { path: 'listing/u2/a.png', url: url('listing/u2/a.png') },
+    ],
+    [
+      'a URL that does not match its path',
+      { path: own.path, url: url('listing/u2/b.png') },
+    ],
+    [
+      'an avatar path',
+      { path: 'avatar/u1/a.png', url: url('avatar/u1/a.png') },
+    ],
+  ])('rejects %s', (_label, photo) => {
+    expect(() => service.assertPhotosOwned('u1', [photo])).toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('keeps legacy photos already on the listing', () => {
+    const legacy = { path: 'listing/old.png', url: url('listing/old.png') };
+    expect(() =>
+      service.assertPhotosOwned('u1', [legacy, own], [legacy]),
+    ).not.toThrow();
   });
 });

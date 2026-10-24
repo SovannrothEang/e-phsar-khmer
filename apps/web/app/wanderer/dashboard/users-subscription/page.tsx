@@ -50,8 +50,10 @@ import { Plus } from "lucide-react";
 import {
   getUserSubscriptions,
   grantSubscription,
-  deleteUserSubscription,
+  revokeUserSubscription,
+  type UserSubscriptionRow,
 } from "@/actions/admin-user-subscriptions";
+import type { SupersededReason } from "@/types/subscription";
 import { getAdminUsers } from "@/actions/admin-users";
 import {
   getSubCategories,
@@ -66,7 +68,7 @@ type Subscription = {
   name: string;
   email: string;
   phone: string;
-  category: string;
+  group: string;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
@@ -75,21 +77,47 @@ type Subscription = {
   paymentMethod: string;
   subscribedAt: string;
   expiredAt: string;
+  status: UserSubscriptionRow["status"];
+  supersededReason: SupersededReason | null;
 };
+
+// A superseded row is history, not a second subscription: label it by why it
+// was retired so it never reads as another active plan.
+function statusBadge(sub: Subscription): { label: string; className: string } {
+  const muted = "text-muted-foreground border-border bg-muted";
+  const red = "text-red-500 border-red-500/30 bg-red-500/10";
+  switch (sub.status) {
+    case "active":
+      return {
+        label: "Active",
+        className: "text-emerald-500 border-emerald-500/30 bg-emerald-500/10",
+      };
+    case "expired":
+      return { label: "Expired", className: red };
+    case "revoked":
+      return { label: "Revoked", className: red };
+    case "superseded":
+      return {
+        label: sub.supersededReason === "upgrade" ? "Upgraded" : "Replaced",
+        className: muted,
+      };
+  }
+}
 
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
+  const [view, setView] = useState<"current" | "history">("current");
   const { data: subscription = [] } = useQuery({
-    queryKey: ["admin", "user-subscriptions"],
+    queryKey: ["admin", "user-subscriptions", view],
     queryFn: async (): Promise<Subscription[]> => {
-      const rows = await getUserSubscriptions();
+      const rows = await getUserSubscriptions(view === "history");
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
         name: r.name,
         email: r.email ?? "",
         phone: r.phone ?? "",
-        category: r.category ?? "—",
+        group: r.group ?? "—",
         totalAds: r.totalAds,
         totalRenew: r.totalRenew,
         autoRenew: r.autoRenew,
@@ -98,6 +126,8 @@ export default function SubscriptionPage() {
         paymentMethod: r.paymentMethod ?? "—",
         subscribedAt: r.subscribedAt.slice(0, 10),
         expiredAt: r.expiresAt,
+        status: r.status,
+        supersededReason: r.supersededReason,
       }));
     },
   });
@@ -184,21 +214,21 @@ export default function SubscriptionPage() {
       sub.accountId.toLowerCase().includes(q) ||
       sub.name.toLowerCase().includes(q) ||
       sub.email.toLowerCase().includes(q) ||
-      sub.category.toLowerCase().includes(q);
+      sub.group.toLowerCase().includes(q);
 
     const matchesTab =
       tab === "all"
         ? true
         : tab === "auto"
-          ? sub.category === "Auto"
+          ? sub.group === "Auto"
           : tab === "food"
-            ? sub.category === "Food"
+            ? sub.group === "Food"
             : tab === "general"
-              ? sub.category === "General"
+              ? sub.group === "General"
               : tab === "property"
-                ? sub.category === "Property"
+                ? sub.group === "Property"
                 : tab === "services"
-                  ? sub.category === "Services"
+                  ? sub.group === "Services"
                   : true;
 
     return matchesSearch && matchesTab;
@@ -210,11 +240,17 @@ export default function SubscriptionPage() {
     startIndex,
     startIndex + rowsPerPage,
   );
-  const handleDelete = async (id: string) => {
-    const res = await deleteUserSubscription(id);
+  const [revokeTarget, setRevokeTarget] = useState<Subscription | null>(null);
+  const [revoking, setRevoking] = useState(false);
+  const handleRevoke = async () => {
+    if (!revokeTarget) return;
+    setRevoking(true);
+    const res = await revokeUserSubscription(revokeTarget.id);
+    setRevoking(false);
     if (res.success) {
       refresh();
-      toast.success("Subscription removed");
+      setRevokeTarget(null);
+      toast.success("Subscription revoked");
     } else {
       toast.error(res.error);
     }
@@ -252,6 +288,23 @@ export default function SubscriptionPage() {
               className="pl-9"
             />
           </div>
+          <div className="pt-4">
+            <Select
+              value={view}
+              onValueChange={(value) => {
+                setView(value as "current" | "history");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current subscriptions</SelectItem>
+                <SelectItem value="history">Full history</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="mt-6">
             <Tabs
               value={tab}
@@ -267,40 +320,31 @@ export default function SubscriptionPage() {
                 <TabsTrigger value="auto" className="cursor-pointer">
                   Auto
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Auto").length}
+                    {subscription.filter((s) => s.group === "Auto").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="food" className="cursor-pointer">
                   Food
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Food").length}
+                    {subscription.filter((s) => s.group === "Food").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="general" className="cursor-pointer">
                   General
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "General")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "General").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="property" className="cursor-pointer">
                   Property
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Property")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "Property").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="services" className="cursor-pointer">
                   Services
                   <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Services")
-                        .length
-                    }
+                    {subscription.filter((s) => s.group === "Services").length}
                   </Badge>
                 </TabsTrigger>
               </TabsList>
@@ -333,7 +377,7 @@ export default function SubscriptionPage() {
 
           <TableBody>
             {paginatedSubscriptions.map((sub) => {
-              const isExpired = new Date(sub.expiredAt) < new Date();
+              const badge = statusBadge(sub);
               return (
                 <TableRow key={sub.id}>
                   <TableCell>{sub.id}</TableCell>
@@ -351,7 +395,7 @@ export default function SubscriptionPage() {
                   <TableCell>{sub.phone}</TableCell>
 
                   <TableCell>
-                    <Badge variant="outline">{sub.category}</Badge>
+                    <Badge variant="outline">{sub.group}</Badge>
                   </TableCell>
 
                   <TableCell>{sub.totalAds}</TableCell>
@@ -376,34 +420,28 @@ export default function SubscriptionPage() {
 
                   {/* Status */}
                   <TableCell>
-                    <Badge
-                      className={
-                        isExpired
-                          ? "text-red-500 border-red-500/30 bg-red-500/10"
-                          : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                      }
-                    >
-                      {isExpired ? "Expired" : "Active"}
-                    </Badge>
+                    <Badge className={badge.className}>{badge.label}</Badge>
                   </TableCell>
 
                   {/* Actions */}
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="outline">
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem
-                          className="text-destructive cursor-pointer"
-                          onClick={() => handleDelete(sub.id)}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {sub.status === "active" && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="outline">
+                            <MoreVertical className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem
+                            className="text-destructive cursor-pointer"
+                            onClick={() => setRevokeTarget(sub)}
+                          >
+                            Revoke
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -643,6 +681,36 @@ export default function SubscriptionPage() {
               disabled={granting || !grant.userId || !grant.termId}
             >
               Grant
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!revokeTarget}
+        onOpenChange={(open) => !open && setRevokeTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke subscription?</DialogTitle>
+            <DialogDescription>
+              {revokeTarget?.name}&apos;s {revokeTarget?.plan} plan ends now.
+              The record stays in the history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="h-9 rounded-sm cursor-pointer"
+              onClick={() => setRevokeTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+              disabled={revoking}
+              onClick={handleRevoke}
+            >
+              Revoke
             </Button>
           </DialogFooter>
         </DialogContent>

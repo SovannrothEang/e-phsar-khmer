@@ -4,8 +4,10 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -22,6 +24,8 @@ import {
   UpdateSubPackageDto,
   CreateSubTermDto,
   UpdateSubTermDto,
+  UpdateFreePlanDto,
+  UpdateSubCategoryScopeDto,
 } from './dto/subscription-config.dto';
 
 @ApiTags('admin')
@@ -48,6 +52,23 @@ export class SubscriptionConfigController {
   @Delete('categories/:id')
   removeCategory(@Param('id') id: string) {
     return this.service.removeCategory(id);
+  }
+  @Put('categories/:id/scope')
+  updateCategoryScope(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSubCategoryScopeDto,
+  ) {
+    return this.service.updateCategoryScope(id, dto);
+  }
+
+  // Free plan
+  @Get('free-plan')
+  getFreePlan() {
+    return this.service.getFreePlan();
+  }
+  @Put('free-plan')
+  updateFreePlan(@Body() dto: UpdateFreePlanDto) {
+    return this.service.updateFreePlan(dto);
   }
 
   // Plans

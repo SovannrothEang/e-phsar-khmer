@@ -73,7 +73,6 @@
       "previewListing": "Listing",
       "unreadCount": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}",
       "actionsLabel": "Conversation actions",
-      "archive": "Archive",
       "delete": "Delete",
       "deleteConfirmTitle": "Delete this conversation?",
       "deleteConfirmDescription": "It will be removed from your inbox. {name} can still see their side of the conversation.",
@@ -87,14 +86,27 @@
     "thread": {
       "back": "Back",
       "selectPrompt": "Select a conversation to start reading",
-      "emptyTitle": "Start a conversation with {name}",
       "loadOlder": "Load earlier messages",
-      "attachingListing": "About this listing",
       "removeListing": "Remove listing",
       "blocked": "You can no longer message this user.",
       "blockedByMe": "You blocked this user.",
       "notFoundTitle": "Conversation not found",
-      "notFoundDescription": "This conversation doesn't exist or you don't have access to it."
+      "notFoundDescription": "This conversation doesn't exist or you don't have access to it.",
+      "lastActive": "Last active {time}",
+      "viewProfile": "View profile",
+      "locationShared": "Shared location",
+      "viewOnMap": "View on map",
+      "voiceNote": "Voice note",
+      "quickReplies": {
+        "label": "Quick replies",
+        "hide": "Hide quick replies",
+        "hi": "Hi!",
+        "available": "Yes, it's still for sale",
+        "offer": "What's your offer?",
+        "sold": "Sorry! the product has been sold!",
+        "negotiable": "Yes, it's negotiable",
+        "notNegotiable": "No, it's not negotiable"
+      }
     },
     "message": {
       "imageAlt": "Sent photo",
@@ -109,7 +121,7 @@
       "downloadFailed": "Couldn’t save the file"
     },
     "composer": {
-      "placeholder": "Write a message…",
+      "placeholder": "Type your message here…",
       "send": "Send",
       "attachImage": "Attach image",
       "removeImage": "Remove image",
@@ -121,7 +133,22 @@
       "uploadFailed": "Image upload failed.",
       "imageSizeError": "Image is too large.",
       "imageTypeError": "Unsupported image type.",
-      "imageLimitError": "Maximum {max} images allowed."
+      "imageLimitError": "Maximum {max} images allowed.",
+      "shareLocation": "Share location",
+      "locationLocating": "Getting your location…",
+      "locationUnsupported": "Location sharing is not supported by this browser.",
+      "locationError": "Couldn't get your location. Check your browser permissions.",
+      "locationReady": "Location ready to send",
+      "cancelLocation": "Cancel location",
+      "recordVoice": "Record a voice note",
+      "stopRecording": "Stop recording",
+      "recording": "Recording…",
+      "voiceUnsupported": "Voice notes are not supported by this browser.",
+      "voicePermissionError": "Microphone access was denied.",
+      "voiceTooLong": "Voice notes can be up to {seconds} seconds.",
+      "voiceReady": "Voice note ready",
+      "cancelVoice": "Cancel voice note",
+      "cancelRecording": "Cancel"
     },
     "listing": {
       "noPrice": "Price on request",
@@ -179,6 +206,12 @@
       "setTitle": "Set a backup passcode",
       "setDescription": "At least {count} characters. You will need it to read your chats on a new device. We cannot recover it for you.",
       "save": "Save passcode"
+    },
+    "voice": {
+      "play": "Play voice note",
+      "pause": "Pause voice note",
+      "seek": "Seek voice note",
+      "speed": "Playback speed {rate}×"
     }
   },
   "Search": {

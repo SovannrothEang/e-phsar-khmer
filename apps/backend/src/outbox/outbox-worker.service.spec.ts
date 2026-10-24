@@ -85,19 +85,19 @@ describe('OutboxWorker lifecycle', () => {
     const { dispatcher, dispatchDue } = makeDispatcher([]);
     const worker = makeWorker(dispatcher, {
       'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 1,
+      'outbox.workerConcurrency': 2,
       'outbox.pollIntervalMs': 60_000,
     });
 
     worker.onApplicationBootstrap();
-    // Startup wakeup drains once.
+    // Startup wakeup broadcasts to both workers.
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(1);
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
 
     // A producer's wakeup drains again, 60s before the fallback would fire.
     worker.wakeup();
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(2);
+    expect(dispatchDue).toHaveBeenCalledTimes(4);
 
     await worker.onModuleDestroy();
   });
@@ -118,6 +118,36 @@ describe('OutboxWorker lifecycle', () => {
     // No wakeup — the fallback timer is the only thing that can run it again.
     await jest.advanceTimersByTimeAsync(50);
     expect(dispatchDue).toHaveBeenCalledTimes(2);
+
+    await worker.onModuleDestroy();
+  });
+
+  it('costs one claim per fallback tick regardless of pool size, and retains no waiters', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
+    const worker = makeWorker(dispatcher, {
+      'outbox.workerEnabled': true,
+      'outbox.workerConcurrency': 3,
+      'outbox.pollIntervalMs': 50,
+    });
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    // The startup wakeup fans out to all workers. Subsequent idle fallback
+    // should perform one claim per pool interval, not one claim per worker.
+    expect(dispatchDue).toHaveBeenCalledTimes(3);
+
+    await jest.advanceTimersByTimeAsync(150);
+    expect(dispatchDue).toHaveBeenCalledTimes(6);
+
+    const signal = (
+      worker as unknown as {
+        wakeupSignal: { waiters: Set<unknown> };
+      }
+    ).wakeupSignal;
+    // Every tick wakes one worker that re-parks afterwards, so the waiter set
+    // never grows past the pool size.
+    expect(signal.waiters.size).toBe(3);
 
     await worker.onModuleDestroy();
   });
@@ -203,8 +233,120 @@ describe('OutboxWorker lifecycle', () => {
     expect(active).toBe(3);
     expect(maxActive).toBe(3);
 
-    resolvers.forEach((resolve) => resolve());
+    resolvers.splice(0).forEach((resolve) => resolve());
+    await flush();
+    // A wakeup buffered while all workers were busy must trigger a follow-up
+    // drain once capacity is available.
+    expect(dispatchDue).toHaveBeenCalledTimes(4);
+    resolvers.splice(0).forEach((resolve) => resolve());
     await flush();
     await worker.onModuleDestroy();
+  });
+
+  it('uses a fallback claim to wake idle peers when backlog exists', async () => {
+    jest.useFakeTimers();
+    const found = [outcome('published', 'evt-found')];
+    const { dispatcher, dispatchDue } = makeDispatcher(
+      [],
+      [],
+      [],
+      found,
+      [],
+      [],
+    );
+    const worker = makeWorker(dispatcher, {
+      'outbox.workerEnabled': true,
+      'outbox.workerConcurrency': 3,
+      'outbox.pollIntervalMs': 50,
+      'outbox.batchSize': 2,
+    });
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(dispatchDue).toHaveBeenCalledTimes(3); // startup fan-out
+    expect(
+      (worker as unknown as { wakeupSignal: { waiters: Set<unknown> } })
+        .wakeupSignal.waiters.size,
+    ).toBe(3);
+
+    await jest.advanceTimersByTimeAsync(50);
+    await jest.advanceTimersByTimeAsync(0);
+    // The fallback worker finds due work and broadcasts to its two idle
+    // peers, which each make a concurrent claim.
+    expect(dispatchDue).toHaveBeenCalledTimes(6);
+
+    await worker.onModuleDestroy();
+  });
+
+  it('keeps polling while one worker is stuck in a hung handler', async () => {
+    jest.useFakeTimers();
+    let calls = 0;
+    const dispatchDue = jest.fn(async (): Promise<DispatchOutcome[]> => {
+      calls += 1;
+      // The very first claim never settles: that worker is gone for good.
+      if (calls === 1) await new Promise<void>(() => undefined);
+      return [];
+    });
+    const worker = makeWorker(
+      { dispatchDue },
+      {
+        'outbox.workerEnabled': true,
+        'outbox.workerConcurrency': 2,
+        'outbox.pollIntervalMs': 50,
+      },
+    );
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(dispatchDue).toHaveBeenCalledTimes(2); // startup fan-out
+
+    // The fallback keeps ticking through the surviving worker.
+    await jest.advanceTimersByTimeAsync(150);
+    expect(dispatchDue).toHaveBeenCalledTimes(5);
+
+    // Shutdown gives the hung worker its grace period, then gives up on it.
+    const destroyed = worker.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(10_000);
+    await destroyed;
+  });
+
+  it('stops the fallback timer on shutdown', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([], []);
+    const worker = makeWorker(dispatcher, {
+      'outbox.workerEnabled': true,
+      'outbox.workerConcurrency': 2,
+      'outbox.pollIntervalMs': 50,
+    });
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    await worker.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(500);
+
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
+  });
+
+  it('releases parked workers on shutdown without starting another drain', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([], [], []);
+    const worker = makeWorker(dispatcher, {
+      'outbox.workerEnabled': true,
+      'outbox.workerConcurrency': 3,
+      'outbox.pollIntervalMs': 60_000,
+    });
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(dispatchDue).toHaveBeenCalledTimes(3);
+
+    await worker.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(dispatchDue).toHaveBeenCalledTimes(3);
+    expect(
+      (worker as unknown as { wakeupSignal: { waiters: Set<unknown> } })
+        .wakeupSignal.waiters.size,
+    ).toBe(0);
   });
 });

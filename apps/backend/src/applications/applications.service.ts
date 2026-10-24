@@ -497,6 +497,7 @@ export class ApplicationsService {
         id: users.id,
         username: users.username,
         profilePhotoUrl: users.profilePhotoUrl,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .where(inArray(users.id, unique));
@@ -566,7 +567,7 @@ type JobRow = {
   title: string;
   price: string | null;
   currency: string;
-  status: 'draft' | 'active' | 'expired' | 'deleted';
+  status: 'draft' | 'active' | 'expired' | 'deleted' | 'restricted';
   company: string | null;
 };
 
@@ -616,7 +617,7 @@ function snippet(value: string): string {
 
 /** A user row that no longer exists still has to render as something. */
 function unknownUser(id: string): ChatUserSummary {
-  return { id, username: null, profilePhotoUrl: null };
+  return { id, username: null, profilePhotoUrl: null, lastSeenAt: null };
 }
 
 /** A job whose listing row is gone (hard-deleted): the row still renders. */

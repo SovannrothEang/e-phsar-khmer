@@ -99,7 +99,7 @@ export default function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/me/membership" className="hover:underline">
+                  <Link href="/me/subscriptions" className="hover:underline">
                     {t("membership")}
                   </Link>
                 </li>

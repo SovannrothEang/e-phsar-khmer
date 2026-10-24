@@ -21,6 +21,10 @@ export const listingStatusEnum = pgEnum('listing_status', [
   'active',
   'expired',
   'deleted',
+  // Hidden from public browsing because the owner is over their plan's ad
+  // limit (e.g. the subscription lapsed). Reversible: reconciliation flips it
+  // back to 'active' once the owner's allowance covers it again.
+  'restricted',
 ]);
 export const discountTypeEnum = pgEnum('discount_type', ['percent', 'amount']);
 export const listingConditionEnum = pgEnum('listing_condition', [
@@ -79,6 +83,9 @@ export const listings = pgTable(
     contactEmail: varchar('contact_email', { length: 255 }),
     status: listingStatusEnum('status').default('draft').notNull(),
     viewsCount: integer('views_count').default(0).notNull(),
+    // Times this ad was re-published after its first publish — what the
+    // plan's `renews` allowance is spent against.
+    renewCount: integer('renew_count').default(0).notNull(),
     // The price a buyer actually pays — what cards show and what price
     // filters/sorts must use. MUST stay equal to `applyDiscount` in
     // apps/web/lib/utils.ts (v <= 0 → no discount, percent >= 100 → 0, amount
@@ -98,10 +105,15 @@ export const listings = pgTable(
     ),
     publishedAt: timestamp('published_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
-    // Set only by moderation (an approved listing report). Kept separate from
-    // `status` because a taken-down listing must stay hidden even if its owner
-    // re-publishes it — `status` alone cannot express that intent.
-    takenDownAt: timestamp('taken_down_at', { withTimezone: true }),
+    // Set when staff take the ad down (directly or by approving a report).
+    // Separate from `status`, which the owner and plan reconciliation both
+    // drive: a moderated ad stays 'deleted' and the owner cannot republish or
+    // edit it until staff restore it (which clears these three).
+    moderatedAt: timestamp('moderated_at', { withTimezone: true }),
+    moderatedById: uuid('moderated_by_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    moderationReason: varchar('moderation_reason', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

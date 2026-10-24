@@ -28,6 +28,7 @@ import type { BakongAccountConfig } from './bakong.types';
 @Injectable()
 export class BakongProvider implements PaymentGatewayProvider {
   readonly name = 'bakong';
+  readonly displayName = 'Bakong KHQR';
 
   private readonly apiClient: ApiClient;
 

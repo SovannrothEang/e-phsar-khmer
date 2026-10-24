@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { kantumruyPro } from "@/lib/fonts";
+import { inter, kantumruyPro } from "@/lib/fonts";
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
@@ -30,7 +30,7 @@ export default async function WandererRootLayout({
   return (
     <html
       lang={locale}
-      className={kantumruyPro.variable}
+      className={`${kantumruyPro.variable} ${inter.variable}`}
       suppressHydrationWarning
     >
       <body>
