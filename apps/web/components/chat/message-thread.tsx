@@ -5,12 +5,16 @@ import Image from "next/image";
 import {
   ArrowLeft,
   Download,
+  ImageOff,
   Loader2,
   MessageSquareOff,
+  MoreVertical,
+  SendHorizonal,
   ShieldAlert,
+  UserRound,
   X,
 } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,10 +24,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { Link } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
-import { dayKey } from "@/lib/chat/format";
+import { dayKey, formatPrice } from "@/lib/chat/format";
 import { saveFromUrl } from "@/lib/chat/save-file";
 import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
@@ -31,6 +42,7 @@ import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useDecryptedMessages } from "@/hooks/use-decrypted-messages";
 import { isDecryptable } from "@/lib/e2e/decrypt-message";
 import { parseAttachmentContent } from "@/lib/e2e/attachments/content";
+import { parseStructuredChatContent } from "@/lib/e2e/chat-content";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -44,18 +56,45 @@ import type {
 
 /** How long the opening loading block may wait on decryption. */
 const DECRYPT_REVEAL_TIMEOUT_MS = 10_000;
+const E2E_RELOAD_ATTEMPTED_KEY = "chat:e2e-reload-attempted";
 
 /**
- * An encrypted-attachment message's plaintext is JSON (caption + per-file
- * keys); split it into the caption `body` and `e2eFiles` for the bubble.
- * Only messages the server lists `attachments` on are parsed.
+ * Text-only replies offered above the composer. Their label IS the message
+ * body, so tapping one sends exactly what the peer reads — through the same
+ * encrypted path as typed text.
  */
-function withFiles(m: ThreadMessage, plaintext: string | null): ThreadMessage {
-  if (!m.attachments?.length || plaintext === null)
-    return plaintext === m.body ? m : { ...m, body: plaintext };
-  const content = parseAttachmentContent(plaintext);
-  if (!content) return { ...m, body: null };
-  return { ...m, body: content.text ?? null, e2eFiles: content.attachments };
+const QUICK_REPLIES = [
+  "hi",
+  "available",
+  "offer",
+  "sold",
+  "negotiable",
+  "notNegotiable",
+] as const;
+
+/**
+ * Turn a decrypted plaintext into what the bubble renders: attachment JSON
+ * (caption + per-file keys), structured content (location / listing-only,
+ * which must never surface as raw JSON), or ordinary text. Legacy plaintext
+ * strings and old rows simply fall through as `body`.
+ */
+function withDecryptedContent(
+  m: ThreadMessage,
+  plaintext: string | null,
+): ThreadMessage {
+  // Only messages the server lists `attachments` on can carry file metadata.
+  if (m.attachments?.length && plaintext !== null) {
+    const content = parseAttachmentContent(plaintext);
+    if (!content) return { ...m, body: null };
+    return { ...m, body: content.text ?? null, e2eFiles: content.attachments };
+  }
+  if (plaintext === null) return m;
+  const structured = parseStructuredChatContent(plaintext);
+  if (structured?.kind === "location")
+    return { ...m, body: null, sharedLocation: structured.location };
+  if (structured?.kind === "listing")
+    return { ...m, body: null, listingOnly: true };
+  return plaintext === m.body ? m : { ...m, body: plaintext };
 }
 
 export function MessageThread({
@@ -82,21 +121,47 @@ export function MessageThread({
 }) {
   const t = useTranslations("Chat");
   const format = useFormatter();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [listingSent, setListingSent] = useState(false);
   const [listingDismissed, setListingDismissed] = useState(false);
-  // True while the listing preview is still pending a decision (send it, or
-  // remove it) — gates both render spots below and the attach in handleSend.
-  const showListingAttachment =
+  // Per-thread preference only: ChatWorkspace keys this component by peer +
+  // conversation, so a thread switch remounts it and the row comes back.
+  const [quickRepliesHidden, setQuickRepliesHidden] = useState(false);
+  const listingPending =
     Boolean(listingId) && !listingSent && !listingDismissed;
 
   const peerName = peer.username ?? t("unknownUser");
+  const username = peer.username;
+  // Read `lastSeenAt` defensively: it is optional on ChatUserSummary, and a
+  // missing or null value must simply render no secondary line.
+  const lastSeenAt =
+    (peer as { lastSeenAt?: string | null }).lastSeenAt ?? null;
+  const lastSeen = lastSeenAt ? new Date(lastSeenAt) : null;
+  // Formatted once here so a malformed timestamp can never render as
+  // "Invalid Date"; the header only decides whether to show the line.
+  const lastActiveLabel =
+    lastSeen !== null && !Number.isNaN(lastSeen.getTime())
+      ? t("thread.lastActive", {
+          time: format.relativeTime(lastSeen, new Date()),
+        })
+      : null;
 
   const onMutated = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
     void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
   }, [queryClient]);
+
+  const reloadAfterE2eUnavailable = useCallback(() => {
+    try {
+      if (sessionStorage.getItem(E2E_RELOAD_ATTEMPTED_KEY) === "1") return;
+      sessionStorage.setItem(E2E_RELOAD_ATTEMPTED_KEY, "1");
+    } catch {
+      // If sessionStorage is unavailable, still honor the requested reload.
+    }
+    window.location.reload();
+  }, []);
 
   const onSendError = useCallback(
     (message: string, status: number) => {
@@ -116,6 +181,7 @@ export function MessageThread({
       }
       if (message === "E2E_UNAVAILABLE") {
         toast.error(t("errors.e2eUnavailable"));
+        reloadAfterE2eUnavailable();
         return;
       }
       // Block state is cached (see `withPeer` in chat-workspace); a 403 means
@@ -130,7 +196,7 @@ export function MessageThread({
           : message || t("errors.sendFailed"),
       );
     },
-    [t, queryClient, peer.id],
+    [t, queryClient, peer.id, reloadAfterE2eUnavailable],
   );
 
   const thread = useChatThread({
@@ -156,12 +222,29 @@ export function MessageThread({
     markActivity,
   } = thread;
 
+  // True while the listing preview is still pending a decision (send it, or
+  // remove it) — gates both render spots below and the attach in handleSend.
+  // A message that already carries the listing is proof it rode out: the
+  // local flags reset on every remount (the first send creates the
+  // conversation, which changes the mount key), the messages never do.
+  const showListingAttachment =
+    listingPending && !messages.some((m) => m.listingId === listingId);
+
   // ── E2E decrypt ──────────────────────────────────────────────────────────
   // Own optimistic echoes already carry plaintext; only server rows need
   // resolving. A still-bootstrapping or failed engine yields a null map —
   // we render a neutral placeholder, never the raw ciphertext.
   const e2eEngine = useE2eEngine(viewerId);
   const decrypted = useDecryptedMessages(messages, e2eEngine);
+
+  useEffect(() => {
+    if (!e2eEngine) return;
+    try {
+      sessionStorage.removeItem(E2E_RELOAD_ATTEMPTED_KEY);
+    } catch {
+      // Private browsing/storage restrictions do not block E2E itself.
+    }
+  }, [e2eEngine]);
 
   // Server E2E rows with no decrypt outcome yet (engine bootstrapping, or
   // the batch is still running).
@@ -190,17 +273,25 @@ export function MessageThread({
   }, [revealed]);
 
   const displayMessages = useMemo<ThreadMessage[]>(() => {
-    if (!messages.some((m) => m.isE2e || m.attachments?.length))
+    // Ordinary plaintext threads need no post-processing. Optimistic echoes
+    // are always inspected: a location / listing-only send stores its
+    // structured JSON in `body` even before the row is E2E.
+    if (
+      !messages.some(
+        (m) => m.isE2e || m.attachments?.length || m.tempId !== undefined,
+      )
+    )
       return messages;
     const out: ThreadMessage[] = [];
     for (const m of messages) {
       // Local optimistic / failed rows already hold the user's plaintext.
       if (m.tempId || !m.isE2e) {
-        out.push(withFiles(m, m.body));
+        out.push(withDecryptedContent(m, m.body));
         continue;
       }
       const outcome = decrypted.get(m.id);
-      if (outcome?.status === "ok") out.push(withFiles(m, outcome.plaintext));
+      if (outcome?.status === "ok")
+        out.push(withDecryptedContent(m, outcome.plaintext));
       else if (outcome?.status === "unavailable")
         out.push({ ...m, body: t("message.notOnThisDevice") });
       else if (outcome?.status === "failed")
@@ -251,17 +342,44 @@ export function MessageThread({
     if (atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [displayMessages, revealed]);
 
+  // The listing still waiting to ride out on the next send of any kind.
+  const pendingListingId = showListingAttachment ? listingId : undefined;
+
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
-      if (showListingAttachment) setListingSent(true);
+      if (pendingListingId) setListingSent(true);
+      // Location and voice must be forwarded here: the composer clears its
+      // staged state on send, so a dropped field is a silently lost message.
       send({
         body: draft.body,
         draftKeys: draft.draftKeys,
-        listingId: showListingAttachment ? listingId : undefined,
+        listingId: pendingListingId,
+        location: draft.location,
+        voice: draft.voice,
       });
     },
-    [send, listingId, showListingAttachment],
+    [send, pendingListingId],
   );
+
+  const handleQuickReply = useCallback(
+    (text: string) => {
+      if (pendingListingId) setListingSent(true);
+      send({ body: text, listingId: pendingListingId });
+    },
+    [send, pendingListingId],
+  );
+
+  // Sending the card is a send of its own — the quick replies row stays
+  // available for a follow-up message.
+  const handleSendListing = useCallback(() => {
+    if (!listingId) return;
+    setListingSent(true);
+    send({ listingId });
+  }, [send, listingId]);
+
+  const listingPrice = listing
+    ? formatPrice(listing.price, listing.currency, locale)
+    : null;
 
   const grouped = useMemo(() => {
     // First group by day.
@@ -328,16 +446,44 @@ export function MessageThread({
             {peerName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-none">
             {peerName}
           </p>
-          {!canMessage && (
+          {!canMessage ? (
             <p className="mt-1 text-[11px] text-destructive">
               {blockedByMe ? t("thread.blockedByMe") : t("thread.blocked")}
             </p>
-          )}
+          ) : lastActiveLabel ? (
+            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              {lastActiveLabel}
+            </p>
+          ) : null}
         </div>
+        {username && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("thread.viewProfile")}
+                className="-mr-1 shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted"
+              >
+                <MoreVertical className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem asChild>
+                <Link
+                  href={{ pathname: "/[username]", params: { username } }}
+                  className="flex w-full items-center gap-1.5"
+                >
+                  <UserRound className="size-4" />
+                  {t("thread.viewProfile")}
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Messages */}
@@ -376,25 +522,23 @@ export function MessageThread({
               </div>
             )}
 
-            {messages.length === 0 && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-                {listing !== undefined && showListingAttachment && (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <ListingContextCard listing={listing} />
-                    <button
-                      type="button"
-                      onClick={() => setListingDismissed(true)}
-                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {t("thread.removeListing")}
-                    </button>
-                  </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  {t("thread.emptyTitle", { name: peerName })}
-                </p>
-              </div>
-            )}
+            {/* Empty thread: no prompt copy — the composer and the quick
+                replies are the empty state. Only a listing that is still
+                pending has something to show here. */}
+            {messages.length === 0 &&
+              listing !== undefined &&
+              showListingAttachment && (
+                <div className="flex flex-1 flex-col items-center justify-center gap-1.5">
+                  <ListingContextCard listing={listing} />
+                  <button
+                    type="button"
+                    onClick={() => setListingDismissed(true)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    {t("thread.removeListing")}
+                  </button>
+                </div>
+              )}
 
             {grouped.map((group) => (
               <div key={group.day} className="flex flex-col gap-4">
@@ -434,24 +578,88 @@ export function MessageThread({
         )}
       </div>
 
-      {/* Pending listing context — shown until it rides out on the first
-          send, or the buyer removes it before sending. */}
-      {showListingAttachment && displayMessages.length > 0 && (
+      {/* Pending listing — a compact row until the card itself is sent
+          (paper plane), it rides out on the next message, or it is
+          dismissed. The empty-thread case shows the full card above. */}
+      {canMessage && showListingAttachment && displayMessages.length > 0 && (
         <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">
-              {t("thread.attachingListing")}
-            </p>
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
+              {listing?.thumbnailUrl ? (
+                <Image
+                  src={listing.thumbnailUrl}
+                  alt={listing.title}
+                  fill
+                  sizes="40px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <ImageOff className="size-4 text-muted-foreground" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {listing?.title ?? t("listing.unavailable")}
+              </p>
+              <p className="truncate text-[11px] font-semibold text-[#f04d4e]">
+                {listingPrice ?? t("listing.noPrice")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSendListing}
+              aria-label={t("composer.send")}
+              className="shrink-0 rounded-full bg-sky-500 p-1.5 text-white transition-colors hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <SendHorizonal className="size-4" />
+            </button>
             <button
               type="button"
               onClick={() => setListingDismissed(true)}
               aria-label={t("thread.removeListing")}
+              className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick replies: one tap sends the pill's text (plus the pending
+          listing, if one is still armed). Hidden per thread, restored on
+          the next mount — i.e. on a thread change. */}
+      {canMessage && !quickRepliesHidden && (
+        <div className="shrink-0 border-t border-border bg-card px-3 pt-2 sm:px-4">
+          <div className="flex items-center gap-1.5 pb-2">
+            <div
+              role="group"
+              aria-label={t("thread.quickReplies.label")}
+              className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {QUICK_REPLIES.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    handleQuickReply(t(`thread.quickReplies.${key}`))
+                  }
+                  disabled={isSending}
+                  className="shrink-0 rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+                >
+                  {t(`thread.quickReplies.${key}`)}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setQuickRepliesHidden(true)}
+              aria-label={t("thread.quickReplies.hide")}
               className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
           </div>
-          <ListingContextCard listing={listing ?? null} />
         </div>
       )}
 

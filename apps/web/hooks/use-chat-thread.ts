@@ -10,7 +10,6 @@ import {
   fetchMessages,
   markConversationRead,
   sendChatMessage,
-  signChatUpload,
 } from "@/actions/chat";
 import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { mergeMessages } from "@/lib/chat/format";
@@ -27,18 +26,18 @@ import type { E2eSendOutcome } from "@/lib/e2e/send-encrypt";
 import { E2E_ATTACHMENTS_ENABLED } from "@/lib/e2e/config";
 import {
   contentFor,
-  createImageOutboxEntry,
+  createOutboxEntry,
   sendOutboxEntry,
 } from "@/lib/e2e/attachments/send";
 import type { AttachmentSendOutcome } from "@/lib/e2e/attachments/send";
 import { getOutbox, listOutbox } from "@/lib/e2e/attachments/store";
 import type { OutboxEntry } from "@/lib/e2e/attachments/store";
-import type {
-  ChatMessage,
-  MessagePage,
-  SendMessageInput,
-  ThreadMessage,
-} from "@/types/chat";
+import {
+  encodeListingOnlyContent,
+  encodeLocationContent,
+} from "@/lib/e2e/chat-content";
+import type { SharedLocation } from "@/lib/e2e/chat-content";
+import type { ChatMessage, MessagePage, ThreadMessage } from "@/types/chat";
 
 const PAGE_SIZE = 30;
 const MARK_READ_DEBOUNCE_MS = 700;
@@ -116,6 +115,10 @@ export interface SendDraft {
   /** Draft-image registry keys — uploaded to Supabase at send-time. */
   draftKeys?: string[];
   listingId?: string;
+  /** Shared position; encoded into the encrypted body, never sent in clear. */
+  location?: SharedLocation;
+  /** Recorded voice note; encrypted and uploaded as a v2 attachment. */
+  voice?: { file: File; durationMs: number };
 }
 
 export interface ChatThread {
@@ -402,7 +405,7 @@ export function useChatThread({
       else if (outcome.reason === "send-failed")
         onSendError?.(outcome.message, outcome.status);
       else if (outcome.reason === "upload-failed")
-        onSendError?.("Image upload failed", outcome.status);
+        onSendError?.("Attachment upload failed", outcome.status);
       else onSendError?.("E2E_UNAVAILABLE", 0);
     },
     [onSendError],
@@ -414,8 +417,12 @@ export function useChatThread({
    * same ids (lib/e2e/attachments/send.ts).
    */
   const dispatchOutbox = useCallback(
-    async (entry: OutboxEntry, tempId: string, draftKeys: string[] = []) => {
-      if (!viewerId) return;
+    async (
+      entry: OutboxEntry,
+      tempId: string,
+      draftKeys: string[] = [],
+    ): Promise<string | null> => {
+      if (!viewerId) return null;
       setIsSending(true);
       const engine = await getE2eEngine(viewerId).catch(() => null);
       const outcome = await sendOutboxEntry(engine, entry, {
@@ -426,7 +433,7 @@ export function useChatThread({
       if (!outcome.ok) {
         markFailed(tempId);
         reportE2eFailure(outcome);
-        return;
+        return null;
       }
       for (const key of draftKeys) removeDraftImage(key);
       // Same reason as text sends: show the known plaintext, not ciphertext.
@@ -441,6 +448,7 @@ export function useChatThread({
       if (conversationId === null)
         onConversationCreated?.(outcome.result.conversationId);
       onMutated?.();
+      return outcome.result.conversationId;
     },
     [
       viewerId,
@@ -461,157 +469,139 @@ export function useChatThread({
       if (saved) return dispatchOutbox(saved, tempId);
 
       const draftKeys = draft.draftKeys ?? [];
-      if (draftKeys.length > 0 && E2E_ATTACHMENTS_ENABLED) {
-        const engine = await getE2eEngine(viewerId).catch(() => null);
-        if (engine?.deviceId) {
-          setIsSending(true);
-          let entry: OutboxEntry;
-          try {
-            entry = await createImageOutboxEntry({
-              clientMessageId,
-              recipientId,
-              conversationId,
-              listingId: draft.listingId,
-              text: draft.body,
-              files: draftKeys
-                .map((k) => getDraftFile(k))
-                .filter((f): f is File => f !== null),
-            });
-          } catch (err) {
-            setIsSending(false);
-            markFailed(tempId);
-            onSendError?.(
-              err instanceof Error ? err.message : "Image upload failed",
-              0,
-            );
-            return;
-          }
-          return dispatchOutbox(entry, tempId, draftKeys);
+      const engine = await getE2eEngine(viewerId).catch(() => null);
+
+      // Images and voice notes ride the v2 encrypted-attachment pipeline, and
+      // deliberately have no fallback: the legacy path uploaded plaintext
+      // images to a PUBLIC bucket — the exact leak E2E exists to close. A
+      // browser without a registered v2 device fails here, visibly.
+      if (draftKeys.length > 0 || draft.voice) {
+        if (!E2E_ATTACHMENTS_ENABLED || !engine?.deviceId) {
+          markFailed(tempId);
+          onSendError?.("E2E_UNAVAILABLE", 0);
+          return;
         }
-        // No v2 device (flag off / bootstrap failed): legacy image send below.
-      }
-
-      setIsSending(true);
-
-      const imageCount = draftKeys.length;
-      const hasBody = !!draft.body;
-
-      // Generate a shared groupId for all images in this batch.
-      const groupId = imageCount > 0 ? crypto.randomUUID() : undefined;
-
-      // Upload and send each image via HTTP (returns full message with imageUrl).
-      for (let i = 0; i < imageCount; i++) {
-        const key = draftKeys[i];
+        setIsSending(true);
+        let entry: OutboxEntry;
         try {
-          const file = getDraftFile(key);
-          if (!file) continue;
-          const ext = file.type.split("/")[1] ?? "jpg";
-          const filename = `chat-image-${Date.now()}-${i}.${ext}`;
-          const signed = await signChatUpload(filename);
-          if (!signed.ok) throw new Error(signed.message);
-          const uploadRes = await fetch(signed.data.signedUrl, {
-            method: "PUT",
-            body: file,
-            headers: { "Content-Type": file.type },
-          });
-          if (!uploadRes.ok) throw new Error("Upload failed");
-
-          // Always use HTTP for images — returns full message with imageUrl.
-          // Per-image dedup key: one logical draft → many rows; index i keeps
-          // retries of the same draft from re-inserting a delivered image.
-          const input: SendMessageInput = {
+          entry = await createOutboxEntry({
+            clientMessageId,
             recipientId,
-            imagePath: signed.data.path,
-            groupId,
-            listingId: i === 0 ? draft.listingId : undefined,
-            clientMessageId: `${clientMessageId}-img-${i}`,
-          };
-          const sendRes = await sendChatMessage(input);
-          if (!sendRes.ok) throw new Error(sendRes.message);
-
-          // Replace optimistic with server message.
-          setLocal((prev) =>
-            replaceEcho(prev, tempId, {
-              ...sendRes.data.message,
-              pending: false,
-              failed: false,
-            }),
-          );
-
-          // Cleanup this key after successful upload+send.
-          removeDraftImage(key);
-        } catch {
-          // Upload/send failed — mark as failed, keep remaining drafts.
+            conversationId,
+            listingId: draft.listingId,
+            text: draft.body,
+            images: draftKeys
+              .map((k) => getDraftFile(k))
+              .filter((f): f is File => f !== null),
+            ...(draft.voice
+              ? {
+                  voice: {
+                    blob: draft.voice.file,
+                    mime: draft.voice.file.type,
+                    durationMs: draft.voice.durationMs,
+                  },
+                }
+              : {}),
+          });
+        } catch (err) {
           setIsSending(false);
-          setLocal((prev) =>
-            prev.map((m) =>
-              m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
-            ),
+          markFailed(tempId);
+          onSendError?.(
+            err instanceof Error ? err.message : "Attachment upload failed",
+            0,
           );
-          onSendError?.("Image upload failed", 0);
           return;
         }
-      }
-
-      // Send text body as final message (if any).
-      // Always E2E for text (spec decision #6 — fail closed, no plaintext
-      // fallback). sendE2eText runs encrypt → HTTP → session commit under
-      // one per-conversation lock and never uses the WS envelope, because
-      // the commit needs conversationId + message.id from the HTTP response.
-      if (hasBody) {
-        const engine = await getE2eEngine(viewerId).catch(() => null);
-        const outcome = await sendE2eText(engine, {
-          conversationId,
-          senderId: viewerId,
-          recipientId,
-          plaintext: draft.body as string,
-          listingId: imageCount === 0 ? draft.listingId : undefined,
-          clientMessageId,
-          send: sendChatMessage,
-        });
-        setIsSending(false);
-
-        if (!outcome.ok) {
-          setLocal((prev) =>
-            prev.map((m) =>
-              m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
-            ),
-          );
-          if (outcome.reason === "no-recipient-keys") {
-            onSendError?.("E2E_NO_KEYS", 404);
-          } else if (outcome.reason === "engine-unavailable") {
-            onSendError?.("E2E_UNAVAILABLE", 0);
-          } else if (outcome.reason === "send-failed") {
-            onSendError?.(outcome.message, outcome.status);
-          } else {
-            onSendError?.("E2E_UNAVAILABLE", 0);
-          }
-          return;
-        }
-
-        // Replace the optimistic echo with the server row. Override body
-        // with the plaintext we already know — the server copy is ciphertext,
-        // and rendering it for one frame before the decrypt hook runs would
-        // flash base64 at the user. History refetches re-resolve via the
-        // decrypt cache (committed inside sendE2eText).
+        // Swap the placeholder bubble for the real encrypted content (caption,
+        // voice duration, image previews). Built from the same JSON that will
+        // be sealed, so the optimistic render and the recipient's view match.
+        const echo = outboxEcho(entry, tempId, viewerId, true);
         setLocal((prev) =>
-          replaceEcho(prev, tempId, {
-            ...outcome.result.message,
-            body: draft.body ?? null,
-            pending: false,
-            failed: false,
-          }),
+          prev.some((m) => m.tempId === tempId)
+            ? prev.map((m) => (m.tempId === tempId ? echo : m))
+            : [...prev, echo],
         );
-        if (conversationId === null) {
-          onConversationCreated?.(outcome.result.conversationId);
+        const sentConversationId = await dispatchOutbox(
+          entry,
+          tempId,
+          draftKeys,
+        );
+        // A location staged together with photos/voice cannot ride the same
+        // message (its payload is the attachment JSON), so it follows as its
+        // own encrypted message rather than being silently dropped. Only sent
+        // after the attachment message landed, so a failure never splits the
+        // pair into an orphaned location.
+        if (sentConversationId && draft.location) {
+          const followUp = await sendE2eText(engine, {
+            conversationId: sentConversationId,
+            senderId: viewerId,
+            recipientId,
+            plaintext: encodeLocationContent(draft.location),
+            clientMessageId: `${clientMessageId}-location`,
+            send: sendChatMessage,
+          });
+          if (followUp.ok) onMutated?.();
+          else onSendError?.("E2E_UNAVAILABLE", 0);
         }
-        onMutated?.();
         return;
       }
 
-      // No body — all images sent, clean up optimistic echo.
+      // Everything else is ONE encrypted body: plain text, a shared location,
+      // or a listing-only card (whose body is the structured marker the thread
+      // renders as the card). sendE2eText encrypts → sends → commits the
+      // ratchet session under one per-conversation lock.
+      const plaintext = draft.location
+        ? encodeLocationContent(draft.location)
+        : (draft.body ?? (draft.listingId ? encodeListingOnlyContent() : null));
+      if (!plaintext) {
+        markFailed(tempId);
+        onSendError?.("E2E_UNAVAILABLE", 0);
+        return;
+      }
+
+      setIsSending(true);
+      const outcome = await sendE2eText(engine, {
+        conversationId,
+        senderId: viewerId,
+        recipientId,
+        plaintext,
+        listingId: draft.listingId,
+        clientMessageId,
+        send: sendChatMessage,
+      });
       setIsSending(false);
-      setLocal((prev) => prev.filter((m) => m.tempId !== tempId));
+
+      if (!outcome.ok) {
+        setLocal((prev) =>
+          prev.map((m) =>
+            m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
+          ),
+        );
+        if (outcome.reason === "no-recipient-keys") {
+          onSendError?.("E2E_NO_KEYS", 404);
+        } else if (outcome.reason === "send-failed") {
+          onSendError?.(outcome.message, outcome.status);
+        } else {
+          onSendError?.("E2E_UNAVAILABLE", 0);
+        }
+        return;
+      }
+
+      // Replace the optimistic echo with the server row, keeping the plaintext
+      // we already know: the server copy is ciphertext, and rendering it for a
+      // frame would flash base64. History refetches resolve via the decrypt
+      // cache committed inside sendE2eText.
+      setLocal((prev) =>
+        replaceEcho(prev, tempId, {
+          ...outcome.result.message,
+          body: plaintext,
+          pending: false,
+          failed: false,
+        }),
+      );
+      if (conversationId === null) {
+        onConversationCreated?.(outcome.result.conversationId);
+      }
       onMutated?.();
     },
     [
@@ -670,7 +660,9 @@ export function useChatThread({
         clientMessageId,
         conversationId: conversationId ?? "",
         senderId: viewerId,
-        body: draft.body ?? null,
+        body:
+          draft.body ??
+          (draft.location ? encodeLocationContent(draft.location) : null),
         listingId: draft.listingId ?? null,
         imageUrl: previewUrls[0] ?? null,
         imagePath: null,
@@ -698,8 +690,8 @@ export function useChatThread({
             : m,
         ),
       );
-      // Retry with existing imagePath (already uploaded) or no image (upload failed).
-      // Draft keys are lost after failure — user must re-attach if upload failed.
+      // Failed drafts lose their attachment draft keys — retry resends the
+      // body/listing only, so the user must re-attach if the upload failed.
       void dispatch(
         {
           body: message.body ?? undefined,

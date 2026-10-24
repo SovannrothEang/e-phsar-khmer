@@ -141,6 +141,9 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
             expectedVersion: transaction.version,
             status: toStatus,
             completedAt: toStatus === 'succeeded' ? now : undefined,
+            expiresAt: result.expiresAt
+              ? new Date(result.expiresAt)
+              : undefined,
           });
           yield* recordPaymentStatusHistory({
             paymentTransactionId: transaction.id,

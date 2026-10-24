@@ -11,7 +11,7 @@ write; a WebSocket gateway sits alongside it as an optional low-latency push
 Every message is written through `ChatService.sendMessage`, whether the
 request arrived over `POST /chats/messages` or the WS `send_message` event —
 the gateway calls the exact same service method, so validation (self-message,
-empty body, blocked pair, listing ownership, chat-image path ownership) only
+encrypted-only payload, required body, blocked pair, listing ownership) only
 exists once. The socket's only job on top of that write is: if the recipient
 happens to have an open connection _to this process_, push the already-
 persisted message to them immediately. If they don't — wrong node, offline,
@@ -24,7 +24,7 @@ is a latency optimization on a system that already works without it.
 | File                            | Purpose                                                                                                                                                                                                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `chat.controller.ts`            | REST surface: send, inbox, unread-count, resolve-with-user, message history/poll, mark-read.                                                                                                                                                                          |
-| `chat.service.ts`               | All persistence + business rules. The single write path for a message, REST or WS. Publishes realtime events after every send / mark-read.                                                                                                                            |
+| `chat.service.ts`               | All persistence + business rules. The single write path for a message, REST or WS; rejects any unencrypted write. Publishes realtime events after every send / mark-read.                                                                                             |
 | `chat.gateway.ts`               | WebSocket gateway (`/ws/chat`). Authenticates the socket (JWT + soft-delete check), rate-limits and validates `send_message`, relays it into `ChatService`, answers each send with one `ack` or `error` frame, and delivers push events to locally-connected sockets. |
 | `chat-pubsub.service.ts`        | Redis pub/sub wrapper (reuses the BullMQ Redis connection). Fans a `message` / `inbox_update` / `unread_count` / `read` event out to every backend instance so a recipient connected to a different process still gets realtime delivery.                             |
 | `connection-registry.ts`        | In-memory `userId -> sockets` map for this process. Answers "is this user online, and on which socket(s)." — always process-local; cross-instance reach comes from `chat-pubsub.service.ts`.                                                                          |
@@ -58,10 +58,11 @@ erDiagram
         uuid id PK
         uuid conversationId FK
         uuid senderId FK
-        text body "nullable — image-only messages allowed"
+        text body "nullable in schema; new sends are ciphertext"
         uuid listingId FK "nullable, SET NULL on delete"
-        text imageUrl
-        text imagePath
+        text imageUrl "legacy public image, history only"
+        text imagePath "legacy storage path, history only"
+        boolean isE2e "false on historical plaintext rows"
         timestamp readAt "null until read"
         timestamp createdAt "precision(3): cursors roundtrip through JS Date"
     }
@@ -70,6 +71,16 @@ erDiagram
 One `conversations` row per unordered pair, enforced by a CHECK
 (`user_a_id < user_b_id`) plus a unique index on the pair — there is no
 "start a new thread with the same person" possible, by construction.
+
+New messages are encrypted-only. `sendMessage` rejects a payload carrying
+neither an `e2eHeader` (v1) nor an `e2e` envelope (v2) — `Encrypted messages
+are required` — requires a `body` (ciphertext), and rejects the legacy
+public-bucket `imagePath` with `Unencrypted chat images are not accepted`.
+`imageUrl`/`imagePath` stay in the schema because historical rows still
+render, but nothing writes them any more. The web client seals a shared
+location, a listing-only marker and a voice note's `purpose`/`durationMs`
+inside the ciphertext (`khmer24-chat-content` v1 for the first two), so the
+server only ever stores and relays ciphertext.
 
 ### Where this differs from the payment module's approach
 
@@ -160,24 +171,28 @@ Key properties this gives us:
 
 ## Current state
 
-| Piece                                                             | Status                                                                                                                                                           |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| REST endpoints (send / inbox / unread / resolve / history / read) | Done.                                                                                                                                                            |
-| DB schema (`conversations`, `messages`)                           | Done, migrated.                                                                                                                                                  |
-| Blocking enforcement (403 either direction)                       | Done.                                                                                                                                                            |
-| Cursor pagination + `after` delta polling                         | Done — now the fallback path, not the default (see below).                                                                                                       |
-| WebSocket gateway (real-time push)                                | Done, multi-instance (Redis pub/sub fan-out via `chat-pubsub.service.ts`).                                                                                       |
-| Heartbeat / stale-connection sweep                                | Done.                                                                                                                                                            |
-| Multi-instance WS fan-out                                         | Done — `ChatPubSubService` publishes every push through Redis; `ConnectionRegistry` stays local, each instance's subscriber delivers to its own local sockets.   |
-| WS auth parity with REST                                          | Done — `handleConnection` now runs the same soft-delete DB check `JwtStrategy.validate` does.                                                                    |
-| WS-path rate limiting                                             | Done — in-memory 30/min per user in `chat.gateway.ts`, mirroring the REST route's `@Throttle`.                                                                   |
-| Realtime inbox / unread-badge push                                | Done — `inbox_update` / `unread_count` events replace the flat poll on the web client whenever the shared socket (`apps/web/hooks/use-chat-ws.ts`) is connected. |
-| WS `ack`/`error` frames + live `read` receipts                    | Done.                                                                                                                                                            |
-| E2E v1 + v2 multi-device                                          | Done (migrations `0017`–`0023`); Phase 3 cutover not started — see `tasks/plan-e2e-multi-device.md`.                                                             |
-| E2E history backup + device approval                              | Done (`0024`, `0025`), unit-tested, not yet browser-verified.                                                                                                    |
-| E2E attachments (images/files)                                    | Done (`0026`): backend, web send/receive, hourly cleanup. Not yet browser-verified end to end. Legacy public images not migrated.                                |
-| Push notifications (FCM/APNs)                                     | Not started.                                                                                                                                                     |
-| Message delete / private chat-image bucket                        | Not started, by design (see the repo's known-gaps notes).                                                                                                        |
+| Piece                                                             | Status                                                                                                                                                                                                                        |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST endpoints (send / inbox / unread / resolve / history / read) | Done.                                                                                                                                                                                                                         |
+| DB schema (`conversations`, `messages`)                           | Done, migrated.                                                                                                                                                                                                               |
+| Encrypted-only sending (REST + WS)                                | Done — `sendMessage` requires an `e2eHeader`/`e2e` envelope plus a body and rejects the legacy `imagePath`; historical plaintext rows still read.                                                                             |
+| Encrypted structured content (location / listing-only)            | Done, web-side — a `khmer24-chat-content` v1 marker inside the ciphertext; the thread renders a location card / listing card, never raw JSON.                                                                                 |
+| Encrypted voice notes                                             | Done, web-side — a `file` attachment with `purpose: "voice-note"` and `durationMs` inside the encrypted metadata; received as an inline player.                                                                               |
+| Last-seen presence (`lastSeenAt`)                                 | Done — participant-only coarse activity from `users.last_seen_at` feeds "Last active …" in the thread header; no online derivation.                                                                                           |
+| Blocking enforcement (403 either direction)                       | Done.                                                                                                                                                                                                                         |
+| Cursor pagination + `after` delta polling                         | Done — now the fallback path, not the default (see below).                                                                                                                                                                    |
+| WebSocket gateway (real-time push)                                | Done, multi-instance (Redis pub/sub fan-out via `chat-pubsub.service.ts`).                                                                                                                                                    |
+| Heartbeat / stale-connection sweep                                | Done.                                                                                                                                                                                                                         |
+| Multi-instance WS fan-out                                         | Done — `ChatPubSubService` publishes every push through Redis; `ConnectionRegistry` stays local, each instance's subscriber delivers to its own local sockets.                                                                |
+| WS auth parity with REST                                          | Done — `handleConnection` now runs the same soft-delete DB check `JwtStrategy.validate` does.                                                                                                                                 |
+| WS-path rate limiting                                             | Done — in-memory 30/min per user in `chat.gateway.ts`, mirroring the REST route's `@Throttle`.                                                                                                                                |
+| Realtime inbox / unread-badge push                                | Done — `inbox_update` / `unread_count` events replace the flat poll on the web client whenever the shared socket (`apps/web/hooks/use-chat-ws.ts`) is connected.                                                              |
+| WS `ack`/`error` frames + live `read` receipts                    | Done.                                                                                                                                                                                                                         |
+| E2E v1 + v2 multi-device                                          | Done (migrations `0021`, `0022`, `0027`); Phase 3 cutover not started — see `tasks/plan-e2e-multi-device.md`.                                                                                                                 |
+| E2E history backup + device approval                              | Done (`0028`, `0029`), unit-tested. The new-device banner appeared in the browser run, but approving a device from an existing one was not exercised.                                                                         |
+| E2E attachments (images/files/voice)                              | Done (`0030`): backend, web send/receive, hourly cleanup. Browser-verified end to end — v2 text, an image, a voice note and a shared location card. Legacy public images are read-only history; new sends are encrypted-only. |
+| Push notifications (FCM/APNs)                                     | Not started.                                                                                                                                                                                                                  |
+| Message delete / private chat-image bucket                        | Not started, by design (see the repo's known-gaps notes).                                                                                                                                                                     |
 
 ## Open items
 

@@ -11,6 +11,7 @@ import {
   eq,
   getTableColumns,
   gte,
+  isNotNull,
   isNull,
   lte,
   or,
@@ -21,7 +22,8 @@ import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
 import { ReactionsService } from '../reactions/reactions.service';
-import type { DbClient } from '../db/drizzle.provider';
+import { EntitlementsService } from '../subscriptions/entitlements.service';
+import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import type {
   ListingPhotoRow,
@@ -96,12 +98,19 @@ export class ListingsService {
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly filesService: FilesService,
     private readonly reactionsService: ReactionsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
     userId: string,
     dto: CreateListingDto,
   ): Promise<ListingWithPhotos> {
+    await this.entitlements.assertPhotos(
+      userId,
+      { categoryId: dto.categoryId, subcategoryId: dto.subcategoryId },
+      dto.photos?.length ?? 0,
+    );
+
     const [cat] = await this.db
       .select({ id: categories.id })
       .from(categories)
@@ -148,25 +157,58 @@ export class ListingsService {
       status: 'draft',
     };
 
-    const [listing] = await this.db.insert(listings).values(values).returning();
+    this.assertPhotosOwned(userId, dto.photos ?? []);
 
-    const photos: ListingPhotoRow[] = [];
-    if (dto.photos && dto.photos.length > 0) {
-      const rows = await this.db
-        .insert(listingPhotos)
-        .values(
-          dto.photos.map((p) => ({
-            listingId: listing.id,
-            url: p.url,
-            path: p.path,
-            sort: p.sort,
-          })),
-        )
-        .returning();
-      photos.push(...rows);
+    return this.db.transaction(async (tx) => {
+      const [listing] = await tx.insert(listings).values(values).returning();
+
+      const photos: ListingPhotoRow[] = [];
+      if (dto.photos && dto.photos.length > 0) {
+        const rows = await tx
+          .insert(listingPhotos)
+          .values(
+            dto.photos.map((p) => ({
+              listingId: listing.id,
+              url: p.url,
+              path: p.path,
+              sort: p.sort,
+            })),
+          )
+          .returning();
+        photos.push(...rows);
+      }
+
+      return { ...listing, photos };
+    });
+  }
+
+  /**
+   * Every photo must be an object this user uploaded (`listing/{userId}/…`,
+   * the folder `/files/sign` hands them) whose URL is that object's own public
+   * URL. Photos already on the listing are exempt, so ads created before the
+   * per-user folders existed can still be edited.
+   *
+   * Without this a payload could reference anyone's object — and since a photo
+   * dropped on a later edit is deleted from storage, that would let a user
+   * delete other users' images.
+   */
+  private assertPhotosOwned(
+    userId: string,
+    photos: ReadonlyArray<{ url: string; path: string }>,
+    alreadyOnListing: ReadonlyArray<{ url: string; path: string }> = [],
+  ): void {
+    const key = (p: { url: string; path: string }) => `${p.path}\n${p.url}`;
+    const kept = new Set(alreadyOnListing.map(key));
+    for (const p of photos) {
+      if (kept.has(key(p))) continue;
+      if (
+        !this.filesService.isOwnedPath(p.path, userId) ||
+        !p.path.startsWith(`listing/${userId}/`) ||
+        p.url !== this.filesService.publicUrlFor(p.path)
+      ) {
+        throw new BadRequestException('INVALID_PHOTO');
+      }
     }
-
-    return { ...listing, photos };
   }
 
   async update(
@@ -177,6 +219,22 @@ export class ListingsService {
     const existing = await this.findById(id);
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
+    if (existing.moderatedAt) {
+      throw new ForbiddenException({
+        code: 'LISTING_REMOVED_BY_ADMIN',
+        message: 'This ad was removed by an administrator.',
+      });
+    }
+
+    if (dto.photos !== undefined) {
+      await this.entitlements.assertPhotos(
+        userId,
+        existing,
+        dto.photos.length,
+        existing.photos.length,
+      );
+      this.assertPhotosOwned(userId, dto.photos, existing.photos);
+    }
 
     const updates: Partial<ListingRow> = { updatedAt: new Date() };
     if (dto.title !== undefined) updates.title = dto.title;
@@ -205,54 +263,60 @@ export class ListingsService {
       updates.contactPhones = dto.contactPhones;
     if (dto.contactEmail !== undefined) updates.contactEmail = dto.contactEmail;
 
-    const [updated] = await this.db
-      .update(listings)
-      .set(updates)
-      .where(eq(listings.id, id))
-      .returning();
-
-    let photos: ListingPhotoRow[];
-    if (dto.photos !== undefined) {
-      // Capture existing photo URLs so removed objects can be cleaned up
-      // after the row swap (removeByPublicUrl warns on error, never throws).
-      const existingPhotos = await this.db
-        .select({ url: listingPhotos.url })
-        .from(listingPhotos)
-        .where(eq(listingPhotos.listingId, id));
-
-      await this.db
-        .delete(listingPhotos)
-        .where(eq(listingPhotos.listingId, id));
-      if (dto.photos.length > 0) {
-        photos = await this.db
-          .insert(listingPhotos)
-          .values(
-            dto.photos.map((p) => ({
-              listingId: id,
-              url: p.url,
-              path: p.path,
-              sort: p.sort,
-            })),
-          )
+    // One transaction: the row update and the photo swap land together, so a
+    // failure between the delete and the insert can't leave the ad photoless.
+    const { updated, photos, dropped } = await this.db.transaction(
+      async (tx) => {
+        const [updated] = await tx
+          .update(listings)
+          .set(updates)
+          .where(eq(listings.id, id))
           .returning();
-      } else {
-        photos = [];
-      }
 
-      // Best-effort cleanup of photos dropped from the payload.
-      const keptUrls = new Set(dto.photos.map((p) => p.url));
-      await Promise.all(
-        existingPhotos
-          .filter((p) => !keptUrls.has(p.url))
-          .map((p) => this.filesService.removeByPublicUrl(p.url)),
-      );
-    } else {
-      photos = await this.db
-        .select()
-        .from(listingPhotos)
-        .where(eq(listingPhotos.listingId, id))
-        .orderBy(listingPhotos.sort);
-    }
+        if (dto.photos === undefined) {
+          const photos = await tx
+            .select()
+            .from(listingPhotos)
+            .where(eq(listingPhotos.listingId, id))
+            .orderBy(listingPhotos.sort);
+          return { updated, photos, dropped: [] as string[] };
+        }
+
+        const before = await tx
+          .select({ url: listingPhotos.url })
+          .from(listingPhotos)
+          .where(eq(listingPhotos.listingId, id));
+        await tx.delete(listingPhotos).where(eq(listingPhotos.listingId, id));
+        const photos =
+          dto.photos.length > 0
+            ? await tx
+                .insert(listingPhotos)
+                .values(
+                  dto.photos.map((p) => ({
+                    listingId: id,
+                    url: p.url,
+                    path: p.path,
+                    sort: p.sort,
+                  })),
+                )
+                .returning()
+            : [];
+        const keptUrls = new Set(dto.photos.map((p) => p.url));
+        const dropped = before
+          .map((p) => p.url)
+          .filter((url) => !keptUrls.has(url));
+        return { updated, photos, dropped };
+      },
+    );
+
+    // Best-effort cleanup after commit, and only of this owner's own objects —
+    // a URL that made it into the row from a pre-validation payload is never
+    // trusted as a delete target.
+    await Promise.all(
+      dropped.map((url) =>
+        this.filesService.removeOwnedByPublicUrl(url, userId),
+      ),
+    );
 
     return { ...updated, photos };
   }
@@ -485,24 +549,68 @@ export class ListingsService {
     if (existing.userId !== userId)
       throw new ForbiddenException('Not the listing owner');
 
-    const publishedAt = new Date();
-    const expiresAt = new Date(
-      publishedAt.getTime() + 30 * 24 * 60 * 60 * 1000,
-    );
+    if (existing.moderatedAt) {
+      throw new ForbiddenException({
+        code: 'LISTING_REMOVED_BY_ADMIN',
+        message: 'This ad was removed by an administrator.',
+      });
+    }
+
+    if (existing.status === 'restricted') {
+      throw new ForbiddenException({
+        code: 'PLAN_RESTRICTED',
+        message:
+          'This ad is hidden because it is over your plan’s limit. Renew or upgrade your subscription to show it again.',
+      });
+    }
+
+    const now = new Date();
+    if (existing.publishedAt === null) {
+      // A brand-new ad: needs a free slot, and its photos must fit the plan.
+      await this.entitlements.assertPhotos(
+        userId,
+        existing,
+        existing.photos.length,
+      );
+      await this.entitlements.assertCanHoldAnotherAd(userId, existing);
+    } else {
+      // Re-publishing an ad that already went live is a renewal. An ad that
+      // lapsed (or was deleted) is no longer counted, so it also needs a slot.
+      await this.entitlements.assertCanRenew(
+        userId,
+        existing,
+        existing.renewCount,
+      );
+      const stillLive =
+        existing.status === 'active' &&
+        (existing.expiresAt === null || existing.expiresAt > now);
+      if (!stillLive) {
+        await this.entitlements.assertCanHoldAnotherAd(userId, existing);
+      }
+    }
+
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     const [updated] = await this.db
       .update(listings)
-      .set({ status: 'active', publishedAt, expiresAt, updatedAt: new Date() })
+      .set({
+        status: 'active',
+        publishedAt: existing.publishedAt ?? now,
+        expiresAt,
+        renewCount:
+          existing.publishedAt === null
+            ? existing.renewCount
+            : existing.renewCount + 1,
+        updatedAt: now,
+      })
       .where(eq(listings.id, id))
       .returning();
 
-    const photos = await this.db
-      .select()
-      .from(listingPhotos)
-      .where(eq(listingPhotos.listingId, id))
-      .orderBy(listingPhotos.sort);
+    // The count check above is not atomic with the write; settling here keeps
+    // two parallel publishes from leaving the user over their allowance.
+    await this.entitlements.reconcileListingsSafely(userId);
 
-    return { ...updated, photos };
+    return { ...updated, photos: existing.photos };
   }
 
   /**
@@ -749,5 +857,83 @@ export class ListingsService {
       .orderBy(listingPhotos.sort);
 
     return { ...updated, photos };
+  }
+
+  /**
+   * The public detail read. A moderated ad is gone for everyone but its owner
+   * (who sees it in `/me/all`) and staff (the admin listings page) — serving
+   * it here would keep a removed scam reachable by its link.
+   */
+  async findPublicById(id: string): Promise<ListingWithPhotos> {
+    const listing = await this.findById(id);
+    if (listing.moderatedAt) throw new NotFoundException('Listing not found');
+    return listing;
+  }
+
+  /**
+   * Staff take-down. Accepts the caller's transaction so approving a report
+   * and removing its listing commit together.
+   */
+  async moderate(
+    id: string,
+    moderatorId: string,
+    reason: string | null,
+    executor: DbExecutor = this.db,
+  ): Promise<ListingRow> {
+    const [row] = await executor
+      .update(listings)
+      .set({
+        status: 'deleted',
+        moderatedAt: new Date(),
+        moderatedById: moderatorId,
+        moderationReason: reason?.slice(0, 500) ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(listings.id, id))
+      .returning();
+    if (!row) throw new NotFoundException('Listing not found');
+    return row;
+  }
+
+  /**
+   * Undoes a take-down. The ad comes back live if its 30-day window is still
+   * open, otherwise as expired (a never-published draft stays a draft) — then
+   * plan reconciliation runs, since a restored live ad takes one of the
+   * owner's slots and may push another (or itself) into 'restricted'.
+   */
+  async restoreModerated(id: string): Promise<ListingRow> {
+    const [existing] = await this.db
+      .select()
+      .from(listings)
+      .where(eq(listings.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Listing not found');
+    if (!existing.moderatedAt) {
+      throw new BadRequestException('LISTING_NOT_MODERATED');
+    }
+
+    const now = new Date();
+    const status =
+      existing.publishedAt === null
+        ? 'draft'
+        : existing.expiresAt !== null && existing.expiresAt > now
+          ? 'active'
+          : 'expired';
+
+    const [row] = await this.db
+      .update(listings)
+      .set({
+        status,
+        moderatedAt: null,
+        moderatedById: null,
+        moderationReason: null,
+        updatedAt: now,
+      })
+      .where(and(eq(listings.id, id), isNotNull(listings.moderatedAt)))
+      .returning();
+    if (!row) throw new BadRequestException('LISTING_NOT_MODERATED');
+
+    await this.entitlements.reconcileListingsSafely(existing.userId);
+    return row;
   }
 }

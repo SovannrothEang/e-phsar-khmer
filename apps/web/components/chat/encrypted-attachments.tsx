@@ -8,6 +8,7 @@ import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
 import { loadAttachment } from "@/lib/e2e/attachments/download";
 import { mediaFileName, saveBlob } from "@/lib/chat/save-file";
 import { toast } from "@/components/ui/sonner";
+import { VoicePlayer } from "@/components/chat/voice-player";
 
 /** Save decrypted bytes (cache first, else download → verify → decrypt). */
 async function downloadAttachment(
@@ -136,6 +137,26 @@ function EncryptedImage({
   );
 }
 
+/**
+ * A voice note is an encrypted audio file: the sender's duration rides in the
+ * encrypted metadata, while the bytes only exist as a blob URL decrypted
+ * locally (revoked on unmount by `useAttachmentUrl`).
+ */
+function EncryptedVoiceNote({ meta }: { meta: AttachmentMeta }) {
+  const t = useTranslations("Chat");
+  const state = useAttachmentUrl(meta);
+  return (
+    <VoicePlayer
+      src={state.status === "ready" ? state.url : null}
+      status={state.status}
+      durationMs={meta.durationMs ?? 0}
+      onDownload={() =>
+        void downloadAttachment(meta, t("message.downloadFailed"))
+      }
+    />
+  );
+}
+
 function EncryptedFile({ meta }: { meta: AttachmentMeta }) {
   const t = useTranslations("Chat");
   const [busy, setBusy] = useState(false);
@@ -190,7 +211,12 @@ export function EncryptedAttachments({
   onOpenImage?: (url: string) => void;
 }) {
   const images = files.filter((f) => f.kind === "image");
-  const others = files.filter((f) => f.kind === "file");
+  // The purpose is stored only inside the encrypted body, so it is the only
+  // thing that separates a voice note from a generic file chip.
+  const voices = files.filter((f) => f.purpose === "voice-note");
+  const others = files.filter(
+    (f) => f.kind === "file" && f.purpose !== "voice-note",
+  );
   return (
     <div className="flex flex-col gap-1">
       {images.length > 0 && (
@@ -209,6 +235,9 @@ export function EncryptedAttachments({
           ))}
         </div>
       )}
+      {voices.map((m) => (
+        <EncryptedVoiceNote key={m.id} meta={m} />
+      ))}
       {others.map((m) => (
         <EncryptedFile key={m.id} meta={m} />
       ))}

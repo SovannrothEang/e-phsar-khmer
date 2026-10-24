@@ -59,7 +59,8 @@ export default function ReportUsersPage() {
             ReportUserID: r.id,
             TargetUserID: r.targetUserId,
             ReportedByUserID: r.reporterId,
-            ReportImage: r.imagePaths ?? [],
+            // Storage paths are not URLs — render the backend's public URLs.
+            ReportImage: r.imageUrls ?? [],
             ReportReasonID: r.reasonText ?? "",
             ReportUserDescription: r.description ?? "",
             Status: (r.status.charAt(0).toUpperCase() +
@@ -83,6 +84,11 @@ export default function ReportUsersPage() {
   const locale = useLocale();
 
   const updateStatus = async (id: string, status: ReportUser["Status"]) => {
+    if (
+      status === "Approved" &&
+      !window.confirm("Approving suspends this account. Continue?")
+    )
+      return;
     const s = status.toLowerCase() as "pending" | "approved" | "rejected";
     const res = await updateUserReportStatus(id, s);
     if (res.success) {

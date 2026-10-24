@@ -14,11 +14,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MoreVertical, Search, Trash2, Plus, Pencil } from "lucide-react";
+import {
+  Filter,
+  MoreVertical,
+  Search,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -28,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -123,7 +131,7 @@ export default function SubscriptionPlanPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState("all");
+  const [planNameFilter, setPlanNameFilter] = useState("__all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -140,6 +148,10 @@ export default function SubscriptionPlanPage() {
     return rawPlans.map((p) => toPlanRow(p, nameById.get(p.categoryId) ?? "—"));
   }, [rawPlans, subscriptionCategories]);
 
+  const planNames = Array.from(
+    new Set(allPlans.map((plan) => plan.subscriptionplanname)),
+  ).sort((a, b) => a.localeCompare(b));
+
   const filteredPlans = allPlans.filter((plan) => {
     const q = searchQuery.toLowerCase();
 
@@ -153,18 +165,11 @@ export default function SubscriptionPlanPage() {
       formatDate(plan.createdAt).toLowerCase().includes(q) ||
       formatDate(plan.updatedAt).toLowerCase().includes(q);
 
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "bronze"
-          ? plan.subscriptionplanname === "Bronze"
-          : tab === "siliver"
-            ? plan.subscriptionplanname === "Siliver"
-            : tab === "gold"
-              ? plan.subscriptionplanname === "Gold"
-              : true;
+    const matchesFilter =
+      planNameFilter === "__all" ||
+      plan.subscriptionplanname === planNameFilter;
 
-    return matchesSearch && matchesTab;
+    return matchesSearch && matchesFilter;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredPlans.length / rowsPerPage));
@@ -275,7 +280,7 @@ export default function SubscriptionPlanPage() {
         <Label htmlFor={`${idPrefix}-name`}>Plan name</Label>
         <Input
           id={`${idPrefix}-name`}
-          placeholder="e.g. Bronze"
+          placeholder="Enter a plan name"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
         />
@@ -301,18 +306,9 @@ export default function SubscriptionPlanPage() {
       </div>
     </div>
   );
-  const getPlanBadge = (type: PlanRow["subscriptionplanname"]) => {
-    const colors: Record<PlanRow["subscriptionplanname"], string> = {
-      Bronze: "text-foreground border-amber-950/30 bg-amber-950/10",
-      Siliver: "text-slate-500 border-slate-500/30 bg-slate-500/10",
-      Gold: "text-amber-500 border-amber-500/30 bg-amber-500/10",
-    };
-    return (
-      <Badge variant="outline" className={colors[type]}>
-        {type}
-      </Badge>
-    );
-  };
+  const getPlanBadge = (name: string) => (
+    <Badge variant="outline">{name}</Badge>
+  );
 
   const isFormValid =
     formData.name.trim().length > 0 && formData.categoryId.length > 0;
@@ -368,62 +364,50 @@ export default function SubscriptionPlanPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <div className="relative w-95">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search plans..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="pl-9"
-        />
-      </div>
-      <div className="mt-6">
-        <Tabs
-          value={tab}
-          onValueChange={(value) => {
-            setTab(value);
-            setCurrentPage(1);
-          }}
-        >
-          <TabsList className="gap-1">
-            <TabsTrigger value="all" className="cursor-pointer">
-              All Subscription
-            </TabsTrigger>
-            <TabsTrigger value="bronze" className="cursor-pointer">
-              Bronze
-              <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-amber-950/30 bg-amber-950/10">
-                {
-                  allPlans.filter(
-                    (plan) => plan.subscriptionplanname === "Bronze",
-                  ).length
-                }
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="siliver" className="cursor-pointer">
-              Siliver
-              <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-slate-500/30 bg-slate-500/10">
-                {
-                  allPlans.filter(
-                    (plan) => plan.subscriptionplanname === "Siliver",
-                  ).length
-                }
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="gold" className="cursor-pointer">
-              Gold
-              <Badge className="ml-1.5 px-1.5 py-0.5 text-xs text-foreground border-amber-500/30 bg-amber-500/10">
-                {
-                  allPlans.filter(
-                    (plan) => plan.subscriptionplanname === "Gold",
-                  ).length
-                }
-              </Badge>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-95">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search plans..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="size-4" />
+              Filter
+              {planNameFilter !== "__all" && (
+                <span className="max-w-40 truncate text-muted-foreground">
+                  {planNameFilter}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={planNameFilter}
+              onValueChange={(value) => {
+                setPlanNameFilter(value);
+                setCurrentPage(1);
+              }}
+            >
+              <DropdownMenuRadioItem value="__all">
+                All plans ({allPlans.length})
+              </DropdownMenuRadioItem>
+              {planNames.map((name) => (
+                <DropdownMenuRadioItem key={name} value={name}>
+                  {`${name} (${allPlans.filter((plan) => plan.subscriptionplanname === name).length})`}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="border rounded-lg">
         <Table>

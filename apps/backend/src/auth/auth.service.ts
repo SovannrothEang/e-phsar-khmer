@@ -27,6 +27,7 @@ import type { SocialLoginDto } from './dto/social-login.dto';
 import {
   buildUsernameBase,
   generateUniqueUsername,
+  normalizeUsername,
 } from '../users/username.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 
@@ -70,6 +71,10 @@ export class AuthService {
         and(
           or(
             eq(users.username, dto.identifier),
+            // Generated and self-chosen handles are stored lowercased, so
+            // "SokDara" must find "sokdara". The exact match above still
+            // serves admin-created mixed-case usernames.
+            eq(users.username, normalizeUsername(dto.identifier)),
             eq(users.primaryPhone, dto.identifier),
           ),
           isNull(users.deletedAt),
@@ -282,6 +287,16 @@ export class AuthService {
     if (!botToken)
       throw new UnauthorizedException('Telegram login not configured');
 
+    // The payload is an interface, so the ValidationPipe never checks it — a
+    // missing or non-hex hash would otherwise throw inside Buffer.from (500).
+    if (
+      typeof payload?.hash !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(payload.hash) ||
+      typeof payload.auth_date !== 'number'
+    ) {
+      throw new UnauthorizedException('Invalid Telegram auth data');
+    }
+
     const secretKey = createHash('sha256').update(botToken).digest();
     const checkString = Object.entries(payload)
       .filter(([k]) => k !== 'hash')
@@ -393,6 +408,7 @@ export class AuthService {
         and(
           or(
             eq(users.username, identifier),
+            eq(users.username, normalizeUsername(identifier)),
             eq(users.primaryPhone, identifier),
           ),
           isNotNull(users.deletedAt),

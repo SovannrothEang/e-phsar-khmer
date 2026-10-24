@@ -24,6 +24,7 @@ import {
   type ListingFormConfig,
 } from "@/actions/listings";
 import type { BackendModel } from "@/lib/api/categories";
+import { describeBucket } from "@/lib/subscription-pricing";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -50,7 +51,7 @@ const TRANSMISSIONS = ["Auto", "Manual"] as const;
  *
  * The design puts Condition in a different place on almost every form and the
  * `field_schema` cannot arbitrate: Cars For Sale's own schema lists Condition
- * before Body Type while its approved layout puts it after (tasks/redesign.md
+ * before Body Type while its approved layout puts it after (docs/post-form-layout.md
  * rows 11/15). So the slot is declared here, per subcategory:
  *
  *  - `lead` — directly under the identity pickers and above the spec cluster
@@ -619,8 +620,8 @@ export default function ListingPostForm({
       toast.error(result.error);
       return;
     }
-    toast.success("Your ad was published");
     if (result.warning) toast.warning(result.warning);
+    else toast.success("Your ad was published");
     router.push({
       pathname: "/post/[slug]",
       params: { slug: result.listingId },
@@ -674,6 +675,7 @@ export default function ListingPostForm({
       onChange={setCondition}
     />
   ) : null;
+  const bucketCopy = describeBucket(config.plan?.bucket ?? null);
 
   return (
     <div className="space-y-8">
@@ -686,6 +688,34 @@ export default function ListingPostForm({
           Reset
         </button>
       </div>
+
+      {config.plan && (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm ring-1 ${
+            config.plan.usage.ads >= config.plan.limits.ads
+              ? "bg-amber-500/10 text-amber-800 ring-amber-500/30 dark:text-amber-300"
+              : "bg-muted text-muted-foreground ring-border"
+          }`}
+        >
+          <span>
+            {/* Limits are per bucket: the group subscription covering this
+                subcategory, else the free cap for where it is posted. */}
+            <strong className="font-semibold text-foreground">
+              {bucketCopy.planLabel}
+            </strong>{" "}
+            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used ·{" "}
+            {bucketCopy.scopeLabel} · up to {config.plan.limits.photos} photos
+            per ad
+          </span>
+          <Link
+            href="/premium-account"
+            className="font-semibold text-[#0089c8] hover:underline"
+          >
+            {bucketCopy.ctaLabel}
+          </Link>
+        </div>
+      )}
 
       {/* ── Photos ─────────────────────────────────────────────────────────── */}
       <ImageUpload
@@ -732,7 +762,7 @@ export default function ListingPostForm({
             because the captain's mock reads Bedroom → Bathroom → Facing → Size
             → Type, and `type` renders in the identity cluster below. No other
             family declares these keys, so the position is inert elsewhere.
-            Every one is an ordinary `SearchPicker`/input: redesign.md's rule is
+            Every one is an ordinary `SearchPicker`/input: post-form-layout.md's rule is
             that no native `<select>` remains, not that the mock's chevron
             renders as one. All four are unstarred in that mock. */}
         {has("bedroom") && (

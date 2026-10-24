@@ -5,15 +5,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
 import {
+  freePlanAdLimits,
+  freePlanSettings,
   subscriptionCategories,
+  subscriptionCategorySubcategories,
   subscriptionPlans,
   subscriptionPackages,
   subscriptionTerms,
 } from '../../db/schema/subscriptions.schema';
+import { EntitlementsScheduler } from '../../subscriptions/entitlements.scheduler';
+import { toFreePlanSettings } from '../../subscriptions/entitlements.constants';
 import type {
   SubscriptionCategoryRow,
   SubscriptionPlanRow,
@@ -29,18 +34,118 @@ import type {
   UpdateSubPackageDto,
   CreateSubTermDto,
   UpdateSubTermDto,
+  UpdateFreePlanDto,
+  UpdateSubCategoryScopeDto,
 } from './dto/subscription-config.dto';
 
 @Injectable()
 export class SubscriptionConfigService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly entitlementsScheduler: EntitlementsScheduler,
+  ) {}
 
   // ── Categories ──────────────────────────────────────────
-  listCategories() {
-    return this.db
-      .select()
-      .from(subscriptionCategories)
-      .orderBy(asc(subscriptionCategories.sortOrder));
+  /** Each group with the listing subcategories it covers. */
+  async listCategories() {
+    const [rows, scopes] = await Promise.all([
+      this.db
+        .select()
+        .from(subscriptionCategories)
+        .orderBy(asc(subscriptionCategories.sortOrder)),
+      this.db.select().from(subscriptionCategorySubcategories),
+    ]);
+    const byGroup = new Map<string, string[]>();
+    for (const scope of scopes) {
+      const ids = byGroup.get(scope.subscriptionCategoryId) ?? [];
+      ids.push(scope.subcategoryId);
+      byGroup.set(scope.subscriptionCategoryId, ids);
+    }
+    return rows.map((row) => ({
+      ...row,
+      subcategoryIds: byGroup.get(row.id) ?? [],
+    }));
+  }
+
+  /**
+   * Replaces the subcategories a group covers. A subcategory already in
+   * another group is refused (409) rather than moved, so one edit can never
+   * silently shift another group's subscribers. Affected users' ads are
+   * reconciled in the background; the 10-minute sweep is the backstop.
+   */
+  async updateCategoryScope(id: string, dto: UpdateSubCategoryScopeDto) {
+    const subcategoryIds = [...new Set(dto.subcategoryIds)];
+    await this.db
+      .transaction(async (tx) => {
+        const [group] = await tx
+          .select({ id: subscriptionCategories.id })
+          .from(subscriptionCategories)
+          .where(eq(subscriptionCategories.id, id))
+          .for('update')
+          .limit(1);
+        if (!group) throw new NotFoundException('Category not found');
+
+        if (subcategoryIds.length > 0) {
+          const taken = await tx
+            .select({
+              subcategoryId: subscriptionCategorySubcategories.subcategoryId,
+              groupName: subscriptionCategories.name,
+            })
+            .from(subscriptionCategorySubcategories)
+            .innerJoin(
+              subscriptionCategories,
+              eq(
+                subscriptionCategories.id,
+                subscriptionCategorySubcategories.subscriptionCategoryId,
+              ),
+            )
+            .where(
+              and(
+                inArray(
+                  subscriptionCategorySubcategories.subcategoryId,
+                  subcategoryIds,
+                ),
+                ne(
+                  subscriptionCategorySubcategories.subscriptionCategoryId,
+                  id,
+                ),
+              ),
+            );
+          if (taken.length > 0) {
+            throw new ConflictException({
+              code: 'SUBCATEGORY_IN_ANOTHER_GROUP',
+              message: `${taken.length === 1 ? '1 subcategory is' : `${taken.length} subcategories are`} already covered by ${[...new Set(taken.map((t) => t.groupName))].join(', ')}. Remove ${taken.length === 1 ? 'it' : 'them'} there first.`,
+              details: taken,
+            });
+          }
+        }
+
+        await tx
+          .delete(subscriptionCategorySubcategories)
+          .where(
+            eq(subscriptionCategorySubcategories.subscriptionCategoryId, id),
+          );
+        if (subcategoryIds.length > 0) {
+          await tx.insert(subscriptionCategorySubcategories).values(
+            subcategoryIds.map((subcategoryId) => ({
+              subscriptionCategoryId: id,
+              subcategoryId,
+            })),
+          );
+        }
+      })
+      .catch((err: unknown) => {
+        // A concurrent edit of another group claimed one first.
+        if ((err as { code?: string } | null)?.code === '23505') {
+          throw new ConflictException(
+            'A subcategory was just added to another group. Reload and try again.',
+          );
+        }
+        this.rethrow(err);
+      });
+
+    await this.entitlementsScheduler.enqueueConfigReconcile();
+    return { id, subcategoryIds };
   }
 
   async createCategory(dto: CreateSubCategoryDto) {
@@ -309,6 +414,77 @@ export class SubscriptionConfigService {
     if (!row) throw new NotFoundException('Term not found');
     await this.db.delete(subscriptionTerms).where(eq(subscriptionTerms.id, id));
     return { id };
+  }
+
+  // ── Free plan ───────────────────────────────────────────
+  async getFreePlan() {
+    const [[settings], adLimits] = await Promise.all([
+      this.db.select().from(freePlanSettings).limit(1),
+      this.db
+        .select({
+          id: freePlanAdLimits.id,
+          categoryId: freePlanAdLimits.categoryId,
+          subcategoryId: freePlanAdLimits.subcategoryId,
+          ads: freePlanAdLimits.ads,
+        })
+        .from(freePlanAdLimits),
+    ]);
+    return { ...toFreePlanSettings(settings), adLimits };
+  }
+
+  /** Replaces the whole free plan in one transaction, then reconciles ads. */
+  async updateFreePlan(dto: UpdateFreePlanDto) {
+    const seen = new Set<string>();
+    for (const limit of dto.adLimits) {
+      const scope = limit.subcategoryId
+        ? `sub:${limit.subcategoryId}`
+        : `cat:${limit.categoryId}`;
+      if (!limit.categoryId === !limit.subcategoryId) {
+        throw new BadRequestException(
+          'Each ad limit needs exactly one of categoryId or subcategoryId',
+        );
+      }
+      if (seen.has(scope)) {
+        throw new BadRequestException('An ad limit is listed twice');
+      }
+      seen.add(scope);
+    }
+
+    const settings = {
+      photos: dto.photos,
+      renews: dto.renews,
+      autoRenews: dto.autoRenews,
+      videos: dto.videos,
+      otherAds: dto.otherAds,
+    };
+    await this.db
+      .transaction(async (tx) => {
+        await tx
+          .insert(freePlanSettings)
+          .values({ id: 1, ...settings })
+          .onConflictDoUpdate({ target: freePlanSettings.id, set: settings });
+        await tx.delete(freePlanAdLimits);
+        if (dto.adLimits.length > 0) {
+          await tx.insert(freePlanAdLimits).values(
+            dto.adLimits.map((limit) => ({
+              categoryId: limit.subcategoryId ? null : limit.categoryId,
+              subcategoryId: limit.subcategoryId ?? null,
+              ads: limit.ads,
+            })),
+          );
+        }
+      })
+      .catch((err: unknown) => {
+        if ((err as { code?: string } | null)?.code === '23505') {
+          throw new ConflictException(
+            'The free plan was just changed by someone else. Reload and try again.',
+          );
+        }
+        this.rethrow(err);
+      });
+
+    await this.entitlementsScheduler.enqueueConfigReconcile();
+    return this.getFreePlan();
   }
 
   private rethrow(err: unknown): never {

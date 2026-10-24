@@ -172,10 +172,10 @@ export default function Settings({ me }: { me?: SettingsUser | null }) {
             </Link>
             <Separator />
             <Link
-              href={{ pathname: "/me/membership" }}
+              href={{ pathname: "/me/subscriptions" }}
               className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-none border border-transparent hover:border-border"
             >
-              <p className="px-1">Membership Information</p>
+              <p className="px-1">Subscription &amp; Plan</p>
               <p className="flex items-center opacity-50 gap-1">
                 <ChevronRight size={24} className="text-gray-300" />
               </p>

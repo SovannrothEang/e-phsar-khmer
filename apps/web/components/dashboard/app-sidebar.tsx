@@ -17,6 +17,7 @@ import {
   IconCategory2,
   IconPackages,
   IconClockHour4,
+  IconGift,
   IconAccessPoint,
   IconCalendarStats,
   IconBriefcase,
@@ -29,6 +30,7 @@ import {
   IconCameraExclamation,
   IconUserCog,
   IconUserDollar,
+  IconListDetails,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import {
@@ -84,6 +86,11 @@ export const menuItems: MenuItem[] = [
     title: "Categories",
     icon: Folder,
     href: "/wanderer/dashboard/categories",
+  },
+  {
+    title: "Listings",
+    icon: IconListDetails,
+    href: "/wanderer/dashboard/listings",
   },
   {
     title: "Subcategories",
@@ -182,6 +189,11 @@ const subscriptionSubItems = [
     title: "Terms",
     icon: IconClockHour4,
     href: "/wanderer/dashboard/subscription/terms",
+  },
+  {
+    title: "Free Plan",
+    icon: IconGift,
+    href: "/wanderer/dashboard/subscription/free-plan",
   },
 ] as const;
 

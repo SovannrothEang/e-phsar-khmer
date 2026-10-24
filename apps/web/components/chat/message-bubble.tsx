@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { isReadByPeer } from "@/lib/chat/format";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
+import { LocationCard } from "@/components/chat/location-card";
 import { EncryptedAttachments } from "@/components/chat/encrypted-attachments";
 import type { ThreadMessage } from "@/types/chat";
 
@@ -65,9 +66,15 @@ export function MessageBubble({
         )}
       >
         {/* Listing context card. `listing` is undefined on inbox previews and
-            null when the ad was deleted — only the latter renders a tombstone. */}
-        {message.listingId !== null && message.listing !== undefined && (
-          <ListingContextCard listing={message.listing} />
+            null when the ad was deleted — only the latter renders a tombstone.
+            A listing-only body renders this card instead of any text. */}
+        {message.listing !== undefined &&
+          (message.listingOnly === true || message.listingId !== null) && (
+            <ListingContextCard listing={message.listing} />
+          )}
+
+        {message.sharedLocation && (
+          <LocationCard location={message.sharedLocation} />
         )}
 
         {message.imageUrl && (

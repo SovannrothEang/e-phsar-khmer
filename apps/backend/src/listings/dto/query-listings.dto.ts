@@ -81,7 +81,7 @@ export class QueryListingsDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({ description: 'Only honoured on /listings/me/all' })
   @IsOptional()
-  @IsIn(['draft', 'active', 'expired', 'deleted'])
+  @IsIn(['draft', 'active', 'expired', 'deleted', 'restricted'])
   status?: string;
 
   /**

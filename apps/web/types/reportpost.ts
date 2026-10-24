@@ -1,6 +1,6 @@
 export type ReportPost = {
   ReportPostID: string;
-  postId: number;
+  postId: number | string;
   userId: string;
   ReportReasonID: string;
   ReportPostDescription: string;

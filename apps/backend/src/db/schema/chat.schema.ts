@@ -444,7 +444,7 @@ export type E2eHistoryRequestRow = typeof e2eHistoryRequests.$inferSelect;
  * Lifecycle: pending (upload URL issued) → uploaded (object exists, size
  * checked) → attached (referenced by a message, in the send transaction).
  * Rows never attached within 24 h are removed with their objects by cleanup.
- * See tasks/plan-e2e-attachments.md.
+ * See docs/e2e-attachments.md.
  */
 export const chatAttachments = chatSchema.table(
   'attachments',

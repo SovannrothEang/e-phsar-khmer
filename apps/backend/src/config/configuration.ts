@@ -71,12 +71,20 @@ export default () => {
       jobAttempts: env.PAYMENT_JOB_ATTEMPTS,
       jobBackoffMs: env.PAYMENT_JOB_BACKOFF_MS,
       workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
+      reconcilerEnabled: env.PAYMENT_RECONCILER_ENABLED,
+      reconcileIntervalMs: env.PAYMENT_RECONCILE_INTERVAL_MS,
+      reconcileProviders: env.PAYMENT_RECONCILE_PROVIDERS.split(',')
+        .map((name) => name.trim())
+        .filter(Boolean),
+      pendingAbandonMs: env.PAYMENT_PENDING_ABANDON_MS,
+      latePaymentGraceMs: env.PAYMENT_LATE_PAYMENT_GRACE_MS,
     },
     abaPayway: {
       apiKey: env.ABA_PAYWAY_API_KEY,
       merchantId: env.ABA_PAYWAY_MERCHANT_ID,
       baseUrl: env.ABA_PAYWAY_BASE_URL,
       webhookUrl: env.ABA_PAYWAY_WEBHOOK_URL,
+      lifetimeMinutes: env.ABA_PAYWAY_LIFETIME_MINUTES,
     },
     bakong: {
       baseUrl: env.BAKONG_BASE_URL,

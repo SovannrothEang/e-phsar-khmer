@@ -54,7 +54,7 @@ primitives that have more than one caller (`checkPayment`, `upsertPayment`,
 controller routes, which is what earns a primitive its own file here. Two
 primitives have exactly one caller each — `listPayments`
 (`PaymentsController`) and `findPaymentAttemptByProviderAttemptId`
-(`AbaPaywayWebhookController`, in [`../webhooks/`](../webhooks)) — and both
+(`AbaPaywayWebhookController`, in [`webhooks/`](webhooks)) — and both
 are deliberate exceptions to the single-caller fold below: their only caller
 is a Nest controller, so folding would put a Drizzle query inside a route
 handler. The thin-controller rule wins over file count in that case.
@@ -367,12 +367,10 @@ Key properties this gives us:
 
 ## Open items
 
-- `payment_transactions.tenantId` and `.orderId` are plain UUIDs with no FK
-  — there's no `tenants` or `orders` table in this codebase yet (see
-  [`../tenant/README.md`](../tenant/README.md)). `PaymentsController.create()`
-  currently writes a hardcoded `DEFAULT_TENANT_ID` placeholder
-  (`00000000-…`) to every transaction — real values only make sense once a
-  `tenants` table exists.
+- `payment_transactions.orderId` is a loose UUID pointer. Subscription
+  checkout stores its purchase ID there; other order types can define their
+  own relationship when implemented. Organization tenancy is not part of
+  current user-owned subscription billing (see [`../tenant/README.md`](../tenant/README.md)).
 - No admin/reporting surface for the ledger (e.g. a trial-balance view) —
   the posting service exists now, but nothing reads it back yet.
 - **System ledger accounts (`provider_clearing`, `platform_revenue`) are
