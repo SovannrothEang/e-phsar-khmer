@@ -242,3 +242,111 @@ describe('PaymentReconciler.runOnce — webhook-only expiry', () => {
     expect(summary.checked).toBe(0);
   });
 });
+
+describe('PaymentReconciler timer', () => {
+  const BASE = 15_000;
+  const IDLE = 60_000;
+
+  beforeEach(() => {
+    reconcileMock.mockReset();
+    expireMock.mockReset();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /**
+   * Each tick issues three selects (purchases, webhook expiries, candidates).
+   * `candidatesFor(tickIndex)` supplies the third one.
+   */
+  function buildLoop(candidatesFor: (tick: number) => unknown[]) {
+    let call = 0;
+    const select = jest.fn(() => {
+      const tick = Math.floor(call / 3);
+      const isCandidates = call % 3 === 2;
+      call += 1;
+      return chain(isCandidates ? candidatesFor(tick) : []);
+    });
+    const reconciler = new PaymentReconciler(
+      { select } as never,
+      {} as never,
+      { wakeupAfterCommit: jest.fn() } as never,
+      { activatePaidPurchase: jest.fn() } as never,
+      {
+        get: jest.fn((key: string) => {
+          if (key === 'payment.reconcileProviders') return ['bakong'];
+          if (key === 'payment.reconcileIntervalMs') return BASE;
+          if (key === 'payment.reconcileIdleIntervalMs') return IDLE;
+          return undefined;
+        }),
+      } as never,
+    );
+    const ticks = () => Math.floor(select.mock.calls.length / 3);
+    return { reconciler, ticks };
+  }
+
+  it('still runs a tick immediately at boot', async () => {
+    const { reconciler, ticks } = buildLoop(() => []);
+
+    reconciler.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(ticks()).toBe(1);
+    reconciler.onModuleDestroy();
+  });
+
+  it('stretches to the idle interval while there is nothing to look at', async () => {
+    const { reconciler, ticks } = buildLoop(() => []);
+
+    reconciler.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(BASE * 3);
+    expect(ticks()).toBe(1);
+
+    await jest.advanceTimersByTimeAsync(IDLE);
+    expect(ticks()).toBe(2);
+    reconciler.onModuleDestroy();
+  });
+
+  it('keeps the base interval while an unresolved attempt exists', async () => {
+    const { reconciler, ticks } = buildLoop(() => [attempt('a1', MINUTE)]);
+    reconcileMock.mockResolvedValue('pending');
+
+    reconciler.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(BASE * 4);
+
+    expect(ticks()).toBe(5);
+    reconciler.onModuleDestroy();
+  });
+
+  it('returns to the base interval once an attempt shows up, and relaxes again after', async () => {
+    // Tick 0 idle, tick 1 sees an attempt, tick 2 sees none.
+    const { reconciler, ticks } = buildLoop((tick) =>
+      tick === 1 ? [attempt('a1', MINUTE)] : [],
+    );
+    reconcileMock.mockResolvedValue('pending');
+
+    reconciler.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(IDLE); // tick 1 (found an attempt)
+    expect(ticks()).toBe(2);
+
+    await jest.advanceTimersByTimeAsync(BASE); // tick 2 (empty again)
+    expect(ticks()).toBe(3);
+
+    await jest.advanceTimersByTimeAsync(BASE * 3);
+    expect(ticks()).toBe(3); // idle again: no tick inside the base window
+    reconciler.onModuleDestroy();
+  });
+
+  it('stops ticking after shutdown', async () => {
+    const { reconciler, ticks } = buildLoop(() => []);
+
+    reconciler.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+    reconciler.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(IDLE * 5);
+
+    expect(ticks()).toBe(1);
+  });
+});

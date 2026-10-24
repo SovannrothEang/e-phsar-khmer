@@ -73,6 +73,7 @@ export default () => {
       workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
       reconcilerEnabled: env.PAYMENT_RECONCILER_ENABLED,
       reconcileIntervalMs: env.PAYMENT_RECONCILE_INTERVAL_MS,
+      reconcileIdleIntervalMs: env.PAYMENT_RECONCILE_IDLE_INTERVAL_MS,
       reconcileProviders: env.PAYMENT_RECONCILE_PROVIDERS.split(',')
         .map((name) => name.trim())
         .filter(Boolean),

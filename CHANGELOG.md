@@ -21,6 +21,23 @@ How to use this file:
 
 ### Changed
 
+- **Background work no longer runs when there is nothing to do** (Vercel resource audit; plan in `Plans.md`).
+  The outbox worker used to claim from `outbox_events` every 2 s forever; it now asks the database when the
+  next row is due (`OutboxService.msUntilNextDue`), sleeps until then, and re-arms after every drain that
+  handled events. `OUTBOX_POLL_INTERVAL_MS` is now the **longest** idle sleep (default 2000 → 30000), which
+  only bounds the latency of a lost wakeup or a producer in another process — lower it for an API-only /
+  separate-drainer topology. A failed peek falls back to a plain claim.
+- **Bakong poll chain backs off.** Rounds are the base interval (4 s) for five rounds, then 2×, then 4×
+  (cap 30 s), and the last round lands just after the QR expires. One abandoned checkout writes ~25
+  outbox rows instead of ~75. Payloads gained optional `round` / `delayMs`; older queued payloads still work.
+- **`PaymentReconciler` relaxes when idle.** With no unresolved attempt and nothing to activate or expire it
+  ticks every `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (new, default 60 s) instead of every 15 s; any activity
+  returns it to `PAYMENT_RECONCILE_INTERVAL_MS`. The boot tick is still immediate.
+- **No housekeeping at boot.** The outbox retention sweep and the account purge no longer run the moment the
+  process starts; the first run waits a jittered 1–2 minutes, so a restart loop is not a query loop.
+- **Checkout fallback polling** (socket down only) backs off 5 s → 15 s and pauses while the tab is hidden.
+- Outbox worker logs a one-line stats summary (due-time checks, drains, events) every 10 minutes.
+
 - **Chat is encrypted-only for new messages.** `ChatService.sendMessage` rejects a payload
   with neither `e2eHeader` (v1) nor `e2e` (v2) (`Encrypted messages are required`), requires a
   body, and refuses the legacy public-bucket `imagePath`

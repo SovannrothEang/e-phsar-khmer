@@ -44,7 +44,12 @@ const envSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   OUTBOX_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
-  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  // Longest an idle worker sleeps between due-time checks (one cheap query).
+  // A producer in this process wakes the pool instantly and backoff retries
+  // fire at their own due time, so this only bounds the latency of a lost
+  // wakeup or of a producer in ANOTHER process (e.g. an API-only instance
+  // whose drainers run elsewhere) — lower it for that topology.
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(5),
   // How long a claim is honoured before another dispatcher may steal the
@@ -108,6 +113,9 @@ const envSchema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
   PAYMENT_RECONCILE_INTERVAL_MS: z.coerce.number().default(15_000),
+  // Gap between passes while nothing is unresolved (no pending attempt, nothing
+  // to activate or expire). Any activity returns to the interval above.
+  PAYMENT_RECONCILE_IDLE_INTERVAL_MS: z.coerce.number().default(60_000),
   // Providers the reconciler polls: only those with no webhook (Bakong). ABA
   // PayWay is webhook-only — its expiry is `ABA_PAYWAY_LIFETIME_MINUTES`.
   PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong'),

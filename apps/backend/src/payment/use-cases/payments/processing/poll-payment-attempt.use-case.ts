@@ -10,6 +10,7 @@ import { failPaymentAttempt } from './fail-payment-attempt.use-case';
 import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
 import { checkPayment } from '../transaction/check-payment.use-case';
 import { settleReconciledAttempt } from './settle-reconciled-attempt.use-case';
+import { nextPollDelayMs } from './poll-schedule';
 
 export type PollPaymentAttemptOutcome =
   | 'skipped'
@@ -114,7 +115,17 @@ export const pollPaymentAttempt = Effect.fn('pollPaymentAttempt')(function* (
 
     // No DB write on this branch, so nothing for the outbox insert to be
     // atomic with — see enqueuePaymentAttemptPoll's own doc comment.
-    yield* enqueuePaymentAttemptPoll(outbox, input);
+    const round = (input.round ?? 0) + 1;
+    yield* enqueuePaymentAttemptPoll(outbox, {
+      ...input,
+      round,
+      delayMs: nextPollDelayMs({
+        baseMs: input.intervalMs,
+        round,
+        expiresAt: input.expiresAt,
+        now: Date.now(),
+      }),
+    });
     return 'still_pending';
   }
 

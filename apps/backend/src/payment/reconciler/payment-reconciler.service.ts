@@ -40,12 +40,26 @@ const BATCH_LIMIT = 100;
 const EXPIRY_GRACE_MS = 30 * 1000;
 
 export interface ReconcileSummary {
+  /** Unresolved attempts in view this pass, due or not. Zero means an empty system. */
+  candidates: number;
   checked: number;
   settled: number;
   /** Purchases activated for a payment that had already settled. */
   activated: number;
   abandoned: number;
   errors: number;
+}
+
+/** A pass that saw no attempt and did nothing: safe to wait longer for the next one. */
+function isIdle(summary: ReconcileSummary): boolean {
+  return (
+    summary.candidates === 0 &&
+    summary.checked === 0 &&
+    summary.settled === 0 &&
+    summary.activated === 0 &&
+    summary.abandoned === 0 &&
+    summary.errors === 0
+  );
 }
 
 /**
@@ -76,6 +90,7 @@ export class PaymentReconciler
 {
   private readonly logger = new Logger(PaymentReconciler.name);
   private timer: NodeJS.Timeout | undefined;
+  private stopped = false;
   private running = false;
   private tickCount = 0;
 
@@ -95,11 +110,10 @@ export class PaymentReconciler
       return;
     }
 
-    const intervalMs = this.intervalMs();
-    this.timer = setInterval(() => void this.tick(), intervalMs);
-    this.timer.unref?.();
+    this.stopped = false;
     this.logger.log(
-      `Payment reconciler started (every ${intervalMs}ms, providers: ${this.providers().join(', ') || 'none'})`,
+      `Payment reconciler started (every ${this.intervalMs()}ms while work exists, ` +
+        `${this.idleIntervalMs()}ms when idle, providers: ${this.providers().join(', ') || 'none'})`,
     );
     // Don't wait a full interval after boot: a payment made while the app was
     // down is picked up as soon as it is back.
@@ -107,16 +121,31 @@ export class PaymentReconciler
   }
 
   onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.stopped = true;
+    if (this.timer) clearTimeout(this.timer);
   }
 
-  /** One timer tick. Never throws, and never overlaps a still-running one. */
+  /**
+   * One timer tick, then re-arms the timer. Never throws, and never overlaps
+   * a still-running one.
+   *
+   * The next tick is `intervalMs` away while there is anything to look at (an
+   * unresolved attempt, or a tick that just did something) and
+   * `idleIntervalMs` away when the pass found nothing at all. An empty system
+   * would otherwise run three queries every 15 s forever; the poll chain
+   * covers a fresh checkout's first minute, and the boot tick above covers
+   * downtime, so the idle gap only delays the backstop.
+   */
   private async tick(): Promise<void> {
     if (this.running) return;
     this.running = true;
     this.tickCount += 1;
+    let nextDelayMs = this.intervalMs();
     try {
       const summary = await this.runOnce(this.tickCount);
+      if (isIdle(summary)) {
+        nextDelayMs = Math.max(this.idleIntervalMs(), nextDelayMs);
+      }
       if (
         summary.settled ||
         summary.activated ||
@@ -133,6 +162,10 @@ export class PaymentReconciler
       );
     } finally {
       this.running = false;
+      if (!this.stopped) {
+        this.timer = setTimeout(() => void this.tick(), nextDelayMs);
+        this.timer.unref?.();
+      }
     }
   }
 
@@ -142,6 +175,7 @@ export class PaymentReconciler
    */
   async runOnce(tick = 0): Promise<ReconcileSummary> {
     const summary: ReconcileSummary = {
+      candidates: 0,
       checked: 0,
       settled: 0,
       activated: 0,
@@ -185,6 +219,7 @@ export class PaymentReconciler
       .orderBy(asc(paymentAttempts.createdAt))
       .limit(BATCH_LIMIT);
 
+    summary.candidates = candidates.length;
     for (const candidate of candidates) {
       const ageMs = now - candidate.createdAt.getTime();
       if (
@@ -323,6 +358,13 @@ export class PaymentReconciler
   private intervalMs(): number {
     return (
       this.configService.get<number>('payment.reconcileIntervalMs') ?? 15_000
+    );
+  }
+
+  private idleIntervalMs(): number {
+    return (
+      this.configService.get<number>('payment.reconcileIdleIntervalMs') ??
+      60_000
     );
   }
 

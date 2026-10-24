@@ -43,8 +43,13 @@ export interface ProcessProviderEventJobData {
 export interface PollAttemptJobData {
   paymentTransactionId: string;
   paymentAttemptId: string;
+  /** The provider's base interval; the back-off schedule is derived from it. */
   intervalMs: number;
   expiresAt: number;
+  /** Rounds already run. Absent on the first round and on older queued payloads. */
+  round?: number;
+  /** Delay for THIS round when it differs from `intervalMs` (back-off). */
+  delayMs?: number;
 }
 
 export type PaymentJobData =

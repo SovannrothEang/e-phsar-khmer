@@ -41,7 +41,7 @@ export class PaymentPollOutboxHandler implements OutboxHandler, OnModuleInit {
 
     try {
       await this.queue.add(PAYMENT_POLL_JOB, payload, {
-        delay: payload.intervalMs,
+        delay: payload.delayMs ?? payload.intervalMs,
         jobId: event.id,
       });
       return { status: 'published' };

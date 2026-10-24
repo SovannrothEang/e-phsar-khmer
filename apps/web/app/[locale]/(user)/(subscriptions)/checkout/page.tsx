@@ -45,6 +45,7 @@ const QR_WAIT_TRIES = 20;
 // Payment status reads only when no push can arrive: socket down, or the
 // code just expired (failures and expiry are not pushed).
 const FALLBACK_REFRESH_MS = 5_000;
+const FALLBACK_MAX_REFRESH_MS = 15_000;
 // Kept above the backend's 30 s expiry sweep slack (PaymentReconciler), so
 // the page is still reading when an expired checkout flips to failed.
 const EXPIRY_GRACE_MS = 60_000;
@@ -339,10 +340,31 @@ export default function CheckoutPage() {
 
   // No socket at all (blocked, misconfigured, reconnects exhausted): a slow
   // read keeps the page settling on its own.
+  // Backs off (5s, 10s, 15s, then steady) and reads nothing while the tab is
+  // hidden; coming back to the tab reads once at once and restarts the pace.
   useEffect(() => {
     if (!awaitingResult || isConnected) return;
-    const timer = setInterval(() => void refreshPayment(), FALLBACK_REFRESH_MS);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = FALLBACK_REFRESH_MS;
+    const run = () => {
+      if (document.visibilityState === "visible") {
+        void refreshPayment();
+        delay = Math.min(delay + FALLBACK_REFRESH_MS, FALLBACK_MAX_REFRESH_MS);
+      }
+      timer = setTimeout(run, delay);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      delay = FALLBACK_REFRESH_MS;
+      run();
+    };
+    timer = setTimeout(run, delay);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [awaitingResult, isConnected, refreshPayment]);
 
   // Failures and expiry are not pushed, so once the code can no longer be
