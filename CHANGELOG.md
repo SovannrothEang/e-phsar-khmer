@@ -34,7 +34,10 @@ How to use this file:
 - **Chat thread redesign.** The workspace stays inside the normal app shell (the `(chat)`
   layout still mounts `NavBar`) and takes the viewport minus the navbar, as a dark two-pane
   panel. The thread pane gains quick replies above the composer and a compact pending-listing
-  row with immediate send. The inbox column keeps its previous design ("Inbox" title, chevron
+  row with immediate send. Quick replies are an empty-thread onboarding row: they are shown
+  while a conversation has no messages, and dismissing them with the X is remembered per
+  conversation in `localStorage` (`chat:quick-replies-dismissed:<scope>`), so every new chat
+  introduces them again. The inbox column keeps its previous design ("Inbox" title, chevron
   collapse, 300/340px default width). Only its portaled menu and delete dialog pick up the
   panel's dark scope.
 

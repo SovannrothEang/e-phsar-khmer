@@ -73,6 +73,33 @@ const QUICK_REPLIES = [
 ] as const;
 
 /**
+ * Dismissal memory for the quick-replies row, scoped to one conversation.
+ * The row is an empty-thread onboarding aid (see `showQuickReplies`), so the
+ * flag only has to survive reloads of a still-empty chat. A brand-new
+ * conversation has no stored key — that is what re-introduces the row for
+ * every new chat without ever sharing a dismissal across chats.
+ */
+const QUICK_REPLIES_DISMISSED_KEY = "chat:quick-replies-dismissed";
+
+function readQuickRepliesDismissed(scope: string): boolean {
+  try {
+    return (
+      localStorage.getItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`) === "1"
+    );
+  } catch {
+    return false; // private mode / quota
+  }
+}
+
+function dismissQuickReplies(scope: string): void {
+  try {
+    localStorage.setItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`, "1");
+  } catch {
+    // Private mode / quota — hidden for this mount only.
+  }
+}
+
+/**
  * Turn a decrypted plaintext into what the bubble renders: attachment JSON
  * (caption + per-file keys), structured content (location / listing-only,
  * which must never surface as raw JSON), or ordinary text. Legacy plaintext
@@ -126,9 +153,16 @@ export function MessageThread({
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [listingSent, setListingSent] = useState(false);
   const [listingDismissed, setListingDismissed] = useState(false);
-  // Per-thread preference only: ChatWorkspace keys this component by peer +
-  // conversation, so a thread switch remounts it and the row comes back.
-  const [quickRepliesHidden, setQuickRepliesHidden] = useState(false);
+  // Per-conversation dismissal memory for the quick-replies row. `peer.id` is
+  // the scope until the first send creates the conversation (`conversationId`
+  // null) — the same logical chat, and still one flag.
+  const quickRepliesScope = conversationId
+    ? `conversation:${conversationId}`
+    : `peer:${peer.id}`;
+  const [quickRepliesDismissedNow, setQuickRepliesDismissedNow] =
+    useState(false);
+  const quickRepliesDismissed =
+    quickRepliesDismissedNow || readQuickRepliesDismissed(quickRepliesScope);
   const listingPending =
     Boolean(listingId) && !listingSent && !listingDismissed;
 
@@ -229,6 +263,14 @@ export function MessageThread({
   // conversation, which changes the mount key), the messages never do.
   const showListingAttachment =
     listingPending && !messages.some((m) => m.listingId === listingId);
+
+  // Quick replies are an empty-thread onboarding aid: introduced in every new
+  // chat, retired as soon as a message exists (from either side), and hidden
+  // once the user dismisses them — a dismissal stored per conversation, so a
+  // new chat always gets the introduction again. `!isLoading` keeps the row
+  // from flashing while a thread's first page is still in flight.
+  const showQuickReplies =
+    canMessage && !isLoading && messages.length === 0 && !quickRepliesDismissed;
 
   // ── E2E decrypt ──────────────────────────────────────────────────────────
   // Own optimistic echoes already carry plaintext; only server rows need
@@ -627,9 +669,10 @@ export function MessageThread({
       )}
 
       {/* Quick replies: one tap sends the pill's text (plus the pending
-          listing, if one is still armed). Hidden per thread, restored on
-          the next mount — i.e. on a thread change. */}
-      {canMessage && !quickRepliesHidden && (
+          listing, if one is still armed). See `showQuickReplies` — the row
+          only exists in a message-less thread and a dismissal is persisted
+          per conversation. */}
+      {showQuickReplies && (
         <div className="shrink-0 border-t border-border bg-card px-3 pt-2 sm:px-4">
           <div className="flex items-center gap-1.5 pb-2">
             <div
@@ -653,7 +696,10 @@ export function MessageThread({
             </div>
             <button
               type="button"
-              onClick={() => setQuickRepliesHidden(true)}
+              onClick={() => {
+                dismissQuickReplies(quickRepliesScope);
+                setQuickRepliesDismissedNow(true);
+              }}
               aria-label={t("thread.quickReplies.hide")}
               className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
