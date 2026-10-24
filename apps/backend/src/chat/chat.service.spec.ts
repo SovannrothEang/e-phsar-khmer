@@ -138,7 +138,11 @@ function predicateColumns(value: unknown): string[] {
       return;
     }
     if (typeof v !== 'object' || v === null) return;
-    const maybe = v as { name?: unknown; table?: unknown; queryChunks?: unknown };
+    const maybe = v as {
+      name?: unknown;
+      table?: unknown;
+      queryChunks?: unknown;
+    };
     if (typeof maybe.name === 'string' && maybe.table) {
       names.push(maybe.name);
       return;
@@ -346,7 +350,11 @@ describe('ChatService.sendMessage', () => {
       },
     }));
 
-    await service.sendMessage('u1', { recipientId: 'u2', body: 'hi', e2eHeader });
+    await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'hi',
+      e2eHeader,
+    });
 
     expect(sets).toEqual([{ lastMessageAt: NOW }]);
   });
@@ -361,7 +369,11 @@ describe('ChatService.sendMessage', () => {
     const captured: Record<string, unknown>[] = [];
     mockInserts(captured);
 
-    await service.sendMessage('u2', { recipientId: 'u1', body: 'yo', e2eHeader });
+    await service.sendMessage('u2', {
+      recipientId: 'u1',
+      body: 'yo',
+      e2eHeader,
+    });
 
     expect(captured[0]).toMatchObject({ userAId: 'u1', userBId: 'u2' });
   });
@@ -1355,7 +1367,6 @@ describe('ChatService.getConversationWith', () => {
     ]);
   });
 });
-
 
 describe('ChatService conversation authorisation (security)', () => {
   let db: ReturnType<typeof makeDb>;

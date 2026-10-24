@@ -21,22 +21,22 @@
 
 The diagram's connector lines cross heavily, so ownership was read at branch level and the repository's own super-admin spec (docs/super-admin-spec.md) was used as the authoritative intended boundary: admin = routine operations and moderation; super_admin = all admin work plus team/role governance and platform advertisements.
 
-| Diagram use case | Implemented? | Who can call it | Evidence / note |
-|---|---|---|---|
-| Login (password/OTP/social) | Yes | public | POST /auth/login, /auth/otp/*, /auth/social/*. Staff use the same endpoint as users. No MFA. |
-| Browse / search / view listing, view other profile | Yes | public / any auth | Public feed and public profile endpoints. Not admin-specific. |
-| Manage Catalog (brands, models) | Yes | admin + super_admin | admin-brands/-models controllers and pages. |
-| Manage Categories | Yes | admin + super_admin | admin-categories/-subcategories controllers and pages. |
-| Manage Attribute | Yes | admin + super_admin | attributes controller; generic :type, years writes rejected server-side. |
-| Manage User | Partial | admin + super_admin (staff actions super_admin only) | Backend CRUD, soft delete, hardened policy. UI lists only role=user and offers only delete; no suspend/activate; staff accounts are not listed anywhere. |
-| Manage Subscription | Partial | admin + super_admin | Full config CRUD, free plan, user-subscription list, manual grant/revoke. No purchase/refund view; config deletes are hard and unsupervised. |
-| Manage Payment | Inadequate | admin + super_admin | Only PATCH /payments/:id status (refunds refused). No admin list, detail, ledger, or refund workflow. |
-| Manage Listing | Yes | admin + super_admin | List any status, take down with reason, restore. No audit and restore erases the moderation record. |
-| Manage Reports (Review User, Review Listings, Approve/Rejected) | Yes | admin + super_admin | Report reasons CRUD, user/listing report queues, approve/reject. Approving suspends/takes down transactionally. Evidence is hard-deletable. |
-| View Dashboard & Stats (stats cards) | Yes | admin + super_admin | Four KPI cards plus 7/30/90-day user/listing series. No revenue, subscription, report, or moderation metrics. |
-| Manage Teams & Role | Partial / broken | super_admin (UI + policy) | Team page is server-gated to super_admin but queries only role=super_admin, so plain admin accounts are invisible; the Users page excludes staff. Newly created admins disappear from the UI. No team model beyond the role enum, no audit, no session revocation. |
-| Manage Advertisement Ads | Missing | n/a | No table, endpoint, page, or navigation. Plan Phase 4 is unimplemented. |
-| Audit log / workspace settings (in the spec, not the diagram) | Missing | n/a | No audit table/service/UI; no settings model. |
+| Diagram use case                                                | Implemented?     | Who can call it                                      | Evidence / note                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------- | ---------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Login (password/OTP/social)                                     | Yes              | public                                               | POST /auth/login, /auth/otp/_, /auth/social/_. Staff use the same endpoint as users. No MFA.                                                                                                                                                                       |
+| Browse / search / view listing, view other profile              | Yes              | public / any auth                                    | Public feed and public profile endpoints. Not admin-specific.                                                                                                                                                                                                      |
+| Manage Catalog (brands, models)                                 | Yes              | admin + super_admin                                  | admin-brands/-models controllers and pages.                                                                                                                                                                                                                        |
+| Manage Categories                                               | Yes              | admin + super_admin                                  | admin-categories/-subcategories controllers and pages.                                                                                                                                                                                                             |
+| Manage Attribute                                                | Yes              | admin + super_admin                                  | attributes controller; generic :type, years writes rejected server-side.                                                                                                                                                                                           |
+| Manage User                                                     | Partial          | admin + super_admin (staff actions super_admin only) | Backend CRUD, soft delete, hardened policy. UI lists only role=user and offers only delete; no suspend/activate; staff accounts are not listed anywhere.                                                                                                           |
+| Manage Subscription                                             | Partial          | admin + super_admin                                  | Full config CRUD, free plan, user-subscription list, manual grant/revoke. No purchase/refund view; config deletes are hard and unsupervised.                                                                                                                       |
+| Manage Payment                                                  | Inadequate       | admin + super_admin                                  | Only PATCH /payments/:id status (refunds refused). No admin list, detail, ledger, or refund workflow.                                                                                                                                                              |
+| Manage Listing                                                  | Yes              | admin + super_admin                                  | List any status, take down with reason, restore. No audit and restore erases the moderation record.                                                                                                                                                                |
+| Manage Reports (Review User, Review Listings, Approve/Rejected) | Yes              | admin + super_admin                                  | Report reasons CRUD, user/listing report queues, approve/reject. Approving suspends/takes down transactionally. Evidence is hard-deletable.                                                                                                                        |
+| View Dashboard & Stats (stats cards)                            | Yes              | admin + super_admin                                  | Four KPI cards plus 7/30/90-day user/listing series. No revenue, subscription, report, or moderation metrics.                                                                                                                                                      |
+| Manage Teams & Role                                             | Partial / broken | super_admin (UI + policy)                            | Team page is server-gated to super_admin but queries only role=super_admin, so plain admin accounts are invisible; the Users page excludes staff. Newly created admins disappear from the UI. No team model beyond the role enum, no audit, no session revocation. |
+| Manage Advertisement Ads                                        | Missing          | n/a                                                  | No table, endpoint, page, or navigation. Plan Phase 4 is unimplemented.                                                                                                                                                                                            |
+| Audit log / workspace settings (in the spec, not the diagram)   | Missing          | n/a                                                  | No audit table/service/UI; no settings model.                                                                                                                                                                                                                      |
 
 **Assessment:** the diagram is a reasonable target for routine operations, but as implemented it overstates governance: super_admin has no exclusive operational surface, and the two capabilities that would justify the role (team/role governance and ads) are respectively incomplete and absent.
 
@@ -58,15 +58,15 @@ Cannot: revoke another user's sessions; obtain an audit trail; manage advertisem
 
 ### Enforcement reality
 
-| Control | Status |
-|---|---|
-| Per-controller RBAC | Solid: @Roles('admin','super_admin') + @UseGuards(RolesGuard) on all admin controllers, attributes, feedback, and payment PATCH; no @Public leak. Guard order is correct (global JWT first). |
-| Role source of truth | Solid: JwtStrategy re-reads role/status/deletedAt per request, so demotion/suspension/deletion take effect on the next REST call. Refresh re-issues from the DB row, never the old claim. |
-| Staff-target policy | Solid: plain admin cannot manage staff; staff role grants require super_admin; self-demote/self-suspend/self-delete blocked; last active super_admin row-locked and counted transactionally. |
-| Super-admin-only API boundary | Absent: zero @Roles('super_admin') routes. Team governance exists only as business policy inside shared admin endpoints, plus a web-page redirect. |
-| Audit | Absent. |
-| MFA / step-up | Absent. |
-| Session revocation | Absent. |
+| Control                       | Status                                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-controller RBAC           | Solid: @Roles('admin','super_admin') + @UseGuards(RolesGuard) on all admin controllers, attributes, feedback, and payment PATCH; no @Public leak. Guard order is correct (global JWT first). |
+| Role source of truth          | Solid: JwtStrategy re-reads role/status/deletedAt per request, so demotion/suspension/deletion take effect on the next REST call. Refresh re-issues from the DB row, never the old claim.    |
+| Staff-target policy           | Solid: plain admin cannot manage staff; staff role grants require super_admin; self-demote/self-suspend/self-delete blocked; last active super_admin row-locked and counted transactionally. |
+| Super-admin-only API boundary | Absent: zero @Roles('super_admin') routes. Team governance exists only as business policy inside shared admin endpoints, plus a web-page redirect.                                           |
+| Audit                         | Absent.                                                                                                                                                                                      |
+| MFA / step-up                 | Absent.                                                                                                                                                                                      |
+| Session revocation            | Absent.                                                                                                                                                                                      |
 
 ---
 
@@ -98,7 +98,7 @@ Fix: remove the route until a proper admin money workflow exists; otherwise rout
 
 #### C3. Deleting a subscription category silently downgrades every paying subscriber
 
-Evidence: subscription-config.service.ts:194-205 hard-deletes the category with no reference check. user_subscriptions.subscription_category_id and term_id are ON DELETE SET NULL (subscriptions.schema.ts:169-177), and plans/packages/terms cascade. entitlements.service.ts:177-184 filters isNotNull(subscriptionCategoryId), so affected rows vanish from heldGroups. remove* does not enqueue reconcileListings, unlike updateCategoryScope/updateFreePlan.
+Evidence: subscription-config.service.ts:194-205 hard-deletes the category with no reference check. user_subscriptions.subscription_category_id and term_id are ON DELETE SET NULL (subscriptions.schema.ts:169-177), and plans/packages/terms cascade. entitlements.service.ts:177-184 filters isNotNull(subscriptionCategoryId), so affected rows vanish from heldGroups. remove\* does not enqueue reconcileListings, unlike updateCategoryScope/updateFreePlan.
 
 Scenario: an admin deletes "General" (or a plan/package under it) while subscribers are live. Their subscription row survives with a null group; entitlements fall back to the free plan on the next reconcile/sweep, restricting ads and photo allowances. No warning, no record, no refund path.
 
@@ -212,7 +212,7 @@ Fix: distinct secrets per environment; rotate production secrets; stop keeping a
 - L1. The WebSocket gateway re-checks deletedAt but not status, so a suspended user's open chat socket keeps working (chat.gateway.ts:123-131 vs jwt.strategy.ts:48).
 - L2. Report Users "View Profile" builds a profile URL from display name + UUID, but profiles resolve by username, so the moderator link 404s.
 - L3. window.open on report/feedback attachments lacks noopener.
-- L4. Admin cookies are unprefixed (admin_access_token), 30-day maxAge despite 15-minute tokens, and a sibling subdomain could shadow them; use __Host- prefixes in the subdomain topology.
+- L4. Admin cookies are unprefixed (admin_access_token), 30-day maxAge despite 15-minute tokens, and a sibling subdomain could shadow them; use \_\_Host- prefixes in the subdomain topology.
 - L5. session reads are fail-soft: a backend 5xx bounces a signed-in admin to login.
 - L6. Dead SupabaseStrategy registered with a placeholder secret; delete it. Public Swagger exposes the full admin route inventory.
 - L7. Status column shows last-seen presence ("Online/Offline"), not account status; a suspended admin reads "Offline".
@@ -232,25 +232,27 @@ Fix: distinct secrets per environment; rotate production secrets; stop keeping a
 
 ## 4. Comparison
 
-| Capability | This repo | Khmer24-style classifieds | Shopify-style backoffice |
-|---|---|---|---|
-| Role model | 3 fixed roles; super_admin inherits admin; no super-only routes | Publicly buyer/seller; staff/moderation roles undocumented (inferred separate desk) | Owner + staff + org roles, cumulative; custom roles on Plus |
-| Granular permissions | None by design (plan Phase 6 deferred) | Not public | Large permission catalogue with dependencies |
-| MFA | None | Passkey/QR login offered to users publicly | Staff self-enrol 2FA; Plus can require; Payments requires it |
-| Session revocation | None (30-day stateless refresh) | Passkeys revocable per device (public) | Suspend users and revoke device permissions |
-| Audit log | None for admin actions; only payment_status_history | Not public | Activity log (view-only, 250 rows) + per-object timelines |
-| Moderation evidence | Take-down stores actor/reason but restore nulls it; reports hard-deletable | Posting rules with penalties (duplicate deletion, blacklist, law-enforcement referral); support hotline for appeals | n/a |
-| Paid packages | 4-tier config editable/deletable by any admin, no versioning | Membership area behind login; tiers/pricing not public | n/a |
-| Finance separation | Refunds refused; any admin patches payment state | Not public | Permissions for payouts/disputes; 2FA mandatory for Payments |
-| Support impersonation | None (but admins can reset normal users' passwords silently) | Published support hotlines | Scoped app tokens, not impersonation |
-| PII exposure | Full row minus passwordHash to any admin; GET /users/:id to any auth user | Public privacy policy | Permissions gate customer data |
+| Capability            | This repo                                                                  | Khmer24-style classifieds                                                                                           | Shopify-style backoffice                                     |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Role model            | 3 fixed roles; super_admin inherits admin; no super-only routes            | Publicly buyer/seller; staff/moderation roles undocumented (inferred separate desk)                                 | Owner + staff + org roles, cumulative; custom roles on Plus  |
+| Granular permissions  | None by design (plan Phase 6 deferred)                                     | Not public                                                                                                          | Large permission catalogue with dependencies                 |
+| MFA                   | None                                                                       | Passkey/QR login offered to users publicly                                                                          | Staff self-enrol 2FA; Plus can require; Payments requires it |
+| Session revocation    | None (30-day stateless refresh)                                            | Passkeys revocable per device (public)                                                                              | Suspend users and revoke device permissions                  |
+| Audit log             | None for admin actions; only payment_status_history                        | Not public                                                                                                          | Activity log (view-only, 250 rows) + per-object timelines    |
+| Moderation evidence   | Take-down stores actor/reason but restore nulls it; reports hard-deletable | Posting rules with penalties (duplicate deletion, blacklist, law-enforcement referral); support hotline for appeals | n/a                                                          |
+| Paid packages         | 4-tier config editable/deletable by any admin, no versioning               | Membership area behind login; tiers/pricing not public                                                              | n/a                                                          |
+| Finance separation    | Refunds refused; any admin patches payment state                           | Not public                                                                                                          | Permissions for payouts/disputes; 2FA mandatory for Payments |
+| Support impersonation | None (but admins can reset normal users' passwords silently)               | Published support hotlines                                                                                          | Scoped app tokens, not impersonation                         |
+| PII exposure          | Full row minus passwordHash to any admin; GET /users/:id to any auth user  | Public privacy policy                                                                                               | Permissions gate customer data                               |
 
 What to copy:
+
 - Shopify's append-only activity-log concept, staff 2FA, device/session revocation, and explicit ownership/role-change safeguards.
 - Khmer24's published enforcement/appeal path: a suspension should tell the user why and how to appeal, and moderation evidence should be durable.
 - Marketplace trust-and-safety practice: separate moderation from finance, require evidence retention, and hide reported/suspended sellers' content.
 
 What not to copy:
+
 - Shopify's ~100-permission matrix or a full IAM/SSO service at this team size; it contradicts the repo's modular-monolith and "no speculative abstraction" rules. Start with two or three named permissions (finance, moderation, catalog) behind the existing policy seam.
 - Shopify's 250-row, view-only activity-log limit; build an exportable, filterable audit trail instead.
 - OLX-scale ML moderation; at current volume a manual queue plus user reports is sufficient.
@@ -327,23 +329,23 @@ Ordered by risk reduction per unit of work. All fit the existing modular monolit
 
 ## Appendix A - endpoint / role matrix (admin-relevant)
 
-| Route | Allowed |
-|---|---|
-| auth/login, register, otp/*, social/*, telegram, refresh | public, IP-throttled |
-| auth/me; users/me*; files user scopes | any authenticated |
-| users/by-username/:username | public allow-list |
-| users/:id | any authenticated (over-exposed; H9) |
-| admin/users GET (including ?role=super_admin) | admin or super_admin |
-| admin/users POST role=user; PATCH/DELETE normal users | admin or super_admin |
-| admin/users POST staff role; PATCH/DELETE staff | super_admin (service policy, not route) |
-| admin/stats, stats/timeseries, chat-metrics | admin or super_admin |
-| admin/categories, subcategories, brands, models, attributes, feedback | admin or super_admin |
-| admin/listings, listings/:id/remove, listings/:id/restore | admin or super_admin |
-| admin/reports/* (reasons, users, listings) | admin or super_admin |
-| admin/subscriptions/*, admin/user-subscriptions/* | admin or super_admin |
-| payments PATCH :id | admin or super_admin |
-| /wanderer/dashboard/team | super_admin (web page only) |
-| files staff scopes | admin or super_admin (handler check) |
+| Route                                                                 | Allowed                                 |
+| --------------------------------------------------------------------- | --------------------------------------- |
+| auth/login, register, otp/_, social/_, telegram, refresh              | public, IP-throttled                    |
+| auth/me; users/me\*; files user scopes                                | any authenticated                       |
+| users/by-username/:username                                           | public allow-list                       |
+| users/:id                                                             | any authenticated (over-exposed; H9)    |
+| admin/users GET (including ?role=super_admin)                         | admin or super_admin                    |
+| admin/users POST role=user; PATCH/DELETE normal users                 | admin or super_admin                    |
+| admin/users POST staff role; PATCH/DELETE staff                       | super_admin (service policy, not route) |
+| admin/stats, stats/timeseries, chat-metrics                           | admin or super_admin                    |
+| admin/categories, subcategories, brands, models, attributes, feedback | admin or super_admin                    |
+| admin/listings, listings/:id/remove, listings/:id/restore             | admin or super_admin                    |
+| admin/reports/\* (reasons, users, listings)                           | admin or super_admin                    |
+| admin/subscriptions/_, admin/user-subscriptions/_                     | admin or super_admin                    |
+| payments PATCH :id                                                    | admin or super_admin                    |
+| /wanderer/dashboard/team                                              | super_admin (web page only)             |
+| files staff scopes                                                    | admin or super_admin (handler check)    |
 
 ## Appendix B - sources (external research)
 
@@ -372,4 +374,4 @@ Ordered by risk reduction per unit of work. All fit the existing modular monolit
 
 ---
 
-*No product code or database schema was modified for this audit. This report is the only file written.*
+_No product code or database schema was modified for this audit. This report is the only file written._

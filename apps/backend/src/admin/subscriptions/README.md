@@ -147,7 +147,7 @@ Key properties this gives us:
 | User subscription grant and revoke                              | Done; manual grants use the activation transaction; revoke preserves history and reconciles the owner. |
 | Paid checkout and activation                                    | Done; payment settlement activates the frozen purchase through `SubscriptionActivationService`.        |
 | Current/history status                                          | Done; status is derived from expiry/supersede fields, with typed supersede reasons.                    |
-| Admin configuration reconciliation                              | Done; BullMQ job (one running + one waiting) plus the 10-min sweep.                                          |
+| Admin configuration reconciliation                              | Done; BullMQ job (one running + one waiting) plus the 10-min sweep.                                    |
 | Video and auto-renew enforcement                                | Not started; values are stored/displayed but no feature consumes them.                                 |
 | Admin reporting for failed outbox events                        | Not part of subscriptions; separately tracked as an outbox operational gap.                            |
 
