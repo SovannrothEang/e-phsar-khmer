@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   Check,
   CheckCheck,
+  History,
   Loader2,
   RotateCcw,
   TriangleAlert,
@@ -15,6 +16,7 @@ import { isReadByPeer } from "@/lib/chat/format";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { LocationCard } from "@/components/chat/location-card";
 import { EncryptedAttachments } from "@/components/chat/encrypted-attachments";
+import { useE2eBackupContext } from "@/components/chat/e2e-backup-provider";
 import type { ThreadMessage } from "@/types/chat";
 
 export function MessageBubble({
@@ -36,6 +38,9 @@ export function MessageBubble({
 }) {
   const t = useTranslations("Chat");
   const format = useFormatter();
+  // Null outside the backup provider (e.g. an inbox preview) — the restore
+  // action is then simply not rendered.
+  const backup = useE2eBackupContext();
 
   const time = format.dateTime(new Date(message.createdAt), {
     hour: "2-digit",
@@ -113,6 +118,20 @@ export function MessageBubble({
           >
             {message.body}
           </div>
+        )}
+
+        {/* This device cannot decrypt the row: offer the history restore that
+            may recover it. Nothing renders when the backup provider is absent
+            — never ciphertext, never a dead control. */}
+        {message.needsHistoryRestore && backup && (
+          <button
+            type="button"
+            onClick={() => backup.openRestore()}
+            className="inline-flex items-center gap-1 rounded-sm px-1 text-[11px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <History className="size-3" />
+            {t("message.restoreHistory")}
+          </button>
         )}
 
         <div

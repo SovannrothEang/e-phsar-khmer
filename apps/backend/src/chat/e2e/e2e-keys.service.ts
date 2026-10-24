@@ -18,7 +18,11 @@ import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
 import type { RegisterE2eDeviceDto } from './dto/register-e2e-device.dto';
 import type { AddDevicePrekeysDto } from './dto/add-device-prekeys.dto';
 import type { E2eDeviceBundle, E2eKeyBundle } from './e2e-keys.types';
-import { activeDeviceCondition, MAX_ACTIVE_DEVICES } from './e2e-devices.util';
+import {
+  activeDeviceCondition,
+  lockE2eDeviceKeys,
+  MAX_ACTIVE_DEVICES,
+} from './e2e-devices.util';
 
 @Injectable()
 export class E2eKeysService {
@@ -213,6 +217,12 @@ export class E2eKeysService {
     dto: RegisterE2eDeviceDto,
   ): Promise<{ deviceId: string }> {
     return this.db.transaction(async (tx) => {
+      // Serializes with v2 sends for this user: a send holds the same
+      // transaction-scoped lock while it re-reads the active set and inserts
+      // its envelopes, so this device is either visible to that re-read or
+      // waits until the send commits (sorted keys → no deadlock).
+      await lockE2eDeviceKeys(tx, [userId]);
+
       const [device] = await tx
         .insert(userE2eDevices)
         .values({

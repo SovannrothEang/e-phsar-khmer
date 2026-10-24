@@ -1,5 +1,6 @@
 import { and, gt, isNull, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
+import type { DbExecutor } from '../../db/drizzle.provider';
 import { userE2eDevices } from '../../db/schema/chat.schema';
 
 /** Hard cap on active devices per user; registering past it evicts the least recently seen. */
@@ -40,4 +41,31 @@ export function diffDevices(
     missing: expected.filter((d) => !sent.has(d.deviceId)),
     stale: sentDeviceIds.filter((id) => !expectedIds.has(id)),
   };
+}
+
+/**
+ * Serializes device-set writes for the given users with transaction-scoped
+ * advisory locks: a v2 send holds them while it re-reads the active device set
+ * and inserts its envelopes, and registerDevice holds its own user's lock
+ * across the upsert/eviction. A registration therefore cannot land between a
+ * send's check and its insert and leave the new device without an envelope.
+ *
+ * Keys are deduped and sorted ascending before locking. Every transaction
+ * takes these locks in the same order (a send locks both participants), so two
+ * concurrent sends/registrations can never wait on each other's lock in
+ * opposite order — that ordering, not the lock itself, is what rules out a
+ * deadlock.
+ */
+export async function lockE2eDeviceKeys(
+  tx: DbExecutor,
+  userIds: string[],
+): Promise<void> {
+  const keys = [...new Set(userIds)].map((id) => `e2e-devices:${id}`).sort();
+  const keyList = sql.join(
+    keys.map((key) => sql`${key}`),
+    sql`, `,
+  );
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(key, 0)) from (select unnest(array[${keyList}]::text[]) as key order by 1) s`,
+  );
 }

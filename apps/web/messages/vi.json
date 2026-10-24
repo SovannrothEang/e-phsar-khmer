@@ -117,6 +117,7 @@
       "decrypting": "Đang giải mã…",
       "decryptFailed": "Không thể giải mã tin nhắn này.",
       "notOnThisDevice": "Được gửi trước khi thiết bị này được thiết lập — hãy mở trên thiết bị khác của bạn.",
+      "restoreHistory": "Khôi phục lịch sử trò chuyện",
       "download": "Tải xuống",
       "downloadFailed": "Không thể lưu tệp"
     },

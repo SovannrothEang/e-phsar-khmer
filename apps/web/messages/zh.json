@@ -117,6 +117,7 @@
       "decrypting": "正在解密…",
       "decryptFailed": "无法解密此消息。",
       "notOnThisDevice": "此消息发送于本设备设置之前——请在您的其他设备上查看。",
+      "restoreHistory": "恢复聊天记录",
       "download": "下载",
       "downloadFailed": "无法保存文件"
     },

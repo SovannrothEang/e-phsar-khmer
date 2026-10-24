@@ -117,6 +117,7 @@
       "decrypting": "Mendekripsi…",
       "decryptFailed": "Tidak dapat mendekripsi pesan ini.",
       "notOnThisDevice": "Dikirim sebelum perangkat ini disiapkan — buka di perangkat Anda yang lain.",
+      "restoreHistory": "Pulihkan riwayat obrolan",
       "download": "Unduh",
       "downloadFailed": "Tidak dapat menyimpan file"
     },

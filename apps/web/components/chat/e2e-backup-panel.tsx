@@ -2,20 +2,15 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { KeyRound, Loader2, ShieldCheck, Smartphone } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useE2eBackup } from "@/hooks/use-e2e-backup";
-import { MIN_PASSCODE_LENGTH } from "@/lib/e2e/backup-crypto";
-import type { RatchetEngine } from "@/lib/e2e/types";
+  AlertCircle,
+  KeyRound,
+  Loader2,
+  ShieldCheck,
+  Smartphone,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useE2eBackupContext } from "@/components/chat/e2e-backup-provider";
 
 const DISMISS_KEY = "e2e-backup-passcode-dismissed";
 
@@ -28,21 +23,20 @@ function readDismissed(userId: string): boolean {
 }
 
 /**
- * Chat-history backup surface for the thread column:
+ * Chat-history backup banners for the thread column. The backup itself (and
+ * every dialog) lives in the app-wide E2eBackupProvider; this panel only
+ * surfaces state and opens the provider's flows:
  *  - this device can't read older history → restore with the backup
  *    passcode, or ask another signed-in device to approve;
  *  - this device holds the backup but no passcode is set → nudge to set one;
- *  - another device is asking for access → approve/decline dialog.
+ *  - the status read failed → retry.
  */
-export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
+export function E2eBackupPanel() {
   const t = useTranslations("Chat.backup");
-  const backup = useE2eBackup(engine);
-  const { state, requestState, incoming } = backup;
-
-  const [enterOpen, setEnterOpen] = useState(false);
-  const [setOpen, setSetOpen] = useState(false);
+  const tMessage = useTranslations("Chat.message");
+  const backup = useE2eBackupContext();
   const [dismissedNow, setDismissedNow] = useState(false);
-  const userId = engine?.userId ?? null;
+  const userId = backup?.userId ?? null;
   // The panel only renders anything after the engine resolved on the client,
   // so reading localStorage here never diverges from the server render.
   const dismissed = dismissedNow || !userId || readDismissed(userId);
@@ -56,7 +50,8 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
     }
   };
 
-  const request = incoming[0] ?? null;
+  if (!backup) return null;
+  const { state, requestState } = backup;
 
   return (
     <>
@@ -90,7 +85,7 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
           </div>
           <div className="flex flex-wrap gap-2 pl-6">
             {state.hasPasscode && (
-              <Button size="sm" onClick={() => setEnterOpen(true)}>
+              <Button size="sm" onClick={backup.openRestore}>
                 {t("enterPasscode")}
               </Button>
             )}
@@ -108,6 +103,16 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
         </div>
       )}
 
+      {state?.kind === "error" && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
+          <AlertCircle className="size-4 shrink-0 text-destructive" />
+          <span className="min-w-0 flex-1">{t("genericError")}</span>
+          <Button size="sm" variant="outline" onClick={backup.retry}>
+            {tMessage("retry")}
+          </Button>
+        </div>
+      )}
+
       {state?.kind === "ready" && backup.lastRestoredCount !== null && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
           <ShieldCheck className="size-4 text-green-600" />
@@ -119,7 +124,7 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
           <ShieldCheck className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1">{t("setNudge")}</span>
-          <Button size="sm" onClick={() => setSetOpen(true)}>
+          <Button size="sm" onClick={backup.openSetPasscode}>
             {t("setPasscode")}
           </Button>
           <Button size="sm" variant="ghost" onClick={dismiss}>
@@ -127,182 +132,6 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
           </Button>
         </div>
       )}
-
-      <EnterPasscodeDialog
-        open={enterOpen}
-        onOpenChange={setEnterOpen}
-        onSubmit={backup.enterPasscode}
-      />
-      <SetPasscodeDialog
-        open={setOpen}
-        onOpenChange={setSetOpen}
-        onSubmit={backup.savePasscode}
-      />
-
-      <Dialog open={request !== null}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{t("approveTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("approveDescription", {
-                device: request?.requesterLabel ?? t("unknownDevice"),
-              })}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => request && void backup.decline(request)}
-            >
-              {t("decline")}
-            </Button>
-            <Button onClick={() => request && void backup.approve(request)}>
-              {t("allow")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
-  );
-}
-
-function EnterPasscodeDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: ReturnType<typeof useE2eBackup>["enterPasscode"];
-}) {
-  const t = useTranslations("Chat.backup");
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!value || busy) return;
-    setBusy(true);
-    setError(null);
-    const result = await onSubmit(value);
-    setBusy(false);
-    if (result.ok) {
-      setValue("");
-      onOpenChange(false);
-      return;
-    }
-    if (result.reason === "wrong")
-      setError(t("wrongPasscode", { count: result.attemptsLeft }));
-    else if (result.reason === "locked")
-      setError(
-        t("lockedOut", {
-          time: result.lockedUntil
-            ? new Date(result.lockedUntil).toLocaleTimeString()
-            : "—",
-        }),
-      );
-    else setError(t("genericError"));
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>{t("enterTitle")}</DialogTitle>
-            <DialogDescription>{t("enterDescription")}</DialogDescription>
-          </DialogHeader>
-          <Input
-            type="password"
-            autoComplete="off"
-            autoFocus
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={t("passcodePlaceholder")}
-            disabled={busy}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={!value || busy}>
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              {busy ? t("unlocking") : t("unlock")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SetPasscodeDialog({
-  open,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: ReturnType<typeof useE2eBackup>["savePasscode"];
-}) {
-  const t = useTranslations("Chat.backup");
-  const [first, setFirst] = useState("");
-  const [second, setSecond] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (busy) return;
-    if (first.length < MIN_PASSCODE_LENGTH)
-      return setError(t("tooShort", { count: MIN_PASSCODE_LENGTH }));
-    if (first !== second) return setError(t("mismatch"));
-    setBusy(true);
-    setError(null);
-    const result = await onSubmit(first);
-    setBusy(false);
-    if (result.ok) {
-      setFirst("");
-      setSecond("");
-      onOpenChange(false);
-    } else setError(t("genericError"));
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <form onSubmit={submit} className="flex flex-col gap-4">
-          <DialogHeader>
-            <DialogTitle>{t("setTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("setDescription", { count: MIN_PASSCODE_LENGTH })}
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            type="password"
-            autoComplete="new-password"
-            autoFocus
-            value={first}
-            onChange={(e) => setFirst(e.target.value)}
-            placeholder={t("passcodePlaceholder")}
-            disabled={busy}
-          />
-          <Input
-            type="password"
-            autoComplete="new-password"
-            value={second}
-            onChange={(e) => setSecond(e.target.value)}
-            placeholder={t("confirmPlaceholder")}
-            disabled={busy}
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={busy}>
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              {t("save")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -83,10 +83,14 @@ export async function fetchBackupStatus() {
   return call<BackupStatus>("/chats/e2e/backup");
 }
 
-export async function initBackup(keyCheck: string, keyProof: string) {
+export async function initBackup(
+  deviceId: string,
+  keyCheck: string,
+  keyProof: string,
+) {
   return call<BackupStatus & { created: boolean }>(
     "/chats/e2e/backup",
-    post({ keyCheck, keyProof }),
+    post({ deviceId, keyCheck, keyProof }),
   );
 }
 
@@ -119,9 +123,12 @@ export async function uploadBackupSegment(input: {
   return call<{ id: string }>("/chats/e2e/backup/segments", post(input));
 }
 
-export async function fetchBackupSegments(cursor?: string) {
-  const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return call<BackupSegmentPage>(`/chats/e2e/backup/segments${qs}`);
+export async function fetchBackupSegments(deviceId: string, cursor?: string) {
+  const params = new URLSearchParams({ deviceId });
+  if (cursor) params.set("cursor", cursor);
+  return call<BackupSegmentPage>(
+    `/chats/e2e/backup/segments?${params.toString()}`,
+  );
 }
 
 export async function createHistoryRequest(deviceId: string) {

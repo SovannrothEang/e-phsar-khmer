@@ -117,6 +117,7 @@
       "decrypting": "Decrypting…",
       "decryptFailed": "Couldn't decrypt this message.",
       "notOnThisDevice": "Sent before this device was set up — open it on your other device.",
+      "restoreHistory": "Restore chat history",
       "download": "Download",
       "downloadFailed": "Couldn’t save the file"
     },

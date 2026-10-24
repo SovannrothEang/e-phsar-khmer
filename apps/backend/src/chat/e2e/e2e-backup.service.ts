@@ -22,6 +22,8 @@ import type { BackupKdfParams, E2eHeader } from '../../db/schema/chat.schema';
 import type {
   AddBackupSegmentDto,
   ApproveHistoryRequestDto,
+  InitBackupDto,
+  ListBackupSegmentsDto,
   SetBackupPasscodeDto,
 } from './dto/backup.dto';
 
@@ -97,12 +99,16 @@ export class E2eBackupService {
    */
   async init(
     userId: string,
-    keyCheck: string,
-    keyProof: string,
+    dto: InitBackupDto,
   ): Promise<BackupStatus & { created: boolean }> {
+    await this.assertOwnDevice(userId, dto.deviceId);
     const inserted = await this.db
       .insert(e2eBackups)
-      .values({ userId, keyCheck, keyProofHash: hashKeyProof(keyProof) })
+      .values({
+        userId,
+        keyCheck: dto.keyCheck,
+        keyProofHash: hashKeyProof(dto.keyProof),
+      })
       .onConflictDoNothing({ target: e2eBackups.userId })
       .returning({ userId: e2eBackups.userId });
     return { ...(await this.getStatus(userId)), created: inserted.length > 0 };
@@ -264,7 +270,7 @@ export class E2eBackupService {
 
   async listSegments(
     userId: string,
-    cursor?: string,
+    dto: ListBackupSegmentsDto,
   ): Promise<{
     items: { id: string; ciphertext: string; messageCount: number }[];
     nextCursor: string | null;
@@ -274,6 +280,8 @@ export class E2eBackupService {
      */
     latestCursor: string | null;
   }> {
+    await this.assertOwnDevice(userId, dto.deviceId);
+    const cursor = dto.cursor;
     const decoded = cursor ? this.decodeCursor(cursor) : null;
     const rows = await this.db
       .select()
@@ -489,7 +497,11 @@ export class E2eBackupService {
     requestId: string,
     deviceId: string,
   ): Promise<{ ok: true }> {
-    await this.db
+    await this.assertOwnDevice(userId, deviceId);
+    // One conditional UPDATE: only the requesting device can consume, and only
+    // while the request is still approved. A replay (or a request answered on
+    // another device) must not report success.
+    const consumed = await this.db
       .update(e2eHistoryRequests)
       .set({ status: 'consumed', header: null, wrappedKey: null })
       .where(
@@ -499,7 +511,30 @@ export class E2eBackupService {
           eq(e2eHistoryRequests.requesterDeviceId, deviceId),
           eq(e2eHistoryRequests.status, 'approved'),
         ),
-      );
-    return { ok: true };
+      )
+      .returning({ id: e2eHistoryRequests.id });
+    if (consumed.length > 0) return { ok: true };
+
+    // Nothing matched. Only tell this device about requests it made itself —
+    // for any other id the answer is indistinguishable from "no such request".
+    const [existing] = await this.db
+      .select({ requesterDeviceId: e2eHistoryRequests.requesterDeviceId })
+      .from(e2eHistoryRequests)
+      .where(
+        and(
+          eq(e2eHistoryRequests.id, requestId),
+          eq(e2eHistoryRequests.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (existing && existing.requesterDeviceId === deviceId)
+      throw new ConflictException({
+        code: 'E2E_REQUEST_NOT_PENDING',
+        message: 'This request was already handled or has expired',
+      });
+    throw new NotFoundException({
+      code: 'E2E_REQUEST_NOT_FOUND',
+      message: 'No such history request for this device',
+    });
   }
 }

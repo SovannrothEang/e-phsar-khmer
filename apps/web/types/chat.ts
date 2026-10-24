@@ -196,6 +196,12 @@ export interface ThreadMessage extends ChatMessage {
   sharedLocation?: SharedLocation;
   /** Decrypted body is the structured "listing card only" marker. */
   listingOnly?: boolean;
+  /**
+   * This message could not be decrypted on this device and restoring the
+   * encrypted history backup may recover it. `body` holds a neutral note,
+   * never ciphertext; the bubble offers the restore action when available.
+   */
+  needsHistoryRestore?: boolean;
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */

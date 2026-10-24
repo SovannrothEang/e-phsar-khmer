@@ -8,6 +8,7 @@ import z from "zod";
 
 /** Profile fields the dashboard chrome (header avatar chip) needs. */
 export type CurrentUser = {
+  id: string;
   username: string;
   role: string;
   email: string;
@@ -26,6 +27,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     const res = await serverFetch<BackendUser>("/users/me");
     return {
+      id: res.data.id,
       username: res.data.username ?? "",
       role: res.data.role,
       email: res.data.email ?? "",
@@ -49,6 +51,7 @@ export async function getUserProfile(): Promise<CurrentUser | null> {
   try {
     const res = await userServerFetch<BackendUser>("/users/me");
     return {
+      id: res.data.id,
       username: res.data.username ?? "",
       role: res.data.role,
       email: res.data.email ?? "",

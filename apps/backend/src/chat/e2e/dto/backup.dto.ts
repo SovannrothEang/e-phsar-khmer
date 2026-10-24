@@ -15,6 +15,10 @@ import { Type } from 'class-transformer';
 import { E2eHeaderDto } from '../../dto/e2e-header.dto';
 
 export class InitBackupDto {
+  @ApiProperty({ description: 'The calling device (must be active and yours)' })
+  @IsUUID()
+  deviceId: string;
+
   @ApiProperty({ description: 'base64 HMAC(BK, "npic-backup-check")' })
   @IsString()
   @IsNotEmpty()
@@ -130,6 +134,10 @@ export class AddBackupSegmentDto {
 }
 
 export class ListBackupSegmentsDto {
+  @ApiProperty({ description: 'The calling device (must be active and yours)' })
+  @IsUUID()
+  deviceId: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

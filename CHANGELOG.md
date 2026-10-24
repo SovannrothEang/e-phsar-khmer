@@ -38,6 +38,16 @@ How to use this file:
 - **Checkout fallback polling** (socket down only) backs off 5 s → 15 s and pauses while the tab is hidden.
 - Outbox worker logs a one-line stats summary (due-time checks, drains, events) every 10 minutes.
 
+- **Backup API is device-scoped.** `POST /chats/e2e/backup` and
+  `GET /chats/e2e/backup/segments` now require an active `deviceId`;
+  `POST /chats/e2e/history-requests/:id/consume` only succeeds for the requesting device and
+  returns `404 E2E_REQUEST_NOT_FOUND` / `409 E2E_REQUEST_NOT_PENDING` instead of a silent
+  `{ ok: true }`. Init, segment upload and segment list are throttled (10 / 30 / 60 per
+  minute).
+- **v2 send device-set check is race-free.** The active-set read is repeated inside the
+  message insert transaction under per-user Postgres advisory locks shared with
+  `registerDevice`, so a device registering mid-send surfaces as `409 E2E_DEVICES_MISMATCH`
+  and is retried by the client instead of silently missing an envelope.
 - **Chat is encrypted-only for new messages.** `ChatService.sendMessage` rejects a payload
   with neither `e2eHeader` (v1) nor `e2e` (v2) (`Encrypted messages are required`), requires a
   body, and refuses the legacy public-bucket `imagePath`
@@ -60,6 +70,15 @@ How to use this file:
 
 ### Added
 
+- **App-wide encrypted-history restore.** `E2eBackupProvider` now mounts in the `(user)` and
+  `(chat)` layouts and owns the single backup instance (status, uploads, pulls, the
+  approval prompt and the restore dialogs), so history backs up and restores even when the
+  chat page is closed. A locked (new) device automatically asks the account's other devices
+  for the backup key once per session, and an incoming request is approved from any page.
+- **Actionable "not on this device" bubble.** A message this device cannot decrypt now
+  offers `Chat.message.restoreHistory` ("Restore chat history"), opening the passcode or
+  other-device restore flow instead of ending at a dead-end note. Newly decrypted plaintext
+  is uploaded to the backup promptly via the `E2E_PLAINTEXT_CACHED` window event.
 - **Encrypted rich content** (`lib/e2e/chat-content.ts`, marker `khmer24-chat-content` v1):
   shared locations and listing-only messages are sealed inside the ciphertext. New
   `location-card.tsx` (OSM link, no map tiles).
@@ -84,6 +103,16 @@ How to use this file:
 
 ### Fixed
 
+- **Backup-key creation race.** Two first devices creating the account backup at the same
+  time could leave the loser holding a key that would never open the account backup.
+  Creation now runs under a cross-tab Web Lock, re-reads the status inside it, and clears
+  any stored key that fails the server `keyCheck` instead of using it.
+- **An approval can no longer be stranded.** After a device approves a new device, the
+  backup key is validated and saved before the one-shot ratchet step is committed and
+  before the request is consumed; a pull that fails after that is retried by the ordinary
+  pull cycle.
+- **Backup pulls are no longer silently lossy.** An unreadable segment stops the cursor
+  instead of advancing past it, and pulls no longer depend on uploads succeeding.
 - A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
   first inbound message created it. `chat-workspace.tsx` now reconciles the cached
   `GET /chats/with/:userId` lookup against the inbox.
@@ -107,6 +136,12 @@ How to use this file:
   re-checked against the stored object size.
 - A v2 envelope's `wrappedKey`/`header` is stored verbatim, with nothing binding it to the device
   key it claims to target. No safety-number / key-substitution protection yet.
+- Backup restoration remains ciphertext-only and device-gated, but there is still no segment
+  retention/size quota beyond the route throttles, no device-list/revocation management, and
+  a participant still receives every device envelope of a v2 message (device ids/count are
+  visible; wrapped keys stay unreadable). A revoked device keeps the backup key and can read
+  messages already addressed to it; any authenticated stranger can list a user's active
+  device ids and claim one-time prekeys. These are tracked as follow-ups, not fixed here.
 
 ## 2026-10-23 — Security audit, moderation, reports, feedback
 

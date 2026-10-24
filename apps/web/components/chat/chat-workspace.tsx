@@ -173,10 +173,9 @@ export function ChatWorkspace({
   });
 
   // Warm E2E bootstrap as soon as the viewer is known so key registration
-  // races ahead of the first send (fail-closed on send if still pending).
-  const e2eEngine = useE2eEngine(
-    viewer.isSuccess ? (viewer.data?.id ?? null) : null,
-  );
+  // races ahead of the first send (fail-closed on send if still pending). The
+  // backup panel reads the same engine through E2eBackupProvider.
+  useE2eEngine(viewer.isSuccess ? (viewer.data?.id ?? null) : null);
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
   // The nav badge's own socket subscription keeps the shared connection alive
@@ -532,7 +531,7 @@ export function ChatWorkspace({
           threadOpen ? "flex" : "hidden md:flex",
         )}
       >
-        <E2eBackupPanel engine={e2eEngine} />
+        <E2eBackupPanel />
         {!threadOpen && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
             <div className="flex size-20 items-center justify-center rounded-full bg-white/5">

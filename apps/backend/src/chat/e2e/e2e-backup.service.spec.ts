@@ -36,6 +36,17 @@ function limitQuery(rows: unknown[]) {
   };
 }
 
+// .from().where().orderBy().limit() → rows
+function listQuery(rows: unknown[]) {
+  return {
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({ limit: () => Promise.resolve(rows) }),
+      }),
+    }),
+  };
+}
+
 function makeDb() {
   return { select: jest.fn(), update: jest.fn(), insert: jest.fn() };
 }
@@ -229,6 +240,9 @@ describe('E2eBackupService.init', () => {
   it('stores keyCheck and the proof hash, never the raw proof', async () => {
     const db = makeDb();
     const values: Record<string, unknown>[] = [];
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(limitQuery([{ keyCheck: 'kc' }])); // getStatus
     db.insert.mockReturnValueOnce({
       values: (v: Record<string, unknown>) => {
         values.push(v);
@@ -239,10 +253,13 @@ describe('E2eBackupService.init', () => {
         };
       },
     });
-    db.select.mockReturnValueOnce(limitQuery([{ keyCheck: 'kc' }]));
     const service = new E2eBackupService(db as never);
 
-    const res = await service.init('u1', 'kc', 'secret-proof');
+    const res = await service.init('u1', {
+      deviceId: 'd1',
+      keyCheck: 'kc',
+      keyProof: 'secret-proof',
+    });
 
     expect(values[0]).toEqual({
       userId: 'u1',
@@ -252,6 +269,124 @@ describe('E2eBackupService.init', () => {
     expect(res).toMatchObject({ created: true, keyCheck: 'kc' });
     // getStatus must never leak the hash
     expect(res).not.toHaveProperty('keyProofHash');
+  });
+
+  it("404s a device that is not one of the caller's active devices", async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([])); // assertOwnDevice
+    const service = new E2eBackupService(db as never);
+
+    await expect(
+      service.init('u1', {
+        deviceId: 'foreign-device',
+        keyCheck: 'kc',
+        keyProof: 'kp',
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('E2eBackupService.listSegments', () => {
+  it("404s a device that isn't the caller's active device", async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([])); // assertOwnDevice
+    const service = new E2eBackupService(db as never);
+
+    await expect(
+      service.listSegments('u1', { deviceId: 'foreign-device' }),
+    ).rejects.toThrow(NotFoundException);
+    // The paging query must never run.
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages the caller device backlog and returns an opaque latest cursor', async () => {
+    const db = makeDb();
+    const createdAt = new Date('2026-10-24T00:00:00.000Z');
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(
+        listQuery([{ id: 's1', ciphertext: 'c1', messageCount: 2, createdAt }]),
+      );
+    const service = new E2eBackupService(db as never);
+
+    const page = await service.listSegments('u1', { deviceId: 'd1' });
+
+    expect(page.items).toEqual([
+      { id: 's1', ciphertext: 'c1', messageCount: 2 },
+    ]);
+    expect(page.nextCursor).toBeNull();
+    expect(
+      JSON.parse(Buffer.from(page.latestCursor!, 'base64').toString('utf8')),
+    ).toEqual({ createdAt: createdAt.toISOString(), id: 's1' });
+  });
+});
+
+describe('E2eBackupService.consume', () => {
+  it('consumes an approved request made by the calling device', async () => {
+    const db = makeDb();
+    const sets: Record<string, unknown>[] = [];
+    db.select.mockReturnValueOnce(limitQuery([{ id: 'd1' }])); // assertOwnDevice
+    db.update.mockReturnValueOnce(updateReturning([{ id: 'r1' }], sets));
+    const service = new E2eBackupService(db as never);
+
+    await expect(service.consume('u1', 'r1', 'd1')).resolves.toEqual({
+      ok: true,
+    });
+    expect(sets[0]).toEqual({
+      status: 'consumed',
+      header: null,
+      wrappedKey: null,
+    });
+    // No diagnostic lookup on the success path.
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it("404s a device that isn't the caller's active device", async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([])); // assertOwnDevice
+    const service = new E2eBackupService(db as never);
+
+    await expect(service.consume('u1', 'r1', 'foreign-device')).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('404s rather than reporting ok when the request belongs to another device', async () => {
+    const db = makeDb();
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(limitQuery([{ requesterDeviceId: 'd-other' }]));
+    db.update.mockReturnValueOnce(updateReturning([]));
+    const service = new E2eBackupService(db as never);
+
+    const err = await service
+      .consume('u1', 'r1', 'd1')
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NotFoundException);
+    expect((err as NotFoundException).getResponse()).toMatchObject({
+      code: 'E2E_REQUEST_NOT_FOUND',
+    });
+  });
+
+  it('409s when the request exists for this device but is no longer approved', async () => {
+    const db = makeDb();
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(
+        limitQuery([{ requesterDeviceId: 'd1', status: 'consumed' }]),
+      );
+    db.update.mockReturnValueOnce(updateReturning([]));
+    const service = new E2eBackupService(db as never);
+
+    const err = await service
+      .consume('u1', 'r1', 'd1')
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      code: 'E2E_REQUEST_NOT_PENDING',
+    });
   });
 });
 
