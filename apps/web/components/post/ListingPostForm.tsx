@@ -51,7 +51,7 @@ const TRANSMISSIONS = ["Auto", "Manual"] as const;
  *
  * The design puts Condition in a different place on almost every form and the
  * `field_schema` cannot arbitrate: Cars For Sale's own schema lists Condition
- * before Body Type while its approved layout puts it after (tasks/redesign.md
+ * before Body Type while its approved layout puts it after (docs/post-form-layout.md
  * rows 11/15). So the slot is declared here, per subcategory:
  *
  *  - `lead` — directly under the identity pickers and above the spec cluster
@@ -762,7 +762,7 @@ export default function ListingPostForm({
             because the captain's mock reads Bedroom → Bathroom → Facing → Size
             → Type, and `type` renders in the identity cluster below. No other
             family declares these keys, so the position is inert elsewhere.
-            Every one is an ordinary `SearchPicker`/input: redesign.md's rule is
+            Every one is an ordinary `SearchPicker`/input: post-form-layout.md's rule is
             that no native `<select>` remains, not that the mock's chevron
             renders as one. All four are unstarred in that mock. */}
         {has("bedroom") && (

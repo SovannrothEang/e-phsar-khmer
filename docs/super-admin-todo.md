@@ -1,12 +1,12 @@
 # Super Admin Implementation Tasks
 
-**Status:** Ready for implementation  
+**Status:** In progress. Phase 1 mostly shipped 2026-10-23 in `46e5ed0`. Phases 3–6 not started (verified against code 2026-10-24; see also `admin-backoffice-audit-2026-10-24.md`).  
 **Source:** [`super-admin-plan.md`](./super-admin-plan.md) and [`super-admin-spec.md`](./super-admin-spec.md)
 
 ## Phase 0 — Decisions
 
 - [ ] Decide the minimum number of active break-glass super admins.
-- [ ] Decide whether role changes invalidate access tokens immediately.
+- [ ] Decide whether role changes invalidate access tokens immediately. _De facto yes: `JwtStrategy.validate` re-reads role/status/deletedAt on every request and refresh re-issues from the DB row. Not yet recorded as a decision._
 - [ ] Decide whether advertisement ads are internal promotions or paid campaigns.
 - [ ] Select the first advertisement placements and lifecycle states.
 - [ ] Select high-impact actions that require re-authentication.
@@ -14,19 +14,19 @@
 
 ## Phase 1 — Authorization hardening
 
-- [ ] Add an application-level admin identity policy helper.
-- [ ] Pass the authenticated actor into every role/status/delete mutation.
-- [ ] Block self-demotion.
-- [ ] Block self-delete from admin control.
-- [ ] Block demotion, suspension, and deletion of the last active super admin.
-- [ ] Make deleted/suspended targets return explicit errors.
-- [ ] Add stable error codes and DTO/API documentation.
-- [ ] Add backend unit and service tests for all rules.
+- [x] Add an application-level admin identity policy helper. (`admin/admin-user-policy.ts`, `46e5ed0`)
+- [x] Pass the authenticated actor into every role/status/delete mutation. (`AdminService.authorizeManage`: update, delete, user-report approval)
+- [x] Block self-demotion. (`CANNOT_CHANGE_OWN_ROLE`)
+- [x] Block self-delete from admin control. (`CANNOT_DELETE_SELF`; self-suspend also blocked)
+- [x] Block demotion, suspension, and deletion of the last active super admin. (`LAST_SUPER_ADMIN`, counted under `FOR UPDATE`)
+- [ ] Make deleted/suspended targets return explicit errors. _Partial: a missing row is 404, but a soft-deleted target is still accepted._
+- [ ] Add stable error codes and DTO/API documentation. _Partial: stable codes exist as exception messages; not documented in Swagger._
+- [ ] Add backend unit and service tests for all rules. _Partial: `admin-user-policy.spec.ts` (10 cases) and the report-approval path; no `AdminService` spec for the locked count._
 
 ## Phase 2 — Team management
 
-- [ ] Keep the Team page super-admin-only at route and API levels.
-- [ ] Hide or disable role-management controls for regular admins.
+- [ ] Keep the Team page super-admin-only at route and API levels. _Partial: the route redirects (`f008db6`, 2026-08-15) and staff mutations are policy-checked, but `GET /admin/users?role=super_admin` is readable by any admin._
+- [x] Hide or disable role-management controls for regular admins. (Team link hidden in `app-sidebar.tsx`; the Users page offers no role control)
 - [ ] Add target identity/current state to role mutation confirmation.
 - [ ] Add explicit confirmation copy for demotion, suspension, and deletion.
 - [ ] Refresh the Team table after successful mutations.

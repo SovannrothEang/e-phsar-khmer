@@ -1,33 +1,33 @@
 # Super Admin Acceptance Criteria
 
-**Status:** Proposed  
+**Status:** Partially met. Ticked items were verified against code on 2026-10-24; Team gating since `f008db6` (2026-08-15), identity safety since `46e5ed0` (2026-10-23)  
 **Feature:** Super Admin Governance and Workspace Control
 
 ## A. Role and access
 
-- [ ] A user with role `user` cannot render or call admin dashboard functionality.
-- [ ] A user with role `admin` can perform ordinary operational admin work.
-- [ ] A user with role `admin` cannot open Team management.
-- [ ] A user with role `admin` cannot manage team roles.
+- [x] A user with role `user` cannot render or call admin dashboard functionality.
+- [x] A user with role `admin` can perform ordinary operational admin work.
+- [x] A user with role `admin` cannot open Team management.
+- [x] A user with role `admin` cannot manage team roles.
 - [ ] A user with role `admin` cannot manage advertisement ads.
 - [ ] A user with role `super_admin` can access all admin areas plus Team, Advertisement Ads, and relevant audit history.
-- [ ] Backend authorization remains correct when navigation links and buttons are bypassed.
+- [x] Backend authorization remains correct when navigation links and buttons are bypassed.
 
 ## B. Administrative identity safety
 
-- [ ] Only a `super_admin` can assign `admin` or `super_admin`.
-- [ ] Only a `super_admin` can revoke `admin` or `super_admin`.
-- [ ] An actor cannot demote their own administrative account.
-- [ ] An actor cannot delete their own administrative account through admin management.
-- [ ] The last active `super_admin` cannot be demoted, suspended, or deleted.
-- [ ] Two concurrent attempts to remove the last active super admin cannot both succeed.
+- [x] Only a `super_admin` can assign `admin` or `super_admin`.
+- [x] Only a `super_admin` can revoke `admin` or `super_admin`.
+- [x] An actor cannot demote their own administrative account.
+- [x] An actor cannot delete their own administrative account through admin management.
+- [x] The last active `super_admin` cannot be demoted, suspended, or deleted.
+- [x] Two concurrent attempts to remove the last active super admin cannot both succeed. (Row-locked count; not covered by a concurrency test.)
 - [ ] A missing, deleted, or suspended target produces an explicit failure.
 - [ ] Role/status changes produce stable API error codes and no partial mutation.
 
 ## C. Session behavior
 
 - [ ] The selected role-change session policy is documented.
-- [ ] A demoted admin cannot retain privileged access indefinitely through an old token.
+- [x] A demoted admin cannot retain privileged access indefinitely through an old token. (Role re-read per request.)
 - [ ] Refresh behavior after demotion is tested.
 - [ ] The dashboard refreshes its user/session state after a role mutation.
 

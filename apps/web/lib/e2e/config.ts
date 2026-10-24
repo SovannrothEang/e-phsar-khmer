@@ -6,7 +6,7 @@
 export const E2E_V2_ENABLED = process.env.NEXT_PUBLIC_E2E_V2 !== "off";
 
 /**
- * Encrypted attachments (tasks/plan-e2e-attachments.md). On by default; set
+ * Encrypted attachments (docs/e2e-attachments.md). On by default; set
  * NEXT_PUBLIC_E2E_ATTACHMENTS=off to disable encrypted media (images, voice
  * notes) entirely. This is a kill switch, not a fallback: new sends are
  * E2E-only, so there is no plaintext public-bucket path to fall back to — with

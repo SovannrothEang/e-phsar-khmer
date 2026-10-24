@@ -1,6 +1,6 @@
 # Subscriptions Review Fixes
 
-**Status:** Implemented (2026-10-23); commit-isolation check remains pending because no commit was created
+**Status:** Implemented and committed 2026-10-23 in `f074f5e`. Commit isolation verified 2026-10-24: the deploy workflow landed separately in `e54cca3`. Subscription suites pass (8/8, 69 tests). The only open item is "Failed outbox events are invisible" (below).
 **Date:** 2026-10-23
 **Source:** Standards review of `git diff d465bdf` on `rothh/subscriptions`: the five subscription commits `275e8bb`…`53dfd6e` plus the uncommitted working tree. There was no spec, so only the Standards axis was reviewed.
 **Rules cited:** `AGENTS.md` (concurrency, testing, smallest diff), `CLAUDE.md` (web on port 3001, Module README convention), Fowler smell baseline (always a judgement call).
@@ -60,7 +60,7 @@ Each item gives the **finding**, the **requirement** (what "fixed" means) and th
     - an unknown id → 404
 - **Acceptance:** `pnpm --filter backend test -- --testPathPatterns=admin/subscriptions` is green, and every listed case is its own `it`.
 
-### 1.3 Keep unrelated changes out of the branch (commit isolation pending)
+### 1.3 [x] Keep unrelated changes out of the branch (verified: `f074f5e` holds no deploy change; `e54cca3` holds it)
 
 - **Finding:** see Phase 0 (web port, `deploy.yml`). Both are uncommitted, sit outside the subscriptions scope, and break the smallest-diff rule.
 - **Requirement:** apply the Phase 0 decision. The subscriptions commit contains only subscription files.
@@ -130,7 +130,7 @@ Each item gives the **finding**, the **requirement** (what "fixed" means) and th
 
 `docs/chat-and-outbox.md` and `docs/notifications.md` were deleted on 2026-10-23. Both were point-in-time scout reports of 2026-09-02 branches, and what they described has since merged: `src/outbox/`, the chat WebSocket gateway, `src/notifications/`. They remain in git history. One finding from them is still true and has no other home:
 
-- [ ] **Failed outbox events are invisible.** `outbox_events.last_error` is recorded, but nothing reads it: no admin endpoint, metric or alert. `failed` rows are kept as dead letters by `OutboxRetention`, so they pile up unseen. Out of scope for this branch; track separately.
+- [ ] **Failed outbox events are invisible.** (Still open, re-checked 2026-10-24: `last_error` is only written in `outbox.service.ts`.) `outbox_events.last_error` is recorded, but nothing reads it: no admin endpoint, metric or alert. `failed` rows are kept as dead letters by `OutboxRetention`, so they pile up unseen. Out of scope for this branch; track separately.
 
 ---
 

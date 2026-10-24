@@ -51,10 +51,29 @@ from the most recent ships that aren't recorded there.
   Payments page are not built (product decisions).
 - Dead mock files: `apps/web/lib/feedbacks.ts`, `apps/web/lib/report.ts`.
 
+### Admin backoffice audit (2026-10-24)
+
+From `docs/admin-backoffice-audit-2026-10-24.md`, re-checked against code the same day. None of
+these is fixed yet.
+
+- **C1, check first:** the `DEV_OTP_TOKEN` SMS bypass isn't environment-gated
+  (`config.validation.ts` accepts it in every `NODE_ENV`), and `apps/backend/.env.prod` sets it.
+  Verify the Vercel production env, reject the variable when `NODE_ENV=production`, and rotate it.
+- **C2:** `PATCH /payments/:id` changes status without a ledger entry, status history or actor.
+- **C3:** deleting a subscription category (`removeCategory`) silently drops every subscriber in
+  that group to the free plan, and doesn't reconcile their ads.
+- **H1:** no audit trail for any privileged action. This is super-admin Phase 3
+  (`docs/super-admin-todo.md`).
+
 ### Chat
 
 - See CHANGELOG **Unreleased → Known issues**: the attachment quota uses `declaredSize`; v2
   envelopes aren't bound to the target device key; there are no safety numbers.
+- **E2E multi-device Phase 3 cutover** (`tasks/plan-e2e-multi-device.md`) is not started.
+  Still to do:
+  - reject v1 `e2eHeader` sends (426 `E2E_CLIENT_OUTDATED`);
+  - remove the v1 bundle endpoint and `user_e2e_identities`;
+  - wire `components/setting/Devices.tsx` (still a mock) to a device list + revoke API.
 
 ### Web
 

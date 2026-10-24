@@ -13,6 +13,9 @@ How to use this file:
   `tasks/todo.md`. Once an entry has shipped, fold its outcome into this file and drop it from
   the log. The full historical log up to 2026-10-24 is in git (`git show fd824a0:tasks/todo.md`).
 - Migrations are named by their file prefix in `apps/backend/drizzle/migrations/`.
+- Plans cited below that were deleted once shipped (`tasks/plan.md`, `tasks/spec.md`,
+  `tasks/plan-e2e-phase1-2.md`, `tasks/plan-tenant-subscriptions.md`) can still be read with
+  `git show 5783531:<path>`. Design references were moved to `docs/`.
 
 ## [Unreleased]
 
@@ -93,7 +96,10 @@ How to use this file:
   suspend or delete one. Every admin user mutation now goes through `assertCanManageUser`
   (`admin/admin-user-policy.ts`): only super_admin manages staff accounts, nobody can
   delete/demote/suspend themselves, and the last active super_admin can't be removed (counted
-  under a row lock).
+  under a row lock). Stable error codes (`ONLY_SUPER_ADMIN_CAN_MANAGE_ADMINS`,
+  `CANNOT_CHANGE_OWN_ROLE`, `LAST_SUPER_ADMIN`, …). This is Phase 1 of
+  `docs/super-admin-todo.md`. The audit log, advertisement ads and workspace settings phases are
+  not started.
 - **Auth throttles per route**: login/verify/social/telegram 10/min; register, OTP request and
   OTP login 5/min (each sends a paid SMS); refresh 30/min. Telegram payloads are shape-checked.
   Login also matches the lowercased username.
@@ -120,10 +126,24 @@ How to use this file:
   another phone and refuses to remove the last one.
 - Listing create/update are transactional; dropped-photo cleanup touches only the owner's folder.
 - Web `serverActions.bodySizeLimit` raised to 32 MB (avatars over 1 MB were rejected by Next).
-- **Subscription review fixes**: reconciliation updates are guarded by owner + expected state;
-  admin edits enqueue a coalesced BullMQ sweep (`EntitlementsScheduler`); status types live in
-  `subscription-status.ts`; user-facing fields renamed to `group*`.
-- **Outbox**: `Channel` replaced with `WakeupSignal`; the fallback poll is decoupled.
+- **Subscription review fixes** (`f074f5e`, per `docs/subscriptions-review-todo.md`):
+  - `reconcileListings` only restores rows still `restricted` and only restricts rows still
+    `active`, scoped to the owner, and counts from `RETURNING`.
+  - Admin scope and free-plan edits enqueue one coalesced BullMQ job
+    (`reconcile-on-config-change` via `EntitlementsScheduler`), replacing the fire-and-forget
+    sweep.
+  - A concurrent free-plan save returns an honest 409 instead of "Slug already in use".
+  - `supersededReason` is typed end to end (`subscription-status.ts`).
+  - Shared helpers: `toFreePlanSettings`, `groupBucket`, `describeBucket` and
+    `use-admin-category-tree`.
+  - User-facing fields renamed to `group*`.
+  - New specs for scope/free-plan updates and revoke.
+- **Outbox wakeup** (`7f3477c`, per `docs/outbox-wakeup-signal-spec.md`): the generic
+  `Channel<T>` is replaced by a small `WakeupSignal`.
+  - One process-level fallback timer makes one claim per interval, whatever the worker count.
+  - A fallback claim that finds backlog wakes idle peers.
+  - A worker stuck in a handler no longer stops polling.
+  - Shutdown releases parked workers.
 - **CI**: the deploy workflow deploys only the apps the push affects.
 
 ### Fixed
@@ -153,6 +173,10 @@ How to use this file:
 - **ABA PayWay**: webhook-only settlement with a checkout `lifetime`
   (`ABA_PAYWAY_LIFETIME_MINUTES`); on a phone, checkout opens ABA Mobile via deeplink.
 - Data-driven subscription filters in the admin.
+- Together these deliver the goal of `tasks/plan-tenant-subscriptions.md`: self-serve paid plans
+  through the payment module, with enforced limits and admin comp grants. They use a per-user
+  model instead of the plan's tenant layer, which was dropped. The plan's order expiry was not
+  built.
 
 ### Changed
 
@@ -170,6 +194,10 @@ How to use this file:
   when the live API returns it as a sibling.
 - The Bakong poll checked expiry before asking the provider, so a payment made at the deadline was
   lost.
+- **Graceful shutdown** (`d465bdf`, 2026-10-17): `app.enableShutdownHooks()`. SIGTERM, which
+  happens on every Vercel scale-down and redeploy, used to kill the process without running
+  lifecycle hooks, so BullMQ workers never closed, Redis pub/sub connections never quit and the
+  outbox shutdown grace never ran.
 - Long-lived WebSocket sessions held stale state. Completed BullMQ jobs are now removed, and queue
   config is centralised.
 
@@ -218,10 +246,17 @@ How to use this file:
 - **`/settings` made real**: profile, password, username and phone change via OTP, delete account
   with a 90-day purge (`AccountPurgeService`).
 - **Designed storefront 404 page.**
-- **Chat E2E v2**: multi-device (migration `0027`), encrypted history backup with a passcode or
-  device approval (`0028`, `0029`), WebSocket ack/error frames and live read receipts.
-- **Encrypted chat attachments** (migration `0030`): a private `chat-files` bucket, AES-256-GCM
-  per file, 5-minute signed URLs, an hourly cleanup job, a download button, and a resizable chat
+- **Chat E2E v2** (`603aa33`, 2026-09-29, per `tasks/plan-e2e-multi-device.md`; Phases 0–2 and
+  4/5 done):
+  - multi-device (migration `0027`);
+  - encrypted history backup with a passcode or device approval (`0028`, `0029`);
+  - WebSocket ack/error frames and live read receipts.
+
+  The plan's Phase 3 cutover is still open: rejecting v1 sends, and a real devices page.
+
+- **Encrypted chat attachments** (migration `0030`; `e222daa`/`28e1d37`/`72d5102`, 2026-09-29,
+  per `docs/e2e-attachments.md`, P1–P4): a private `chat-files` bucket, AES-256-GCM per
+  file, 5-minute signed URLs, an hourly cleanup job, a download button, and a resizable chat
   sidebar.
 - **Outbox retention sweep** (`OUTBOX_RETENTION_DAYS` was parsed but never read).
 - Ledger amount rules plus a DB `CHECK (amount > 0)` (migration `0032`).
@@ -236,7 +271,7 @@ How to use this file:
 - Search: date-posted hid listings without `published_at`; expired ads now leave the feed.
 - The Show More bars are equal on the left and right.
 
-## 2026-09-21 → 2026-09-24 — Post form families, notifications, chat
+## 2026-09-18 → 2026-09-24 — Post form families, notifications, chat
 
 ### Added
 
@@ -249,10 +284,18 @@ How to use this file:
 - **Attribute-grid filters**: `GET /listings` gained `attrKey` + `attrValue`, so clicking a Type,
   Accessory or other tile filters the feed (it used to return nothing).
 - **In-app notifications** (migration `0024`).
-- **Chat**: E2E encryption (X3DH + Double Ratchet over `@noble/curves`, migrations `0021`,
-  `0022`), cross-instance realtime push over Redis pub/sub, WebSocket auth/rate-limit parity,
-  user-keyed throttling, WebSocket tickets, attached-ad cards, draft image management, grouped
-  images (`0026`), per-side conversation delete (`0025`), and `clientMessageId` dedupe (`0023`).
+- **Chat E2E v1**: the key schema and key-management endpoints landed first (2026-09-19,
+  `cb0bc4a`/`4d28133`, per `tasks/plan-e2e-phase1-2.md`; migration `0021`). Then a separate
+  Ed25519 signing key (`0022`) and X3DH + Double Ratchet over `@noble/curves` (2026-09-21,
+  `64c1414`, per `docs/e2e-encryption.md`).
+- **Chat production hardening**, delivered on a different path from `tasks/plan.md`:
+  - cross-instance realtime push over Redis pub/sub;
+  - WebSocket auth and rate-limit parity, and user-keyed throttling;
+  - `clientMessageId` dedupe (`0023`);
+  - WebSocket tickets, and a heartbeat that records client pongs (`c33fb24`);
+  - in-process send-latency metrics at `GET /admin/chat-metrics` (`b9222f9`).
+- **Chat UX**: attached-ad cards, draft image management, grouped images (`0026`) and per-side
+  conversation delete (`0025`).
 - Listings without a price read "Negotiable" instead of `$0`.
 
 ### Changed
@@ -325,3 +368,6 @@ How to use this file:
 - **Chat**: 1:1 conversations, inbox, messages and read receipts over REST.
 - **Admin dashboard** (Next.js, later moved from `apps/admin` to `apps/web`): stats, users,
   categories, subcategories, brands, models, attributes, subscription config and reports.
+- **`super_admin` role** (2026-08-15, `f008db6`, migration `0012_blushing_sentinel`). It
+  satisfies every admin guard; only super_admin may assign staff roles, and the Team page is
+  super_admin-only (server redirect + hidden sidebar link).

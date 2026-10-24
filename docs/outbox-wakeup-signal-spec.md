@@ -1,6 +1,6 @@
 # Outbox Wakeup Signal — Design Spec
 
-**Status:** Draft for alignment  
+**Status:** Implemented 2026-10-23 in `7f3477c` (`src/outbox/wakeup-signal.ts`; `src/utils/channel.ts` deleted). All eight acceptance tests below are covered by `wakeup-signal.spec.ts` and `outbox-worker.service.spec.ts` (verified 2026-10-24: outbox suites 8/8, 57 tests pass).  
 **Scope:** Replace the generic `Channel<T>` used only by `OutboxWorker` with a Node-appropriate, outbox-specific wakeup signal. This does not change the transactional outbox or move work out of the existing NestJS process architecture.
 
 ## Problem
