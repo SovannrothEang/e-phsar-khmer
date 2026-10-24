@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { loadMyAds } from "@/actions/my-ads";
-import type { PlanEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
 
 type Tab = "active" | "expired";
@@ -22,6 +22,20 @@ interface TabState {
   page: number;
   hasMore: boolean;
   error: string | null;
+}
+
+// Allowances are per bucket (a held group, or a free category cap), so the
+// account totals are sums over the buckets the user actually has.
+function adsSummary(plan: PlanEntitlements): string {
+  const allowance = plan.buckets.reduce((sum, b) => sum + b.limits.ads, 0);
+  return `${plan.usage.ads}/${plan.buckets.length > 0 ? allowance : plan.limits.ads}`;
+}
+
+function renewsSummary(plan: PlanEntitlements): string {
+  const values = plan.buckets.map((b) => b.limits.renews);
+  const low = Math.min(plan.limits.renews, ...values);
+  const high = Math.max(plan.limits.renews, ...values);
+  return low === high ? `${low} per ad` : `${low}–${high} per ad`;
 }
 
 export default function ManageAds() {
@@ -121,13 +135,13 @@ export default function ManageAds() {
           <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
             Total Ads
             <p className="text-lg text-foreground">
-              {plan ? `${plan.usage.ads}/${plan.limits.ads}` : "–"}
+              {plan ? adsSummary(plan) : "–"}
             </p>
           </div>
           <div className="bg-muted h-20 w-full text-center p-6 rounded-md text-foreground font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
             Renews
             <p className="text-lg text-foreground">
-              {plan ? `${plan.limits.renews} per ad` : "–"}
+              {plan ? renewsSummary(plan) : "–"}
             </p>
           </div>
         </div>

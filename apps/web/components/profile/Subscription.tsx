@@ -1,47 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  BadgeCheck,
-  Camera,
-  CircleAlert,
-  Megaphone,
-  RefreshCw,
-  Repeat,
-  Sparkles,
-  Video,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ChevronRight, CircleAlert, RefreshCw } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import {
-  getMyEntitlements,
-  getMySubscriptions,
-  getSubscriptionCatalog,
-  type PlanEntitlements,
-  type SubscriptionCatalogItem,
-  type UserSubscription,
-} from "@/actions/subscriptions";
-import {
-  currentSubscription,
-  offerState,
-  packageIdOf,
-  priceFor,
-} from "@/lib/subscription-pricing";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { getMySubscriptions, getPublicFreePlan } from "@/actions/subscriptions";
+import type { PublicFreePlan, UserSubscription } from "@/types/subscription";
+import { activeSubscriptions } from "@/lib/subscription-pricing";
 
 const STATUS_STYLE: Record<UserSubscription["status"], string> = {
   active: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   expired: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   superseded: "bg-muted text-muted-foreground",
+  revoked: "bg-red-500/10 text-red-700 dark:text-red-400",
 };
 
 const STATUS_LABEL: Record<UserSubscription["status"], string> = {
   active: "Active",
   expired: "Expired",
   superseded: "Upgraded",
+  revoked: "Revoked",
 };
 
 function money(value: string | number): string {
@@ -59,330 +37,78 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-type Limits = {
-  photos: number;
-  ads: number;
-  renews: number;
-  autoRenews: number;
-  videos: number;
-};
+/** Zero reads as "None", like an unavailable feature. */
+const amount = (value: number) => (value > 0 ? String(value) : "None");
 
-function benefits(limits: Limits): {
-  label: string;
-  value: number;
-  Icon: LucideIcon;
-}[] {
+type Row = { label: string; value: string };
+
+/** One plan as a sheet: a centred title over label / value rows. */
+function PlanSheet({
+  title,
+  subtitle,
+  rows,
+}: {
+  title: string;
+  subtitle?: string;
+  rows: Row[];
+}) {
+  return (
+    <section
+      aria-label={`${title} plan`}
+      className="overflow-hidden rounded-md bg-card ring-1 ring-border"
+    >
+      <header className="px-6 pt-8 pb-4 text-center">
+        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+        {subtitle && (
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        )}
+      </header>
+      <dl>
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-center justify-between gap-4 border-b border-border px-6 py-5 last:border-b-0"
+          >
+            <dt className="text-foreground">{row.label}</dt>
+            <dd className="tabular-nums text-foreground">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function freeRows(plan: PublicFreePlan): Row[] {
   return [
-    { label: "Photos per ad", value: limits.photos, Icon: Camera },
-    { label: "Active ads", value: limits.ads, Icon: Megaphone },
-    { label: "Renewals", value: limits.renews, Icon: RefreshCw },
-    { label: "Auto-renewals", value: limits.autoRenews, Icon: Repeat },
-    { label: "Videos", value: limits.videos, Icon: Video },
+    { label: "Photos", value: amount(plan.photos) },
+    { label: "Videos", value: amount(plan.videos) },
+    ...plan.caps.map((cap) => ({ label: cap.name, value: amount(cap.ads) })),
+    { label: "Other Ads", value: amount(plan.otherAds) },
+    { label: "Renews", value: amount(plan.renews) },
+    { label: "Auto-Renews", value: amount(plan.autoRenews) },
   ];
 }
 
-function BenefitGrid({ limits }: { limits: Limits }) {
-  return (
-    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-      {benefits(limits).map(({ label, value, Icon }) => (
-        <li key={label} className="rounded-xl bg-muted px-3 py-3">
-          <Icon className="size-4 text-muted-foreground" />
-          <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
-            {value}
-          </p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function UsageBar({ entitlements }: { entitlements: PlanEntitlements }) {
-  const { usage, limits } = entitlements;
-  const full = usage.ads >= limits.ads;
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="text-muted-foreground">Active ads used</span>
-        <span className="font-semibold tabular-nums text-foreground">
-          {usage.ads} / {limits.ads}
-        </span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full ${full ? "bg-amber-500" : "bg-[#00a0e9]"}`}
-          style={{
-            width: `${Math.min(100, Math.round((usage.ads / Math.max(1, limits.ads)) * 100))}%`,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function CurrentPlan({
-  subscription,
-  entitlements,
-  now,
-}: {
-  subscription: UserSubscription;
-  entitlements: PlanEntitlements | null;
-  now: number;
-}) {
-  const started = new Date(subscription.subscribedAt).getTime();
-  const ends = new Date(subscription.expiresAt).getTime();
-  const daysLeft = Math.max(0, Math.ceil((ends - now) / DAY_MS));
-  const elapsed =
-    ends > started
-      ? Math.min(1, Math.max(0, (now - started) / (ends - started)))
-      : 1;
-
-  return (
-    <section
-      aria-label="Current plan"
-      className="rounded-2xl bg-card p-6 shadow-sm ring-1 ring-[#00a0e9]/50"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-            <BadgeCheck className="size-3.5" /> Current plan
-          </span>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-            {subscription.packageName ?? subscription.planName ?? "Premium"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {[
-              subscription.categoryName,
-              subscription.planName,
-              subscription.termName,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-2xl font-semibold tabular-nums text-foreground">
-            {daysLeft}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {daysLeft === 1 ? "day" : "days"} left
-          </p>
-        </div>
-      </div>
-
-      <div
-        role="progressbar"
-        aria-label="Time used"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(elapsed * 100)}
-        className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="h-full rounded-full bg-[#00a0e9]"
-          style={{ width: `${Math.round(elapsed * 100)}%` }}
-        />
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Started {formatDate(subscription.subscribedAt)} · ends{" "}
-        {formatDate(subscription.expiresAt)} · paid $
-        {money(subscription.priceUsd)}
-      </p>
-
-      <h3 className="mt-6 mb-3 text-sm font-semibold text-foreground">
-        Your benefits
-      </h3>
-      <BenefitGrid limits={entitlements?.limits ?? subscription} />
-      {entitlements && (
-        <div className="mt-5">
-          <UsageBar entitlements={entitlements} />
-        </div>
-      )}
-    </section>
-  );
-}
-
-function FreePlan({ entitlements }: { entitlements: PlanEntitlements }) {
-  return (
-    <section
-      aria-label="Current plan"
-      className="rounded-2xl bg-card p-6 shadow-sm ring-1 ring-border"
-    >
-      <span className="inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-        Current plan
-      </span>
-      <h2 className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-        Free
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        The limits every account starts with.
-      </p>
-      <h3 className="mt-6 mb-3 text-sm font-semibold text-foreground">
-        Your benefits
-      </h3>
-      <BenefitGrid limits={entitlements.limits} />
-      <div className="mt-5">
-        <UsageBar entitlements={entitlements} />
-      </div>
-    </section>
-  );
-}
-
-function UpgradeOptions({
-  catalog,
-  active,
-  now,
-}: {
-  catalog: SubscriptionCatalogItem[];
-  active: UserSubscription | null;
-  now: number;
-}) {
-  const activePackageId = packageIdOf(active, catalog);
-  const categories = useMemo(() => {
-    const byCategory = new Map<
-      string,
-      { name: string; slug: string; packages: SubscriptionCatalogItem[][] }
-    >();
-    const byPackage = new Map<string, SubscriptionCatalogItem[]>();
-    for (const item of catalog) {
-      const terms = byPackage.get(item.packageId) ?? [];
-      terms.push(item);
-      byPackage.set(item.packageId, terms);
-    }
-    for (const terms of byPackage.values()) {
-      const first = terms[0];
-      const category = byCategory.get(first.categoryId) ?? {
-        name: first.categoryName,
-        slug: first.categorySlug,
-        packages: [],
-      };
-      category.packages.push(terms);
-      byCategory.set(first.categoryId, category);
-    }
-    return [...byCategory.values()];
-  }, [catalog]);
-
-  if (categories.length === 0) return null;
-
-  return (
-    <section aria-labelledby="upgrade-heading">
-      <div className="mb-3">
-        <h2
-          id="upgrade-heading"
-          className="text-lg font-semibold tracking-tight text-foreground"
-        >
-          {active ? "Upgrade your plan" : "Premium plans"}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {active
-            ? "Upgrades keep your current end date — you pay only the difference for the time left."
-            : "More photos, more active ads and more renewals. Pay with KHQR."}
-        </p>
-      </div>
-      <div className="space-y-6">
-        {categories.map((category) => (
-          <div key={category.slug}>
-            <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-              {category.name}
-            </h3>
-            <div className="grid items-stretch gap-4 md:grid-cols-2">
-              {category.packages.map((terms) => {
-                const base = terms[0];
-                const states = terms.map((term) =>
-                  offerState(term, active, activePackageId, now),
-                );
-                const inUse = states.some((s) => s.kind === "current");
-                const dues = states.flatMap((s) =>
-                  s.kind === "upgrade" || s.kind === "new" ? [s.due] : [],
-                );
-                const from = dues.length > 0 ? Math.min(...dues) : null;
-                const lowestPrice = Math.min(...terms.map(priceFor));
-
-                return (
-                  <article
-                    key={base.packageId}
-                    className={`flex flex-col rounded-2xl bg-card p-5 shadow-sm ${
-                      inUse
-                        ? "ring-2 ring-emerald-500/60"
-                        : "ring-1 ring-border"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-[#0089c8]">
-                          {base.planName}
-                        </p>
-                        <h4 className="mt-1 truncate text-lg font-semibold text-foreground">
-                          {base.packageName}
-                        </h4>
-                      </div>
-                      {inUse ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                          <BadgeCheck className="size-3.5" /> In use
-                        </span>
-                      ) : (
-                        <span className="shrink-0 text-right">
-                          <span className="block text-xs text-muted-foreground">
-                            From
-                          </span>
-                          <span className="font-semibold tabular-nums text-foreground">
-                            ${money(lowestPrice)}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {base.photos} photos · {base.ads} ads · {base.renews}{" "}
-                      renewals · {base.autoRenews} auto-renewals · {base.videos}{" "}
-                      videos
-                    </p>
-                    <div className="mt-auto pt-5">
-                      {inUse ? (
-                        <p className="flex h-10 items-center justify-center rounded-xl bg-muted text-sm font-medium text-muted-foreground">
-                          Your current package
-                        </p>
-                      ) : from === null ? (
-                        <p
-                          aria-disabled
-                          className="flex h-10 items-center justify-center rounded-xl bg-muted text-sm font-medium text-muted-foreground"
-                        >
-                          Not an upgrade from your plan
-                        </p>
-                      ) : (
-                        <Link
-                          href={{
-                            pathname: "/premium-account/[category]",
-                            params: { category: base.categorySlug },
-                          }}
-                          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-[#00a0e9] text-sm font-semibold text-white transition-colors hover:bg-[#008ccb]"
-                        >
-                          {active
-                            ? `Upgrade · from $${money(from)} today`
-                            : `Choose ${base.packageName}`}
-                          <ArrowRight className="size-4" />
-                        </Link>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
+function subscriptionRows(subscription: UserSubscription): Row[] {
+  return [
+    { label: "Photos", value: amount(subscription.photos) },
+    { label: "Videos", value: amount(subscription.videos) },
+    { label: "Ads", value: amount(subscription.ads) },
+    { label: "Renews", value: amount(subscription.renews) },
+    { label: "Auto-Renews", value: amount(subscription.autoRenews) },
+    { label: "Expires", value: formatDate(subscription.expiresAt) },
+  ];
 }
 
 function HistoryCard({ subscription }: { subscription: UserSubscription }) {
   return (
-    <article className="flex items-center justify-between gap-3 rounded-xl bg-card p-4 ring-1 ring-border">
+    <article className="flex items-center justify-between gap-3 rounded-md bg-card p-4 ring-1 ring-border">
       <div className="min-w-0">
         <p className="truncate font-medium text-foreground">
           {subscription.packageName ?? subscription.planName ?? "Subscription"}
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {[subscription.categoryName, subscription.termName]
+          {[subscription.groupName, subscription.termName]
             .filter(Boolean)
             .join(" · ")}{" "}
           · {formatDate(subscription.subscribedAt)} –{" "}
@@ -405,136 +131,130 @@ function HistoryCard({ subscription }: { subscription: UserSubscription }) {
 
 export default function Subscription() {
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
-  const [catalog, setCatalog] = useState<SubscriptionCatalogItem[]>([]);
-  const [entitlements, setEntitlements] = useState<PlanEntitlements | null>(
-    null,
-  );
+  const [freePlan, setFreePlan] = useState<PublicFreePlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [now] = useState(() => Date.now());
+
+  const apply = useCallback(
+    ([subs, free]: [
+      PromiseSettledResult<UserSubscription[]>,
+      PromiseSettledResult<PublicFreePlan>,
+    ]) => {
+      // Subscriptions decide which sheets render, so only they can fail the
+      // page; the free plan degrades to a hidden sheet.
+      if (subs.status === "fulfilled") setSubscriptions(subs.value);
+      else setError("We couldn't load your membership. Please try again.");
+      if (free.status === "fulfilled") setFreePlan(free.value);
+      setLoading(false);
+    },
+    [],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Subscriptions decide which screen renders, so only they can fail the
-    // page; entitlements and the catalog degrade to hidden sections.
-    const [subs, ents, offers] = await Promise.allSettled([
-      getMySubscriptions(),
-      getMyEntitlements(),
-      getSubscriptionCatalog(),
-    ]);
-    if (subs.status === "fulfilled") setSubscriptions(subs.value);
-    else setError("We couldn't load your subscriptions. Please try again.");
-    if (ents.status === "fulfilled") setEntitlements(ents.value);
-    if (offers.status === "fulfilled") setCatalog(offers.value);
-    setLoading(false);
-  }, []);
+    apply(
+      await Promise.allSettled([getMySubscriptions(), getPublicFreePlan()]),
+    );
+  }, [apply]);
 
   useEffect(() => {
     let mounted = true;
-    Promise.allSettled([
-      getMySubscriptions(),
-      getMyEntitlements(),
-      getSubscriptionCatalog(),
-    ]).then(([subs, ents, offers]) => {
-      if (!mounted) return;
-      if (subs.status === "fulfilled") setSubscriptions(subs.value);
-      else setError("We couldn't load your subscriptions. Please try again.");
-      if (ents.status === "fulfilled") setEntitlements(ents.value);
-      if (offers.status === "fulfilled") setCatalog(offers.value);
-      setLoading(false);
-    });
+    Promise.allSettled([getMySubscriptions(), getPublicFreePlan()]).then(
+      (results) => {
+        if (mounted) apply(results);
+      },
+    );
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apply]);
 
-  const active = useMemo(
-    () => currentSubscription(subscriptions),
+  // One live subscription per category, held side by side.
+  const held = useMemo(
+    () => activeSubscriptions(subscriptions),
     [subscriptions],
   );
-  const history = useMemo(
-    () => subscriptions.filter((item) => item.id !== active?.id),
-    [subscriptions, active],
-  );
+  const history = useMemo(() => {
+    const current = new Set(held.map((item) => item.id));
+    return subscriptions.filter((item) => !current.has(item.id));
+  }, [subscriptions, held]);
 
   return (
-    <div className="min-w-full bg-muted pb-12 pt-6">
-      <main className="mx-auto max-w-5xl space-y-8 px-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Subscriptions
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your plan, its benefits and how to get more.
-          </p>
-        </div>
+    <div className="min-w-full bg-background pb-12 pt-6">
+      <main className="mx-auto max-w-5xl space-y-6 px-4">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+          Membership
+        </h1>
 
         {loading ? (
-          <div className="space-y-4">
-            <div className="h-72 animate-pulse rounded-2xl bg-card ring-1 ring-border" />
-            <div className="grid gap-4 md:grid-cols-2">
-              {[0, 1].map((item) => (
-                <div
-                  key={item}
-                  className="h-40 animate-pulse rounded-2xl bg-card ring-1 ring-border"
-                />
-              ))}
-            </div>
-          </div>
+          <div className="h-[34rem] animate-pulse rounded-md bg-card ring-1 ring-border" />
         ) : error ? (
           <div
             role="alert"
-            className="rounded-2xl bg-card p-10 text-center ring-1 ring-border"
+            className="rounded-md bg-card p-10 text-center ring-1 ring-border"
           >
             <CircleAlert className="mx-auto size-7 text-amber-600" />
             <p className="mt-3 text-sm text-muted-foreground">{error}</p>
             <Button
               variant="outline"
               onClick={() => void load()}
-              className="mt-4 h-10 rounded-xl"
+              className="mt-4 h-10 rounded-md"
             >
               <RefreshCw className="mr-2 size-4" /> Try again
             </Button>
           </div>
         ) : (
           <>
-            {active ? (
-              <CurrentPlan
-                subscription={active}
-                entitlements={entitlements}
-                now={now}
+            {held.map((subscription) => (
+              <PlanSheet
+                key={subscription.id}
+                title={
+                  subscription.packageName ?? subscription.planName ?? "Premium"
+                }
+                subtitle={[subscription.groupName, subscription.termName]
+                  .filter(Boolean)
+                  .join(" · ")}
+                rows={subscriptionRows(subscription)}
               />
-            ) : entitlements ? (
-              <FreePlan entitlements={entitlements} />
-            ) : null}
+            ))}
 
-            {!active && (
-              <Link
-                href="/premium-account"
-                className="group flex items-center justify-between gap-4 rounded-2xl bg-card p-5 ring-1 ring-border transition-colors hover:ring-[#00a0e9]/60"
-              >
-                <span className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-[#00a0e9]/10 text-[#0089c8]">
-                    <Sparkles className="size-5" />
-                  </span>
-                  <span>
-                    <span className="block font-semibold text-foreground">
-                      Need more?
-                    </span>
-                    <span className="block text-sm text-muted-foreground">
-                      Upgrade to the plan that better suits your business.
-                    </span>
-                  </span>
-                </span>
-                <ArrowRight className="size-5 text-[#0089c8] transition-transform group-hover:translate-x-0.5" />
-              </Link>
+            {freePlan && (
+              <PlanSheet
+                title="Free"
+                subtitle={
+                  held.length > 0
+                    ? "For ads in categories your plans don't cover"
+                    : undefined
+                }
+                rows={freeRows(freePlan)}
+              />
             )}
 
-            <UpgradeOptions catalog={catalog} active={active} now={now} />
+            <Link
+              href="/premium-account"
+              className="flex items-center justify-between gap-4 rounded-md bg-card px-6 py-6 ring-1 ring-border transition-colors hover:ring-[#00a0e9]/60"
+            >
+              <span>
+                <span className="block text-xl font-semibold text-foreground">
+                  Need More?
+                </span>
+                <span className="mt-3 block text-foreground">
+                  Upgrade to the right plan that better suits your business.
+                </span>
+              </span>
+              <ChevronRight className="size-5 shrink-0 text-[#00a0e9]" />
+            </Link>
+
+            <Link
+              href="/premium-account"
+              className="flex h-14 items-center justify-center rounded-md bg-[#00a0e9] text-lg font-semibold text-white transition-colors hover:bg-[#008ccb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a0e9] focus-visible:ring-offset-2"
+            >
+              Upgrade Account
+            </Link>
 
             {history.length > 0 && (
-              <section aria-label="Past plans">
+              <section aria-label="Past plans" className="pt-4">
                 <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
                   History
                 </h2>

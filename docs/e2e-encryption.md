@@ -1,6 +1,10 @@
-# Spec: End-to-End Encryption for Chat Messages
+# End-to-End Encryption for Chat Messages — design
+
+> Design reference (moved from `tasks/spec-e2e-encryption.md` on 2026-10-24). The protocol decisions and design §1–§9 are current; code comments cite "design §9" and "decision #2". Rollout steps, the file inventory and the pre-E2E code snapshot were dropped (they are in git history). Multi-device (`tasks/plan-e2e-multi-device.md`) and attachments (`e2e-attachments.md`) extend this design.
 
 ## Status
+
+**Update 2026-10-24:** the client engine has since been round-tripped. A 22-scenario esbuild script ran when multi-device shipped, and a 20-check script on 2026-10-24 covered X3DH, the Double Ratchet, tamper/replay/wrong-key rejection and the voice/location payloads. Decision #2 (single device) is superseded by `plan-e2e-multi-device.md`, and #3 (text only) by `plan-e2e-attachments.md`. New sends are E2E-only since 2026-10-24 (`5f1d1b6`). The paragraph below is the original 2026-09-30 status.
 
 **Backend Phases 1–3 shipped and tested; client crypto engine built and reasoned through against spec but never round-tripped (no test runner in `apps/web` — see Open questions).** No client key-bootstrap flow and no UI wiring yet — see Current state for the precise line between done and not-done. This file is standalone — it does not touch or depend on `tasks/spec.md` / `tasks/plan.md` (a separate, unrelated chat-scaling effort: idempotency, ordering, outbox delivery). Nothing in this spec assumes any of that work has landed.
 
@@ -15,28 +19,6 @@
 7. **Prekey pool size (100) and replenish threshold (<10) adopt Signal's own reference defaults as final v1 values**, not a placeholder — see "Deciding the numeric parameters" below for why this one didn't need npic-specific research.
 8. **`messages_body_length_max` ships with a provisional value (24000) pending a real measurement**, tracked as a checklist item, not an open-ended question — see the same section. **Shipped at 24000** (migration `0017`).
 9. **Identity key is split into two keys, not one.** X3DH needs the identity key to both Diffie-Hellman (X25519) and sign the signed-prekey (Ed25519). Signal's own XEdDSA scheme lets one key do both via an Edwards↔Montgomery curve conversion; `@noble/curves` doesn't expose that conversion publicly, and hand-rolling elliptic-curve point conversion math is exactly the kind of risk decision #1 exists to avoid. `user_e2e_identities` carries both `identityKey` (X25519, DH) and `identitySigningKey` (Ed25519, signing) — shipped in migration `0018`.
-
-## Current state (verified against the code, not the README)
-
-**Backend — shipped:**
-
-- `ChatModule` (`apps/backend/src/chat/`): REST is authoritative (`ChatService.sendMessage`), a WebSocket gateway (`chat.gateway.ts`) is a best-effort push shortcut on top of the same write path. Both call the identical service method — confirmed in `chat.controller.ts` and `chat.gateway.ts`.
-- Schema (`apps/backend/src/db/schema/chat.schema.ts`), all in the dedicated `chat` Postgres schema:
-  - `conversations` / `messages`: unchanged shape except `messages` gained `isE2e boolean` + `e2eHeader jsonb`, and `messages_body_length_max` is now `char_length(body) <= 24000`.
-  - `userE2eIdentities`: `userId` PK, `identityKey` (X25519), `identitySigningKey` (Ed25519 — decision #9), `registrationId`, `signedPrekeyId`/`signedPrekeyPublic`/`signedPrekeySignature`/`signedPrekeyCreatedAt`, timestamps.
-  - `userE2eOneTimePrekeys`: `id`, `userId`, `prekeyId`, `publicKey`, `usedAt` (null = available), unique on `(userId, prekeyId)`, partial index on unused rows.
-- `apps/backend/src/chat/blocks.util.ts`: shared `isBlockedEitherWay` — used by both `ChatService.sendMessage` and `E2eKeysService.getBundle`, so a block disables every chat interaction surface (send **and** bundle-fetch), not just sending.
-- `apps/backend/src/chat/e2e/`: `E2eKeysController` (`POST /chats/e2e/keys`, `GET .../me/prekey-count`, `GET .../:userId/bundle`) + `E2eKeysService` (upsert via `onConflictDoUpdate`/`onConflictDoNothing`, atomic one-time-prekey claim via `SKIP LOCKED`, block-gated bundle fetch), registered in `ChatModule`.
-- `SendMessageDto` (`dto/send-message.dto.ts`): gained an optional `e2eHeader?: E2eHeaderDto`; `body`'s cap raised to 24000 to match the schema. `ChatService.sendMessage` stores `isE2e`/`e2eHeader` and rejects `e2eHeader` combined with `imagePath` (text-only in v1, decision #3). No WS gateway change needed — it forwards the same DTO.
-- Test coverage: 291 backend unit tests passing across all of the above; the `SKIP LOCKED` concurrency guarantee itself is still unverified by an integration test (flagged, not blocking — see Risks).
-
-**Web client — built, not wired up:**
-
-- `apps/web/lib/e2e/crypto/`: `primitives.ts` (X25519/Ed25519 via `@noble/curves`, the two KDFs, AES-256-GCM AEAD via `@noble/ciphers`), `double-ratchet.ts` (the ratchet state machine, spec-field-named), `x3dh.ts` (initiator/responder handshake, verifies the bundle signature before any DH work), `engine.ts` (composes both into the `RatchetEngine` interface).
-- `apps/web/lib/e2e/`: the reliability orchestration layer built _before_ the real engine — `decrypt-message.ts` (idempotent-by-message-id, cross-tab-locked, transactionally persisted), `store.ts` (IndexedDB: sessions keyed by conversation, decrypted plaintext keyed by message id), `lock.ts` (Web Locks API). `stub-engine.ts` still exists for exercising this layer without real key material.
-- **Not built:** anything that sources `LocalKeyMaterial` — no key generation, no local private-key storage, no caller of `POST /chats/e2e/keys`. `createSignalEngine()` has no real caller yet. No wiring into `message-thread.tsx`/`conversation-list.tsx`. This is design §9's bootstrap flow, still entirely on paper.
-- `FilesModule`: chat images upload via `POST /files/sign` with `scope: 'chat'`, stored at `chat/{userId}/…`, bucket is **public** (README's own Known Gaps flags this as an existing exposure, unrelated to this spec).
-- No message-content reporting endpoint exists (`user_reports`/`listing_reports` exist; nothing reports a specific message). **This means E2E does not regress an existing moderation feature — there is none to regress**, which removes what would otherwise be the biggest non-crypto cost of this change.
 
 ## Goals
 
@@ -277,33 +259,6 @@ Don't treat every unresolved constant the same way. Split them by whether the ri
 1. Once `createSignalEngine` has a real `LocalKeyMaterial` source (i.e. once the bootstrap flow above exists), encrypt representative 4000-character samples in `en`, `km`, and `zh` (the app's supported scripts — byte length per character varies a lot between them).
 2. Base64-encode each ciphertext, record the longest result.
 3. Set `messages_body_length_max` to that measured max + ~15-20% margin, replacing the provisional 24000. Adjust the DB check constraint via a follow-up migration if the measured value differs meaningfully.
-
-## Migration / rollout
-
-1. ~~Ship backend: new tables + 3 endpoints + `messages` schema change + `SendMessageDto`/`ChatService` changes.~~ **Done** (migrations `0017`, `0018`). No behavior change for any client that doesn't send `e2eHeader` — confirmed backward compatible, zero existing tests broke.
-2. **Not yet done:** ship an E2E-capable client build — key generation, `POST .../keys` on first launch, wiring `createSignalEngine`/`useDecryptedMessages` into the actual thread/inbox components. Existing conversations will keep working in plaintext until this exists.
-3. No backfill, no dual-write, no cutover flag. This is additive per-message, not a hard migration — still true, unaffected by anything above.
-
-## Files
-
-**Backend — shipped:**
-
-- `apps/backend/src/db/schema/chat.schema.ts` — `userE2eIdentities`, `userE2eOneTimePrekeys`, `messages.isE2e`/`e2eHeader`, updated check constraint.
-- `apps/backend/drizzle/migrations/0017_perfect_tarantula.sql`, `0018_friendly_pandemic.sql`.
-- `apps/backend/src/chat/blocks.util.ts` — shared block check.
-- `apps/backend/src/chat/e2e/` — `e2e-keys.controller.ts`, `e2e-keys.service.ts`, `e2e-keys.service.spec.ts`, `e2e-keys.types.ts`, `dto/{register-e2e-keys,one-time-prekey}.dto.ts`.
-- `apps/backend/src/chat/dto/send-message.dto.ts`, `dto/e2e-header.dto.ts`, `chat.service.ts`, `chat.service.spec.ts`, `chat.module.ts` — all modified/added for the `e2eHeader` passthrough.
-- No `@signalapp/libsignal-client` dependency anywhere in the backend — confirmed unneeded; the server only ever stores/relays opaque values.
-
-**Web — built:**
-
-- `apps/web/lib/e2e/crypto/{base64,primitives,x3dh,double-ratchet,engine}.ts` — the real `RatchetEngine`.
-- `apps/web/lib/e2e/{types,lock,store,decrypt-message,stub-engine}.ts` — the reliability orchestration layer and its seams.
-- `apps/web/hooks/use-decrypted-messages.ts` — the React hook, unused by any component so far.
-- `apps/web/types/chat.ts`, `hooks/use-chat-ws.ts`, `hooks/use-chat-thread.ts` — `isE2e`/`e2eHeader` mirrored into the wire types, rippling into the WS payload/send-envelope shapes and the optimistic-echo object.
-- `apps/web/package.json` — `@noble/curves`, `@noble/ciphers`, `@noble/hashes`.
-
-**Web — not started:** anything implementing `LocalKeyMaterial` (key generation/storage/registration — design §9's bootstrap flow), and wiring the decrypt hook + a not-yet-written encrypt/send path into `components/chat/message-thread.tsx` and `components/chat/conversation-list.tsx`.
 
 ## Resolved since first draft
 

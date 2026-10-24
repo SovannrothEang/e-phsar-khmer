@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
@@ -9,7 +11,9 @@ import {
   Matches,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -120,4 +124,35 @@ export class UpdateSubTermDto {
     | 'amount';
   @IsOptional() @IsInt() sortOrder?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+// ── Group scope ─────────────────────────────────────────────
+/** Replaces the whole set of listing subcategories a group covers. */
+export class UpdateSubCategoryScopeDto {
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @IsUUID('all', { each: true })
+  subcategoryIds: string[];
+}
+
+// ── Free plan ───────────────────────────────────────────────
+export class FreePlanAdLimitDto {
+  @IsOptional() @IsUUID() categoryId?: string;
+  @IsOptional() @IsUUID() subcategoryId?: string;
+  @IsInt() @Min(0) ads: number;
+}
+
+/** Replaces the free plan: its account-wide numbers and every ad cap. */
+export class UpdateFreePlanDto {
+  @IsInt() @Min(0) photos: number;
+  @IsInt() @Min(0) renews: number;
+  @IsInt() @Min(0) autoRenews: number;
+  @IsInt() @Min(0) videos: number;
+  @IsInt() @Min(0) otherAds: number;
+
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @ValidateNested({ each: true })
+  @Type(() => FreePlanAdLimitDto)
+  adLimits: FreePlanAdLimitDto[];
 }

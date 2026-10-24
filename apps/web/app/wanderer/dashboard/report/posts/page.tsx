@@ -57,7 +57,8 @@ export default function ReportPostsPage() {
         (r) =>
           ({
             ReportPostID: r.id,
-            postId: r.listingId ? Number(r.listingId) || 0 : 0,
+            // A UUID — Number(uuid) was NaN → 0, so every View opened post 0.
+            postId: r.listingId,
             userId: r.reporterId,
             ReportReasonID: r.reasonText ?? "",
             ReportPostDescription: r.description ?? "",
@@ -82,6 +83,13 @@ export default function ReportPostsPage() {
   const [tab, setTab] = useState("all");
 
   const updateStatus = async (id: string, status: ReportPost["Status"]) => {
+    if (
+      status === "Approved" &&
+      !window.confirm(
+        "Approving takes this listing down (you can restore it from Listings). Continue?",
+      )
+    )
+      return;
     const s = status.toLowerCase() as "pending" | "approved" | "rejected";
     const res = await updateListingReportStatus(id, s);
     if (res.success) {
@@ -273,7 +281,7 @@ export default function ReportPostsPage() {
                       size="sm"
                       onClick={() => {
                         router.push(
-                          `/${locale}/${listingTitle.replace(/\s+/g, "-").toLowerCase()}-adid-${report.postId}`,
+                          `/${locale}/${encodeURIComponent(listingTitle.replace(/\s+/g, "-").toLowerCase())}-adid-${report.postId}`,
                         );
                       }}
                       className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"

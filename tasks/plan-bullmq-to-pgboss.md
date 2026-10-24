@@ -1,6 +1,6 @@
 # Plan: BullMQ (Redis) → pg-boss (Postgres)
 
-Status: **proposal, nothing implemented.** Written 2026-10-14 from a read-through of the backend plus a local benchmark (numbers below are real runs, with the caveats listed).
+Status: **proposal, nothing implemented** (re-checked 2026-10-24: `pg-boss` is not a dependency, and BullMQ still runs the `payments`, `chat-maintenance` and `entitlements` queues). Written 2026-10-14 from a read-through of the backend plus a local benchmark (numbers below are real runs, with the caveats listed).
 
 ## 1. What Redis actually does here
 

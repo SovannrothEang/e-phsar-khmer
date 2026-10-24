@@ -1,5 +1,17 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
 import { Public } from '../common/decorators/public.decorator';
@@ -21,6 +33,16 @@ export class SubscriptionsController {
     return this.subscriptions.catalog();
   }
 
+  @Public()
+  @Get('free-plan')
+  @ApiOperation({
+    summary:
+      'What every account gets without a subscription: limits and per-category ad caps',
+  })
+  freePlan() {
+    return this.entitlements.freePlan();
+  }
+
   @Get('me')
   @ApiBearerAuth()
   mine(@CurrentUser() user: RequestUser) {
@@ -31,10 +53,15 @@ export class SubscriptionsController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      "The caller's effective plan limits (free plan when nothing is live) and current usage",
+      "The caller's allowance buckets and usage; with subcategoryId, `limits`/`usage` are that subcategory's bucket",
   })
-  myEntitlements(@CurrentUser() user: RequestUser) {
-    return this.entitlements.view(user.id);
+  @ApiQuery({ name: 'subcategoryId', required: false })
+  myEntitlements(
+    @CurrentUser() user: RequestUser,
+    @Query('subcategoryId', new ParseUUIDPipe({ optional: true }))
+    subcategoryId?: string,
+  ) {
+    return this.entitlements.view(user.id, subcategoryId);
   }
 
   @Post('checkout')

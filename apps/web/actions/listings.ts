@@ -26,10 +26,9 @@ import type { Post } from "@/lib/posts";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
-import {
-  getMyEntitlements,
-  type PlanEntitlements,
-} from "@/actions/subscriptions";
+import { describeBucket } from "@/lib/subscription-pricing";
+import { getMyEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import { ALL_ADS_PAGE_SIZE, type AllAdsFilters } from "@/lib/all-ads";
 
@@ -360,7 +359,7 @@ export async function getListingFormConfig(
   // declares 8.
   const schemaPhotoMax =
     (sub.fieldSchema ?? []).find((f) => f.key === "photos")?.max ?? 8;
-  const plan = await getMyEntitlements().catch(() => null);
+  const plan = await getMyEntitlements(sub.id).catch(() => null);
   const photoMax = plan
     ? Math.min(schemaPhotoMax, plan.limits.photos)
     : schemaPhotoMax;
@@ -555,11 +554,13 @@ export async function createListing(
 ): Promise<CreateListingResult> {
   // Refuse up front when the plan has no free ad slot, so a failed publish
   // doesn't leave an orphaned draft behind.
-  const plan = await getMyEntitlements().catch(() => null);
+  // Limits are per category bucket, so ask for the one this ad lands in.
+  const plan = await getMyEntitlements(payload.subcategoryId).catch(() => null);
   if (plan && plan.usage.ads >= plan.limits.ads) {
+    const bucketCopy = describeBucket(plan.bucket);
     return {
       success: false,
-      error: `Your ${plan.plan === "free" ? "free" : "current"} plan allows ${plan.limits.ads} active ads and you have ${plan.usage.ads}. Upgrade your subscription or remove an ad to post another.`,
+      error: `Your ${bucketCopy.planLabel} allows ${plan.limits.ads} active ads ${bucketCopy.scopeLabel} and you have ${plan.usage.ads}. ${bucketCopy.ctaLabel} or remove an ad to post another.`,
     };
   }
 

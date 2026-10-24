@@ -12,6 +12,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+
+// Multer buffers uploads in memory: without a limit it reads the whole body
+// before the service's 5 MB check ever runs. Over the limit → 413.
+const IMAGE_UPLOAD_OPTIONS = {
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+};
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -132,7 +138,7 @@ export class UsersController {
   @Post('me/avatar')
   @ApiOperation({ summary: 'Upload profile photo' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_OPTIONS))
   setAvatar(
     @CurrentUser() user: RequestUser,
     @UploadedFile() file: Express.Multer.File,
@@ -143,7 +149,7 @@ export class UsersController {
   @Post('me/cover')
   @ApiOperation({ summary: 'Upload cover photo' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_OPTIONS))
   setCover(
     @CurrentUser() user: RequestUser,
     @UploadedFile() file: Express.Multer.File,

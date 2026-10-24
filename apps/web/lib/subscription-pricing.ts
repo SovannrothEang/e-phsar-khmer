@@ -1,7 +1,8 @@
 import type {
+  EntitlementBucket,
   SubscriptionCatalogItem,
   UserSubscription,
-} from "@/actions/subscriptions";
+} from "@/types/subscription";
 
 // Client mirror of the backend checkout math (subscriptions.service.ts:
 // calculatePrice / calculateUpgradeCredit / prorateToRemaining). Used only to
@@ -18,18 +19,63 @@ export function priceFor(item: SubscriptionCatalogItem): number {
   return Math.max(0, Math.round(final * 100) / 100);
 }
 
-/** The subscription checkout treats as "current": active, latest expiry. */
+/**
+ * The subscription checkout treats as "current" for a group (subscription
+ * category): active, latest expiry. A user holds one per group side by side,
+ * so pass the group being bought into; without one, the latest of any group.
+ */
 export function currentSubscription(
   subscriptions: UserSubscription[],
+  groupId?: string | null,
 ): UserSubscription | null {
   return (
     subscriptions
-      .filter((item) => item.status === "active")
+      .filter(
+        (item) =>
+          item.status === "active" &&
+          (groupId === undefined || item.groupId === groupId),
+      )
       .sort(
         (a, b) =>
           new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime(),
       )[0] ?? null
   );
+}
+
+/** Every active subscription, one per group, latest expiry first. */
+export function activeSubscriptions(
+  subscriptions: UserSubscription[],
+): UserSubscription[] {
+  const byGroup = new Map<string, UserSubscription>();
+  for (const item of subscriptions) {
+    if (item.status !== "active") continue;
+    const key = item.groupId ?? item.id;
+    const kept = byGroup.get(key);
+    if (!kept || new Date(item.expiresAt) > new Date(kept.expiresAt)) {
+      byGroup.set(key, item);
+    }
+  }
+  return [...byGroup.values()].sort(
+    (a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime(),
+  );
+}
+
+/** Shared plan/scope/CTA wording for subscription allowance buckets. */
+export function describeBucket(
+  bucket: Pick<EntitlementBucket, "kind" | "name"> | null,
+): { planLabel: string; scopeLabel: string; ctaLabel: string } {
+  if (bucket?.kind === "group") {
+    return {
+      planLabel: `${bucket.name} plan`,
+      scopeLabel: "in its categories",
+      ctaLabel: "See plans",
+    };
+  }
+  return {
+    planLabel: "Free plan",
+    scopeLabel: bucket ? `in ${bucket.name}` : "in this category",
+    ctaLabel: "Upgrade",
+  };
 }
 
 /** Package id of a subscription, resolved through its term in the catalog. */

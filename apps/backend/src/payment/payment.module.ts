@@ -7,6 +7,7 @@ import { PAYMENT_GATEWAY_PROVIDERS, PaymentGatewayRegistry } from './providers';
 import { AbaPaywayProvider } from './providers/aba-payway/aba-payway.provider';
 import { BakongProvider } from './providers/bakong/bakong.provider';
 import { PAYMENT_QUEUE } from './payment.constants';
+import { JOB_RETENTION } from '../common/queue/queue-defaults';
 import { PaymentEffectRunner } from './payment-effect-runner.service';
 import { PaymentAttemptOutboxHandler } from './outbox/payment-attempt-outbox-handler';
 import { PaymentEventOutboxHandler } from './outbox/payment-event-outbox-handler';
@@ -24,7 +25,12 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
       name: PAYMENT_QUEUE,
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
+        // Replaces (not merges with) the root BullModule defaultJobOptions,
+        // so the retention has to be repeated here — this queue is the one
+        // that fills Redis fastest (a poll job every few seconds per open
+        // Bakong checkout).
         defaultJobOptions: {
+          ...JOB_RETENTION,
           attempts: configService.get<number>('payment.jobAttempts') ?? 3,
           backoff: {
             type: 'exponential' as const,

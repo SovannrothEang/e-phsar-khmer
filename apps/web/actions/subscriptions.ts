@@ -1,74 +1,14 @@
 "use server";
 
+import type {
+  PaymentProvider,
+  PaymentTransactionStatus,
+  PlanEntitlements,
+  PublicFreePlan,
+  SubscriptionCatalogItem,
+  UserSubscription,
+} from "@/types/subscription";
 import { ApiError, userServerFetch } from "@/lib/api/client";
-
-export interface SubscriptionCatalogItem {
-  categoryId: string;
-  categoryName: string;
-  categorySlug: string;
-  categoryDescription: string | null;
-  planId: string;
-  planName: string;
-  packageId: string;
-  packageName: string;
-  termId: string;
-  termName: string;
-  durationValue: number;
-  durationUnit: "day" | "month" | "year";
-  price: string;
-  discount: string;
-  discountType: "percent" | "amount";
-  photos: number;
-  ads: number;
-  renews: number;
-  autoRenews: number;
-  videos: number;
-}
-
-export interface UserSubscription {
-  id: string;
-  purchaseId: string | null;
-  termId: string | null;
-  termName: string | null;
-  categoryName: string | null;
-  planName: string | null;
-  packageName: string | null;
-  photos: number;
-  ads: number;
-  renews: number;
-  autoRenews: number;
-  videos: number;
-  priceUsd: string;
-  subscribedAt: string;
-  expiresAt: string;
-  status: "active" | "expired" | "superseded";
-}
-
-export interface PaymentTransactionStatus {
-  id: string;
-  status:
-    | "pending"
-    | "processing"
-    | "succeeded"
-    | "failed"
-    | "cancelled"
-    | "expired"
-    | "refund_pending"
-    | "refunded";
-  amount: string;
-  currency: string;
-  checkout: {
-    redirectUrl: string | null;
-    rawResponse: unknown;
-  } | null;
-}
-
-export interface PaymentProvider {
-  name: string;
-  displayName: string;
-  /** Registered but missing credentials � show it, don't let it be picked. */
-  available: boolean;
-}
 
 export async function getPaymentProviders(): Promise<PaymentProvider[]> {
   const { data } = await userServerFetch<PaymentProvider[]>(
@@ -77,22 +17,15 @@ export async function getPaymentProviders(): Promise<PaymentProvider[]> {
   return data;
 }
 
-export interface PlanEntitlements {
-  plan: "free" | "premium";
-  limits: {
-    photos: number;
-    ads: number;
-    renews: number;
-    autoRenews: number;
-    videos: number;
-  };
-  expiresAt: string | null;
-  usage: { ads: number };
-}
-
-export async function getMyEntitlements(): Promise<PlanEntitlements> {
+/** Pass the subcategory being posted to for the limits that apply there. */
+export async function getMyEntitlements(
+  subcategoryId?: string,
+): Promise<PlanEntitlements> {
+  const query = subcategoryId
+    ? `?subcategoryId=${encodeURIComponent(subcategoryId)}`
+    : "";
   const { data } = await userServerFetch<PlanEntitlements>(
-    "/subscriptions/entitlements",
+    `/subscriptions/entitlements${query}`,
   );
   return data;
 }
@@ -149,4 +82,12 @@ export async function getPaymentTransactionStatus(id: string) {
         error instanceof ApiError ? error.message : "Could not check payment",
     };
   }
+}
+
+/** The free plan's public sheet: limits plus every per-category ad cap. */
+export async function getPublicFreePlan(): Promise<PublicFreePlan> {
+  const { data } = await userServerFetch<PublicFreePlan>(
+    "/subscriptions/free-plan",
+  );
+  return data;
 }

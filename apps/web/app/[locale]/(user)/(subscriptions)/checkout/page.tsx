@@ -21,11 +21,13 @@ import {
   getPaymentProviders,
   getPaymentTransactionStatus,
   getSubscriptionCatalog,
-  type PaymentProvider,
-  type PaymentTransactionStatus,
-  type SubscriptionCatalogItem,
-  type UserSubscription,
 } from "@/actions/subscriptions";
+import type {
+  PaymentProvider,
+  PaymentTransactionStatus,
+  SubscriptionCatalogItem,
+  UserSubscription,
+} from "@/types/subscription";
 import {
   currentSubscription,
   offerState,
@@ -140,7 +142,7 @@ export default function CheckoutPage() {
   const [startingCheckout, setStartingCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [active, setActive] = useState<UserSubscription | null>(null);
+  const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const idempotencyKey = useRef<string | null>(null);
   const platform = useMobilePlatform();
   const appOpenedFor = useRef<string | null>(null);
@@ -162,7 +164,7 @@ export default function CheckoutPage() {
       });
     getMySubscriptions()
       .then((items) => {
-        if (mounted) setActive(currentSubscription(items));
+        if (mounted) setSubscriptions(items);
       })
       .catch(() => {});
     getPaymentProviders()
@@ -195,6 +197,12 @@ export default function CheckoutPage() {
   const offer = useMemo(
     () => catalog.find((item) => item.termId === termId),
     [catalog, termId],
+  );
+  // The offer's own group: a purchase there replaces (upgrades) that
+  // group's subscription and leaves the others alone.
+  const active = useMemo(
+    () => currentSubscription(subscriptions, offer?.groupId ?? null),
+    [subscriptions, offer],
   );
 
   async function startCheckout() {
@@ -273,9 +281,10 @@ export default function CheckoutPage() {
         setError(null);
         setPayment(result.data);
         if (result.data.status !== "succeeded") continue;
-        const subscriptions = await getMySubscriptions().catch(() => null);
+        const latest = await getMySubscriptions().catch(() => null);
+        if (latest) setSubscriptions(latest);
         if (
-          subscriptions?.some(
+          latest?.some(
             (subscription) =>
               subscription.purchaseId === purchaseId &&
               subscription.status === "active",
@@ -442,7 +451,7 @@ export default function CheckoutPage() {
             offer
               ? {
                   pathname: "/premium-account/[category]",
-                  params: { category: offer.categorySlug },
+                  params: { category: offer.groupSlug },
                 }
               : "/premium-account"
           }
@@ -551,7 +560,7 @@ export default function CheckoutPage() {
                   <Link
                     href={{
                       pathname: "/premium-account/[category]",
-                      params: { category: offer.categorySlug },
+                      params: { category: offer.groupSlug },
                     }}
                     className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
                   >
@@ -773,7 +782,7 @@ export default function CheckoutPage() {
                 <>
                   <div className="mt-4">
                     <span className="text-xs font-medium text-[#0089c8]">
-                      {offer.categoryName}
+                      {offer.groupName}
                     </span>
                     <p className="mt-1 text-lg font-semibold text-foreground">
                       {offer.packageName}

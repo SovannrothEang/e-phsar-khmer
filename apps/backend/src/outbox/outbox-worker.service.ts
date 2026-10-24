@@ -5,22 +5,9 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Channel } from '../utils/channel';
 import { OutboxDispatcher } from './outbox-dispatcher.service';
 import { OutboxService } from './outbox.service';
-
-/**
- * The wakeup channel carries a coalescing "work is pending" flag, not a queue
- * of items — capacity 1 is all that is meaningful, and a full buffer simply
- * means a wakeup is already pending.
- *
- * The token is a non-undefined string on purpose: `Channel.tryRead()` uses
- * `undefined` as its "buffer empty" sentinel, so a `Channel<void>` cannot tell
- * an empty buffer from a real value. Using a real token keeps this code
- * correct without touching channel.ts.
- */
-type WakeupToken = 'wake';
-const WAKE: WakeupToken = 'wake';
+import { WakeupSignal } from './wakeup-signal';
 
 const SHUTDOWN_GRACE_MS = 10_000;
 
@@ -30,22 +17,25 @@ const SHUTDOWN_GRACE_MS = 10_000;
  * It runs in-process on every API instance. That is safe because claiming
  * is atomic (`FOR UPDATE SKIP LOCKED`), so N instances simply drain the
  * table N times faster — no leader election, no broker. Set
- * `OUTBOX_WORKER_ENABLED=false` to run an instance as API-only and let a
- * dedicated deployment do the draining.
+ * `OUTBOX_WORKER_ENABLED=false` to disable this drainer when another
+ * deployment is responsible for draining the table.
  *
  * The trigger is event-driven (a producer's `wakeupAfterCommit`), backed by
- * a poll-fallback timeout — the safety net for a lost wakeup and the
+ * a poll-fallback timer that is independent of the workers — the safety net for a lost wakeup and the
  * steady-state heartbeat that picks up rows whose backoff expired while
- * nothing new enqueued. The pool stays bounded: fixed worker count, capacity-1
- * channel, capped batch — memory is O(workers + batch); the durable backlog
+ * nothing new enqueued. The pool stays bounded: fixed worker count, coalesced
+ * wakeup signal, capped batch — memory is O(workers + batch); the durable backlog
  * lives in `outbox_events`, never in RAM.
  */
 @Injectable()
 export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(OutboxWorker.name);
-  private readonly channel = Channel.createBounded<WakeupToken>(1);
+  private readonly wakeupSignal = new WakeupSignal();
   private readonly workers: Promise<void>[] = [];
   private running = false;
+  private fallbackTimer: NodeJS.Timeout | undefined;
+  /** Set by the fallback timer, taken by the first worker that wakes. */
+  private fallbackDue = false;
 
   private readonly concurrency: number;
   private readonly pollIntervalMs: number;
@@ -88,6 +78,17 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
       );
     }
 
+    // The periodic DB fallback lives outside the workers on purpose: if it
+    // belonged to one of them, a handler that hangs that worker would stop the
+    // heartbeat for the whole instance. Each tick wakes ONE idle worker (or
+    // leaves a token if all are busy), so idle polling cost stays one query per
+    // interval regardless of pool concurrency.
+    this.fallbackTimer = setInterval(() => {
+      this.fallbackDue = true;
+      this.wakeupSignal.notifyOne();
+    }, this.pollIntervalMs);
+    this.fallbackTimer.unref();
+
     // Startup drain: wake the pool once so any backlog committed before this
     // process booted is claimed without waiting for the poll fallback.
     this.wakeup();
@@ -96,10 +97,11 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     // Stop accepting work: workers finish the batch they are on, then exit.
     this.running = false;
+    if (this.fallbackTimer) clearInterval(this.fallbackTimer);
 
     // Releasing blocked readers is what lets the worker loops observe
     // `running === false` and unwind.
-    this.channel.writer.complete();
+    this.wakeupSignal.close();
 
     // Let in-flight dispatches settle, but never block shutdown forever on a
     // handler that hangs — an abandoned row is recovered by the stale-lease
@@ -115,12 +117,11 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
   /**
    * Called by the wakeup listener once a producer's transaction commits.
    *
-   * This does NOT perform the dispatch — it only wakes one worker. `tryWrite`
-   * returning false means a wakeup is already buffered; that is coalescing,
-   * not an error.
+   * This does NOT perform the dispatch — it tells the local pool to check
+   * PostgreSQL. Notifications coalesce while workers are busy.
    */
   wakeup(): void {
-    this.channel.writer.tryWrite(WAKE);
+    this.wakeupSignal.notify();
   }
 
   /**
@@ -144,16 +145,15 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async worker(workerId: string): Promise<void> {
     while (this.running) {
-      // Clear any coalesced token before waiting, so a stale wakeup cannot
-      // make every subsequent iteration spin without real work behind it.
-      this.channel.reader.tryRead();
+      const result = await this.wakeupSignal.wait();
+      if (result !== 'signaled' || !this.running) break;
 
-      const proceed = await this.waitForWork();
-      if (!proceed) {
-        break;
-      }
+      // Take the fallback flag: whichever worker wakes first after a tick is
+      // the one that reports a discovered backlog to its peers.
+      const fallbackPoll = this.fallbackDue;
+      this.fallbackDue = false;
 
-      await this.drain(workerId);
+      await this.drain(workerId, fallbackPoll);
     }
   }
 
@@ -162,7 +162,7 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
    * is probably more waiting), and returns to the wakeup wait once a batch is
    * not full.
    */
-  private async drain(workerId: string): Promise<void> {
+  private async drain(workerId: string, fallbackPoll: boolean): Promise<void> {
     while (this.running) {
       let processed = 0;
       try {
@@ -177,38 +177,17 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
         return;
       }
 
+      // A fallback poll can discover a backlog even when producers live in a
+      // different process. Wake parked peers to restore configured claim
+      // concurrency; this worker is busy, so it cannot wake itself.
+      if (fallbackPoll && processed > 0) {
+        this.wakeupSignal.notifyWaiters();
+        fallbackPoll = false;
+      }
+
       if (processed < this.batchSize) {
         return;
       }
     }
-  }
-
-  /**
-   * Waits until either the wakeup channel has a token (a producer committed)
-   * or the poll-fallback timeout elapses (lost wakeup, or a row's backoff
-   * expired while nothing new enqueued).
-   *
-   * Resolves `false` only when the channel is completed during shutdown.
-   */
-  private waitForWork(): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      let settled = false;
-
-      const timeout = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          resolve(true);
-        }
-      }, this.pollIntervalMs);
-      timeout.unref?.();
-
-      void this.channel.reader.waitToReadAsync().then((available) => {
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          resolve(available);
-        }
-      });
-    });
   }
 }

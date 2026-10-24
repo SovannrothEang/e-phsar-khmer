@@ -51,6 +51,7 @@ export class PaymentSettledOutboxHandler
         }
         if (
           result.status === 'payment_mismatch' ||
+          result.status === 'needs_refund' ||
           result.status === 'not_pending' ||
           result.status === 'not_found'
         ) {

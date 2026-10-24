@@ -73,7 +73,6 @@
       "previewListing": "商品",
       "unreadCount": "{count} 条未读消息",
       "actionsLabel": "对话操作",
-      "archive": "归档",
       "delete": "删除",
       "deleteConfirmTitle": "删除此对话？",
       "deleteConfirmDescription": "将从您的收件箱中移除。{name} 仍可看到他们那一侧的对话。",
@@ -87,14 +86,27 @@
     "thread": {
       "back": "返回",
       "selectPrompt": "选择一个对话开始阅读",
-      "emptyTitle": "与 {name} 开始对话",
       "loadOlder": "加载更早的消息",
-      "attachingListing": "关于此商品",
       "removeListing": "移除商品",
       "blocked": "您已无法向该用户发送消息。",
       "blockedByMe": "您已屏蔽该用户。",
       "notFoundTitle": "未找到对话",
-      "notFoundDescription": "该对话不存在，或您无权访问。"
+      "notFoundDescription": "该对话不存在，或您无权访问。",
+      "lastActive": "最后活跃于 {time}",
+      "viewProfile": "查看资料",
+      "locationShared": "分享了位置",
+      "viewOnMap": "在地图上查看",
+      "voiceNote": "语音消息",
+      "quickReplies": {
+        "label": "快捷回复",
+        "hide": "隐藏快捷回复",
+        "hi": "你好！",
+        "available": "是的，还在出售",
+        "offer": "您出价多少？",
+        "sold": "抱歉！该商品已售出！",
+        "negotiable": "是的，可以议价",
+        "notNegotiable": "不，不接受议价"
+      }
     },
     "message": {
       "imageAlt": "已发送的图片",
@@ -121,7 +133,22 @@
       "uploadFailed": "图片上传失败。",
       "imageSizeError": "图片太大。",
       "imageTypeError": "不支持的图片格式。",
-      "imageLimitError": "最多只能添加 {max} 张图片。"
+      "imageLimitError": "最多只能添加 {max} 张图片。",
+      "shareLocation": "分享位置",
+      "locationLocating": "正在获取您的位置…",
+      "locationUnsupported": "此浏览器不支持位置共享。",
+      "locationError": "无法获取您的位置。请检查浏览器权限。",
+      "locationReady": "位置已准备好发送",
+      "cancelLocation": "取消位置",
+      "recordVoice": "录制语音消息",
+      "stopRecording": "停止录音",
+      "recording": "正在录音…",
+      "voiceUnsupported": "此浏览器不支持语音消息。",
+      "voicePermissionError": "麦克风访问被拒绝。",
+      "voiceTooLong": "语音消息最长 {seconds} 秒。",
+      "voiceReady": "语音消息已准备好",
+      "cancelVoice": "取消语音消息",
+      "cancelRecording": "取消"
     },
     "listing": {
       "noPrice": "价格面议",
@@ -179,6 +206,12 @@
       "setTitle": "设置备份密码",
       "setDescription": "至少 {count} 个字符。在新设备上查看聊天记录时需要它。我们无法为您找回。",
       "save": "保存密码"
+    },
+    "voice": {
+      "play": "播放语音消息",
+      "pause": "暂停语音消息",
+      "seek": "拖动语音进度",
+      "speed": "播放速度 {rate}×"
     }
   },
   "Search": {

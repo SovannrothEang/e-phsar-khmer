@@ -13,11 +13,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MoreVertical, Search, Trash2, Plus, Pencil } from "lucide-react";
+import {
+  Filter,
+  MoreVertical,
+  Search,
+  Trash2,
+  Plus,
+  Pencil,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -27,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -62,8 +70,6 @@ import {
   type SubCategory,
   type SubTerm,
 } from "@/actions/admin-subscriptions";
-
-type PackageTier = "Bronze" | "Siliver" | "Gold";
 
 type TermRow = SubscriptionTermOption & {
   subscriptionCateId: string;
@@ -116,17 +122,6 @@ function formatDuration(value: number, unit: SubscriptionTermDurationUnit) {
   return `${value} ${unitLabel}${plural}`;
 }
 
-type DurationPresetKey =
-  | "1-day"
-  | "1-month"
-  | "2-month"
-  | "3-month"
-  | "4-month"
-  | "5-month"
-  | "6-month"
-  | "1-year"
-  | "2-year";
-
 function toVerbose(c: SubCategory): SubscriptionCategory {
   return {
     subscriptionCateId: c.id,
@@ -172,7 +167,6 @@ const emptyForm = {
   categoryId: "",
   planId: "",
   packageId: "",
-  durationPreset: "" as "" | DurationPresetKey,
   durationValue: "",
   durationUnit: "month" as SubscriptionTermDurationUnit,
   name: "",
@@ -205,7 +199,7 @@ export default function SubscriptionTermPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState("all");
+  const [durationFilter, setDurationFilter] = useState("__all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -261,6 +255,26 @@ export default function SubscriptionTermPage() {
     [rawPackages, formData.planId],
   );
 
+  const durationOptions = Array.from(
+    new Map(
+      allTerms.map((term) => {
+        const value = term.subscriptiontermdurationvalue;
+        const unit = term.subscriptiontermdurationunit;
+        return [
+          `${value}:${unit}`,
+          { value, unit, label: formatDuration(value, unit) },
+        ];
+      }),
+    ).values(),
+  ).sort((a, b) => {
+    const unitOrder: Record<SubscriptionTermDurationUnit, number> = {
+      day: 0,
+      month: 1,
+      year: 2,
+    };
+    return unitOrder[a.unit] - unitOrder[b.unit] || a.value - b.value;
+  });
+
   const filteredTerms = allTerms.filter((term) => {
     const q = searchQuery.toLowerCase();
 
@@ -278,18 +292,12 @@ export default function SubscriptionTermPage() {
       formatDate(term.createdAt).toLowerCase().includes(q) ||
       formatDate(term.updatedAt).toLowerCase().includes(q);
 
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "3months"
-          ? term.subscriptiontermname === "3 Months"
-          : tab === "6months"
-            ? term.subscriptiontermname === "6 Months"
-            : tab === "1year"
-              ? term.subscriptiontermname === "1 Year"
-              : true;
+    const matchesFilter =
+      durationFilter === "__all" ||
+      `${term.subscriptiontermdurationvalue}:${term.subscriptiontermdurationunit}` ===
+        durationFilter;
 
-    return matchesSearch && matchesTab;
+    return matchesSearch && matchesFilter;
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredTerms.length / rowsPerPage));
@@ -359,7 +367,6 @@ export default function SubscriptionTermPage() {
       categoryId: term.subscriptionCateId,
       planId: term.subscriptionPlanId,
       packageId: term.SubscriptionPackageId,
-      durationPreset: "",
       durationValue: String(term.subscriptiontermdurationvalue),
       durationUnit: term.subscriptiontermdurationunit,
       name: term.subscriptiontermname,
@@ -474,14 +481,54 @@ export default function SubscriptionTermPage() {
           </SelectContent>
         </Select>
       </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor={`${idPrefix}-duration-value`}>Duration</Label>
+          <Input
+            id={`${idPrefix}-duration-value`}
+            type="number"
+            min={1}
+            step={1}
+            placeholder="e.g. 6"
+            value={formData.durationValue}
+            onChange={(e) =>
+              setFormData({ ...formData, durationValue: e.target.value })
+            }
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor={`${idPrefix}-duration-unit`}>Duration unit</Label>
+          <Select
+            value={formData.durationUnit}
+            onValueChange={(value: SubscriptionTermDurationUnit) =>
+              setFormData({ ...formData, durationUnit: value })
+            }
+          >
+            <SelectTrigger id={`${idPrefix}-duration-unit`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Days</SelectItem>
+              <SelectItem value="month">Months</SelectItem>
+              <SelectItem value="year">Years</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-name`}>Term name</Label>
+        <Label htmlFor={`${idPrefix}-name`}>Term name (optional)</Label>
         <Input
           id={`${idPrefix}-name`}
-          placeholder="e.g. 6 Months"
+          placeholder={formatDuration(
+            Number(formData.durationValue) || 1,
+            formData.durationUnit,
+          )}
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
         />
+        <p className="text-xs text-muted-foreground">
+          Leave blank to use the duration as the term name.
+        </p>
       </div>
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-price`}>Price ($)</Label>
@@ -555,57 +602,19 @@ export default function SubscriptionTermPage() {
   const getDurationBadge = (
     value: number,
     unit: SubscriptionTermDurationUnit,
-  ) => {
-    const label = formatDuration(value, unit);
+  ) => <Badge variant="outline">{formatDuration(value, unit)}</Badge>;
 
-    let className = "text-muted-foreground border-muted bg-muted/30";
+  const getPackageBadge = (name: string) => (
+    <Badge variant="outline">{name}</Badge>
+  );
 
-    if (value === 3 && unit === "month") {
-      className = "text-sky-700 border-sky-700/30 bg-sky-700/10";
-    }
-
-    if (value === 6 && unit === "month") {
-      className = "text-emerald-700 border-emerald-700/30 bg-emerald-700/10";
-    }
-
-    if (value === 1 && unit === "year") {
-      className = "text-violet-700 border-violet-700/30 bg-violet-700/10";
-    }
-
-    return (
-      <Badge variant="outline" className={className}>
-        {label}
-      </Badge>
-    );
-  };
-
-  const getPackageBadge = (name: string) => {
-    const tier = name as PackageTier;
-    const colors: Record<PackageTier, string> = {
-      Bronze: "text-foreground border-amber-950/30 bg-amber-950/10",
-      Siliver: "text-slate-500 border-slate-500/30 bg-slate-500/10",
-      Gold: "text-amber-500 border-amber-500/30 bg-amber-500/10",
-    };
-    const className = colors[tier] ?? "text-muted-foreground";
-    return (
-      <Badge variant="outline" className={className}>
-        {name}
-      </Badge>
-    );
-  };
-
-  const countByDuration = (value: number, unit: SubscriptionTermDurationUnit) =>
-    allTerms.filter(
-      (t) =>
-        t.subscriptiontermdurationvalue === value &&
-        t.subscriptiontermdurationunit === unit,
-    ).length;
-
+  const durationValue = Number(formData.durationValue);
   const isFormValid =
-    formData.name.trim().length > 0 &&
     formData.categoryId.length > 0 &&
     formData.planId.length > 0 &&
     formData.packageId.length > 0 &&
+    Number.isInteger(durationValue) &&
+    durationValue > 0 &&
     formData.price.trim().length > 0;
 
   return (
@@ -662,50 +671,57 @@ export default function SubscriptionTermPage() {
         </Dialog>
       </div>
 
-      <div className="relative w-96">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search terms..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search terms..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="pl-9"
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="size-4" />
+              Filter
+              {durationFilter !== "__all" && (
+                <span className="text-muted-foreground">
+                  {durationOptions.find(
+                    (option) =>
+                      `${option.value}:${option.unit}` === durationFilter,
+                  )?.label ?? "Selected"}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={durationFilter}
+              onValueChange={(value) => {
+                setDurationFilter(value);
+                setCurrentPage(1);
+              }}
+            >
+              <DropdownMenuRadioItem value="__all">
+                All terms ({allTerms.length})
+              </DropdownMenuRadioItem>
+              {durationOptions.map((option) => (
+                <DropdownMenuRadioItem
+                  key={`${option.value}:${option.unit}`}
+                  value={`${option.value}:${option.unit}`}
+                >
+                  {`${option.label} (${allTerms.filter((term) => term.subscriptiontermdurationvalue === option.value && term.subscriptiontermdurationunit === option.unit).length})`}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(value);
-          setCurrentPage(1);
-        }}
-      >
-        <TabsList className="gap-1">
-          <TabsTrigger value="all" className="cursor-pointer">
-            All Terms
-          </TabsTrigger>
-          <TabsTrigger value="3months" className="cursor-pointer">
-            3 Months
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-              {countByDuration(3, "month")}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="6months" className="cursor-pointer">
-            6 Months
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-              {countByDuration(6, "month")}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="1year" className="cursor-pointer">
-            1 Year
-            <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-              {countByDuration(1, "year")}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <div className="border rounded-lg overflow-x-auto">
         <Table>

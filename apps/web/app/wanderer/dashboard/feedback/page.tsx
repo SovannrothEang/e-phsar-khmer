@@ -39,12 +39,27 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Trash2, Search, MoreHorizontal } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feedback } from "@/types/feedback";
-// Renamed the import to avoid confusing variable naming conflicts inside the scope
-import { feedbacks as initialFeedbacks } from "@/lib/feedbacks";
+import { deleteFeedback, getAdminFeedback } from "@/actions/feedback";
+import { toast } from "@/components/ui/sonner";
 
 export default function FeedbackPage() {
-  const [Feedbacks, setFeedback] = useState<Feedback[]>(initialFeedbacks);
+  const queryClient = useQueryClient();
+  const { data: Feedbacks = [], isLoading } = useQuery({
+    queryKey: ["admin", "feedback"],
+    queryFn: async (): Promise<Feedback[]> =>
+      (await getAdminFeedback()).map((f) => ({
+        FeedbackID: f.id,
+        userId: f.userId ?? undefined,
+        name: f.name,
+        phone: f.phone,
+        email: f.email ?? undefined,
+        description: f.description,
+        images: f.images,
+        CreatedAt: f.createdAt,
+      })),
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -53,7 +68,6 @@ export default function FeedbackPage() {
     null,
   );
 
-  // ✅ FIXED: Now filtering from the 'Feedbacks' state variable instead of the static import file
   const filteredFeedbacks = Feedbacks.filter(
     (f) =>
       f.FeedbackID.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -75,20 +89,20 @@ export default function FeedbackPage() {
     startIndex + rowsPerPage,
   );
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedFeedback) return;
-
-    // Filter out the item from the state array
-    const updatedFeedbacks = Feedbacks.filter(
-      (f) => f.FeedbackID !== selectedFeedback.FeedbackID,
-    );
-    setFeedback(updatedFeedbacks);
+    const res = await deleteFeedback(selectedFeedback.FeedbackID);
+    if (!res.success) {
+      toast.error(res.error ?? "Delete failed");
+      return;
+    }
+    toast.success("Feedback deleted");
+    await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });
 
     setSelectedFeedback(null);
     setIsDeleteDialogOpen(false);
 
-    // Safe Guard: If you delete the last remaining item on a page (e.g. page 3),
-    // kick the pagination view backward so you don't look at an empty page.
+    // Deleting the last row on a page steps back so the view isn't empty.
     if (paginatedFeedbacks.length === 1 && currentPage > 1) {
       setCurrentPage((p) => p - 1);
     }
@@ -142,7 +156,7 @@ export default function FeedbackPage() {
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-6">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
-                    <p>No feedbacks found</p>
+                    <p>{isLoading ? "Loading…" : "No feedbacks found"}</p>
                     {searchQuery && (
                       <p className="text-sm">
                         No Search results for &quot;{searchQuery}&quot;
@@ -161,7 +175,7 @@ export default function FeedbackPage() {
                     {feedback.userId || "null"}
                   </TableCell>
                   <TableCell>{feedback.name || "null"}</TableCell>
-                  <TableCell>+{feedback.phone || "null"}</TableCell>
+                  <TableCell>{feedback.phone || "null"}</TableCell>
                   <TableCell>{feedback.email || "null"}</TableCell>
                   <TableCell className="text-center max-w-[200px]">
                     {feedback.images && feedback.images.length > 0 ? (

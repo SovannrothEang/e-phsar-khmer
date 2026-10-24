@@ -267,6 +267,27 @@
       "when": 1791970052855,
       "tag": "0037_burly_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792409751342,
+      "tag": "0038_thankful_skullbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792557756050,
+      "tag": "0039_fuzzy_firelord",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792752425639,
+      "tag": "0040_moderation_feedback",
+      "breakpoints": true
     }
   ]
 }

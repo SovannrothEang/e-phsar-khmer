@@ -43,9 +43,9 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
-  OUTBOX_WORKER_CONCURRENCY: z.coerce.number().default(5),
-  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(2000),
-  OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
+  OUTBOX_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(5),
   // How long a claim is honoured before another dispatcher may steal the
   // row. Must exceed the slowest realistic handler, or two dispatchers will

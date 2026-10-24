@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/api/user-client";
 import { getMyAdsPage } from "@/lib/api/my-ads";
 import type { MyAdsTab } from "@/lib/api/my-ads";
 import { getMyEntitlements } from "@/actions/subscriptions";
-import type { PlanEntitlements } from "@/actions/subscriptions";
+import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
 
 export interface MyAdsPageResult {

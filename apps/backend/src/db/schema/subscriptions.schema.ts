@@ -1,11 +1,13 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -15,6 +17,10 @@ import {
 import { sql } from 'drizzle-orm';
 import { users } from './users.schema';
 import { discountTypeEnum } from './listings.schema';
+import { categories, subcategories } from './categories.schema';
+
+/** Why a `user_subscriptions` row stopped being current (TS-only column type). */
+export type SupersededReason = 'upgrade' | 'replaced' | 'expired' | 'revoked';
 
 export const subscriptionDurationUnitEnum = pgEnum(
   'subscription_duration_unit',
@@ -46,6 +52,30 @@ export const subscriptionCategories = pgTable('subscription_categories', {
     .notNull()
     .$onUpdate(() => new Date()),
 });
+
+/**
+ * What a subscription category (a "group" — General, Property, Auto…) covers:
+ * the listing subcategories whose ads count against that group's allowance.
+ * Admin-managed. A subcategory sits in at most one group, so every ad has
+ * exactly one allowance; a subcategory in no group falls to the free plan.
+ */
+export const subscriptionCategorySubcategories = pgTable(
+  'subscription_category_subcategories',
+  {
+    subscriptionCategoryId: uuid('subscription_category_id')
+      .notNull()
+      .references(() => subscriptionCategories.id, { onDelete: 'cascade' }),
+    subcategoryId: uuid('subcategory_id')
+      .notNull()
+      .references(() => subcategories.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.subscriptionCategoryId, t.subcategoryId] }),
+    uniqueIndex('subscription_category_subcategories_subcategory_uq').on(
+      t.subcategoryId,
+    ),
+  ],
+);
 
 export const subscriptionPlans = pgTable(
   'subscription_plans',
@@ -139,6 +169,12 @@ export const userSubscriptions = pgTable(
     termId: uuid('term_id').references(() => subscriptionTerms.id, {
       onDelete: 'set null',
     }),
+    // The group this subscription belongs to, fixed at activation. Stored
+    // rather than derived through the term, which goes null if deleted.
+    subscriptionCategoryId: uuid('subscription_category_id').references(
+      () => subscriptionCategories.id,
+      { onDelete: 'set null' },
+    ),
     priceUsd: numeric('price_usd', { precision: 10, scale: 2 })
       .default('0')
       .notNull(),
@@ -148,7 +184,9 @@ export const userSubscriptions = pgTable(
       .notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     supersededAt: timestamp('superseded_at', { withTimezone: true }),
-    supersededReason: varchar('superseded_reason', { length: 40 }),
+    supersededReason: varchar('superseded_reason', {
+      length: 40,
+    }).$type<SupersededReason>(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -163,6 +201,70 @@ export const userSubscriptions = pgTable(
     index('user_subscriptions_active_idx')
       .on(t.userId, t.expiresAt)
       .where(sql`${t.supersededAt} is null`),
+    // At most one current row per user per group: an upgrade, renewal or
+    // revoke supersedes the old row (history) instead of adding a second live
+    // one. Different groups (Auto and Property) are held side by side.
+    uniqueIndex('user_subscriptions_one_current_per_group_uq')
+      .on(t.userId, t.subscriptionCategoryId)
+      .where(sql`${t.supersededAt} is null`),
+  ],
+);
+
+/** The free plan's account-wide limits. Exactly one row (id = 1). */
+export const freePlanSettings = pgTable(
+  'free_plan_settings',
+  {
+    id: integer('id').primaryKey().default(1),
+    photos: integer('photos').default(0).notNull(),
+    renews: integer('renews').default(0).notNull(),
+    autoRenews: integer('auto_renews').default(0).notNull(),
+    videos: integer('videos').default(0).notNull(),
+    /** Ads allowed across every subcategory with no group or cap of its own. */
+    otherAds: integer('other_ads').default(0).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [check('free_plan_settings_singleton', sql`${t.id} = 1`)],
+);
+
+/**
+ * Free-plan ad caps for one listing category or one subcategory ("Cars for
+ * sale: 2", "Foods: 50"). A subcategory cap beats its category's cap; ads
+ * matching neither share `free_plan_settings.other_ads`.
+ */
+export const freePlanAdLimits = pgTable(
+  'free_plan_ad_limits',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    categoryId: uuid('category_id').references(() => categories.id, {
+      onDelete: 'cascade',
+    }),
+    subcategoryId: uuid('subcategory_id').references(() => subcategories.id, {
+      onDelete: 'cascade',
+    }),
+    ads: integer('ads').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check(
+      'free_plan_ad_limits_one_scope',
+      sql`(${t.categoryId} is null) <> (${t.subcategoryId} is null)`,
+    ),
+    check('free_plan_ad_limits_ads_nonnegative', sql`${t.ads} >= 0`),
+    uniqueIndex('free_plan_ad_limits_category_uq')
+      .on(t.categoryId)
+      .where(sql`${t.categoryId} is not null`),
+    uniqueIndex('free_plan_ad_limits_subcategory_uq')
+      .on(t.subcategoryId)
+      .where(sql`${t.subcategoryId} is not null`),
   ],
 );
 
@@ -221,3 +323,5 @@ export type SubscriptionPackageRow = typeof subscriptionPackages.$inferSelect;
 export type SubscriptionTermRow = typeof subscriptionTerms.$inferSelect;
 export type UserSubscriptionRow = typeof userSubscriptions.$inferSelect;
 export type SubscriptionPurchaseRow = typeof subscriptionPurchases.$inferSelect;
+export type FreePlanSettingsRow = typeof freePlanSettings.$inferSelect;
+export type FreePlanAdLimitRow = typeof freePlanAdLimits.$inferSelect;

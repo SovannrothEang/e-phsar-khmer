@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -23,6 +23,7 @@ import { PaymentGatewayRegistry } from '../payment/providers';
 import { createPaymentTransaction } from '../payment/use-cases';
 import { CreateSubscriptionCheckoutDto } from './dto/create-subscription-checkout.dto';
 import { addDuration } from './subscription-activation.service';
+import { subscriptionStatus } from './subscription-status';
 
 function calculatePrice(
   price: string,
@@ -88,10 +89,10 @@ export class SubscriptionsService {
   async catalog() {
     return this.db
       .select({
-        categoryId: subscriptionCategories.id,
-        categoryName: subscriptionCategories.name,
-        categorySlug: subscriptionCategories.slug,
-        categoryDescription: subscriptionCategories.description,
+        groupId: subscriptionCategories.id,
+        groupName: subscriptionCategories.name,
+        groupSlug: subscriptionCategories.slug,
+        groupDescription: subscriptionCategories.description,
         planId: subscriptionPlans.id,
         planName: subscriptionPlans.name,
         packageId: subscriptionPackages.id,
@@ -131,7 +132,13 @@ export class SubscriptionsService {
           eq(subscriptionTerms.isActive, true),
         ),
       )
-      .where(eq(subscriptionCategories.isActive, true));
+      .where(eq(subscriptionCategories.isActive, true))
+      .orderBy(
+        asc(subscriptionCategories.sortOrder),
+        asc(subscriptionPlans.sortOrder),
+        asc(subscriptionPackages.sortOrder),
+        asc(subscriptionTerms.sortOrder),
+      );
   }
 
   async mine(userId: string) {
@@ -140,7 +147,8 @@ export class SubscriptionsService {
         id: userSubscriptions.id,
         termId: userSubscriptions.termId,
         termName: subscriptionTerms.name,
-        categoryName: subscriptionCategories.name,
+        groupId: userSubscriptions.subscriptionCategoryId,
+        groupName: subscriptionCategories.name,
         planName: subscriptionPlans.name,
         packageName: subscriptionPackages.name,
         photos: subscriptionPackages.photos,
@@ -152,6 +160,7 @@ export class SubscriptionsService {
         subscribedAt: userSubscriptions.subscribedAt,
         expiresAt: userSubscriptions.expiresAt,
         supersededAt: userSubscriptions.supersededAt,
+        supersededReason: userSubscriptions.supersededReason,
         purchaseId: subscriptionPurchases.id,
         offerSnapshot: subscriptionPurchases.offerSnapshot,
       })
@@ -170,7 +179,7 @@ export class SubscriptionsService {
       )
       .leftJoin(
         subscriptionCategories,
-        eq(subscriptionCategories.id, subscriptionPlans.categoryId),
+        eq(subscriptionCategories.id, userSubscriptions.subscriptionCategoryId),
       )
       .leftJoin(
         subscriptionPurchases,
@@ -192,7 +201,8 @@ export class SubscriptionsService {
         purchaseId: row.purchaseId,
         termId: row.termId,
         termName: snapshotString('termName', row.termName),
-        categoryName: row.categoryName,
+        groupId: row.groupId,
+        groupName: row.groupName,
         planName: row.planName,
         packageName: snapshotString('packageName', row.packageName),
         photos: snapshotNumber('photos', row.photos),
@@ -203,11 +213,7 @@ export class SubscriptionsService {
         priceUsd: row.priceUsd,
         subscribedAt: row.subscribedAt,
         expiresAt: row.expiresAt,
-        status: row.supersededAt
-          ? 'superseded'
-          : row.expiresAt.getTime() > now
-            ? 'active'
-            : 'expired',
+        status: subscriptionStatus(row, now),
       };
     });
   }
@@ -252,11 +258,16 @@ export class SubscriptionsService {
           renews: subscriptionPackages.renews,
           autoRenews: subscriptionPackages.autoRenews,
           videos: subscriptionPackages.videos,
+          subscriptionCategoryId: subscriptionPlans.categoryId,
         })
         .from(subscriptionTerms)
         .innerJoin(
           subscriptionPackages,
           eq(subscriptionPackages.id, subscriptionTerms.packageId),
+        )
+        .innerJoin(
+          subscriptionPlans,
+          eq(subscriptionPlans.id, subscriptionPackages.planId),
         )
         .where(
           and(
@@ -274,12 +285,18 @@ export class SubscriptionsService {
         term.discountType,
       );
       const now = new Date();
+      // Buying in a group you already hold is an upgrade of that group's
+      // subscription; any other group is a fresh, side-by-side purchase.
       const [active] = await this.db
         .select()
         .from(userSubscriptions)
         .where(
           and(
             eq(userSubscriptions.userId, userId),
+            eq(
+              userSubscriptions.subscriptionCategoryId,
+              term.subscriptionCategoryId,
+            ),
             isNull(userSubscriptions.supersededAt),
             gt(userSubscriptions.expiresAt, now),
           ),

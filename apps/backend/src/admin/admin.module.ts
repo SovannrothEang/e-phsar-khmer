@@ -18,9 +18,12 @@ import { UserSubscriptionsService } from './subscriptions/user-subscriptions.ser
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
+import { ListingsModule } from '../listings/listings.module';
+import { AdminListingsController } from './admin-listings.controller';
+import { AdminListingsService } from './admin-listings.service';
 
 @Module({
-  imports: [FilesModule, ChatModule, SubscriptionsCoreModule],
+  imports: [FilesModule, ChatModule, SubscriptionsCoreModule, ListingsModule],
   controllers: [
     AdminController,
     AdminCategoriesController,
@@ -30,6 +33,7 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     SubscriptionConfigController,
     UserSubscriptionsController,
     ReportsController,
+    AdminListingsController,
   ],
   providers: [
     AdminService,
@@ -40,6 +44,7 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     SubscriptionConfigService,
     UserSubscriptionsService,
     ReportsService,
+    AdminListingsService,
   ],
   exports: [AdminService],
 })

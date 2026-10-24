@@ -1,6 +1,10 @@
-# Plan: E2E Attachments (encrypted images/files, private bucket, signed URLs)
+# E2E Attachments — design (encrypted images/files, private bucket, signed URLs)
 
-**Status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2 (web send) + P3 (web receive) done 2026-09-29, not yet browser-tested end to end. P4 done: hourly BullMQ `attachments-cleanup` (job scheduler upsert, boot never blocked), CLAUDE.md + chat README updated.
+> Design reference (moved from `tasks/plan-e2e-attachments.md` on 2026-10-24). §4 defines the frozen `E2E_FILE_V1` format, and §4/§5 are cited from code. The phase checklist and test plan were dropped once everything shipped (they are in git history); the section numbers are kept so those citations still resolve.
+
+**Status (2026-10-24):** P1–P4 complete and browser-verified end to end on 2026-10-24: v2 text, image, voice note and location card across two live accounts. The migration landed as `0030_flimsy_shadow_king` (written below as `0026`, before the renumbering). Shipped in `e222daa`/`28e1d37`/`72d5102`; recorded in `CHANGELOG.md`. D12 is superseded.
+
+**Original status:** P1 (backend) done 2026-09-29 — migration `0026`, bucket `chat-files` created on the dev project. P2 (web send) + P3 (web receive) done 2026-09-29, not yet browser-tested end to end. P4 done: hourly BullMQ `attachments-cleanup` (job scheduler upsert, boot never blocked), CLAUDE.md + chat README updated.
 
 **Deviations:** inbox uses `lastMessage.attachments` (already on every message read) instead of a separate `attachmentCount`. The web crypto round trip was checked with a throwaway Node script (8 checks: size, header, round trip, tampered byte, wrong attachment id, unknown version, forged hash + tampered tag, fresh key/IV), not vitest.
 
@@ -26,7 +30,7 @@
 | D9  | **No outbox**                                                                                                                  | The chat module deliberately skips the outbox: REST is authoritative and delta polling guarantees delivery (see `src/chat/README.md`).                                                                                  |
 | D10 | Hourly BullMQ repeatable job cleans `pending`/`uploaded` rows unattached after 24 h                                            | Covers upload failures and "uploaded, then the browser crashed before sending". First BullMQ use in chat; the Redis/BullMQ infra already exists (`app.module.ts`).                                                      |
 | D11 | Resize/re-encode images to WebP in a Web Worker **before** encrypting                                                          | 3–6 MB phone photos → 200–400 KB; strips EXIF/GPS; encrypted data can't be compressed afterwards.                                                                                                                       |
-| D12 | Kill switch `NEXT_PUBLIC_E2E_ATTACHMENTS=off` falls back to the legacy `imagePath` send                                        | Same pattern as `NEXT_PUBLIC_E2E_V2`.                                                                                                                                                                                   |
+| D12 | Kill switch `NEXT_PUBLIC_E2E_ATTACHMENTS=off` falls back to the legacy `imagePath` send                                        | Same pattern as `NEXT_PUBLIC_E2E_V2`. **Superseded 2026-10-24:** the backend now rejects `imagePath`, so the switch fails closed (media sends fail visibly) instead of falling back.                                    |
 | D13 | `attachments.message_id` is `ON DELETE SET NULL`, and cleanup also removes `attached` rows whose message is gone               | Messages have no delete endpoint today, but a message row can still disappear (e.g. a future hard delete). The row must survive to tell cleanup which storage object to remove; CASCADE would silently leak the object. |
 
 ---
@@ -241,29 +245,6 @@ The client parses JSON only when the server says the message has attachments, so
 - Old clients that don't understand `attachments` see the JSON as text. Acceptable during rollout (all web clients update together); mention in release notes.
 
 ---
-
-## 8. Phases
-
-| Phase              | Work                                                                                                                                                                                                               | Est.   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| **P1 Backend**     | Schema + migration; config vars; `ChatAttachmentsService` (create/complete/sign/attach); extend `SendMessageDto` + `sendMessage` transaction; `attachments` in message reads + inbox `attachmentCount`; unit tests | 0.75 d |
-| **P2 Web send**    | Worker resize + thumbnail; crypto; `DirectUploader`; IndexedDB outbox; `use-chat-thread` send path; server actions                                                                                                 | 0.75 d |
-| **P3 Web receive** | Content parsing in `use-decrypted-messages`; batched signing hook; download/verify/decrypt/cache; bubble + lightbox; inbox preview                                                                                 | 0.5 d  |
-| **P4 Ops**         | Cleanup job; quota/throttle; bucket setup notes; update `CLAUDE.md` + `src/chat/README.md`                                                                                                                         | 0.25 d |
-
-## 9. Tests
-
-**Backend (jest):**
-
-- create: limit exceeded → 400; quota exceeded → 429; same id replay → same row; same id by another user → 409.
-- complete: missing object → 409; oversize → deleted + `expired`; happy path sets `actualSize`.
-- send: another user's id / `pending` / already attached / nonexistent → 400 and message rolled back; > 10 ids → 400; `clientMessageId` replay doesn't re-attach.
-- sign: non-participant ids omitted; unattached ids omitted.
-- cleanup: deletes only unattached rows older than 24 h; rerun safe.
-
-**Web** (no test framework today): round-trip script for encrypt → hash → decrypt, tampered blob rejected by hash, wrong AAD rejected by GCM. Recommended to add vitest scoped to `lib/e2e/**` (open question carried over from the multi-device plan).
-
-**Manual:** send 3 photos + caption; both of the peer's devices render them; kill network mid-upload and reload → resumes; signed URL stops working after 5 min; bucket object downloaded directly is unreadable.
 
 ## 10. Risks
 
