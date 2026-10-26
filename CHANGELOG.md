@@ -17,7 +17,7 @@ How to use this file:
   `tasks/plan-e2e-phase1-2.md`, `tasks/plan-tenant-subscriptions.md`) can still be read with
   `git show 5783531:<path>`. Design references were moved to `docs/`.
 
-## [Unreleased]
+## 2026-10-24 — Encrypted-only chat, history restore, idle background work
 
 ### Changed
 
@@ -37,7 +37,6 @@ How to use this file:
   process starts; the first run waits a jittered 1–2 minutes, so a restart loop is not a query loop.
 - **Checkout fallback polling** (socket down only) backs off 5 s → 15 s and pauses while the tab is hidden.
 - Outbox worker logs a one-line stats summary (due-time checks, drains, events) every 10 minutes.
-
 - **Backup API is device-scoped.** `POST /chats/e2e/backup` and
   `GET /chats/e2e/backup/segments` now require an active `deviceId`;
   `POST /chats/e2e/history-requests/:id/consume` only succeeds for the requesting device and
@@ -116,6 +115,10 @@ How to use this file:
 - A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
   first inbound message created it. `chat-workspace.tsx` now reconciles the cached
   `GET /chats/with/:userId` lookup against the inbox.
+- **The web project failed to build on Vercel (`NEXT_NO_VERSION`).** `.vercelignore` excluded `apps/web`, but
+  that file is read by every project built from this repo, including the web project (Root Directory =
+  `apps/web`), which then had no `package.json`. The exclusion is gone; the backend image build only uploads
+  more (~257 MB instead of ~10 MB).
 
 ### Removed
 
@@ -129,6 +132,9 @@ How to use this file:
   (read-only, no code changes).
 - `CHANGELOG.md` introduced. `tasks/todo.md` was reset to open items only, and its history
   rolled up here.
+- `ARCHITECTURE.md` added and `CLAUDE.md` slimmed down; the plans under `tasks/` were checked against the code
+  and the finished ones deleted (shipped outcome lives here, text in git). `Plans.md` gained the backend
+  background-work audit plan.
 
 ### Known issues
 
