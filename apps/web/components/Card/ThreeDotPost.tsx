@@ -12,6 +12,7 @@ import { Post } from "@/lib/posts";
 import { getUserById } from "@/lib/data";
 import { useState } from "react";
 import { toSlug } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
 import { useRouter } from "@/i18n/routing";
 import { ReportPost } from "../report/ReportPost";
 import { IconShare3, IconUser, IconAlertTriangle } from "@tabler/icons-react";
@@ -29,7 +30,7 @@ import { useTranslations } from "next-intl";
  * own x.
  */
 const ITEM =
-  "flex w-full items-center gap-3 px-3 py-2 text-sm cursor-pointer outline-none transition-colors hover:bg-muted";
+  "flex w-full items-center gap-3 px-3 py-2 type-nav cursor-pointer outline-none transition-colors hover:bg-muted";
 
 /** One icon box for all four rows. */
 const ICON = "size-[18px] shrink-0";
@@ -131,7 +132,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}
-        url={`https://psakhmer.com/${toSlug(post.title)}-adid-${post.postId}`}
+        url={`${SITE_URL}/${toSlug(post.title)}-adid-${post.postId}`}
       />
       <ReportPost open={reportOpen} onOpenChange={setReportOpen} post={post} />
     </>

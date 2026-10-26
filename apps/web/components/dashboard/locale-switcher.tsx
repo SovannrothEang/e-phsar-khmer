@@ -69,7 +69,7 @@ export function LocaleSwitcher() {
             onClick={() => handleChange(code)}
             className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
           >
-            <span className="text-sm">{LOCALE_LABELS[code]}</span>
+            <span className="type-body-sm">{LOCALE_LABELS[code]}</span>
             {locale === code && (
               <div className="ml-auto h-2 w-2 rounded-full bg-[#00a0e9]" />
             )}

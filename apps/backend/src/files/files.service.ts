@@ -24,6 +24,7 @@ export const STAFF_SCOPES = [
   'brand',
   'model',
   'attribute',
+  'advertisement',
 ] as const;
 
 @Injectable()

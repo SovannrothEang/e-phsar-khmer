@@ -621,9 +621,7 @@ export default function SubscriptionTermPage() {
     <main className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
-            Subscription Terms
-          </h1>
+          <h1 className="type-page-title text-sky-500">Subscription Terms</h1>
           <p className="text-sm text-muted-foreground">
             Manage pricing and discounts for each package duration
           </p>

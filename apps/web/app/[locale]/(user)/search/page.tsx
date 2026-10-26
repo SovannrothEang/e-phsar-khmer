@@ -123,10 +123,10 @@ export default async function SearchPage({
       >
         {/* HEADER */}
         <div className="px-6 py-3 bg-card rounded-t-sm border flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="font-semibold text-lg min-w-0 break-words">
+          <h1 className="type-page-title min-w-0 break-words">
             {q ? t("resultsFor", { q }) : t("allAds")}
           </h1>
-          <p className="text-sm text-muted-foreground tabular-nums">
+          <p className="type-meta text-muted-foreground tabular-nums">
             {t("resultCount", { count: total })}
           </p>
         </div>
@@ -181,7 +181,7 @@ export default async function SearchPage({
                     key={c.key}
                     href={{ pathname: "/search", query: c.query }}
                     aria-label={t("removeFilter", { name: c.label })}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-500 bg-card px-3 py-1 text-sm text-sky-600 hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-500 bg-card px-3 py-1 type-nav text-sky-600 hover:bg-muted transition-colors"
                   >
                     {c.label}
                     <IconX className="size-3.5" aria-hidden />
@@ -193,7 +193,7 @@ export default async function SearchPage({
             {feed?.fuzzy && posts.length > 0 && (
               <p
                 role="status"
-                className="mt-3 rounded-sm border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
+                className="mt-3 rounded-sm border border-amber-300 bg-amber-50 px-4 py-2.5 type-body-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200"
               >
                 {t("fuzzyNotice", { q })}
               </p>
@@ -205,13 +205,13 @@ export default async function SearchPage({
                   className="size-10 text-muted-foreground"
                   aria-hidden
                 />
-                <h2 className="text-lg font-semibold break-words max-w-full">
+                <h2 className="type-section-title break-words max-w-full">
                   {q ? t("emptyTitle", { q }) : t("emptyTitleNoQuery")}
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="type-meta text-muted-foreground">
                   {t("emptyHint")}
                 </p>
-                <div className="flex flex-wrap justify-center gap-4 pt-2 text-sm font-medium">
+                <div className="flex flex-wrap justify-center gap-4 pt-2 type-nav">
                   <Link
                     href={{ pathname: "/search", query: clearFilters }}
                     className="text-sky-600 hover:underline"

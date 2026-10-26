@@ -2,6 +2,8 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import { BadRequestException } from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { FilesService } from '../files/files.service';
+import { listingPhotos, listings } from '../db/schema/listings.schema';
+import { trendingEventScoreSql } from './trending';
 
 function makeDb() {
   return {
@@ -267,6 +269,32 @@ describe('ListingsService.findFeed filters', () => {
       expect(text).toContain("->>'bodyType'");
       expect(params).toContain('Toyota');
       expect(params).toContain('Sedan');
+    });
+
+    it('filters model, taxType, color and transmission as bound values', async () => {
+      const { sql: text, params } = await whereSqlFor({
+        model: '3',
+        taxType: 'Tax Paper',
+        color: 'Red',
+        transmission: 'Auto',
+      });
+
+      // Fixed keys in the statement, values bound — same contract as brand.
+      expect(text).toContain("->>'model'");
+      expect(text).toContain("->>'taxType'");
+      expect(text).toContain("->>'color'");
+      expect(text).toContain("->>'transmission'");
+      for (const value of ['3', 'Tax Paper', 'Red', 'Auto']) {
+        expect(params).toContain(value);
+      }
+    });
+
+    it('applies only the dialog filters that were sent', async () => {
+      const { params } = await whereSqlFor({ color: 'Red' });
+
+      expect(params).toContain('Red');
+      expect(params).not.toContain('Tax Paper');
+      expect(params).not.toContain('Auto');
     });
   });
 
@@ -592,6 +620,15 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(whereOf(page).sql).toContain('"delivery_free" = $');
   });
 
+  it('hasDiscount=true filters on a set, positive discount', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ hasDiscount: true });
+    const { sql } = whereOf(page);
+    expect(sql).toMatch(/"discount_value" is not null/);
+    expect(sql).toMatch(/"discount_value" > 0/);
+    expect(sql).toMatch(/"discount_type" is not null/);
+  });
+
   describe('commune', () => {
     it('resolves inside the district', async () => {
       const recs = queue(
@@ -873,5 +910,130 @@ describe('ListingsService photo ownership', () => {
     expect(() =>
       service.assertPhotosOwned('u1', [legacy, own], [legacy]),
     ).not.toThrow();
+  });
+});
+
+describe('ListingsService.findTrending', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * A fake Drizzle client for the trending query. Every chain is thenable, so
+   * the awaited photo load resolves too. `listings` is read twice — the ranked
+   * pass, then the newest-listing fill — so the counter distinguishes them.
+   */
+  function trendingDb(fixture: {
+    ranked?: Row[];
+    fill?: Row[];
+    photos?: Row[];
+  }) {
+    let listingsReads = 0;
+    // Derived-table aliases only need identity for the joins.
+    const alias = () => ({ listingId: {}, score: {} });
+
+    const builder = () => {
+      let value: unknown = [];
+      const node: Record<string, unknown> = {};
+      const chain = () => node;
+      node.from = (table: unknown) => {
+        if (table === listings) {
+          listingsReads++;
+          value =
+            listingsReads === 1 ? (fixture.ranked ?? []) : (fixture.fill ?? []);
+        } else if (table === listingPhotos) {
+          value = fixture.photos ?? [];
+        }
+        return node;
+      };
+      node.leftJoin = chain;
+      node.innerJoin = chain;
+      node.where = chain;
+      node.groupBy = chain;
+      node.orderBy = chain;
+      node.limit = () => Promise.resolve(value);
+      node.as = alias;
+      node.then = (
+        resolve: (v: unknown) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(value).then(resolve, reject);
+      return node;
+    };
+
+    return {
+      select: jest.fn(() => builder()),
+      insert: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+  }
+
+  it('returns ranked listings, strips the score, and attaches photos', async () => {
+    const db = trendingDb({
+      ranked: [
+        { id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 9 },
+        { id: 'l2', title: 'Warm', sellerUsername: 'u2', score: 4 },
+      ],
+      photos: [{ listingId: 'l1', url: 'p1', path: 'listing/u1/p1', sort: 0 }],
+    });
+    const service = makeService(db as never);
+
+    const result = await service.findTrending({ limit: 2 });
+
+    expect(result.meta).toEqual({ limit: 2, windowDays: 7 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2']);
+    expect(result.data[0].photos).toHaveLength(1);
+    expect(result.data[1].photos).toEqual([]);
+    expect(result.data[0]).not.toHaveProperty('score');
+    // event, like and save aggregates + the ranked read + the photo load.
+    expect(db.select).toHaveBeenCalledTimes(5);
+  });
+
+  it('fills the tail with the newest live listings when engagement is thin', async () => {
+    const db = trendingDb({
+      ranked: [{ id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 5 }],
+      fill: [
+        { id: 'l2', title: 'New', sellerUsername: 'u2' },
+        { id: 'l3', title: 'Newer', sellerUsername: 'u3' },
+      ],
+    });
+    const service = makeService(db as never);
+
+    const result = await service.findTrending({ limit: 3, windowDays: 30 });
+
+    expect(result.meta).toEqual({ limit: 3, windowDays: 30 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2', 'l3']);
+  });
+
+  it('reuses the cached list within the cache window', async () => {
+    const db = trendingDb({
+      ranked: [{ id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 5 }],
+    });
+    const service = makeService(db as never);
+
+    const first = await service.findTrending({ limit: 1 });
+    const callsAfterFirst = db.select.mock.calls.length;
+    const second = await service.findTrending({ limit: 1 });
+
+    expect(db.select.mock.calls.length).toBe(callsAfterFirst);
+    expect(second.data).toEqual(first.data);
+  });
+});
+
+describe('trending score weights', () => {
+  it('weights high-intent actions and leaves impressions out entirely', () => {
+    const query = new PgDialect().sqlToQuery(trendingEventScoreSql());
+
+    expect(query.params).toEqual([
+      'view',
+      1,
+      'chat',
+      3,
+      'call',
+      3,
+      'show_contact',
+      3,
+      'apply_job',
+      5,
+    ]);
+    expect(query.params).not.toContain('impression');
   });
 });

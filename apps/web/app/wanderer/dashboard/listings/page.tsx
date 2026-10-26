@@ -122,7 +122,7 @@ export default function AdminListingsPage() {
   return (
     <div className="p-6">
       <div className="flex flex-col gap-1 mb-4">
-        <h1 className="text-2xl text-sky-500 font-semibold">Listings</h1>
+        <h1 className="type-page-title text-sky-500">Listings</h1>
         <p className="text-sm text-muted-foreground">
           Review every ad and take down the ones that break the rules
         </p>

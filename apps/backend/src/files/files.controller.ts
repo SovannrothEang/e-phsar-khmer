@@ -37,6 +37,7 @@ class SignUploadDto {
     'brand',
     'model',
     'attribute',
+    'advertisement',
   ])
   scope:
     | 'avatar'
@@ -49,7 +50,8 @@ class SignUploadDto {
     | 'subcategory'
     | 'brand'
     | 'model'
-    | 'attribute';
+    | 'attribute'
+    | 'advertisement';
 }
 
 class DeleteFilesDto {

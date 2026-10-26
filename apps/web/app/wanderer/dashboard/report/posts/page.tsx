@@ -132,8 +132,8 @@ export default function ReportPostsPage() {
   return (
     <div className="p-6">
       <div className="flex flex-col gap-1 mb-4">
-        <h1 className="text-2xl text-sky-500 font-semibold">Report Posts</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="type-page-title text-sky-500">Report Posts</h1>
+        <p className="type-body-sm text-muted-foreground">
           Manage and review posts reports
         </p>
         <div className="relative max-w-sm mt-2">
@@ -163,7 +163,7 @@ export default function ReportPostsPage() {
                 className="rounded-sm cursor-pointer"
               >
                 Pending
-                <Badge className="bg-blue-500 ml-1 text-xs text-white">
+                <Badge className="bg-blue-500 ml-1 text-white">
                   {reports.filter((r) => r.Status === "Pending").length}
                 </Badge>
               </TabsTrigger>
@@ -172,7 +172,7 @@ export default function ReportPostsPage() {
                 className="rounded-sm cursor-pointer"
               >
                 Approved
-                <Badge className="bg-green-500  ml-1 text-xs text-white">
+                <Badge className="bg-green-500  ml-1 text-white">
                   {reports.filter((r) => r.Status === "Approved").length}
                 </Badge>
               </TabsTrigger>
@@ -181,7 +181,7 @@ export default function ReportPostsPage() {
                 className="rounded-sm cursor-pointer"
               >
                 Rejected
-                <Badge className="bg-red-500 ml-1 text-xs text-white">
+                <Badge className="bg-red-500 ml-1 text-white">
                   {reports.filter((r) => r.Status === "Rejected").length}
                 </Badge>
               </TabsTrigger>
@@ -213,7 +213,7 @@ export default function ReportPostsPage() {
                     <Search className="size-8" />
                     <p>No Report found</p>
                     {searchQuery && (
-                      <p className="text-sm">
+                      <p className="type-body-sm">
                         No Search results for &quot;{searchQuery}&quot;
                       </p>
                     )}
@@ -316,7 +316,7 @@ export default function ReportPostsPage() {
           </TableBody>
         </Table>
         <div className="flex items-center justify-between border-t px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
             Rows per page
             <Select
               value={rowsPerPage.toString()}
@@ -337,7 +337,7 @@ export default function ReportPostsPage() {
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+            <span className="type-body-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
             </span>
             <div className="flex items-center gap-1">

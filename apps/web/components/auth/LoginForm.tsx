@@ -78,7 +78,7 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 bg-card rounded-sm">
-        <CardContent className="grid p-0 md:grid-cols-2">
+        <CardContent className="p-0">
           <form
             className="p-6 md:p-8"
             onSubmit={(e) => {
@@ -88,7 +88,7 @@ export function LoginForm({
           >
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-xl font-medium">
+                <h1 className="type-page-title">
                   Login to manage ads or post free ad
                 </h1>
               </div>
@@ -114,7 +114,7 @@ export function LoginForm({
 
               <Link
                 href="/forgot-password"
-                className="inline-block text-right text-sm underline-offset-2 hover:underline"
+                className="inline-block text-right type-body-sm underline-offset-2 hover:underline"
               >
                 Forgot Password / Account
               </Link>
@@ -173,14 +173,19 @@ export function LoginForm({
               </FieldDescription>
             </FieldGroup>
           </form>
+          {/*
+            Right-side image column disabled for now (no artwork shipped).
+            To restore: uncomment this markup, put back the
+            "grid md:grid-cols-2" classes on CardContent above, and re-add the
+            eslint-disable-next-line for the img.
           <div className="relative hidden bg-muted md:block">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static placeholder */}
             <img
               src="/placeholder.svg"
               alt="Image"
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
+          */}
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">

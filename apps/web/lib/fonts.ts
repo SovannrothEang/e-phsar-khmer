@@ -1,23 +1,15 @@
 import localFont from "next/font/local";
-import { Kantumruy_Pro } from "next/font/google";
+import { Koh_Santepheap } from "next/font/google";
 
 /**
- * Khmer script face. The global stack keeps Times New Roman first, so Latin
- * text renders in Times New Roman while Khmer glyphs fall through to this
- * font; systems without Times New Roman also get a usable Latin fallback here.
+ * Khmer script face, appended last in the global stack. The stack's system
+ * fonts cover Latin first, so this face only renders glyphs the system lacks
+ * (Khmer on systems without Khmer coverage).
  */
-export const kantumruyPro = Kantumruy_Pro({
-  subsets: ["khmer", "latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-kantumruy-pro",
-  display: "swap",
-});
-
-/** Latin face bundled locally by the portal/admin design. */
-export const inter = localFont({
-  src: "../fonts/inter-latin.woff2",
-  weight: "400 700",
-  variable: "--font-inter",
+export const kohSantepheap = Koh_Santepheap({
+  subsets: ["khmer"],
+  weight: ["300", "400", "700", "900"],
+  variable: "--font-koh-santepheap",
   display: "swap",
 });
 

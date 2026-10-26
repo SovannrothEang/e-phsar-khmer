@@ -10,6 +10,8 @@ export interface ListingSpecsProps {
   brand?: { slug: string; name: string };
   model?: { slug: string; name: string };
   attributes?: Record<string, unknown> | null;
+  /** Km display value per attribute key (taxType, bodyType, color, …). */
+  valueLabels?: Record<string, string>;
   condition?: "new" | "used" | null;
 }
 
@@ -147,6 +149,7 @@ export default function ListingSpecs({
   brand,
   model,
   attributes,
+  valueLabels,
   condition,
 }: ListingSpecsProps) {
   const t = useTranslations("Specs");
@@ -262,9 +265,10 @@ export default function ListingSpecs({
     const value = toText(attributes?.[key]);
     if (!value) continue;
     if (!conditionPreKeys.has(key)) pushCondition();
+    const displayValue = valueLabels?.[key] ?? value;
     rows.push({
       label: t(labelOverrides?.[key] ?? labelKey),
-      value: `${value}${VALUE_SUFFIX[key] ?? ""}`,
+      value: `${displayValue}${VALUE_SUFFIX[key] ?? ""}`,
       href: browseHref,
     });
   }
@@ -276,16 +280,16 @@ export default function ListingSpecs({
     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 mb-5">
       {rows.map((row) => (
         <div key={row.label}>
-          <div className="text-xs text-muted-foreground">{row.label}</div>
+          <div className="type-body-sm text-muted-foreground">{row.label}</div>
           {row.href && row.value ? (
             <Link
               href={row.href}
-              className="text-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
+              className="type-body-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
             >
               {row.value}
             </Link>
           ) : (
-            <span className="text-sm text-[#00a0e9] break-words">
+            <span className="type-body-sm text-[#00a0e9] break-words">
               {row.value}
             </span>
           )}

@@ -15,6 +15,7 @@ import {
   getBodyTypes,
   getCategoryWithSubcategories,
   getColors,
+  getLinkedAttributeOptions,
   getModelsForBrand,
   getYears,
   getAllCategories,
@@ -468,6 +469,71 @@ export async function getBrandModels(
   subcategorySlug: string,
 ): Promise<BackendModel[]> {
   return getModelsForBrand(brandId, subcategorySlug);
+}
+
+/** One subcategory's option lists for the More Filters dialog. */
+export interface BrowseFilterOptions {
+  /** The subcategory's own field-schema keys — every dialog field is gated on
+   *  one of these, so a phone page never offers a Body Type. */
+  fields: string[];
+  brands: { id: string; slug: string; name: string }[];
+  /** The `bodytypes` rows linked to this subcategory; `slug` is the value the
+   *  browse grid writes into `ad_type`, so the dialog and the grid agree. */
+  bodyTypes: { slug: string; name: string }[];
+  colors: string[];
+  engineTypes: string[];
+  years: string[];
+}
+
+/**
+ * Option lists for the More Filters dialog's vehicle fields.
+ *
+ * Gated by the subcategory's `field_schema`, and sourced exactly like the
+ * browse grid / post form so a value picked here always matches what listings
+ * actually store: brands from the subcategory's linked set, body types from
+ * the same linked `bodytypes` rows the grid renders, colours through the form's
+ * managed/global set rule, engine types from `enginetypes`, years from the
+ * generated `years` set.
+ */
+export async function getBrowseFilterOptions(
+  categorySlug: string,
+  subcategorySlug: string,
+  locale: string,
+): Promise<BrowseFilterOptions | null> {
+  const category = await getCategoryWithSubcategories(categorySlug, locale);
+  const sub = category?.subcategories.find((s) => s.slug === subcategorySlug);
+  if (!sub) return null;
+
+  const fields = (sub.fieldSchema ?? []).map((f) => f.key);
+  const has = (key: string) => fields.includes(key);
+  const wantsBodyType = has("bodyType") || has("vehicleType");
+
+  const [brands, linkedRows, colors, engineRows, years] = await Promise.all([
+    has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
+    wantsBodyType ? getLinkedAttributeOptions(sub.id) : [],
+    has("color") ? getColors() : [],
+    has("engineType") ? getAttributeOptions("enginetypes") : [],
+    has("year") ? getYears() : [],
+  ]);
+
+  // Colours follow the post form's set rule: a managed set's ticks are the
+  // whole truth; a global picklist returns in full (see `forSub`).
+  const colorRows = colors.some((r) => r.subcategoryIds.length > 0)
+    ? colors.filter((r) => r.subcategoryIds.includes(sub.id))
+    : colors;
+
+  return {
+    fields,
+    brands: brands.map((b) => ({ id: b.id, slug: b.slug, name: b.name })),
+    // The grid renders exactly these linked rows, so the dialog's select can
+    // never offer a body type the grid cannot also select.
+    bodyTypes: linkedRows
+      .filter((r) => r.type === "bodytypes")
+      .map((r) => ({ slug: r.slug, name: r.name })),
+    colors: colorRows.map((r) => r.name),
+    engineTypes: engineRows.map((r) => r.name),
+    years: years.map((y) => y.name),
+  };
 }
 
 export interface AllAdsBatch {

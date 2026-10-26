@@ -317,9 +317,7 @@ export default function SubscriptionPlanPage() {
     <main className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
-            Subscription Plans
-          </h1>
+          <h1 className="type-page-title text-sky-500">Subscription Plans</h1>
           <p className="text-sm text-muted-foreground">
             Manage subscription plans across categories
           </p>

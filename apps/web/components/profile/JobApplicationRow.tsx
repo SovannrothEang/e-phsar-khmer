@@ -79,7 +79,7 @@ export function JobApplicationRow({
               className="h-11 w-11 shrink-0 rounded-full border border-border object-cover"
             />
           ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted type-nav text-muted-foreground">
               {/* A poster's row leads with a handle — the initial is the first
                   letter of the name, not the "@" in front of it. */}
               {title.replace(/^@/, "").slice(0, 1).toUpperCase()}
@@ -108,20 +108,20 @@ export function JobApplicationRow({
           {!jobGone && view === "applied" ? (
             <Link
               href={{ pathname: "/post/[slug]", params: { slug: listing.id } }}
-              className="block truncate text-sm font-semibold text-foreground hover:text-[#00a0e9]"
+              className="block truncate type-nav text-foreground hover:text-[#00a0e9]"
             >
               {title}
             </Link>
           ) : (
-            <p className="truncate text-sm font-semibold text-foreground">
-              {title}
-            </p>
+            <p className="truncate type-nav text-foreground">{title}</p>
           )}
           {subtitle ? (
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+            <p className="truncate type-meta text-muted-foreground">
+              {subtitle}
+            </p>
           ) : null}
 
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-muted-foreground">
             {view === "received" ? (
               <>
                 {jobLine}
@@ -140,7 +140,7 @@ export function JobApplicationRow({
           </p>
 
           {note ? (
-            <p className="mt-2 line-clamp-2 text-xs text-foreground/80">
+            <p className="mt-2 line-clamp-2 type-meta text-foreground/80">
               {note}
             </p>
           ) : null}
@@ -188,7 +188,7 @@ function StatusBadge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${styles[status]}`}
+      className={`inline-flex items-center rounded-sm border px-2 py-0.5 type-button-sm whitespace-nowrap ${styles[status]}`}
     >
       {labels[status]}
     </span>

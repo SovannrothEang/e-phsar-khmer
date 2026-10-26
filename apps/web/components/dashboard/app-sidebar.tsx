@@ -10,6 +10,7 @@ import {
   Folder,
   FolderTreeIcon,
   Layers,
+  Megaphone,
 } from "lucide-react";
 import {
   IconCalendarDollar,
@@ -33,6 +34,7 @@ import {
   IconListDetails,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { BrandWordmark } from "@/components/web/BrandWordmark";
 import {
   Sidebar,
   SidebarContent,
@@ -53,12 +55,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import Image from "next/image";
+
+/** Both staff tiers. `super_admin` is governance-only, so it is NOT a superset. */
+export type StaffRole = "admin" | "super_admin";
 
 export type MenuItem = {
   title: string;
   icon: ComponentType<{ className?: string }>;
   href: string;
+  /** Tiers that see this entry. Omitted = both. */
+  roles?: StaffRole[];
   items?: {
     title: string;
     icon: ComponentType<{ className?: string }>;
@@ -86,22 +92,26 @@ export const menuItems: MenuItem[] = [
     title: "Categories",
     icon: Folder,
     href: "/wanderer/dashboard/categories",
+    roles: ["admin"],
   },
   {
     title: "Listings",
     icon: IconListDetails,
     href: "/wanderer/dashboard/listings",
+    roles: ["admin"],
   },
   {
     title: "Subcategories",
     icon: FolderTreeIcon,
     href: "/wanderer/dashboard/subcategories",
+    roles: ["admin"],
   },
   // Group the attributes sub-items nested inside the main Attributes item!
   {
     title: "Attributes",
     icon: Layers,
     href: "/wanderer/dashboard/attributes",
+    roles: ["admin"],
     items: [
       {
         title: "Brands",
@@ -149,11 +159,19 @@ export const menuItems: MenuItem[] = [
     title: "Team",
     icon: Users,
     href: "/wanderer/dashboard/team",
+    roles: ["super_admin"],
+  },
+  {
+    title: "Advertisements",
+    icon: Megaphone,
+    href: "/wanderer/dashboard/advertisements",
+    roles: ["super_admin"],
   },
   {
     title: "Manage Users",
     icon: IconUserCog,
     href: "/wanderer/dashboard/users",
+    roles: ["admin"],
     items: [
       {
         title: "Users",
@@ -223,10 +241,11 @@ const documentItems: DocumentItem[] = [
 ] as const; // <--- Add this
 
 export function AppSidebar({ userRole }: { userRole: string }) {
-  // The Team management page is super_admin-only — hide it from the sidebar
-  // for regular admins.
+  const role = userRole as StaffRole;
+  // super_admin is a governance tier, not a bigger admin tier: it sees only
+  // the entries that name it, which is why this filters in both directions.
   const visibleMenuItems = menuItems.filter(
-    (item) => item.title !== "Team" || userRole === "super_admin",
+    (item) => !item.roles || item.roles.includes(role),
   );
   return (
     <Sidebar collapsible="icon">
@@ -239,18 +258,9 @@ export function AppSidebar({ userRole }: { userRole: string }) {
             className="flex items-center gap-2 w-full justify-start overflow-hidden"
           >
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
-              <Image
-                src="/logo/psa-npic.png"
-                alt="PSA NPIC"
-                width={20}
-                height={20}
-                className="h-5 w-5 object-contain"
-              />
+              <span className="text-sm font-bold">P</span>
             </div>
-            <span className="text-2xl font-semibold truncate group-data-[collapsible=icon]:hidden">
-              <span className="text-foreground">PSA</span>{" "}
-              <span className="text-[#00a0e9]">KHMER</span>
-            </span>
+            <BrandWordmark className="text-2xl font-semibold truncate group-data-[collapsible=icon]:hidden" />
           </Link>
           <div className="group-data-[collapsible=icon]:hidden"></div>
         </div>
@@ -305,31 +315,33 @@ export function AppSidebar({ userRole }: { userRole: string }) {
               })}
             </SidebarMenu>
           </SidebarGroupContent>
-          <Collapsible className="group/collapsible">
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Subscriptions">
-                  <CreditCard className="size-4" />
-                  <span>Subscriptions</span>
-                  <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {subscriptionSubItems.map((subItem) => (
-                    <SidebarMenuSubItem key={subItem.title}>
-                      <SidebarMenuSubButton asChild>
-                        <Link href={subItem.href}>
-                          <subItem.icon className="size-4" />
-                          <span>{subItem.title}</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+          {role === "admin" && (
+            <Collapsible className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Subscriptions">
+                    <CreditCard className="size-4" />
+                    <span>Subscriptions</span>
+                    <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {subscriptionSubItems.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.title}>
+                        <SidebarMenuSubButton asChild>
+                          <Link href={subItem.href}>
+                            <subItem.icon className="size-4" />
+                            <span>{subItem.title}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Moderation</SidebarGroupLabel>

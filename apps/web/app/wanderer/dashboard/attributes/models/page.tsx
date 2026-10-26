@@ -239,7 +239,7 @@ function AddModelForm({
             )}
           </form.AppField>
         ) : selectedCategoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a subcategory to see brands.
           </p>
         ) : null}
@@ -387,7 +387,7 @@ function EditModelForm({
             )}
           </form.AppField>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -412,7 +412,7 @@ function EditModelForm({
             )}
           </form.AppField>
         ) : selectedCategoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a subcategory to see brands.
           </p>
         ) : null}
@@ -584,10 +584,10 @@ export default function ModelsPage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 Models
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="type-body-sm text-muted-foreground mt-2">
                 Manage product Models Here.
               </p>
             </div>
@@ -650,7 +650,7 @@ export default function ModelsPage() {
                         <Search className="size-8" />
                         <p>No model found</p>
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -674,7 +674,7 @@ export default function ModelsPage() {
                       {allCategories.find(
                         (c) => c.cateId === model.categoryId,
                       ) ? (
-                        <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
+                        <span className="rounded bg-sky-200 px-2 py-1 type-body-sm text-black">
                           {
                             allCategories.find(
                               (c) => c.cateId === model.categoryId,
@@ -693,7 +693,7 @@ export default function ModelsPage() {
                           return (
                             <span
                               key={id}
-                              className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
+                              className="rounded bg-sky-100 px-2 py-1 type-body-sm text-black"
                             >
                               {sub?.name}
                             </span>
@@ -701,10 +701,10 @@ export default function ModelsPage() {
                         })}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="type-meta text-muted-foreground">
                       {model.createdAt}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="type-meta text-muted-foreground">
                       {model.updatedAt}
                     </TableCell>
                     <TableCell className="text-center">
@@ -743,7 +743,7 @@ export default function ModelsPage() {
             </Table>
             {/* Pagination */}
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -765,7 +765,7 @@ export default function ModelsPage() {
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
                 <div className="flex items-center gap-1">

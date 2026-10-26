@@ -67,6 +67,7 @@ export default function FeedbackPage() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
+  const [viewFeedback, setViewFeedback] = useState<Feedback | null>(null);
 
   const filteredFeedbacks = Feedbacks.filter(
     (f) =>
@@ -117,7 +118,7 @@ export default function FeedbackPage() {
     <div className="p-6">
       {/* HEADER */}
       <div className="flex flex-col gap-1 mb-4">
-        <h1 className="text-2xl text-sky-500 font-semibold">Feedbacks</h1>
+        <h1 className="type-page-title text-sky-500">Feedbacks</h1>
         <p className="text-sm text-muted-foreground">
           Manage and review user feedbacks
         </p>
@@ -195,7 +196,23 @@ export default function FeedbackPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell>{feedback.description}</TableCell>
+                  <TableCell className="max-w-[320px]">
+                    <p
+                      className="line-clamp-3 whitespace-pre-wrap break-words"
+                      title={feedback.description}
+                    >
+                      {feedback.description}
+                    </p>
+                    {feedback.description.length > 140 && (
+                      <button
+                        type="button"
+                        onClick={() => setViewFeedback(feedback)}
+                        className="mt-1 type-meta text-sky-500 hover:underline cursor-pointer"
+                      >
+                        Read full text
+                      </button>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {new Date(feedback.CreatedAt).toLocaleString()}
                   </TableCell>
@@ -295,6 +312,36 @@ export default function FeedbackPage() {
             </div>
           </div>
         </div>
+
+        <Dialog
+          open={viewFeedback !== null}
+          onOpenChange={(open) => {
+            if (!open) setViewFeedback(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{viewFeedback?.name}</DialogTitle>
+              <DialogDescription>
+                {viewFeedback
+                  ? new Date(viewFeedback.CreatedAt).toLocaleString()
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <p className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words type-body">
+              {viewFeedback?.description}
+            </p>
+            <DialogFooter>
+              <Button
+                className="h-9 rounded-sm"
+                variant="outline"
+                onClick={() => setViewFeedback(null)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent>

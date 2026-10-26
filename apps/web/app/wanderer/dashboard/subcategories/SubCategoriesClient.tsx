@@ -413,10 +413,10 @@ export default function SubCategoriesClient() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 Sub Categories
               </h1>
-              <p className="text-sm mt-2 text-muted-foreground">
+              <p className="type-body-sm mt-2 text-muted-foreground">
                 Manage product subcategories
               </p>
             </div>
@@ -478,7 +478,7 @@ export default function SubCategoriesClient() {
                         <Search className="size-8" />
                         <p>No sub category found</p>
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -494,7 +494,7 @@ export default function SubCategoriesClient() {
                     <TableCell>
                       <div>{subcategory.name}</div>
                       {subcategory.nameKm && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="type-meta text-muted-foreground">
                           {subcategory.nameKm}
                         </div>
                       )}
@@ -558,7 +558,7 @@ export default function SubCategoriesClient() {
             </Table>
             {/* Pagination */}
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -579,7 +579,7 @@ export default function SubCategoriesClient() {
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
                 <div className="flex items-center gap-1">

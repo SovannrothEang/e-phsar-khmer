@@ -7,9 +7,11 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "@/i18n/routing";
-import { GridCardPost } from "@/components/ads/GridCardPost";
+import { ProfileListingRow } from "@/components/profile/ProfileListingRow";
+import { ManageAdActions } from "@/components/profile/ManageAdActions";
 import { loadMyAds } from "@/actions/my-ads";
 import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
@@ -32,13 +34,13 @@ function adsSummary(plan: PlanEntitlements): string {
 }
 
 function renewsSummary(plan: PlanEntitlements): string {
-  const values = plan.buckets.map((b) => b.limits.renews);
-  const low = Math.min(plan.limits.renews, ...values);
-  const high = Math.max(plan.limits.renews, ...values);
-  return low === high ? `${low} per ad` : `${low}–${high} per ad`;
+  const allowance = plan.buckets.reduce((sum, b) => sum + b.limits.renews, 0);
+  return `${plan.usage.renews}/${plan.buckets.length > 0 ? allowance : plan.limits.renews}`;
 }
 
 export default function ManageAds() {
+  const t = useTranslations("Me.manageAds");
+  const tCommon = useTranslations("Common");
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("active");
   // What the last fetch returned, tagged with the tab it belongs to. A result
@@ -48,6 +50,8 @@ export default function ManageAds() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [plan, setPlan] = useState<PlanEntitlements | null>(null);
   const [counts, setCounts] = useState<Partial<Record<Tab, number>>>({});
+  /** Bumped after a row action (renew/delete) to reload the current tab. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   const current = loaded?.tab === activeTab ? loaded : null;
   const items = current?.items ?? null;
@@ -74,7 +78,7 @@ export default function ManageAds() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, reloadKey]);
 
   const loadMore = () => {
     if (loadingMore || !current) return;
@@ -105,125 +109,147 @@ export default function ManageAds() {
 
   return (
     <div className="min-h-screen bg-muted pt-4">
-      <div className="max-w-7xl mx-auto bg-card rounded-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border">
-          <h1 className="text-foreground text-xl py-2 px-4 pt-6">Manage Ads</h1>
-          <hr />
-          <div className="flex items-center justify-end gap-3 py-2 pt-6 px-6">
-            <Field className="flex-1">
-              <InputGroup>
-                <InputGroupInput
-                  id="inline-start-input"
-                  placeholder="Search..."
-                  className="h-11 border-gray-200 focus:ring-0"
-                />
-                <InputGroupAddon align="inline-end">
-                  <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
-                </InputGroupAddon>
-              </InputGroup>
-            </Field>
-            <Button
-              variant="outline"
-              className="h-10 rounded-sm px-5 border-muted-foreground text-foreground hover:text-foreground font-medium"
-            >
-              <Funnel className="scale-120" />
-              Filter
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 px-4">
-          <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
-            Total Ads
-            <p className="text-lg text-foreground">
-              {plan ? adsSummary(plan) : "–"}
-            </p>
-          </div>
-          <div className="bg-muted h-20 w-full text-center p-6 rounded-md text-foreground font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
-            Renews
-            <p className="text-lg text-foreground">
-              {plan ? renewsSummary(plan) : "–"}
-            </p>
-          </div>
-        </div>
-        <div className="bg-muted rounded-md mb-12 mx-4 p-2 flex">
-          <button
-            onClick={() => setActiveTab("active")}
-            className={`flex-1 h-10 rounded-md text-base font-semibold transition-all cursor-pointer ${
-              activeTab === "active"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent/50"
-            }`}
-          >
-            Active{" "}
-            <span className="text-[#00a0e9]">({counts.active ?? 0})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("expired")}
-            className={`flex-1 h-10 rounded-md text-base font-semibold transition-all cursor-pointer ${
-              activeTab === "expired"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent/50"
-            }`}
-          >
-            Expired{" "}
-            <span className="text-[#00a0e9]">({counts.expired ?? 0})</span>
-          </button>
-        </div>
-        {error || items === null ? (
-          <div className="flex items-center justify-center px-4 text-center min-h-[400px]">
-            <p className="text-sm text-muted-foreground">
-              {error ?? "Loading…"}
-            </p>
-          </div>
-        ) : items.length > 0 ? (
-          <div className="px-4 pb-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {items.map((post) => (
-                <GridCardPost key={post.postId} post={post} />
-              ))}
+      <div className="max-w-7xl mx-auto">
+        {/* Controls card. The ad list is its own section below it (captain,
+            2026-10-27): the listings must not share the Active/Expired card. */}
+        <div className="bg-card rounded-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border">
+            <h1 className="text-foreground text-xl py-2 px-4 pt-6">
+              {t("title")}
+            </h1>
+            <hr />
+            <div className="flex items-center justify-end gap-3 py-2 pt-6 px-6">
+              <Field className="flex-1">
+                <InputGroup>
+                  <InputGroupInput
+                    id="inline-start-input"
+                    placeholder={t("searchPlaceholder")}
+                    className="h-11 border-gray-200 focus:ring-0"
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
+                  </InputGroupAddon>
+                </InputGroup>
+              </Field>
+              <Button
+                variant="outline"
+                className="h-10 rounded-sm px-5 border-muted-foreground text-foreground hover:text-foreground font-medium"
+              >
+                <Funnel className="scale-120" />
+                {t("filter")}
+              </Button>
             </div>
-            {hasMore && (
-              <div className="mt-6 flex justify-center">
-                <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="rounded-sm border bg-card px-6 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
-                >
-                  {loadingMore ? "Loading…" : "Load more"}
-                </button>
-              </div>
-            )}
           </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center px-4 text-center min-h-[400px]">
-            <div className="bg-muted w-36 h-36 rounded-full flex items-center justify-center ">
-              <ImagePlus className="w-16 h-16 text-muted-foreground stroke-1" />
-            </div>
-
-            <h2 className="text-lg font-medium text-foreground mb-3">
-              No Result!
-            </h2>
-
-            {activeTab === "active" ? (
-              <div className="flex flex-col items-center gap-8">
-                <p className="text-muted-foreground text-sm">
-                  Oops! You don&apos;t have any active ads.
-                </p>
-                <Button
-                  onClick={() => router.push("/post")}
-                  className="bg-[#f28e1c] hover:bg-[#d17a15] text-white font-semibold text-sm px-6 py-5   rounded-sm transition-colors cursor-pointer"
-                >
-                  Sell your stuff
-                </Button>
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                You don&apos;t have any expired ads yet.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 px-4">
+            <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
+              {t("totalAds")}
+              <p className="text-lg text-foreground">
+                {plan ? adsSummary(plan) : "–"}
               </p>
-            )}
+            </div>
+            <div className="bg-muted h-20 w-full text-center p-6 rounded-md text-foreground font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
+              {t("renews")}
+              <p className="text-lg text-foreground">
+                {plan ? renewsSummary(plan) : "–"}
+              </p>
+            </div>
           </div>
-        )}
+          <div className="grid grid-cols-2 gap-3 mx-4 mb-4">
+            <button
+              onClick={() => setActiveTab("active")}
+              className={`h-10 rounded-md border text-base font-semibold transition-colors cursor-pointer ${
+                activeTab === "active"
+                  ? "bg-background text-foreground border-border shadow-sm"
+                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+              }`}
+            >
+              {t("active")}{" "}
+              <span className="text-[#00a0e9]">({counts.active ?? 0})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("expired")}
+              className={`h-10 rounded-md border text-base font-semibold transition-colors cursor-pointer ${
+                activeTab === "expired"
+                  ? "bg-background text-foreground border-border shadow-sm"
+                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+              }`}
+            >
+              {t("expired")}{" "}
+              <span className="text-[#00a0e9]">({counts.expired ?? 0})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* The ads live in their own section below the controls card, with
+            only the page background between them (captain, 2026-10-27). */}
+        <div className="mt-6">
+          {error || items === null ? (
+            <div className="flex min-h-[300px] items-center justify-center px-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                {error ?? tCommon("loading")}
+              </p>
+            </div>
+          ) : items.length > 0 ? (
+            <div className="pb-8">
+              {/* List rows, not a grid (captain, 2026-10-27): a populated tab
+                  fills the column; only the empty state is centred. */}
+              <div className="space-y-3">
+                {items.map((post) => (
+                  <ProfileListingRow
+                    key={post.postId}
+                    post={post}
+                    action={
+                      <ManageAdActions
+                        post={post}
+                        onChanged={() => setReloadKey((key) => key + 1)}
+                      />
+                    }
+                  />
+                ))}
+              </div>
+              {hasMore && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="rounded-sm border bg-card px-6 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
+                  >
+                    {loadingMore ? tCommon("loading") : tCommon("loadMore")}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mx-auto flex min-h-[450px] max-w-2xl flex-col items-center justify-center rounded-sm border bg-card p-8 text-center shadow-sm">
+              <div className="bg-muted w-36 h-36 rounded-full flex items-center justify-center ">
+                <ImagePlus className="w-16 h-16 text-muted-foreground stroke-1" />
+              </div>
+
+              <h2 className="text-lg font-medium text-foreground mb-3">
+                {t("noResult")}
+              </h2>
+
+              {activeTab === "active" ? (
+                <div className="flex flex-col items-center gap-8">
+                  <p className="text-muted-foreground text-sm">
+                    {t("noActive")}
+                  </p>
+                  <Button
+                    onClick={() => router.push("/post")}
+                    className="bg-[#f28e1c] hover:bg-[#d17a15] text-white font-semibold text-sm px-6 py-5   rounded-sm transition-colors cursor-pointer"
+                  >
+                    {t("sell")}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  {t("noExpired")}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

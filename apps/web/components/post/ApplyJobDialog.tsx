@@ -93,10 +93,7 @@ export function ApplyJobDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <label
-              htmlFor="apply-note"
-              className="text-sm font-medium text-foreground"
-            >
+            <label htmlFor="apply-note" className="type-nav text-foreground">
               {t("messageLabel")}{" "}
               <span className="text-muted-foreground font-normal">
                 {t("optional")}
@@ -114,10 +111,10 @@ export function ApplyJobDialog({
           <div className="rounded-sm border bg-muted/40 p-3">
             <div className="flex items-start gap-2">
               <FileText className="size-4 mt-0.5 text-muted-foreground shrink-0" />
-              <div className="min-w-0 text-sm">
+              <div className="min-w-0 type-body-sm">
                 {resume?.hasResume ? (
                   <>
-                    <p className="font-medium text-foreground">
+                    <p className="type-nav text-foreground">
                       {t("resumeWillBeSent")}
                     </p>
                     {resume.summary ? (
@@ -133,7 +130,7 @@ export function ApplyJobDialog({
                   </>
                 ) : (
                   <>
-                    <p className="font-medium text-foreground">
+                    <p className="type-nav text-foreground">
                       {t("noResumeTitle")}
                     </p>
                     <p className="text-muted-foreground mt-0.5">

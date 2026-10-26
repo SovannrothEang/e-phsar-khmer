@@ -264,10 +264,10 @@ export default function SubscriptionCategoryPage() {
     <main className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
+          <h1 className="type-page-title text-sky-500">
             Subscription Categories
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="type-body-sm text-muted-foreground">
             Manage subscription categories and their plans
           </p>
         </div>
@@ -422,7 +422,7 @@ export default function SubscriptionCategoryPage() {
           </TableBody>
         </Table>
         <div className="flex items-center justify-between border-t px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
             Rows per page
             <Select
               value={rowsPerPage.toString()}
@@ -443,7 +443,7 @@ export default function SubscriptionCategoryPage() {
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+            <span className="type-body-sm text-muted-foreground">
               Page {currentPage} of {totalPages}
             </span>
 

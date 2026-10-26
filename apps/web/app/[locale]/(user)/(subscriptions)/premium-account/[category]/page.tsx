@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ArrowRight, ChevronRight, CircleCheck, Home } from "lucide-react";
+import { ArrowRight, CircleCheck } from "lucide-react";
 import { Link } from "@/i18n/routing";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import {
   getMySubscriptions,
   getSubscriptionCatalog,
@@ -17,7 +18,6 @@ import {
   offerState,
   packageIdOf,
   priceFor,
-  type OfferState,
 } from "@/lib/subscription-pricing";
 
 function money(value: number): string {
@@ -40,13 +40,13 @@ function unitLabel(item: SubscriptionCatalogItem): string {
   return UNIT[item.durationUnit][item.durationValue === 1 ? 0 : 1];
 }
 
-/** "- 20 %" for a percent discount, "- $5" for an amount; null when none. */
+/** "-20%" for a percent discount, "-$5" for an amount; null when none. */
 function discountLabel(item: SubscriptionCatalogItem): string | null {
   const value = Number(item.discount);
   if (!(value > 0)) return null;
   return item.discountType === "percent"
-    ? `- ${money(value)} %`
-    : `- $${money(value)}`;
+    ? `-${money(value)}%`
+    : `-$${money(value)}`;
 }
 
 function DiscountBadge({
@@ -60,7 +60,7 @@ function DiscountBadge({
   if (!label) return null;
   return (
     <span
-      className={`rounded-sm bg-red-600/85 px-1.5 py-0.5 text-xs font-semibold text-white ${className}`}
+      className={`rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-500 ${className}`}
     >
       {label}
     </span>
@@ -68,23 +68,17 @@ function DiscountBadge({
 }
 
 /** Original price struck through (when discounted) next to the final price. */
-function Price({
-  item,
-  className = "",
-}: {
-  item: SubscriptionCatalogItem;
-  className?: string;
-}) {
+function Price({ item }: { item: SubscriptionCatalogItem }) {
   const final = priceFor(item);
   const original = Number(item.price);
   return (
-    <span className={`tabular-nums ${className}`}>
+    <span className="tabular-nums">
       {final < original && (
-        <span className="mr-2 italic text-muted-foreground line-through">
+        <span className="mr-2 text-base italic text-foreground line-through">
           ${money(original)}
         </span>
       )}
-      <span className="text-[#00a0e9]">${money(final)}</span>
+      <span className="font-medium text-sky-600">${money(final)}</span>
     </span>
   );
 }
@@ -98,11 +92,16 @@ function Benefits({ item }: { item: SubscriptionCatalogItem }) {
     ["Videos", item.videos],
   ];
   return (
-    <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
+    <ul className="mb-4 grid grid-cols-1 gap-1">
       {rows.map(([label, value]) => (
-        <li key={label} className="flex items-center gap-2">
-          <CircleCheck className="size-4" strokeWidth={1.75} />
-          {label} {value}
+        <li
+          key={label}
+          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
+        >
+          <CircleCheck size={16} className="shrink-0 text-sky-400" />
+          <span className="capitalize">
+            {label} {value}
+          </span>
         </li>
       ))}
     </ul>
@@ -120,43 +119,29 @@ function TermRows({
   onPick: (termId: string) => void;
 }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Term"
-      className="mt-2 overflow-hidden rounded-md bg-muted ring-1 ring-border"
-    >
-      {terms.map((term) => {
+    <div className="overflow-hidden rounded-sm border bg-card">
+      {terms.map((term, index) => {
         const checked = term.termId === selectedTermId;
         return (
-          <button
-            key={term.termId}
-            type="button"
-            role="radio"
-            aria-checked={checked}
-            onClick={(e) => {
-              e.stopPropagation();
-              onPick(term.termId);
-            }}
-            className={`flex w-full items-center gap-4 border-b border-border px-6 py-5 text-left last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#00a0e9] ${
-              checked ? "bg-background/60" : "hover:bg-background/40"
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                checked ? "border-[#00a0e9]" : "border-muted-foreground/60"
+          <div key={term.termId} className={index > 0 ? "border-t" : ""}>
+            <label
+              className={`flex cursor-pointer items-center justify-between px-4 py-3 transition-all ${
+                checked ? "bg-muted" : "hover:bg-muted"
               }`}
             >
-              {checked && (
-                <span className="size-2.5 rounded-full bg-[#00a0e9]" />
-              )}
-            </span>
-            <span className="text-lg font-semibold text-foreground">
-              {term.termName}
-            </span>
-            <DiscountBadge item={term} />
-            <Price item={term} className="ml-auto text-lg font-semibold" />
-          </button>
+              <span className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  checked={checked}
+                  onChange={() => onPick(term.termId)}
+                  className="h-4 w-4 accent-sky-500"
+                />
+                <span className="font-semibold">{term.termName}</span>
+                <DiscountBadge item={term} />
+              </span>
+              <Price item={term} />
+            </label>
+          </div>
         );
       })}
     </div>
@@ -172,7 +157,7 @@ function TermTiles({
   onPick: (termId: string) => void;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap gap-10">
+    <div className="flex flex-wrap gap-4">
       {terms.map((term) => (
         <button
           key={term.termId}
@@ -181,79 +166,16 @@ function TermTiles({
             e.stopPropagation();
             onPick(term.termId);
           }}
-          className="relative flex size-28 flex-col items-center justify-center rounded-md bg-muted text-foreground ring-1 ring-border transition-colors hover:ring-[#00a0e9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a0e9]"
+          className="relative flex h-20 w-28 flex-col items-center justify-center rounded-sm border bg-card text-foreground transition-colors hover:border-sky-400"
         >
           <DiscountBadge item={term} className="absolute right-0 top-0" />
-          <span className="text-3xl font-bold leading-none">
+          <span className="text-2xl font-bold leading-none">
             {term.durationValue}
           </span>
-          <span className="mt-1 text-lg">{unitLabel(term)}</span>
+          <span className="mt-1 text-sm">{unitLabel(term)}</span>
         </button>
       ))}
     </div>
-  );
-}
-
-function SummaryBar({
-  plan,
-  term,
-  state,
-  active,
-}: {
-  plan: SubscriptionCatalogItem;
-  term: SubscriptionCatalogItem;
-  state: OfferState;
-  active: UserSubscription | null;
-}) {
-  const button =
-    "flex h-14 w-full items-center justify-center gap-2 rounded-md text-lg font-semibold";
-  return (
-    <section
-      aria-label="Your selection"
-      className="sticky bottom-4 mt-6 rounded-md bg-card p-6 shadow-lg ring-1 ring-border"
-    >
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl text-foreground">
-          {plan.packageName} {term.termName}
-        </h2>
-        <DiscountBadge item={term} />
-        <Price item={term} className="ml-auto text-2xl" />
-      </div>
-      {state.kind === "upgrade" && (
-        <p className="mt-2 text-sm text-muted-foreground">
-          Upgrade from your current plan: you pay{" "}
-          <strong className="text-foreground">${money(state.due)}</strong> today
-          — prorated to your end date, minus ${money(state.credit)} unused
-          credit.
-        </p>
-      )}
-      <div className="mt-4">
-        {state.kind === "current" ? (
-          <Link
-            href="/me/subscriptions"
-            className={`${button} bg-muted text-muted-foreground`}
-          >
-            Your current plan
-            {active &&
-              ` · until ${new Date(active.expiresAt).toLocaleDateString()}`}
-          </Link>
-        ) : state.kind === "unavailable" ? (
-          <span
-            aria-disabled
-            className={`${button} cursor-not-allowed bg-muted text-muted-foreground`}
-          >
-            Not an upgrade from your plan
-          </span>
-        ) : (
-          <Link
-            href={{ pathname: "/checkout", query: { termId: term.termId } }}
-            className={`${button} bg-[#f68b1e] text-white transition-colors hover:bg-[#e07d15] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f68b1e] focus-visible:ring-offset-2`}
-          >
-            {state.kind === "upgrade" ? "Upgrade Now" : "Subscribe Now"}
-          </Link>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -330,60 +252,53 @@ export default function PremiumPlanPage() {
     if (termId) setPicked((current) => ({ ...current, [packageId]: termId }));
   };
 
-  return (
-    <div className="min-h-screen bg-background pb-16">
-      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-8 flex flex-wrap items-center gap-2 text-base text-foreground"
-        >
-          <Link href="/" className="flex items-center gap-2 hover:underline">
-            <Home className="size-4" /> Home
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <Link href="/me" className="hover:underline">
-            Profile
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <Link href="/me/subscriptions" className="hover:underline">
-            Membership
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <Link href="/premium-account" className="hover:underline">
-            Premium Account
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <span className="text-muted-foreground">{groupName}</span>
-        </nav>
+  const state = selectedTerm
+    ? offerState(selectedTerm, active, activePackageId, now)
+    : null;
 
-        <h1 className="mb-6 text-2xl font-semibold text-foreground">
+  return (
+    <div className="min-h-screen bg-muted pb-10 pt-4">
+      <div className="mx-auto max-w-7xl px-4">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: "/me/membership" },
+            { label: "Premium Account", href: "/premium-account" },
+            { label: groupName, className: "capitalize" },
+          ]}
+        />
+      </div>
+
+      <main className="mx-auto max-w-4xl px-4">
+        <h1 className="mb-4 mt-6 text-xl font-semibold text-foreground">
           Choose the right plan for your business
         </h1>
 
         {loading && (
-          <div className="h-96 animate-pulse rounded-md bg-card ring-1 ring-border" />
+          <div className="h-96 animate-pulse rounded-sm border bg-card" />
         )}
 
         {error && (
           <div
             role="alert"
-            className="rounded-md bg-card p-5 text-sm text-destructive ring-1 ring-destructive/30"
+            className="rounded-sm border bg-card p-5 text-sm text-destructive"
           >
             {error}
           </div>
         )}
 
         {!loading && !error && packages.length === 0 && (
-          <div className="rounded-md bg-card p-12 text-center ring-1 ring-border">
+          <div className="rounded-sm border bg-card p-10 text-center">
             <h2 className="font-semibold text-foreground">
               No plans available
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-foreground">
               Browse another category or check back later.
             </p>
             <Link
               href="/premium-account"
-              className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#0089c8] hover:underline"
+              className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#00a0e9] underline"
             >
               Browse categories <ArrowRight className="size-4" />
             </Link>
@@ -392,7 +307,7 @@ export default function PremiumPlanPage() {
 
         {!loading && !error && selectedTerms && selectedTerm && (
           <>
-            <div className="space-y-6">
+            <div className="space-y-4">
               {packages.map((terms) => {
                 const base = terms[0];
                 const isSelected =
@@ -402,54 +317,103 @@ export default function PremiumPlanPage() {
                   <article
                     key={base.packageId}
                     onClick={() => !isSelected && pick(base.packageId)}
-                    className={`rounded-md bg-card p-8 ${
+                    className={
                       isSelected
-                        ? "ring-2 ring-[#00a0e9]"
-                        : "cursor-pointer ring-1 ring-border hover:ring-[#00a0e9]/50"
-                    }`}
+                        ? "rounded-md border-2 border-sky-400 bg-card p-6 shadow-sm"
+                        : "cursor-pointer rounded-sm border bg-card p-6 hover:border-sky-400"
+                    }
                   >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-xl font-semibold text-foreground">
-                        {base.packageName}
-                      </h2>
-                      {isCurrent && (
-                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                          Current plan
-                        </span>
+                    <div className="mb-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-lg font-semibold text-foreground">
+                          {base.packageName}
+                        </h2>
+                        {isCurrent && (
+                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                            Current plan
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-base font-medium">
+                        Start From {money(Number(base.price))} $ For{" "}
+                        {base.termName}
+                      </p>
+                    </div>
+
+                    <Benefits item={base} />
+
+                    <div className="space-y-1">
+                      <p className="text-sm">Term</p>
+                      {isSelected ? (
+                        <TermRows
+                          terms={terms}
+                          selectedTermId={selectedTerm.termId}
+                          onPick={(termId) => pick(base.packageId, termId)}
+                        />
+                      ) : (
+                        <TermTiles
+                          terms={terms}
+                          onPick={(termId) => pick(base.packageId, termId)}
+                        />
                       )}
                     </div>
-                    <p className="mt-3 font-semibold text-foreground">
-                      Start From {money(Number(base.price))} $ For{" "}
-                      {base.termName}
-                    </p>
-                    <Benefits item={base} />
-                    <h3 className="mt-6 text-lg text-foreground">Term</h3>
-                    {isSelected ? (
-                      <TermRows
-                        terms={terms}
-                        selectedTermId={selectedTerm.termId}
-                        onPick={(termId) => pick(base.packageId, termId)}
-                      />
-                    ) : (
-                      <TermTiles
-                        terms={terms}
-                        onPick={(termId) => pick(base.packageId, termId)}
-                      />
-                    )}
                   </article>
                 );
               })}
             </div>
 
-            <SummaryBar
-              plan={selectedTerms[0]}
-              term={selectedTerm}
-              state={offerState(selectedTerm, active, activePackageId, now)}
-              active={active}
-            />
+            <div className="mt-4 rounded-sm border bg-card p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <span className="flex items-center gap-2 text-foreground">
+                  {selectedTerms[0].packageName} {selectedTerm.termName}
+                  <DiscountBadge item={selectedTerm} />
+                </span>
+                <span className="text-lg">
+                  <Price item={selectedTerm} />
+                </span>
+              </div>
+
+              {state?.kind === "upgrade" && (
+                <p className="mb-3 text-sm text-foreground">
+                  Upgrade from your current plan: you pay{" "}
+                  <strong>${money(state.due)}</strong> today — prorated to your
+                  end date, minus ${money(state.credit)} unused credit.
+                </p>
+              )}
+
+              {state?.kind === "current" ? (
+                <Link
+                  href="/me/membership"
+                  className="block w-full rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-gray-500"
+                >
+                  Your current plan
+                  {active &&
+                    ` · until ${new Date(
+                      active.expiresAt,
+                    ).toLocaleDateString()}`}
+                </Link>
+              ) : state?.kind === "unavailable" ? (
+                <span
+                  aria-disabled
+                  className="block w-full cursor-not-allowed rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-gray-500"
+                >
+                  Not an upgrade from your plan
+                </span>
+              ) : (
+                <Link
+                  href={{
+                    pathname: "/checkout",
+                    query: { termId: selectedTerm.termId },
+                  }}
+                  className="block w-full rounded-sm bg-orange-500 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                >
+                  {state?.kind === "upgrade" ? "Upgrade Now" : "Subscribe Now"}
+                </Link>
+              )}
+            </div>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }

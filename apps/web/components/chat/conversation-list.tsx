@@ -98,10 +98,8 @@ export function ConversationList({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MessagesSquare className="size-8 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">
-          {t("inbox.emptyTitle")}
-        </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="type-nav text-foreground">{t("inbox.emptyTitle")}</p>
+        <p className="type-meta text-muted-foreground">
           {t("inbox.emptyDescription")}
         </p>
       </div>
@@ -188,15 +186,15 @@ export function ConversationList({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">{name}</span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                  <span className="truncate type-nav">{name}</span>
+                  <span className="shrink-0 type-meta text-muted-foreground">
                     <RelativeTime iso={item.lastMessageAt} />
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center justify-between gap-2">
                   <p
                     className={cn(
-                      "truncate text-xs",
+                      "truncate type-meta",
                       item.unreadCount > 0
                         ? "font-medium text-foreground"
                         : "text-muted-foreground",
@@ -222,7 +220,7 @@ export function ConversationList({
                       aria-label={t("inbox.unreadCount", {
                         count: item.unreadCount,
                       })}
-                      className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 text-[10px] font-bold text-white"
+                      className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 type-photo-badge text-white"
                     >
                       {item.unreadCount > 99 ? "99+" : item.unreadCount}
                     </span>
@@ -250,10 +248,10 @@ export function ConversationList({
                   )}
                 </button>
               </DropdownMenuTrigger>
-              {/* Portaled out of the dark panel — re-apply the token scope. */}
+              {/* Portaled to <body> — inherits the html-level theme scope,
+                  same as the chat panel itself. */}
               <DropdownMenuContent
                 align="end"
-                className="dark"
                 onClick={(e) => e.stopPropagation()}
               >
                 <DropdownMenuItem
@@ -274,7 +272,7 @@ export function ConversationList({
           <Button
             type="button"
             variant="ghost"
-            className="w-full text-xs"
+            className="w-full type-meta"
             onClick={onLoadMore}
             disabled={isLoadingMore}
           >
@@ -288,7 +286,7 @@ export function ConversationList({
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
       >
-        <DialogContent className="dark">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("inbox.deleteConfirmTitle")}</DialogTitle>
             <DialogDescription>

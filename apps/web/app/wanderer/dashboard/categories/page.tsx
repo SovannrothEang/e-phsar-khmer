@@ -340,10 +340,10 @@ export default function CategoriesPage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 Categories
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="type-body-sm text-muted-foreground mt-2">
                 Manage product categories
               </p>
             </div>
@@ -406,7 +406,7 @@ export default function CategoriesPage() {
                         <p>No category found</p>
 
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -423,7 +423,7 @@ export default function CategoriesPage() {
                       <TableCell>
                         <div>{category.name}</div>
                         {category.nameKm && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="type-meta text-muted-foreground">
                             {category.nameKm}
                           </div>
                         )}
@@ -442,11 +442,11 @@ export default function CategoriesPage() {
                         />
                       </TableCell>
 
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {category.createdAt}
                       </TableCell>
 
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {category.updatedAt}
                       </TableCell>
                       <TableCell className="text-center">

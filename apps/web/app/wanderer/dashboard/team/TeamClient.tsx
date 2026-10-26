@@ -680,10 +680,10 @@ export default function TeamPage({
           {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 Team
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="type-body-sm text-muted-foreground mt-2">
                 Manage your team and roles
               </p>
             </div>
@@ -724,7 +724,7 @@ export default function TeamPage({
               </TabsTrigger>
               <TabsTrigger value="online" className="cursor-pointer">
                 Online
-                <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
+                <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
                   {
                     users.filter(
                       (u) =>
@@ -736,7 +736,7 @@ export default function TeamPage({
               </TabsTrigger>
               <TabsTrigger value="offline" className="cursor-pointer">
                 Offline
-                <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
+                <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
                   {
                     users.filter(
                       (u) =>
@@ -774,7 +774,7 @@ export default function TeamPage({
                         <Search className="size-8" />
                         <p>Not found</p>
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -785,14 +785,14 @@ export default function TeamPage({
                 {paginatedUsers.map((user) => (
                   <TableRow key={user.userId}>
                     {/* ID */}
-                    <TableCell className="text-sm text-center text-foreground">
+                    <TableCell className="type-meta text-center text-foreground">
                       {user.userId}
                     </TableCell>
                     {/* Avatar */}
                     <TableCell>
                       <Avatar className="size-8">
                         <AvatarImage src={user.profileImage} alt={user.name} />
-                        <AvatarFallback className="text-xs">
+                        <AvatarFallback className="type-meta">
                           {user.name
                             .split(" ")
                             .map((n) => n[0])
@@ -803,19 +803,19 @@ export default function TeamPage({
                     {/* Name + Email */}
                     <TableCell>
                       <div className="font-medium">{user.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="type-meta text-muted-foreground">
                         {user.email}
                       </div>
                     </TableCell>
                     {/* Username */}
                     <TableCell>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="type-body-sm text-muted-foreground">
                         {user.username}
                       </div>
                     </TableCell>
                     {/* Phone */}
                     <TableCell>
-                      <div className="grid grid-rows-2 grid-flow-col gap-x-4 gap-y-1 text-sm">
+                      <div className="grid grid-rows-2 grid-flow-col gap-x-4 gap-y-1 type-body-sm">
                         {user.networks
                           .filter((n) => n !== "")
                           .map((network, index) => (
@@ -825,14 +825,14 @@ export default function TeamPage({
                     </TableCell>
                     {/* Role */}
                     <TableCell>
-                      <span className="rounded-lg bg-sky-200 text-sm text-muted-foreground px-2 py-1">
+                      <span className="rounded-lg bg-sky-200 type-body-sm text-muted-foreground px-2 py-1">
                         {user.role}
                       </span>
                     </TableCell>
                     {/* Status */}
                     <TableCell>{getStatusBadge(user.status)}</TableCell>
                     {/* Created */}
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="text-muted-foreground type-meta">
                       {new Date(user.createdAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
@@ -840,7 +840,7 @@ export default function TeamPage({
                       })}
                     </TableCell>
                     {/* Updated */}
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="text-muted-foreground type-meta">
                       {new Date(user.updatedAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "short",
@@ -897,7 +897,7 @@ export default function TeamPage({
 
             {/* Pagination */}
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -918,7 +918,7 @@ export default function TeamPage({
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages || 1}
                 </span>
                 <div className="flex items-center gap-1">
@@ -990,37 +990,39 @@ export default function TeamPage({
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold text-lg">{viewUser.name}</h3>
-                  <div className="text-sm text-muted-foreground">
+                  <h3 className="type-card-heading">{viewUser.name}</h3>
+                  <div className="type-body-sm text-muted-foreground">
                     {viewUser.username}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-body-sm text-muted-foreground">
                     {viewUser.email}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div>
-                  <p className="text-sm text-muted-foreground">User ID</p>
-                  <p className="font-mono text-sm">{viewUser.userId}</p>
+                  <p className="type-body-sm text-muted-foreground">User ID</p>
+                  <p className="font-mono type-body-sm">{viewUser.userId}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Role</p>
+                  <p className="type-body-sm text-muted-foreground">Role</p>
                   <div className="mt-1">{viewUser.role}</div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="type-body-sm text-muted-foreground">Status</p>
                   <div className="mt-1">{getStatusBadge(viewUser.status)}</div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Phone(s)</p>
-                  <div className="text-sm mt-1">
+                  <p className="type-body-sm text-muted-foreground">Phone(s)</p>
+                  <div className="type-body-sm mt-1">
                     {viewUser.networks.filter(Boolean).join(", ") || "—"}
                   </div>
                 </div>
                 <div className="col-span-2 flex items-center gap-20">
                   <div>
-                    <p className="text-sm text-muted-foreground">Created At:</p>
+                    <p className="type-body-sm text-muted-foreground">
+                      Created At:
+                    </p>
                     <p>
                       {new Date(viewUser.createdAt).toLocaleDateString(
                         "en-US",
@@ -1033,7 +1035,9 @@ export default function TeamPage({
                     </p>
                   </div>
                   <div className="text-left">
-                    <p className="text-sm text-muted-foreground">Updated At:</p>
+                    <p className="type-body-sm text-muted-foreground">
+                      Updated At:
+                    </p>
                     <p>
                       {new Date(viewUser.updatedAt).toLocaleDateString(
                         "en-US",

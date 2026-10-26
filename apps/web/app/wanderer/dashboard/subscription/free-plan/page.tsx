@@ -243,7 +243,7 @@ export default function FreePlanPage() {
   return (
     <main className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-sky-500">Free Plan</h1>
+        <h1 className="type-page-title text-sky-500">Free Plan</h1>
         <p className="text-sm text-muted-foreground">
           What every account gets without a subscription. Saving re-checks every
           seller&apos;s ads against the new limits.

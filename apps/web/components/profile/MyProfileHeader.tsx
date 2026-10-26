@@ -16,6 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import UserAvatar from "@/components/common/UserAvatar";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
@@ -207,16 +208,22 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           <div className="px-6 pb-6">
             <div className="flex flex-col md:flex-row md:items-end gap-4 mt-1">
               <div
-                onClick={() => handleImageClick(displayedAvatar)}
+                onClick={() => {
+                  // No photo yet: the circle shows initials, and on your own
+                  // profile a click opens the picker (the cover behaves the
+                  // same way rather than opening a lightbox with nothing in it).
+                  if (displayedAvatar) {
+                    handleImageClick(displayedAvatar);
+                  } else if (isOwnProfile) {
+                    avatarInputRef.current?.click();
+                  }
+                }}
                 className="relative cursor-pointer"
               >
-                <Image
+                <UserAvatar
                   src={displayedAvatar}
-                  alt={user.name}
-                  width={120}
-                  height={120}
-                  unoptimized
-                  className="w-32 h-32 rounded-full border-4 border-card shadow-lg -mt-24"
+                  name={user.name}
+                  className="w-32 h-32 border-4 border-card shadow-lg -mt-24 text-4xl"
                 />
                 {isOwnProfile && (
                   <Button
@@ -246,7 +253,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
                         variant="outline"
-                        onClick={() => router.replace("/me/subscriptions")}
+                        onClick={() => router.replace("/me/membership")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
                         Upgrade Account

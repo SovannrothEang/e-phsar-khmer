@@ -29,15 +29,15 @@
 //             </span>
 //           </Link>
 //           <IconChevronRight size={16} className="block mt-1 text-gray-500" />
-//           <h1 className="text-gray-500 dark:text-gray-400">Post</h1>
+//           <h1 className="type-page-title text-gray-500 dark:text-gray-400">Post</h1>
 //         </nav>
 //         <div className="w-full max-w-4xl rounded-sm border bg-card overflow-hidden">
 //           {/* Header */}
 //           <div className="border-b px-5 py-6">
-//             <h2 className="text-3xl font-semibold text-foreground">
+//             <h2 className="type-section-title text-foreground">
 //               Post an Ad
 //             </h2>
-//             <div className="mt-4 flex items-center gap-3 text-sm">
+//             <div className="mt-4 flex items-center gap-3 type-body-sm">
 //               <div className="flex items-center gap-2 text-sm text-foreground">
 //                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40">
 //                   1
@@ -198,19 +198,17 @@ export default function SellPage() {
           <div className="w-full max-w-4xl rounded-sm border bg-card overflow-hidden">
             {/* Header */}
             <div className=" px-5 py-6">
-              <h2 className="text-3xl font-semibold text-foreground">
-                Post an Ad
-              </h2>
-              <div className="mt-4 flex items-center gap-3 text-sm">
+              <h2 className="type-section-title text-foreground">Post an Ad</h2>
+              <div className="mt-4 flex items-center gap-3 type-body-sm">
                 <div className="flex items-center gap-2 text-foreground font-medium">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40 text-xs">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40 type-button-sm">
                     1
                   </div>
                   Choose a category
                 </div>
                 <IconChevronRight size={14} className="text-muted-foreground" />
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40 text-xs">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40 type-button-sm">
                     2
                   </div>
                   Fill Information

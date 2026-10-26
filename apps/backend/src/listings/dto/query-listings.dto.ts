@@ -173,6 +173,15 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsBoolean()
   deliveryFree?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'Only listings with a discount (discount_value > 0 and discount_type set)',
+  })
+  @IsOptional()
+  @QueryBoolean()
+  @IsBoolean()
+  hasDiscount?: boolean;
+
   @ApiPropertyOptional({ description: 'Add meta.total (feed only)' })
   @IsOptional()
   @QueryBoolean()
@@ -203,6 +212,42 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   bodyType?: string;
+
+  /**
+   * The remaining per-attribute filters the browse dialog offers. Each one
+   * reads the same value the post form wrote into `attributes`, so they are
+   * plain equality params like `brand`/`bodyType` — no JSONB path comes from
+   * the caller, and every param is additive (an old client that never sends
+   * them behaves exactly as before).
+   */
+  @ApiPropertyOptional({
+    description: "Filter by the ad's model (listings.attributes->>'model')",
+  })
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiPropertyOptional({
+    description: "Filter by tax type (listings.attributes->>'taxType')",
+  })
+  @IsOptional()
+  @IsString()
+  taxType?: string;
+
+  @ApiPropertyOptional({
+    description: "Filter by colour (listings.attributes->>'color')",
+  })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Filter by transmission (listings.attributes->>'transmission')",
+  })
+  @IsOptional()
+  @IsString()
+  transmission?: string;
 
   /**
    * Generic sibling of `brand`/`bodyType` for every OTHER attribute grid.

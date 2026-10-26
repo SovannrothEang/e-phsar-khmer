@@ -4,6 +4,7 @@ import { getLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { getFollowStatus } from "@/lib/api/users";
 import { loadJobApplyState } from "@/lib/api/job-apply";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { posts } from "@/lib/posts";
 import type { Metadata } from "next";
 
@@ -52,7 +53,10 @@ export default async function PostDetailPage({
   const { slug } = await params;
   const actualId = extractId(slug);
   const locale = await getLocale();
-  const viewer = await getCurrentUser();
+  const [viewer, banners] = await Promise.all([
+    getCurrentUser(),
+    getAdvertisements("listing_detail"),
+  ]);
 
   if (UUID_RE.test(actualId)) {
     const real = await buildRealDetailData(actualId, locale);
@@ -61,6 +65,7 @@ export default async function PostDetailPage({
         <PostDetail
           id={actualId}
           real={real}
+          banners={banners}
           viewerId={viewer?.id}
           sellerFollowing={
             viewer ? await getFollowStatus(real.listing.userId) : false
@@ -77,5 +82,5 @@ export default async function PostDetailPage({
     }
   }
 
-  return <PostDetail id={actualId} viewerId={viewer?.id} />;
+  return <PostDetail id={actualId} viewerId={viewer?.id} banners={banners} />;
 }

@@ -172,14 +172,14 @@ CREATE TABLE IF NOT EXISTS "user_login_devices" (
 	"last_seen_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "date_of_birth" date;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "discoverable_by_gender" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "discoverable_by_date_of_birth" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "discoverable_by_phone" boolean DEFAULT true NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "discoverable_by_email" boolean DEFAULT true NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "discoverable_by_location" boolean DEFAULT true NOT NULL;--> statement-breakpoint
-ALTER TABLE "attribute_options" ADD COLUMN "name_km" varchar(160);--> statement-breakpoint
-ALTER TABLE "listing_reports" ADD COLUMN "image_paths" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "date_of_birth" date;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discoverable_by_gender" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discoverable_by_date_of_birth" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discoverable_by_phone" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discoverable_by_email" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discoverable_by_location" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "attribute_options" ADD COLUMN IF NOT EXISTS "name_km" varchar(160);--> statement-breakpoint
+ALTER TABLE "listing_reports" ADD COLUMN IF NOT EXISTS "image_paths" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "banned_phones" ADD CONSTRAINT "banned_phones_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
 EXCEPTION

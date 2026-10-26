@@ -174,7 +174,7 @@ function AddBrandForm({
             </form.AppField>
           </FieldSet>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -304,7 +304,7 @@ function EditBrandForm({
             </form.AppField>
           </FieldSet>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -472,10 +472,10 @@ export default function BrandsPage() {
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 Brands
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="type-body-sm text-muted-foreground mt-2">
                 Manage product brands here.
               </p>
             </div>
@@ -539,7 +539,7 @@ export default function BrandsPage() {
                         <Search className="size-8" />
                         <p>No brand found</p>
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -570,7 +570,7 @@ export default function BrandsPage() {
                         {categoryList.find(
                           (c) => c.cateId === brand.categoryId,
                         ) && (
-                          <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
+                          <span className="rounded bg-sky-200 px-2 py-1 type-body-sm text-black">
                             {
                               categoryList.find(
                                 (c) => c.cateId === brand.categoryId,
@@ -588,7 +588,7 @@ export default function BrandsPage() {
                             return (
                               <span
                                 key={id}
-                                className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
+                                className="rounded bg-sky-100 px-2 py-1 type-body-sm text-black"
                               >
                                 {sub?.name ?? id}
                               </span>
@@ -596,10 +596,10 @@ export default function BrandsPage() {
                           })}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {brand.createdAt}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {brand.updatedAt}
                       </TableCell>
                       <TableCell className="text-center">
@@ -638,7 +638,7 @@ export default function BrandsPage() {
             </Table>
 
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -659,7 +659,7 @@ export default function BrandsPage() {
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
                 <div className="flex items-center gap-1">

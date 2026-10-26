@@ -25,7 +25,7 @@ type Props = {
  *  The circle behind it is a fixed light blue in both themes, so the label
  *  needs a fixed dark colour to stay readable on dark themes. */
 const SubcategoryNameFallback = ({ name }: { name: string }) => (
-  <span className="text-xs text-zinc-700">{name}</span>
+  <span className="type-meta text-zinc-700">{name}</span>
 );
 
 export default function SubcategoryGrid({
@@ -74,7 +74,9 @@ export default function SubcategoryGrid({
                 <SubcategoryNameFallback name={sub.name} />
               )}
             </div>
-            <p className="mt-3 text-[14px] truncate w-full block">{sub.name}</p>
+            <p className="mt-3 type-body-sm truncate w-full block">
+              {sub.name}
+            </p>
           </Link>
         ))}
       </div>
@@ -83,7 +85,7 @@ export default function SubcategoryGrid({
         <div className="flex justify-center mt-2">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full border rounded py-2.5 text-sm text-muted-foreground bg-card hover:bg-gray-200"
+            className="w-full border rounded py-2.5 type-nav text-muted-foreground bg-card hover:bg-gray-200"
           >
             {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>

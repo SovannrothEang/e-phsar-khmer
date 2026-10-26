@@ -14,6 +14,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  notInArray,
   or,
   sql,
   inArray,
@@ -25,6 +26,8 @@ import { ReactionsService } from '../reactions/reactions.service';
 import { EntitlementsService } from '../subscriptions/entitlements.service';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
+import { listingEvents } from '../db/schema/insights.schema';
+import { listingLikes, listingSaves } from '../db/schema/reactions.schema';
 import type {
   ListingPhotoRow,
   ListingRow,
@@ -53,6 +56,15 @@ import {
   keywordCondition,
   resolveFeedOrdering,
 } from './keyword-search';
+import {
+  TRENDING_CACHE_MS,
+  TRENDING_LIKE_WEIGHT,
+  TRENDING_LIMIT,
+  TRENDING_SAVE_WEIGHT,
+  TRENDING_WINDOW_DAYS,
+  trendingEventScoreSql,
+} from './trending';
+import type { QueryTrendingDto } from './dto/query-trending.dto';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
@@ -100,6 +112,16 @@ export class ListingsService {
     private readonly reactionsService: ReactionsService,
     private readonly entitlements: EntitlementsService,
   ) {}
+
+  /**
+   * Per-process trend cache. Ranking aggregates the engagement window, so it
+   * is the heaviest public read; a five-minute-old list is indistinguishable
+   * to a visitor and keeps the home page off the event table.
+   */
+  private readonly trendingCache = new Map<
+    string,
+    { at: number; rows: ListingWithPhotos[] }
+  >();
 
   async create(
     userId: string,
@@ -467,6 +489,140 @@ export class ListingsService {
   }
 
   /**
+   * Engagement-ranked "Trending" carousel.
+   *
+   * Score = weighted buyer actions from `listing_events` + likes + saves over
+   * a rolling window. Impressions are excluded (they measure placement, not
+   * demand). Only live listings rank; the tail is filled with the newest live
+   * listings so the carousel is never empty. Deliberately not paginated: the
+   * score moves as events land, so a cursor over it would skip or repeat rows.
+   */
+  async findTrending(query: QueryTrendingDto): Promise<{
+    data: ListingWithPhotos[];
+    meta: { limit: number; windowDays: number };
+  }> {
+    const limit = query.limit ?? TRENDING_LIMIT;
+    const windowDays = query.windowDays ?? TRENDING_WINDOW_DAYS;
+    const meta = { limit, windowDays };
+
+    const cacheKey = `${limit}:${windowDays}`;
+    const cached = this.trendingCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < TRENDING_CACHE_MS) {
+      return { data: cached.rows, meta };
+    }
+
+    const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    // Aggregates are derived tables rather than correlated subqueries: each
+    // scans its window once, then joins, instead of running once per listing.
+    const eventScores = this.db
+      .select({
+        listingId: listingEvents.listingId,
+        score: trendingEventScoreSql().as('event_score'),
+      })
+      .from(listingEvents)
+      .where(gte(listingEvents.createdAt, cutoff))
+      .groupBy(listingEvents.listingId)
+      .as('trend_events');
+
+    // The owner's own like/save must not help their ad trend.
+    const likeScores = this.db
+      .select({
+        listingId: listingLikes.listingId,
+        score: sql<number>`(count(*) * ${TRENDING_LIKE_WEIGHT})::int`.as(
+          'like_score',
+        ),
+      })
+      .from(listingLikes)
+      .innerJoin(listings, eq(listings.id, listingLikes.listingId))
+      .where(
+        and(
+          gte(listingLikes.createdAt, cutoff),
+          sql`${listingLikes.userId} <> ${listings.userId}`,
+        ),
+      )
+      .groupBy(listingLikes.listingId)
+      .as('trend_likes');
+
+    const saveScores = this.db
+      .select({
+        listingId: listingSaves.listingId,
+        score: sql<number>`(count(*) * ${TRENDING_SAVE_WEIGHT})::int`.as(
+          'save_score',
+        ),
+      })
+      .from(listingSaves)
+      .innerJoin(listings, eq(listings.id, listingSaves.listingId))
+      .where(
+        and(
+          gte(listingSaves.createdAt, cutoff),
+          sql`${listingSaves.userId} <> ${listings.userId}`,
+        ),
+      )
+      .groupBy(listingSaves.listingId)
+      .as('trend_saves');
+
+    const trendScore = sql<number>`(
+      coalesce(${eventScores.score}, 0)
+      + coalesce(${likeScores.score}, 0)
+      + coalesce(${saveScores.score}, 0)
+    )`;
+
+    // `score` only feeds the ordering; strip it from the card contract.
+    const rankedRows = await this.db
+      .select({
+        ...getTableColumns(listings),
+        sellerUsername: users.username,
+        score: trendScore,
+      })
+      .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
+      .leftJoin(eventScores, eq(eventScores.listingId, listings.id))
+      .leftJoin(likeScores, eq(likeScores.listingId, listings.id))
+      .leftJoin(saveScores, eq(saveScores.listingId, listings.id))
+      .where(and(...this.liveConditions(), sql`${trendScore} > 0`))
+      .orderBy(desc(trendScore), desc(listings.createdAt), desc(listings.id))
+      .limit(limit);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const ranked = rankedRows.map(({ score, ...row }) => row);
+
+    const fillCount = limit - ranked.length;
+    let filled: typeof ranked = [];
+    if (fillCount > 0) {
+      const conditions = [...this.liveConditions()];
+      if (ranked.length > 0) {
+        conditions.push(
+          notInArray(
+            listings.id,
+            ranked.map((row) => row.id),
+          ),
+        );
+      }
+      filled = await this.db
+        .select({
+          ...getTableColumns(listings),
+          sellerUsername: users.username,
+        })
+        .from(listings)
+        .leftJoin(users, eq(users.id, listings.userId))
+        .where(and(...conditions))
+        .orderBy(desc(listings.createdAt), desc(listings.id))
+        .limit(fillCount);
+    }
+
+    const rows = [...ranked, ...filled];
+    const photosMap = await this.batchLoadPhotos(rows.map((row) => row.id));
+    const data = rows.map((row) => ({
+      ...row,
+      photos: photosMap.get(row.id) ?? [],
+    }));
+
+    this.trendingCache.set(cacheKey, { at: Date.now(), rows: data });
+    return { data, meta };
+  }
+
+  /**
    * What makes a listing publicly visible: active AND not past its expiry.
    * Nothing flips `status` to 'expired' when `expires_at` passes (no job does
    * it yet), so the date itself must be checked or 30-day-old ads never leave
@@ -727,6 +883,23 @@ export class ListingsService {
     if (query.bodyType) {
       out.push(eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType));
     }
+    // The other attribute filters the browse dialog offers — same display-name
+    // equality as `brand`/`bodyType`. The keys are literals in the query (never
+    // caller-supplied paths); only the values are bound.
+    if (query.model) {
+      out.push(eq(sql`${listings.attributes}->>'model'`, query.model));
+    }
+    if (query.taxType) {
+      out.push(eq(sql`${listings.attributes}->>'taxType'`, query.taxType));
+    }
+    if (query.color) {
+      out.push(eq(sql`${listings.attributes}->>'color'`, query.color));
+    }
+    if (query.transmission) {
+      out.push(
+        eq(sql`${listings.attributes}->>'transmission'`, query.transmission),
+      );
+    }
     // Generic attribute filter for every grid that is NOT a car's Body Type.
     // The key is bound as a parameter (`->>$n`), never interpolated, and the
     // DTO additionally constrains it to a plain identifier — so this stays a
@@ -767,6 +940,13 @@ export class ListingsService {
 
     if (query.deliveryFree) {
       out.push(eq(listings.deliveryFree, true));
+    }
+    // A discount exists only when both fields are set and the value is
+    // positive — the same rule the generated `effective_price` column uses.
+    if (query.hasDiscount) {
+      out.push(
+        sql`${listings.discountValue} is not null and ${listings.discountValue} > 0 and ${listings.discountType} is not null`,
+      );
     }
     return out;
   }

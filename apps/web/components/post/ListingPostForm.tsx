@@ -189,7 +189,7 @@ function TextInput({
       <FieldLabel label={label} required={required} />
       <div className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 type-body text-gray-500">
             {prefix}
           </span>
         )}
@@ -200,7 +200,7 @@ function TextInput({
           min={min}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full border border-gray-200 rounded-lg py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+          className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
           } ${trailing ? "pr-11" : "pr-3"}`}
         />
@@ -229,6 +229,7 @@ function SearchPicker({
   disabled,
   placeholder,
   emptyLabel,
+  showOnlyKm,
 }: {
   label: string;
   options: {
@@ -245,15 +246,37 @@ function SearchPicker({
   disabled?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  /** Drop the English half of `nameKm/name` (colours and the range pickers). */
+  showOnlyKm?: boolean;
 }) {
   const t = useTranslations("PostForm");
   const locale = useLocale();
   const [open, setOpen] = useState(false);
+  /**
+   * Inline pick-list ranges (storage / screen size / RAM / VGA) carry no
+   * `nameKm` in the DB — their seeded options are strings like "1TB & Above".
+   * Translate only the words; the number/unit prefix is already universal and
+   * the stored value stays the English option name.
+   */
+  const kmOptionLabel = (name: string): string | null => {
+    if (name === "Integrated") return t("options.integrated");
+    const above = name.match(/^(.*?)\s*&\s*(?:Above|Larger)$/);
+    if (above) return t("options.andAbove", { value: above[1] });
+    const below = name.match(/^(.*?)\s*(?:&\s*(?:Under|Below)|or below)$/);
+    if (below) return t("options.andBelow", { value: below[1] });
+    return null;
+  };
+  const optionKm = (option: { name: string; nameKm?: string | null }) =>
+    option.nameKm ?? (locale === "km" ? kmOptionLabel(option.name) : null);
   /** Bilingual on km ("សេដាន/Sedan"); the stored value stays the English name. */
-  const displayName = (option: { name: string; nameKm?: string | null }) =>
-    locale === "km" && option.nameKm
-      ? `${option.nameKm}/${option.name}`
+  const displayName = (option: { name: string; nameKm?: string | null }) => {
+    const km = optionKm(option);
+    return locale === "km" && km
+      ? showOnlyKm
+        ? km
+        : `${km}/${option.name}`
       : option.name;
+  };
   const selected = options.find((o) => o.id === value);
   const withIcons = options.some((o) => !!o.image);
 
@@ -265,7 +288,7 @@ function SearchPicker({
           <button
             type="button"
             disabled={disabled}
-            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm focus:outline-none ${
+            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left type-body focus:outline-none ${
               disabled
                 ? "cursor-not-allowed bg-gray-100 text-gray-400"
                 : "cursor-pointer text-gray-700 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
@@ -289,34 +312,33 @@ function SearchPicker({
             <CommandInput placeholder={t("search")} />
             <CommandList>
               <CommandEmpty>{emptyLabel ?? t("noMatch")}</CommandEmpty>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={
-                    option.nameKm
-                      ? `${option.nameKm} ${option.name}`
-                      : option.name
-                  }
-                  onSelect={() => {
-                    onChange(option.id);
-                    setOpen(false);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {withIcons && (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                      <DbImage
-                        src={option.image ?? ""}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="object-contain"
-                      />
-                    </span>
-                  )}
-                  <span>{displayName(option)}</span>
-                </CommandItem>
-              ))}
+              {options.map((option) => {
+                const km = optionKm(option);
+                return (
+                  <CommandItem
+                    key={option.id}
+                    value={km ? `${km} ${option.name}` : option.name}
+                    onSelect={() => {
+                      onChange(option.id);
+                      setOpen(false);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {withIcons && (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        <DbImage
+                          src={option.image ?? ""}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="object-contain"
+                        />
+                      </span>
+                    )}
+                    <span>{displayName(option)}</span>
+                  </CommandItem>
+                );
+              })}
             </CommandList>
           </Command>
         </PopoverContent>
@@ -355,7 +377,7 @@ function ToggleGroup({
             key={o}
             type="button"
             onClick={() => onChange(o)}
-            className={`h-11 cursor-pointer rounded-sm border text-sm transition-colors ${
+            className={`h-11 cursor-pointer rounded-sm border type-nav transition-colors ${
               value === o
                 ? "border-gray-300 bg-gray-100 font-medium text-gray-800"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -718,7 +740,7 @@ export default function ListingPostForm({
         <p className="mb-4">{t("loadError")}</p>
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline"
+          className="type-nav text-[#00a0e9] hover:underline"
         >
           {t("back")}
         </button>
@@ -771,7 +793,7 @@ export default function ListingPostForm({
         <div />
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline cursor-pointer"
+          className="type-nav text-[#00a0e9] hover:underline cursor-pointer"
         >
           {t("reset")}
         </button>
@@ -817,7 +839,7 @@ export default function ListingPostForm({
 
       {/* ── Post Details ───────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">
+        <h2 className="type-section-title text-foreground">
           {t("postDetails")}
         </h2>
 
@@ -835,12 +857,12 @@ export default function ListingPostForm({
         <div>
           <FieldLabel label={t("category")} required />
           <div className="flex flex-wrap items-center gap-3 rounded-sm border border-dashed border-gray-300 px-3 py-2.5">
-            <span className="text-sm text-foreground">{categoryName}</span>
+            <span className="type-body text-foreground">{categoryName}</span>
             <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-foreground">{subName}</span>
+            <span className="type-body text-foreground">{subName}</span>
             <button
               onClick={onBack}
-              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 text-sm font-semibold text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
+              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 type-nav text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
             >
               {t("change")}
             </button>
@@ -952,6 +974,7 @@ export default function ListingPostForm({
             value={typeValue}
             onChange={setTypeValue}
             placeholder={t("placeholders.chooseType")}
+            showOnlyKm
             required={!TYPE_OPTIONAL.has(subcategorySlug)}
           />
         )}
@@ -1028,6 +1051,7 @@ export default function ListingPostForm({
             value={screenSize}
             onChange={setScreenSize}
             placeholder={t("placeholders.chooseScreenSize")}
+            showOnlyKm
             required
           />
         )}
@@ -1045,6 +1069,7 @@ export default function ListingPostForm({
             value={storage}
             onChange={setStorage}
             placeholder={t("placeholders.chooseStorage")}
+            showOnlyKm
             required={STORAGE_REQUIRED.includes(subcategorySlug)}
           />
         )}
@@ -1060,6 +1085,7 @@ export default function ListingPostForm({
             value={ram}
             onChange={setRam}
             placeholder={t("placeholders.chooseRam")}
+            showOnlyKm
             required
           />
         )}
@@ -1090,6 +1116,7 @@ export default function ListingPostForm({
             value={vga}
             onChange={setVga}
             placeholder={t("placeholders.chooseVga")}
+            showOnlyKm
             required
           />
         )}
@@ -1190,6 +1217,7 @@ export default function ListingPostForm({
             onChange={setColor}
             placeholder={t("placeholders.chooseColor")}
             required
+            showOnlyKm
           />
         )}
 
@@ -1214,7 +1242,7 @@ export default function ListingPostForm({
                 min={0}
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
               <div className="flex shrink-0 overflow-hidden rounded-sm border border-gray-200">
                 {(
@@ -1228,7 +1256,7 @@ export default function ListingPostForm({
                     type="button"
                     onClick={() => setDiscountType(kind)}
                     aria-pressed={discountType === kind}
-                    className={`w-12 cursor-pointer text-sm transition-colors ${
+                    className={`w-12 cursor-pointer type-nav transition-colors ${
                       discountType === kind
                         ? "bg-gray-100 font-medium text-gray-800"
                         : "bg-white text-gray-500 hover:bg-gray-50"
@@ -1246,7 +1274,7 @@ export default function ListingPostForm({
           <div>
             <FieldLabel label={labelFor("deliveryFree", "Free Delivery")} />
             <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
-              <span className="text-sm text-gray-700">
+              <span className="type-body text-gray-700">
                 {deliveryFree ? t("yes") : t("no")}
               </span>
               <Switch
@@ -1268,7 +1296,7 @@ export default function ListingPostForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={8}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1289,7 +1317,7 @@ export default function ListingPostForm({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={3}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1300,7 +1328,7 @@ export default function ListingPostForm({
 
       {/* ── Contact ────────────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">{t("contact")}</h2>
+        <h2 className="type-section-title text-foreground">{t("contact")}</h2>
 
         {/* The jobs form's Company sits at the top of Contact — its own spec
             lists it directly after Address, ahead of Name. Unstarred. */}
@@ -1378,7 +1406,7 @@ export default function ListingPostForm({
           />
         )}
 
-        <p className="text-sm text-gray-600">
+        <p className="type-body text-gray-600">
           {t("agreement.prefix")}{" "}
           <Link href="/posting-rule" className="text-[#00a0e9] hover:underline">
             {t("agreement.postingRule")}
@@ -1396,7 +1424,7 @@ export default function ListingPostForm({
         <button
           onClick={submit}
           disabled={submitting}
-          className="w-full rounded-sm bg-[#f68b1e] py-3 text-base font-semibold text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
+          className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
         >
           {submitting ? t("publishing") : t("submit")}
         </button>

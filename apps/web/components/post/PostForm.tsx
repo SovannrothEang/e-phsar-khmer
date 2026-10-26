@@ -42,11 +42,11 @@ export function CategorySelecter({
 
   return (
     <>
-      <p className="text-base font-semibold pt-4 px-6">Category</p>
+      <p className="type-card-heading pt-4 px-6">Category</p>
       <div className="grid grid-cols-2">
         <div className="border-r">
           <div className="py-4 px-6">
-            <div className="flex items-center gap-2 text-sm text-foreground">
+            <div className="flex items-center gap-2 type-body-sm text-foreground">
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40">
                 1
               </div>
@@ -77,7 +77,7 @@ export function CategorySelecter({
                       />
                       <span
                         className={clsx(
-                          "text-sm",
+                          "type-body-sm",
                           active
                             ? "font-semibold text-sky-600 dark:text-sky-400"
                             : "text-foreground",
@@ -100,7 +100,7 @@ export function CategorySelecter({
         </div>
         {/* RIGHT SUBCATEGORY */}
         <div className="py-4">
-          <div className="flex items-center gap-2 text-foreground text-sm px-4">
+          <div className="flex items-center gap-2 text-foreground type-body-sm px-4">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/40">
               2
             </div>
@@ -122,7 +122,9 @@ export function CategorySelecter({
                     className="object-contain shrink-0"
                     unoptimized
                   />
-                  <span className="text-sm text-foreground">{sub.name}</span>
+                  <span className="type-body-sm text-foreground">
+                    {sub.name}
+                  </span>
                 </div>
                 <IconChevronRight size={18} className="text-muted-foreground" />
               </button>
@@ -178,7 +180,7 @@ export function PostForm({
                     <button
                       type="button"
                       onClick={onBackAction}
-                      className="bg-[#00a0e9] h-8 w-18 rounded-sm text-white text-sm cursor-pointer"
+                      className="bg-[#00a0e9] h-8 w-18 rounded-sm text-white type-body-sm cursor-pointer"
                     >
                       Change
                     </button>
@@ -398,7 +400,7 @@ export function PostForm({
                   </FieldLabel>
                   <InputGroup className="max-w-auto h-10 rounded-sm">
                     <InputGroupInput type="number" />
-                    <InputGroupAddon className="text-lg">$</InputGroupAddon>
+                    <InputGroupAddon>$</InputGroupAddon>
                   </InputGroup>
                   <FieldLabel>Free Delivery</FieldLabel>
                   <Field orientation="horizontal">

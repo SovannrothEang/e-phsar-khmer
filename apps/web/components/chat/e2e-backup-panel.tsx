@@ -61,7 +61,7 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
   return (
     <>
       {state?.kind === "locked" && (
-        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/60 px-4 py-3 text-sm">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/60 px-4 py-3 type-body">
           <div className="flex items-start gap-2">
             <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
@@ -109,14 +109,14 @@ export function E2eBackupPanel({ engine }: { engine: RatchetEngine | null }) {
       )}
 
       {state?.kind === "ready" && backup.lastRestoredCount !== null && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 type-body">
           <ShieldCheck className="size-4 text-green-600" />
           <span>{t("restored", { count: backup.lastRestoredCount })}</span>
         </div>
       )}
 
       {state?.kind === "ready" && !state.hasPasscode && !dismissed && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 type-body">
           <ShieldCheck className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1">{t("setNudge")}</span>
           <Button size="sm" onClick={() => setSetOpen(true)}>
@@ -222,7 +222,7 @@ function EnterPasscodeDialog({
             placeholder={t("passcodePlaceholder")}
             disabled={busy}
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={!value || busy}>
               {busy && <Loader2 className="size-4 animate-spin" />}
@@ -294,7 +294,7 @@ function SetPasscodeDialog({
             placeholder={t("confirmPlaceholder")}
             disabled={busy}
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="type-body text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={busy}>
               {busy && <Loader2 className="size-4 animate-spin" />}

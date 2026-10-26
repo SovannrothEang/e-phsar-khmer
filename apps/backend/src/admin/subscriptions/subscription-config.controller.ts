@@ -30,7 +30,7 @@ import {
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/subscriptions')
 export class SubscriptionConfigController {

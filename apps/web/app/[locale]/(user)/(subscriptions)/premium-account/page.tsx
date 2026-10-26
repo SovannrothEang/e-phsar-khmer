@@ -1,5 +1,6 @@
-import { BadgeCheck, ChevronRight, Home } from "lucide-react";
+import { BadgeCheck, ChevronRight } from "lucide-react";
 import { Link } from "@/i18n/routing";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import {
   getMySubscriptions,
   getSubscriptionCatalog,
@@ -36,83 +37,76 @@ export default async function PremiumAccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16">
-      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-8 flex flex-wrap items-center gap-2 text-base text-foreground"
-        >
-          <Link href="/" className="flex items-center gap-2 hover:underline">
-            <Home className="size-4" /> Home
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <Link href="/me" className="hover:underline">
-            Profile
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <Link href="/me/subscriptions" className="hover:underline">
-            Membership
-          </Link>
-          <ChevronRight className="size-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Premium Account</span>
-        </nav>
+    <div className="min-h-screen bg-muted pb-10">
+      <div className="mx-auto max-w-7xl px-4 py-4">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: "/me/membership" },
+            { label: "Premium Account" },
+          ]}
+        />
+      </div>
 
-        <h1 className="text-2xl font-semibold text-foreground">
-          Increase your sales with PSA Khmer Premium Service!
-        </h1>
-        <p className="mt-3 text-foreground">
-          Choose the right category for your ads and start selling faster.
-        </p>
+      <main className="mx-auto max-w-4xl px-4">
+        <div className="space-y-2 py-4">
+          <h1 className="text-xl font-semibold">
+            Increase your sales with PSA Khmer Premium Service!
+          </h1>
+          <span className="block py-1 text-sm text-foreground">
+            Choose the right category for your ads and start selling faster.
+          </span>
 
-        {groups.size === 0 ? (
-          <div className="mt-6 rounded-md bg-card p-12 text-center ring-1 ring-border">
-            <h2 className="font-semibold text-foreground">
-              No plans available
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Please check back later.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {[...groups.values()].map((group) => {
+          {groups.size === 0 ? (
+            <div className="rounded-sm border bg-card p-10 text-center">
+              <h2 className="font-semibold text-foreground">
+                No plans available
+              </h2>
+              <p className="mt-1 text-sm text-foreground">
+                Please check back later.
+              </p>
+            </div>
+          ) : (
+            [...groups.values()].map((group) => {
               const mine = heldByGroup.get(group.id);
               return (
-                <article
+                <div
                   key={group.id}
-                  className="rounded-md bg-card px-6 py-6 ring-1 ring-border"
+                  className="space-y-2 rounded-sm border bg-card p-4 py-3 pb-3"
                 >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-xl font-semibold text-foreground">
-                      {group.name}
-                    </h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">{group.name}</h2>
                     {mine && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                        <BadgeCheck className="size-3.5" />
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                        <BadgeCheck className="size-3" />
                         {mine.packageName ?? mine.planName ?? "Active"} ·{" "}
                         {daysUntil(mine.expiresAt)} days left
                       </span>
                     )}
                   </div>
                   {group.description && (
-                    <p className="mt-4 text-foreground">{group.description}</p>
+                    <p className="text-sm text-foreground">
+                      {group.description}
+                    </p>
                   )}
+
                   <Link
                     href={{
                       pathname: "/premium-account/[category]",
                       params: { category: group.slug },
                     }}
-                    className="mt-5 inline-flex items-center gap-1 font-medium text-[#00a0e9] underline underline-offset-4 hover:text-[#0089c8]"
+                    className="flex items-center text-sm font-semibold text-[#00a0e9] underline"
                   >
                     {mine ? "Upgrade" : "Subscribe"}
-                    <ChevronRight className="size-4" />
+                    <ChevronRight size={16} className="block text-[#00a0e9]" />
                   </Link>
-                </article>
+                </div>
               );
-            })}
-          </div>
-        )}
-      </div>
+            })
+          )}
+        </div>
+      </main>
     </div>
   );
 }

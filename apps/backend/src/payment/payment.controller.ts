@@ -125,7 +125,7 @@ export class PaymentsController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'super_admin')
+  @Roles('admin')
   @UseGuards(RolesGuard)
   @ApiOperation({
     summary:

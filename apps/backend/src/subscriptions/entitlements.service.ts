@@ -7,6 +7,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  ne,
   or,
   sql,
 } from 'drizzle-orm';
@@ -65,7 +66,8 @@ export interface BucketView {
 }
 
 export interface EntitlementsView extends Entitlements {
-  usage: { ads: number };
+  /** Live ads held, and renewals spent across every ad the user still owns. */
+  usage: { ads: number; renews: number };
   /** The bucket `limits`/`usage` describe; null for the account overview. */
   bucket: BucketView | null;
   /** Every group the user holds, plus every free bucket they have ads in. */
@@ -241,6 +243,21 @@ export class EntitlementsService {
       );
   }
 
+  /**
+   * Renewals spent across every ad the user still owns. `renew_count` is
+   * per ad and survives expiry, so a lapsed ad's spent renewals stay spent —
+   * counting only live ads would make the figure drop when an ad expires.
+   */
+  private async renewalsUsed(userId: string): Promise<number> {
+    const [row] = await this.db
+      .select({
+        total: sql<number>`coalesce(sum(${listings.renewCount}), 0)::int`,
+      })
+      .from(listings)
+      .where(and(eq(listings.userId, userId), ne(listings.status, 'deleted')));
+    return row?.total ?? 0;
+  }
+
   /** The limits that apply to one ad, given where it is posted. */
   async resolve(
     userId: string,
@@ -266,10 +283,11 @@ export class EntitlementsService {
     userId: string,
     subcategoryId?: string,
   ): Promise<EntitlementsView> {
-    const [{ config, held }, live, scope] = await Promise.all([
+    const [{ config, held }, live, scope, renewsUsed] = await Promise.all([
       this.context(userId),
       this.liveAds(userId),
       subcategoryId ? this.scopeOf(subcategoryId) : null,
+      this.renewalsUsed(userId),
     ]);
 
     const used = new Map<BucketKey, number>();
@@ -319,7 +337,7 @@ export class EntitlementsService {
         plan,
         limits: bucket.limits,
         expiresAt: bucket.expiresAt,
-        usage: { ads: bucket.used },
+        usage: { ads: bucket.used, renews: renewsUsed },
         bucket,
         buckets: views,
       };
@@ -329,7 +347,7 @@ export class EntitlementsService {
       plan,
       limits: freeLimits(config.free, config.free.otherAds),
       expiresAt: null,
-      usage: { ads: live.length },
+      usage: { ads: live.length, renews: renewsUsed },
       bucket: null,
       buckets: views,
     };

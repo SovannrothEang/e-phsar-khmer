@@ -100,7 +100,7 @@ export function ImageUpload({
       ) : (
         <ImagePlus className="size-6" />
       )}
-      <span className="text-xs">{uploading ? "Uploading..." : caption}</span>
+      <span className="type-meta">{uploading ? "Uploading..." : caption}</span>
     </button>
   );
 

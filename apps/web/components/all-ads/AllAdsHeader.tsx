@@ -38,7 +38,7 @@ export default function AllAdsHeader({
     <Tabs defaultValue="grid" className="max-w-7xl select-none bg-muted">
       {/* Header title */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
-        <h1 className="text-lg font-semibold text-card-foreground">
+        <h1 className="type-page-title text-card-foreground">
           All Ads in Cambodia
         </h1>
       </div>

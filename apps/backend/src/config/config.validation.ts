@@ -99,7 +99,7 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   // Namespaces every BullMQ key, so a shared Redis can host more than one
   // environment without one draining the other's jobs.
-  QUEUE_PREFIX: z.string().default('psa'),
+  QUEUE_PREFIX: z.string().default('phsarkhmer'),
 
   // Payment job retry policy (BullMQ-side, distinct from the outbox budget)
   PAYMENT_JOB_ATTEMPTS: z.coerce.number().default(3),

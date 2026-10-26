@@ -119,7 +119,7 @@ export default function Notifications() {
           />
 
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white antialiased">
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 type-photo-badge text-white antialiased">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
@@ -130,15 +130,19 @@ export default function Notifications() {
         <DrawerHeader className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <DrawerTitle className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
+              <DrawerTitle className="text-zinc-950 dark:text-zinc-50">
                 Notifications Center
               </DrawerTitle>
-              <DrawerDescription className="text-sm text-zinc-600 dark:text-zinc-400">
+              <DrawerDescription className="type-body-sm text-zinc-600 dark:text-zinc-400">
                 You have {unreadCount} unread notifications
               </DrawerDescription>
             </div>
             {unreadCount > 0 && (
-              <Button variant="outline" size="sm" className="text-xs h-8 px-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="type-meta h-8 px-3"
+              >
                 Mark all as read
               </Button>
             )}
@@ -178,7 +182,7 @@ export default function Notifications() {
                 <div className="flex items-center justify-between gap-2">
                   <h4
                     className={cn(
-                      "text-sm font-semibold text-zinc-950 dark:text-zinc-50 pr-6", // Added padding right for the dot
+                      "type-body text-zinc-950 dark:text-zinc-50 pr-6", // Added padding right for the dot
                       notification.isUnread
                         ? ""
                         : "text-zinc-700 dark:text-zinc-300",
@@ -187,10 +191,10 @@ export default function Notifications() {
                     {notification.title}
                   </h4>
                 </div>
-                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                <p className="type-body-sm text-zinc-700 dark:text-zinc-300">
                   {notification.description}
                 </p>
-                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                <span className="type-meta text-zinc-500 dark:text-zinc-400">
                   {notification.time}
                 </span>
               </div>
@@ -199,7 +203,7 @@ export default function Notifications() {
 
           {/* Placeholder for "Load More" or "No More Notifications" */}
           <div className="text-center pt-6 pb-4">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="type-body-sm text-zinc-500 dark:text-zinc-400">
               Showing 5 of 28 notifications
             </p>
           </div>

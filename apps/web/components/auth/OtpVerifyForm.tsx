@@ -216,7 +216,7 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           >
             {verifying ? "Verifying…" : "Verify"}
           </Button>
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="type-body-sm text-muted-foreground text-center">
             Wrong number?{" "}
             <button
               type="button"

@@ -135,9 +135,7 @@ export default function JobApplications() {
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-medium text-foreground mb-6">
-          {t("title")}
-        </h1>
+        <h1 className="type-page-title text-foreground mb-6">{t("title")}</h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div className="flex items-center">
             <Tabs defaultValue="applications">
@@ -203,10 +201,10 @@ export default function JobApplications() {
         {error ? (
           <main className="max-w-2xl mx-auto mt-4">
             <div className="bg-card rounded-sm shadow-sm min-h-[240px] flex flex-col items-center justify-center p-8 text-center">
-              <h2 className="text-lg font-medium text-foreground mb-2">
+              <h2 className="type-section-title text-foreground mb-2">
                 {t("loadFailed")}
               </h2>
-              <p className="text-muted-foreground text-sm">{error}</p>
+              <p className="text-muted-foreground type-body-sm">{error}</p>
             </div>
           </main>
         ) : items === null ? (
@@ -226,10 +224,10 @@ export default function JobApplications() {
               </div>
 
               <div className="text-center">
-                <h2 className="text-xl font-medium text-foreground mb-2">
+                <h2 className="type-section-title text-foreground mb-2">
                   {t("noResult")}
                 </h2>
-                <p className="text-muted-foreground text-sm mb-8">
+                <p className="text-muted-foreground type-body-sm mb-8">
                   {t("noApplications")}
                 </p>
               </div>
@@ -371,7 +369,7 @@ function Chip({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-xs ${
+      className={`inline-flex items-center rounded-sm border px-2 py-0.5 type-meta ${
         muted
           ? "border-border bg-muted text-muted-foreground"
           : "border-blue-100 bg-blue-50 text-[#00a0e9]"

@@ -18,10 +18,22 @@ export const MAX_AD_PRICE_PARAM = "max_ad_price";
 export const CONDITION_PARAM = "condition";
 export const DATE_PARAM = "date";
 export const DELIVERY_PARAM = "delivery";
+export const DISCOUNT_PARAM = "discount";
 export const SORT_PARAM = "sort";
 export const YEAR_MIN_PARAM = "year_min";
 export const YEAR_MAX_PARAM = "year_max";
 export const ENGINE_PARAM = "engine";
+/** The browse dialog's remaining attribute filters (display names, verbatim). */
+export const TAX_TYPE_PARAM = "tax_type";
+export const COLOR_PARAM = "color";
+export const TRANSMISSION_PARAM = "transmission";
+
+/** The browse grids' own drill-down params (brand/model/type), NOT filter-bar
+ *  params: they live on the same URLs and the More Filters dialog edits them,
+ *  but "Clear filters" on /search leaves them alone. */
+export const AD_FIELD_PARAM = "ad_field";
+export const AD_MODEL_PARAM = "ad_model";
+export const AD_TYPE_PARAM = "ad_type";
 
 /** Everything the filter bar owns — "Clear all" removes exactly these. */
 export const FILTER_PARAMS = [
@@ -34,10 +46,14 @@ export const FILTER_PARAMS = [
   CONDITION_PARAM,
   DATE_PARAM,
   DELIVERY_PARAM,
+  DISCOUNT_PARAM,
   SORT_PARAM,
   YEAR_MIN_PARAM,
   YEAR_MAX_PARAM,
   ENGINE_PARAM,
+  TAX_TYPE_PARAM,
+  COLOR_PARAM,
+  TRANSMISSION_PARAM,
 ] as const;
 
 export const MAX_QUERY_LENGTH = 100;
@@ -113,6 +129,21 @@ export const CONDITION_OPTIONS = [
 ] as const;
 export type ConditionValue = (typeof CONDITION_OPTIONS)[number]["value"];
 
+/**
+ * Stored engine values → the `PostForm.options.*` label keys.
+ *
+ * The URL/feed keep the English value the post form wrote; only the label is
+ * localized, so /km reads សាំង, ម៉ាស៊ូត, … while filtering still works. Shared
+ * by the bar's Engine chip and the More Filters dialog.
+ */
+export const ENGINE_LABEL_KEYS: Record<string, string> = {
+  Diesel: "diesel",
+  Electric: "electric",
+  Hybrid: "hybrid",
+  LPG: "lpg",
+  Petrol: "petrol",
+};
+
 /** Backend `GET /listings` filter params (see QueryListingsDto). */
 export interface FeedQuery {
   q?: string;
@@ -126,9 +157,17 @@ export interface FeedQuery {
   condition?: ConditionValue;
   postedWithin?: Exclude<DateValue, "">;
   deliveryFree?: boolean;
+  hasDiscount?: boolean;
   yearMin?: number;
   yearMax?: number;
   engineType?: string;
+  /** The More Filters dialog's attribute filters — display names, verbatim.
+   *  `model` is resolved by the page from the `ad_model` slug (the brands API
+   *  is the only place a model id/name pair exists). */
+  model?: string;
+  taxType?: string;
+  color?: string;
+  transmission?: string;
   sort?: BackendSort;
 }
 
@@ -214,6 +253,7 @@ export function parseFeedParams(
   }
 
   if (get(DELIVERY_PARAM) === "1") out.deliveryFree = true;
+  if (get(DISCOUNT_PARAM) === "1") out.hasDiscount = true;
 
   let yearMin = year(get(YEAR_MIN_PARAM));
   let yearMax = year(get(YEAR_MAX_PARAM));
@@ -225,6 +265,17 @@ export function parseFeedParams(
 
   const engine = get(ENGINE_PARAM)?.trim();
   if (engine && engine.length <= 60) out.engineType = engine;
+
+  // The browse dialog's attribute filters carry display names verbatim (the
+  // values the post form wrote into `attributes`), so only trim + bound them.
+  const taxType = get(TAX_TYPE_PARAM)?.trim();
+  if (taxType && taxType.length <= 120) out.taxType = taxType;
+  const color = get(COLOR_PARAM)?.trim();
+  if (color && color.length <= 120) out.color = color;
+  const transmission = get(TRANSMISSION_PARAM)?.trim();
+  if (transmission && transmission.length <= 120) {
+    out.transmission = transmission;
+  }
 
   const sort = SORT_OPTIONS.find(
     (o) => o.value === parseSortParam(get(SORT_PARAM), !!out.q),

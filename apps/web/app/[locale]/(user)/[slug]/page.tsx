@@ -12,6 +12,7 @@ import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { loadJobApplyState } from "@/lib/api/job-apply";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { redirect } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { posts } from "@/lib/posts";
@@ -65,7 +66,7 @@ export async function generateMetadata({
     const name = displayName(profile);
     const t = await getTranslations("Profile");
     return {
-      title: `${name} - PsaKhmer`,
+      title: name,
       description: t("metaDescription", { name }),
     };
   }
@@ -95,7 +96,10 @@ export default async function SlugPage({
   // listing UUIDs render through the real detail template.
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
-    const viewer = await getCurrentUser();
+    const [viewer, banners] = await Promise.all([
+      getCurrentUser(),
+      getAdvertisements("listing_detail"),
+    ]);
     if (UUID_RE.test(actualId)) {
       const real = await buildRealDetailData(actualId, await getLocale());
       if (real) {
@@ -103,6 +107,7 @@ export default async function SlugPage({
           <PostDetail
             id={actualId}
             real={real}
+            banners={banners}
             viewerId={viewer?.id}
             sellerFollowing={
               viewer ? await getFollowStatus(real.listing.userId) : false
@@ -118,7 +123,7 @@ export default async function SlugPage({
         );
       }
     }
-    return <PostDetail id={actualId} viewerId={viewer?.id} />;
+    return <PostDetail id={actualId} viewerId={viewer?.id} banners={banners} />;
   }
 
   // Handle Public Profile — a real account, looked up by handle.

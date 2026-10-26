@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import { Link } from "@/i18n/routing";
-import Image from "next/image";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Truck } from "lucide-react";
+import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
+import type { AdvertisementCard } from "@/lib/api/advertisements";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { IconClockHour4, IconMapPin } from "@tabler/icons-react";
 import ProfileSidebar from "./Profile-Sidebar";
@@ -42,6 +41,8 @@ import { trackEvent } from "@/lib/insights/queue";
  */
 export interface RealDetailData {
   listing: BackendListing;
+  /** Km display values for the listing's attribute keys (taxType, bodyType, color, …). */
+  valueLabels?: Record<string, string>;
   cate?: { slug: string; name: string };
   subcate?: { slug: string; name: string };
   brand?: { slug: string; name: string };
@@ -128,6 +129,7 @@ export default function PostDetail({
   viewerId,
   sellerFollowing = false,
   jobApply = null,
+  banners = [],
 }: {
   id: string;
   real?: RealDetailData;
@@ -138,6 +140,8 @@ export default function PostDetail({
   sellerFollowing?: boolean;
   /** Present only when this viewer may apply to *this* job listing. */
   jobApply?: JobApplyState | null;
+  /** The `listing_detail` banners — fetched by the server page above this one. */
+  banners?: AdvertisementCard[];
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -212,26 +216,13 @@ export default function PostDetail({
   return (
     <main className="min-h-screen flex flex-col bg-muted block pt-6">
       {/* Ad Banner */}
-      <div className="max-w-4xl mx-auto w-full gap-4 px-4 pb-4">
-        <div className="flex-1 space-y-2">
-          <Link href="/" target="_blank">
-            <AspectRatio
-              ratio={4}
-              className="bg-muted rounded-none cursor-pointer"
-            >
-              <Image
-                src="/ads/landforsale.jpg"
-                alt="Photo"
-                fill
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                loading="eager"
-                className="object-cover rounded-none"
-                unoptimized={true}
-              />
-            </AspectRatio>
-          </Link>
+      {banners.length > 0 && (
+        <div className="max-w-4xl mx-auto w-full gap-4 px-4 pb-4">
+          <div className="flex-1 space-y-2">
+            <AdvertisementCarousel banners={banners} priority />
+          </div>
         </div>
-      </div>
+      )}
       {/* Breadcrumb */}
       <div className="max-w-7xl mx-auto w-full pb-2">
         <Breadcrumbs
@@ -311,7 +302,7 @@ export default function PostDetail({
                   }
                 >
                   <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <h1 className="text-xl md:text-3xl font-medium text-foreground leading-snug flex-1 min-w-0">
+                    <h1 className="type-page-title text-foreground flex-1 min-w-0">
                       {post.title}
                     </h1>
                     {isJobListing && (
@@ -321,7 +312,7 @@ export default function PostDetail({
                       />
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-4 text-[13px] text-foreground mt-2">
+                  <div className="flex flex-wrap items-center gap-4 type-meta text-foreground mt-2">
                     <p>ID {displayId}</p>
                     <div className="flex items-center">
                       <IconMapPin className="w-4 h-4 mr-1" />
@@ -337,7 +328,7 @@ export default function PostDetail({
                   </div>
                   {post.freeDelivery && (
                     <div className="mt-3">
-                      <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] text-xs font-medium rounded-sm border border-blue-100">
+                      <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] type-button-sm rounded-sm border border-blue-100">
                         <Truck className="w-3.5 h-3.5 mr-1" />{" "}
                         {t("Common.freeDelivery")}
                       </span>
@@ -345,18 +336,18 @@ export default function PostDetail({
                   )}
                   <div className="flex items-end justify-between gap-3 flex-wrap mt-3 pb-4">
                     <div className="flex items-end gap-2.5">
-                      <span className="text-xl md:text-2xl font-medium text-[#e3281b] leading-none">
+                      <span className="type-price text-[#e3281b]">
                         {post.price === null
                           ? t("Common.negotiable")
                           : `$${post.price}`}
                       </span>
                       {post.oldPrice && (
-                        <span className="text-sm text-gray-400 line-through mb-0.5">
+                        <span className="type-body-sm text-gray-400 line-through mb-0.5">
                           ${post.oldPrice}
                         </span>
                       )}
                       {post.discount && (
-                        <span className="text-sm bg-[#fdf0e6] text-[#f68b1e] px-1.5 py-0.5 rounded-sm mb-1">
+                        <span className="type-discount bg-[#fdf0e6] text-[#f68b1e] px-1.5 py-0.5 rounded-sm mb-1">
                           {post.discount}
                         </span>
                       )}
@@ -376,7 +367,7 @@ export default function PostDetail({
               <hr className="border" />
               {/* Description */}
               <div className="p-4">
-                <h2 className="text-xl font-semibold text-foreground mb-4">
+                <h2 className="type-section-title text-foreground mb-4">
                   {t("Post.description")}
                 </h2>
                 {isReal && (
@@ -386,10 +377,11 @@ export default function PostDetail({
                     brand={real.brand}
                     model={real.model}
                     attributes={real.listing.attributes}
+                    valueLabels={real.valueLabels}
                     condition={real.listing.condition}
                   />
                 )}
-                <p className="whitespace-pre-line leading-10">
+                <p className="whitespace-pre-line type-body">
                   {post.description}
                 </p>
                 <ContactUser
@@ -406,17 +398,17 @@ export default function PostDetail({
               </div>
             </div>
             {/* Disclaimer */}
-            <div className="bg-card border-l-3 border-l-[#f68b1e] rounded-r-sm p-4 text-sm shadow-sm">
-              <h3 className="text-[#f68b1e] font-semibold text-sm mb-2">
+            <div className="bg-card border-l-3 border-l-[#f68b1e] rounded-r-sm p-4 type-body-sm shadow-sm">
+              <h3 className="text-[#f68b1e] type-card-heading mb-2">
                 ការមិនទទួលខុសត្រូវ / Disclaimer
               </h3>
-              <p className="text-sm text-foreground !leading-relaxed">
+              <p className="type-body-sm text-foreground">
                 យើងខ្ញុំមិនគ្រប់គ្រងមាតិកា
                 ដែលបានបង្ហោះឡើងដោយសមាជិកឡើយ។ដូច្នេះយើងមិនទទួលខុសត្រូវលើការផ្សាយផលិតផលនេះទេ
                 ហើយក៏មិនធានាចំពោះបញ្ហាដែលទាក់ទងដោយផ្ទាល់ ឬ ប្រយោលទៅនឹងសកម្មភាព ឬ
                 អសកម្មណាមួយឡើយ។
               </p>
-              <p className="text-sm text-foreground leading-relaxed mt-2">
+              <p className="type-body-sm text-foreground mt-2">
                 We does not control the content posted by members and therefore
                 assumes no responsibility and disclaims any liability for any
                 consequence relating directly or indirectly to any action or

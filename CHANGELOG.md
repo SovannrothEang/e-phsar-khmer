@@ -19,7 +19,81 @@ How to use this file:
 
 ## [Unreleased]
 
+### Added
+
+- **Trending listings replace the mock home Top Ads.** `GET /api/v1/listings/trending`
+  (`limit` ≤ 20, `windowDays` ≤ 30) ranks live listings by weighted engagement from
+  `listing_events` (view 1, chat/call/show_contact 3, apply_job 5 — impressions are
+  deliberately excluded) plus likes/saves at 2 each (owner self-reactions excluded),
+  filters through the feed's `liveConditions()`, and fills the tail with the newest live
+  ads. The home carousel is now `components/ads/TrendingAds.tsx` (label "Trending" /
+  "កំពុងពេញនិយម"), driven by `getTrendingListings`; the 10 `TopPosts` mocks and the
+  unused `HighLightAds` component were deleted. No migration — ranking reads the
+  existing tables.
+- **Superadmin-managed storefront banners.** `advertisements` (migration
+  `0042_omniscient_cloak`) holds one row per banner: a `placement`
+  (`home | all_ads | category | subcategory | listing_detail`), the Storage image
+  path, an optional click-through, alt text, sort order and an active flag.
+  `GET /api/v1/advertisements?placement=` is public and returns active banners
+  only; `/api/v1/admin/advertisements` is super_admin-only CRUD. The dashboard
+  page is `/wanderer/dashboard/advertisements` — hidden from regular admins the
+  same way Team is — and uploads through the new staff-only `advertisement` sign
+  scope. On the storefront the five hardcoded banner `<Image>` blocks are
+  replaced by `components/ads/AdvertisementCarousel.tsx`: an embla carousel that
+  rotates when a slot holds several banners, pauses on hover/focus, honours
+  `prefers-reduced-motion`, and renders nothing when a slot is empty.
+- **The storage bucket allows only `image/jpeg | image/png | image/webp`**
+  (5 MB cap); `image/gif` is refused with `invalid_mime_type`. Animated WebP is
+  allowed, so the old 2.1 MB animated `flag-animation.gif` was re-encoded as a
+  381 KB / 25-frame WebP and keeps its animation. Allowing GIF would be a
+  Supabase bucket-settings change, not a code change.
+
 ### Changed
+
+- **Manage Ads: the ad list is split from the controls card and rows gain an
+  actions menu.** The header, plan stats and Active/Expired tabs keep their own
+  card; the ads (and the loading/empty states) render in a separate section
+  below it. Each row's three-dot menu offers **View ad**, **Renew ad**
+  (re-publish — 30 more days, one plan renewal, confirm dialog), **Share**
+  (copy-link dialog) and **Delete ad** (soft-delete, confirm dialog), wired to
+  the existing backend endpoints; a successful action reloads the tab and the
+  plan summary. The page also renders through the existing `Me.manageAds`
+  namespace (en/km) after reading as hardcoded English since the merge.
+  Edit-listing ("no edit flow yet") and "mark as sold" (no such status) are
+  deliberately absent.
+- **Profile tabs render populated results as list rows.** Likes, Saved and
+  Manage Ads moved from the 2–4 column card grid to full-width rows
+  (thumbnail, title, location, price — plus a like/save toggle on Likes and
+  Saved), matching the captain's reference. Empty tabs keep the centred
+  "No Result!" card; the Jobs and Subscriptions tabs were already lists.
+- **Listing detail's seller button reads "Chat"; the owner sees a note instead.**
+  `Chat.messageSeller` (the default label of `ContactSellerButton`) is now
+  "Chat" (km was already "ជជែក"), and the own-ad note on the seller card reads
+  "This is your own ads - buyers will see 'Chat' here" (`Post.ownAdNote`; the
+  km copy now quotes 'ជជែក'). Labels only — the chat flow is unchanged.
+- **Typography scale trimmed: page titles 20px, section titles 16px.** The
+  captain found the 2026-10-23 scale too large away from the landing page.
+  `type-page-title` is now 20/600/28 and `type-section-title` 16/600/24 (base
+  `h1`/`h2` follow); the homepage alone keeps the display sizes — 24/32 and
+  20/28 — through a `home-type` context class on its wrapper. Ten page-title
+  `h1`s that still hard-coded `text-2xl` (the subscription dashboard, listings,
+  feedback and users-subscription pages, `/feedback`, `/settings`,
+  `/me/membership`) now use the role class, so no non-home page title exceeds
+  20px.
+- **`super_admin` is now a governance tier, not a bigger admin tier.** The
+  captain's rule: a superadmin manages the dashboard & stats, reports, team &
+  roles, advertisements and feedback — nothing else. `RolesGuard` matches roles
+  literally, so `@Roles('admin')` now **excludes** a `super_admin`; the
+  catalogue, subcategories, brands, models, listings, attributes, subscription
+  config, user-subscriptions and the admin payment route were narrowed to
+  `@Roles('admin')`. `AdminController` (stats **and** users) and
+  `ReportsController` still name both roles — the Team page is built on
+  `/admin/users`, so that endpoint cannot be closed to super_admin without
+  breaking team management (the staff-vs-user boundary there stays enforced by
+  `assertCanManageUser`). The admin sidebar mirrors the split: each menu item
+  declares a `roles` list, and the Subscriptions group is admin-only. A
+  dedicated `superadmin` account was created for this tier; `admin` and `asdf1`
+  remain plain admins.
 
 - **Chat is encrypted-only for new messages.** `ChatService.sendMessage` rejects a payload
   with neither `e2eHeader` (v1) nor `e2e` (v2) (`Encrypted messages are required`), requires a
@@ -61,12 +135,44 @@ How to use this file:
   staged preview like images and voice.
 - **"Last active …"** in the thread header from `ChatUserSummary.lastSeenAt`
   (`users.last_seen_at`, coarse — 5-minute activity throttle).
+- **Browse More Filters: the mock's vehicle block, wired end to end.** On a vehicle
+  subcategory the shared dialog now shows Brand, Model (disabled until a brand is picked),
+  Year (minimum/maximum), Tax Type, Condition, Colour, Transmission, Engine Type and Body
+  Type — each gated on that subcategory's own `field_schema` and sourced exactly like the
+  grid/form (linked `bodytypes`, the managed/global `colors` rule, `enginetypes`, the
+  generated `years`). Every field edits the same URL params the browse grids and the bar
+  chips use, so a grid pick shows up in the dialog and counts on its badge, and a dialog
+  pick updates the grids/chips. `GET /listings` gains four additive optional filters —
+  `model`, `taxType`, `color`, `transmission` (display-name equality on `attributes`, values
+  bound as parameters) — so the fields really filter. The header follows the mock (✕ left,
+  centred title, Clear right), controls are h-11, and the segmented groups use the sampled
+  mock colours (`#00a0e9` selected / `#707685` rest).
 
 ### Fixed
 
+- **Chat ignored the site theme.** The workspace forced the `dark` token scope on its panel
+  (hardcoded `bg-[#1b1b1b]` / `border-white/10`, plus `dark` re-applied to the portaled delete
+  menu and dialog), so `/chats` stayed dark in light mode. The panel now uses the normal theme
+  tokens (`bg-card`, `border-border`, `bg-muted`) and follows the visitor's light/dark choice;
+  the Suspense fallback matches.
 - A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
   first inbound message created it. `chat-workspace.tsx` now reconciles the cached
   `GET /chats/with/:userId` lookup against the inbox.
+- **Accounts without an uploaded photo rendered a broken avatar.** The shared fallback pointed at
+  `ui-avatars.com`, which now answers with `image/svg+xml`; Next's optimizer rejects SVG unless
+  `dangerouslyAllowSVG` is set, so every no-photo avatar (navbar account menu, `/me` header,
+  public profiles, follower lists, the listing seller card, settings) came back 400 and printed
+  its alt text inside the circle. The new `components/common/UserAvatar.tsx` renders the photo
+  through `DbImage` and falls back to a brand-blue initials circle instead — no third-party
+  request, no broken `<img>`. The `ui-avatars.com` remotePattern is gone.
+- **Browse filters gave no visible selection, and the header search ignored the category page.**
+  Picking a brand (e.g. MG) hid the whole Brand grid and swapped in its models, so nothing showed
+  which brand was applied except the breadcrumb. The pick now surfaces where the other applied
+  filters do: the More Filters dialog's Brand select and its badge count it. The brand click
+  itself stays a drill-in (grid steps aside, models appear) — like a body-type pick, not a
+  toggle. The header search bar's scope chip now follows the page: a category or subcategory page
+  reads that category ("Cars For Sale" / "រថយន្តសម្រាប់លក់") and a submit from there searches inside
+  it (`/search?q=…&category=…&sub=…`), instead of always starting from "All Categories".
 
 ### Removed
 

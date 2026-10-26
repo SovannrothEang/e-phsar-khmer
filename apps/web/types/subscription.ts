@@ -150,7 +150,7 @@ export interface PlanEntitlements {
   plan: "free" | "premium";
   limits: PlanLimits;
   expiresAt: string | null;
-  usage: { ads: number };
+  usage: { ads: number; renews: number };
   bucket: EntitlementBucket | null;
   buckets: EntitlementBucket[];
 }

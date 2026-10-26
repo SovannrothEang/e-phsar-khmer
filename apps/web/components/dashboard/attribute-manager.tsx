@@ -266,11 +266,11 @@ export function AttributeManager({
       <div className="grid gap-2">
         <Label>Subcategories</Label>
         {!form.categoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category first
           </p>
         ) : availableSubcategories.length === 0 ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             No subcategories available
           </p>
         ) : (
@@ -278,7 +278,7 @@ export function AttributeManager({
             {availableSubcategories.map((sub) => (
               <label
                 key={sub.subId}
-                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer type-body-sm"
               >
                 <Checkbox
                   checked={form.subcategories.includes(sub.subId)}
@@ -299,15 +299,15 @@ export function AttributeManager({
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+              <h1 className="type-page-title text-[#00a0e9] tracking-tight">
                 {title}
               </h1>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="type-body-sm text-muted-foreground mt-2">
                 Manage {title} here.
               </p>
             </div>
             {readOnly ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="type-body-sm text-muted-foreground">
                 Years are generated automatically (1980 –{" "}
                 {new Date().getFullYear() + 1}) and cannot be edited.
               </p>
@@ -369,7 +369,7 @@ export function AttributeManager({
                 ) : (
                   paginated.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                      <TableCell className="text-center font-mono type-meta text-muted-foreground">
                         {item.id.slice(0, 8)}
                       </TableCell>
                       <TableCell>{item.name}</TableCell>
@@ -393,7 +393,7 @@ export function AttributeManager({
                         {allCategories.find(
                           (c) => c.cateId === item.categoryId,
                         ) && (
-                          <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
+                          <span className="rounded bg-sky-200 px-2 py-1 type-body-sm text-black">
                             {
                               allCategories.find(
                                 (c) => c.cateId === item.categoryId,
@@ -411,7 +411,7 @@ export function AttributeManager({
                             return (
                               <span
                                 key={id}
-                                className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
+                                className="rounded bg-sky-100 px-2 py-1 type-body-sm text-black"
                               >
                                 {sub?.name ?? id.slice(0, 8)}
                               </span>
@@ -419,10 +419,10 @@ export function AttributeManager({
                           })}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {item.createdAt}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
+                      <TableCell className="type-meta text-muted-foreground">
                         {item.updatedAt}
                       </TableCell>
                       <TableCell className="text-center">
@@ -468,7 +468,7 @@ export function AttributeManager({
             </Table>
 
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -489,7 +489,7 @@ export function AttributeManager({
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
                 <div className="flex items-center gap-1">

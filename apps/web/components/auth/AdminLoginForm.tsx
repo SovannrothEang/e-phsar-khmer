@@ -66,7 +66,7 @@ export function AdminLoginForm({
           >
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-xl font-medium">
+                <h1 className="type-page-title">
                   Login to manage ads or post free ad
                 </h1>
               </div>
@@ -92,7 +92,7 @@ export function AdminLoginForm({
 
               <Link
                 href={`/${locale}/forgot-password`}
-                className="inline-block text-right text-sm underline-offset-2 hover:underline"
+                className="inline-block text-right type-body-sm underline-offset-2 hover:underline"
               >
                 Forgot Password / Account
               </Link>

@@ -261,9 +261,7 @@ export default function SubscriptionPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
-            Users Subscription
-          </h1>
+          <h1 className="type-page-title text-sky-500">Users Subscription</h1>
           <p className="text-sm text-muted-foreground">
             Manage subscription plans and users
           </p>
@@ -319,31 +317,31 @@ export default function SubscriptionPage() {
                 </TabsTrigger>
                 <TabsTrigger value="auto" className="cursor-pointer">
                   Auto
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
+                  <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
                     {subscription.filter((s) => s.group === "Auto").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="food" className="cursor-pointer">
                   Food
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
+                  <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
                     {subscription.filter((s) => s.group === "Food").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="general" className="cursor-pointer">
                   General
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
+                  <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
                     {subscription.filter((s) => s.group === "General").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="property" className="cursor-pointer">
                   Property
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
+                  <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
                     {subscription.filter((s) => s.group === "Property").length}
                   </Badge>
                 </TabsTrigger>
                 <TabsTrigger value="services" className="cursor-pointer">
                   Services
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
+                  <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
                     {subscription.filter((s) => s.group === "Services").length}
                   </Badge>
                 </TabsTrigger>

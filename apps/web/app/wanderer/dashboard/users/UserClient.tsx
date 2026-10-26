@@ -154,10 +154,10 @@ export default function UserPage({
         <div className="space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl text-sky-500 font-semibold tracking-tight">
+              <h1 className="type-page-title text-sky-500 tracking-tight">
                 Users
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="type-body-sm text-muted-foreground">
                 Manage your users and accounts
               </p>
             </div>
@@ -188,13 +188,13 @@ export default function UserPage({
               </TabsTrigger>
               <TabsTrigger value="premium" className="cursor-pointer">
                 Premium
-                <Badge className="bg-blue-500 ml-1.5 text-xs text-white">
+                <Badge className="bg-blue-500 ml-1.5 type-meta text-white">
                   {users.filter((u) => u.accountType === "Premium").length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="normal" className="cursor-pointer">
                 Normal
-                <Badge className="bg-slate-500 ml-1.5 text-xs text-white">
+                <Badge className="bg-slate-500 ml-1.5 type-meta text-white">
                   {users.filter((u) => u.accountType === "Normal").length}
                 </Badge>
               </TabsTrigger>
@@ -226,7 +226,7 @@ export default function UserPage({
                         <Search className="size-8" />
                         <p>No users found</p>
                         {searchQuery && (
-                          <p className="text-sm">
+                          <p className="type-body-sm">
                             No results for &quot;{searchQuery}&quot;
                           </p>
                         )}
@@ -236,7 +236,7 @@ export default function UserPage({
                 ) : null}
                 {paginatedUsers.map((user) => (
                   <TableRow key={user.userId}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="font-mono type-meta text-muted-foreground">
                       {user.userId}
                     </TableCell>
                     <TableCell>
@@ -247,7 +247,7 @@ export default function UserPage({
                         </Avatar>
                         <div className="text-start">
                           <div className="font-medium">{user.name}</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="type-meta text-muted-foreground">
                             {user.email}
                           </div>
                         </div>
@@ -257,7 +257,7 @@ export default function UserPage({
                       {user.username}
                     </TableCell>
                     <TableCell>
-                      <div className="grid grid-rows-3 grid-flow-col gap-x-4 gap-y-1 text-sm ">
+                      <div className="grid grid-rows-3 grid-flow-col gap-x-4 gap-y-1 type-body-sm ">
                         {user.networks
                           .filter((network) => network !== "")
                           .map((network, index) => (
@@ -347,7 +347,7 @@ export default function UserPage({
 
             {/* Pagination */}
             <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
                 Rows per page
                 <Select
                   value={rowsPerPage.toString()}
@@ -368,7 +368,7 @@ export default function UserPage({
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+                <span className="type-body-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </span>
                 <div className="flex items-center gap-1">

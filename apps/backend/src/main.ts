@@ -55,8 +55,8 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('psa-npic API')
-    .setDescription('E-Market API — Khmer24-style marketplace')
+    .setTitle('PhsarKhmer.com API')
+    .setDescription('E-Market API — PhsarKhmer.com marketplace')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
