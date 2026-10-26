@@ -17,6 +17,47 @@ How to use this file:
   `tasks/plan-e2e-phase1-2.md`, `tasks/plan-tenant-subscriptions.md`) can still be read with
   `git show 5783531:<path>`. Design references were moved to `docs/`.
 
+## [Unreleased]
+
+### Changed
+
+- **Hidden tabs no longer poll the backend** (Vercel usage investigation; plan in `Plans.md`). The backend runs
+  as a container that scales to zero within about a minute, and a hidden tab's throttled timer fired the E2E
+  backup sync and approvals poll once a minute, which is just slow enough that **every call cold-started the
+  whole backend (~6 s to boot, 8 boots in an 8-minute sample from one parked tab)**. `hooks/use-e2e-backup.ts`
+  now runs them through `lib/polling/visible-poller.ts`: no timer or request while the tab is hidden, an
+  immediate catch-up on return (only if the last run is older than the interval), and the account-level
+  sync runs in one visible tab per browser (Web Locks; browsers without it keep every tab polling). The 20 s
+  approvals poll stays per tab and is deliberately **not** slowed, because a poll slower than the ~30–60 s
+  warm window would boot the backend on every call. The 10 s "waiting for another device" poll is gated too.
+  Added `pnpm --filter web test` (Node's built-in `node:test`, no new dependency) and
+  `allowImportingTsExtensions` in `apps/web/tsconfig.json` so the test can import its `.ts` module.
+
+- **Backup and approvals are pushed over the WebSocket instead of polled** (`Plans.md`, "Push instead of poll").
+  `E2eBackupService` now publishes `e2e.history_requested`, `e2e.history_resolved` and `e2e.backup_updated` as
+  `notification` frames to the user's own tabs, after the write commits, with ids only (best-effort; a failed
+  publish never fails the request; an idempotent repeat of a history request publishes nothing). The web hook
+  (`lib/e2e/push-events.ts`) maps each to an ordinary read and ignores its own device's events. While the socket is
+  up the polls drop to a 5-minute safety net (1 minute while waiting for another device to approve); with no socket
+  they keep today's 20 s / 60 s / 10 s, and every (re)connect catches up because a missed frame is not replayed.
+  A push only nudges the one leader tab's sync, so tabs still never pull in parallel. **Backend and web must
+  deploy together**: a new web build against an old backend simply keeps its 5-minute poll and would be slow to
+  notice an approval.
+- **An abandoned visible tab behaves like a hidden one.** After 30 minutes without pointer, key, scroll or touch input
+  (`lib/polling/attention.ts`, `ATTENTION_IDLE_MS`) the socket closes and every poller stops — the E2E ones through
+  `visible-poller.ts`, and the chat fallbacks (inbox, unread badge, thread delta, checkout) through the new
+  `use-tab-attention.ts`, because "socket down" alone would otherwise re-enable them in a tab nobody is looking at.
+  The first input, or the tab being shown again, reopens everything and the reconnect refreshes inbox and unread. A
+  message that arrives meanwhile appears on that first input, not before.
+
+### Known issues
+
+- The cause of the high Vercel usage is inferred from a 50-row log sample and the code: per-project and
+  30-day numbers need the paid Observability Plus add-on, and billing was not readable. Re-measure after
+  this ships (`Plans.md`, Task 0.1 / 4.1). The `APP_ROLE` worker split (Task 2.1) and the hosting decision
+  (Task 3.1) are still open. The push work is covered by unit tests but has **not been exercised in a browser or in
+  production** (`Plans.md` P0.1 / P2.2 / P3.1): confirm the socket connects, then deploy backend and web together.
+
 ## 2026-10-24 — Encrypted-only chat, history restore, idle background work
 
 ### Changed

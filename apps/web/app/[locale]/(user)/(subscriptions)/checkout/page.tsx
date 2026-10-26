@@ -37,6 +37,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { KhqrCard } from "@/components/payment/KhqrCard";
 import { useNotificationEvents } from "@/hooks/use-chat-ws";
+import { isTabAttending } from "@/hooks/use-tab-attention";
 import { useMobilePlatform } from "@/hooks/use-mobile-platform";
 
 // Waiting for the charge job to hand back the KHQR: up to ~20s.
@@ -347,7 +348,10 @@ export default function CheckoutPage() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let delay = FALLBACK_REFRESH_MS;
     const run = () => {
-      if (document.visibilityState === "visible") {
+      // "Attending" also covers an abandoned-but-visible tab: the socket closes
+      // when the tab goes idle, and without this the fallback would then poll a
+      // parked checkout page every few seconds.
+      if (isTabAttending()) {
         void refreshPayment();
         delay = Math.min(delay + FALLBACK_REFRESH_MS, FALLBACK_MAX_REFRESH_MS);
       }

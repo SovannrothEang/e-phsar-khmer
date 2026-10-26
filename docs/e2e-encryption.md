@@ -204,6 +204,13 @@ export class SendMessageDto {
 
 `chat.gateway.ts`'s `send_message` event already forwards the full DTO into `ChatService.sendMessage`. `e2eHeader` rides along for free. This is the one place the module's existing "one write path, REST or WS" design (documented in `chat/README.md`) pays off directly for this feature — zero WS-specific crypto work.
 
+### 7b. Realtime hints for backup and approvals (shipped 2026-10-26)
+
+The three history-backup events (`e2e.history_requested`, `e2e.history_resolved`, `e2e.backup_updated`) ride the same
+`notification` frame as any other push, to the user's own tabs only, with ids and no ciphertext. They replace the
+old 20 s approvals poll and 60 s backup pull while the socket is up; the poll stays as a 5-minute safety net and as
+the fallback when the socket is down. Contract and delivery rules: `apps/backend/src/chat/README.md`.
+
 ### 8. Client-side key storage
 
 - Identity keypair (now: keypairs, plural — decision #9) generated on first use of the feature, stored locally (native app: platform keystore/secure enclave; web: IndexedDB — accepted as weaker, see Risks).

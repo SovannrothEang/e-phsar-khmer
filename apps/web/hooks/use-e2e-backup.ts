@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { HistoryRequest } from "@/actions/e2e-backup";
+import { useNotificationEvents } from "@/hooks/use-chat-ws";
 import {
   E2E_PLAINTEXT_CACHED,
   approveRequest,
@@ -16,11 +17,24 @@ import {
   syncBackup,
 } from "@/lib/e2e/backup";
 import type { BackupState, PasscodeResult } from "@/lib/e2e/backup";
+import { actionForPush } from "@/lib/e2e/push-events";
 import type { RatchetEngine } from "@/lib/e2e/types";
+import { startVisiblePoller } from "@/lib/polling/visible-poller";
+import type { VisiblePoller } from "@/lib/polling/visible-poller";
 
 const SYNC_INTERVAL_MS = 60_000;
 const APPROVALS_POLL_MS = 20_000;
 const REQUEST_POLL_MS = 10_000;
+/**
+ * While the realtime socket is up the backend pushes every change (see
+ * `lib/e2e/push-events.ts`), so these are only a safety net for a push that
+ * went missing. Without a socket the three intervals above apply.
+ */
+const SAFETY_SYNC_MS = 300_000;
+const SAFETY_APPROVALS_MS = 300_000;
+const SAFETY_REQUEST_MS = 60_000;
+/** A push sent while the socket was down is not replayed: catch up on reconnect unless we just ran. */
+const CONNECT_CATCH_UP_MS = 2_000;
 /** Backoff before retrying a failed backup-status read. */
 const ERROR_RETRY_MS = 30_000;
 /** Debounce for the upload kicked off by freshly cached plaintext. */
@@ -87,8 +101,9 @@ function markAutoRequested(userId: string, deviceId: string): void {
 
 /**
  * Drives the history backup for the signed-in device:
- *   ready  → upload new plaintext and pull new segments every minute, watch
- *            for other devices asking for access (and let the user approve);
+ *   ready  → upload new plaintext and pull new segments every minute (one
+ *            visible tab per browser), watch for other devices asking for
+ *            access (and let the user approve); nothing polls in a hidden tab;
  *   locked → offer passcode restore, or ask another device and poll until
  *            it approves (reporting an incoming approval on any page).
  *
@@ -106,6 +121,31 @@ export function useE2eBackup(engine: RatchetEngine | null): E2eBackupApi {
   const [dialog, setDialog] = useState<BackupDialog>("none");
   const userId = engine?.userId ?? null;
   const deviceId = engine?.deviceId ?? null;
+
+  // The three pollers below register here so a push (or a socket change) can
+  // nudge them; `socketUp` is what they read to pick their cadence.
+  const pollers = useRef<{
+    sync?: VisiblePoller;
+    approvals?: VisiblePoller;
+    request?: VisiblePoller;
+  }>({});
+  const socketUp = useRef(false);
+  const { isConnected } = useNotificationEvents({
+    enabled: Boolean(engine && deviceId),
+    onNotification: (notification) => {
+      const action = deviceId ? actionForPush(notification, deviceId) : null;
+      if (action === "refresh-approvals") pollers.current.approvals?.poke();
+      else if (action === "check-approval") pollers.current.request?.poke();
+      else if (action === "pull-backup") pollers.current.sync?.poke();
+    },
+  });
+  useEffect(() => {
+    socketUp.current = isConnected;
+    for (const poller of Object.values(pollers.current)) {
+      if (isConnected) poller.poke({ ifOlderThanMs: CONNECT_CATCH_UP_MS });
+      else poller.retime();
+    }
+  }, [isConnected]);
 
   const loadState = useCallback(async (): Promise<BackupState | null> => {
     if (!userId || !deviceId) return null;
@@ -188,18 +228,33 @@ export function useE2eBackup(engine: RatchetEngine | null): E2eBackupApi {
       pullBackup(userId, deviceId).catch((err: unknown) => {
         console.warn("[e2e] backup pull failed; will retry", err);
       });
-    const sync = () => {
-      void upload();
-      void pull();
-    };
-    const poll = () => void listPendingApprovals(engine).then(setIncoming);
-    sync();
-    poll();
-    const syncTimer = setInterval(sync, SYNC_INTERVAL_MS);
-    const pollTimer = setInterval(poll, APPROVALS_POLL_MS);
+    const sync = () => Promise.allSettled([upload(), pull()]);
+    const poll = () => listPendingApprovals(engine).then(setIncoming);
+    // Both only run while this tab is visible (a hidden tab's throttled timer
+    // wakes the backend once a minute for nobody), and the account-level sync
+    // runs in one visible tab per browser (a push pokes only that tab's
+    // poller). Approvals stay per tab on purpose: the dialog has to show up in
+    // the tab the user is looking at. Socket up: slow safety poll, the pushes do
+    // the work. Socket down: the 20 s / 60 s cadence, which also keeps the
+    // backend warm for that user.
+    const sync_ = startVisiblePoller({
+      run: sync,
+      intervalMs: () => (socketUp.current ? SAFETY_SYNC_MS : SYNC_INTERVAL_MS),
+      leaderKey: `e2e-backup-sync:${userId}:${deviceId}`,
+    });
+    const approvals = startVisiblePoller({
+      run: poll,
+      intervalMs: () =>
+        socketUp.current ? SAFETY_APPROVALS_MS : APPROVALS_POLL_MS,
+    });
+    const registered = pollers.current;
+    registered.sync = sync_;
+    registered.approvals = approvals;
     return () => {
-      clearInterval(syncTimer);
-      clearInterval(pollTimer);
+      registered.sync = undefined;
+      registered.approvals = undefined;
+      sync_();
+      approvals();
     };
   }, [engine, userId, deviceId, state?.kind]);
 
@@ -227,20 +282,28 @@ export function useE2eBackup(engine: RatchetEngine | null): E2eBackupApi {
   // Locked + waiting on another device.
   useEffect(() => {
     if (!engine || requestState !== "pending") return;
-    const timer = setInterval(() => {
-      void checkApproval(engine).then((r) => {
-        if (r.status === "restored") {
-          setLastRestoredCount(r.restored);
-          setRequestState("restored");
-          void refresh();
-        } else if (r.status === "declined" || r.status === "expired") {
-          setRequestState(r.status);
-        } else if (r.status === "error") {
-          setRequestState("error");
-        }
-      });
-    }, REQUEST_POLL_MS);
-    return () => clearInterval(timer);
+    const request = startVisiblePoller({
+      intervalMs: () =>
+        socketUp.current ? SAFETY_REQUEST_MS : REQUEST_POLL_MS,
+      run: () =>
+        checkApproval(engine).then((r) => {
+          if (r.status === "restored") {
+            setLastRestoredCount(r.restored);
+            setRequestState("restored");
+            void refresh();
+          } else if (r.status === "declined" || r.status === "expired") {
+            setRequestState(r.status);
+          } else if (r.status === "error") {
+            setRequestState("error");
+          }
+        }),
+    });
+    const registered = pollers.current;
+    registered.request = request;
+    return () => {
+      registered.request = undefined;
+      request();
+    };
   }, [engine, requestState, refresh]);
 
   const enterPasscode = useCallback(

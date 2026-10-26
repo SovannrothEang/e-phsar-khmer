@@ -169,6 +169,25 @@ Key properties this gives us:
   comparison is scoped inside a conversation the caller was already
   authorized for in the same query.
 
+### Realtime hints for the encrypted backup
+
+The socket also carries three `notification` frames from `E2eBackupService` (types in
+`e2e/e2e-push-events.ts`), so a tab does not have to poll for them. They go through
+`ChatPubSubService.publish` to every open tab of **the same user** after the write has
+committed, carry **ids only** (never ciphertext, wrapped keys or plaintext), and are best-effort:
+a publish failure is logged and never fails the request.
+
+| `payload.type`          | When                                                                 | `payload.data`                             |
+| ----------------------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| `e2e.history_requested` | a device opened a history request (not on an idempotent repeat)      | `requestId`, `requesterDeviceId`           |
+| `e2e.history_resolved`  | a request was approved or declined (not when it was already handled) | `requestId`, `requesterDeviceId`, `status` |
+| `e2e.backup_updated`    | a device uploaded a backup segment                                   | `deviceId` (the uploader)                  |
+
+The client (`apps/web/lib/e2e/push-events.ts`) turns each one into an ordinary authenticated read, and
+ignores events caused by its own device. A push is **never the source of truth**: while the socket is up the
+client keeps a slow safety poll (5 min), and it catches up on every (re)connect, because a frame sent while
+the socket was down is not replayed.
+
 ## Current state
 
 | Piece                                                             | Status                                                                                                                                                                                                                        |

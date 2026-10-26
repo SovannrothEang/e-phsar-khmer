@@ -35,6 +35,7 @@ import {
 import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
 import { readListingPreview } from "@/lib/chat/listing-handoff";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
+import { useTabAttending } from "@/hooks/use-tab-attention";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
@@ -190,6 +191,9 @@ export function ChatWorkspace({
     },
   });
 
+  // Idle counts as "no socket": the socket closes when the tab is abandoned,
+  // and the fallback interval must not take over from a tab nobody is using.
+  const attending = useTabAttending();
   const inbox = useInfiniteQuery({
     queryKey: chatKeys.inbox(),
     enabled: viewer.isSuccess,
@@ -199,7 +203,8 @@ export function ChatWorkspace({
     getNextPageParam: (last) => last.meta.nextCursor,
     // Realtime push (see the subscription above) replaces the poll once the
     // socket is up; the interval stays as the fallback while it isn't.
-    refetchInterval: realtimeConnected ? false : CHAT_POLL.inboxMs,
+    refetchInterval:
+      realtimeConnected || !attending ? false : CHAT_POLL.inboxMs,
     refetchIntervalInBackground: false,
   });
 

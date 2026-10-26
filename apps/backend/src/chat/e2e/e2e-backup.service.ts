@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -19,6 +20,9 @@ import {
   userE2eDevices,
 } from '../../db/schema/chat.schema';
 import type { BackupKdfParams, E2eHeader } from '../../db/schema/chat.schema';
+import { ChatPubSubService } from '../chat-pubsub.service';
+import { E2E_PUSH } from './e2e-push-events';
+import type { E2ePushType } from './e2e-push-events';
 import type {
   AddBackupSegmentDto,
   ApproveHistoryRequestDto,
@@ -71,7 +75,36 @@ export interface HistoryRequestView {
  */
 @Injectable()
 export class E2eBackupService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  private readonly logger = new Logger(E2eBackupService.name);
+
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly pubsub: ChatPubSubService,
+  ) {}
+
+  /**
+   * Tell the user's open tabs something changed (ids only, see
+   * `e2e-push-events.ts`). Runs after the write has committed and never throws:
+   * the client's safety poll covers a lost hint, and a failed hint must not
+   * turn a successful write into an error.
+   */
+  private async push(
+    userId: string,
+    type: E2ePushType,
+    data: Record<string, string>,
+  ): Promise<void> {
+    try {
+      await this.pubsub.publish({
+        targetUserId: userId,
+        type: 'notification',
+        payload: { type, data },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Push of ${type} to ${userId} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   async getStatus(userId: string): Promise<BackupStatus> {
     const [row] = await this.db
@@ -265,6 +298,7 @@ export class E2eBackupService {
         messageCount: dto.messageCount,
       })
       .returning({ id: e2eBackupSegments.id });
+    void this.push(userId, E2E_PUSH.backupUpdated, { deviceId: dto.deviceId });
     return row;
   }
 
@@ -375,14 +409,21 @@ export class E2eBackupService {
   ): Promise<HistoryRequestView> {
     await this.assertOwnDevice(userId, deviceId);
     await this.expireStale(userId);
-    await this.db
+    const inserted = await this.db
       .insert(e2eHistoryRequests)
       .values({
         userId,
         requesterDeviceId: deviceId,
         expiresAt: sql`now() + make_interval(days => ${HISTORY_REQUEST_TTL_DAYS})`,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: e2eHistoryRequests.id });
+    // Only a new request is news; the call is idempotent for an open one.
+    if (inserted.length > 0)
+      void this.push(userId, E2E_PUSH.historyRequested, {
+        requestId: inserted[0].id,
+        requesterDeviceId: deviceId,
+      });
     const mine = await this.getMine(userId, deviceId);
     return mine!;
   }
@@ -459,12 +500,20 @@ export class E2eBackupService {
           gt(e2eHistoryRequests.expiresAt, sql`now()`),
         ),
       )
-      .returning({ id: e2eHistoryRequests.id });
+      .returning({
+        id: e2eHistoryRequests.id,
+        requesterDeviceId: e2eHistoryRequests.requesterDeviceId,
+      });
     if (updated.length === 0)
       throw new ConflictException({
         code: 'E2E_REQUEST_NOT_PENDING',
         message: 'This request was already handled or has expired',
       });
+    void this.push(userId, E2E_PUSH.historyResolved, {
+      requestId: updated[0].id,
+      requesterDeviceId: updated[0].requesterDeviceId,
+      status: 'approved',
+    });
     return { ok: true };
   }
 
@@ -474,7 +523,7 @@ export class E2eBackupService {
     approverDeviceId: string,
   ): Promise<{ ok: true }> {
     await this.assertOwnDevice(userId, approverDeviceId);
-    await this.db
+    const declined = await this.db
       .update(e2eHistoryRequests)
       .set({
         status: 'declined',
@@ -486,8 +535,21 @@ export class E2eBackupService {
           eq(e2eHistoryRequests.id, requestId),
           eq(e2eHistoryRequests.userId, userId),
           eq(e2eHistoryRequests.status, 'pending'),
+          ne(e2eHistoryRequests.requesterDeviceId, approverDeviceId),
+          gt(e2eHistoryRequests.expiresAt, sql`now()`),
         ),
-      );
+      )
+      .returning({
+        id: e2eHistoryRequests.id,
+        requesterDeviceId: e2eHistoryRequests.requesterDeviceId,
+      });
+    // Declining something already handled is a silent no-op, so say nothing.
+    if (declined.length > 0)
+      void this.push(userId, E2E_PUSH.historyResolved, {
+        requestId: declined[0].id,
+        requesterDeviceId: declined[0].requesterDeviceId,
+        status: 'declined',
+      });
     return { ok: true };
   }
 
