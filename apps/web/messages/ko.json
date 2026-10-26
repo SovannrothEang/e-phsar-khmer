@@ -149,7 +149,18 @@
       "voiceTooLong": "음성 메시지는 최대 {seconds}초까지 가능합니다.",
       "voiceReady": "음성 메시지 준비 완료",
       "cancelVoice": "음성 메시지 취소",
-      "cancelRecording": "취소"
+      "cancelRecording": "취소",
+      "attachMenu": "첨부 추가",
+      "attachMenuClose": "첨부 닫기",
+      "tilePhoto": "사진",
+      "tileVoice": "음성 메시지",
+      "tileLocation": "위치",
+      "tileAd": "내 광고",
+      "adPickerTitle": "내 광고 공유",
+      "adPickerLoading": "광고를 불러오는 중…",
+      "adPickerEmpty": "판매 중인 광고가 없습니다.",
+      "adPickerError": "광고를 불러오지 못했습니다.",
+      "removeAd": "광고 제거"
     },
     "listing": {
       "noPrice": "가격 문의",

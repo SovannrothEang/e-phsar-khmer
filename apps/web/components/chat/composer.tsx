@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Camera,
+  ImageIcon,
   Loader2,
   Lock,
   MapPin,
@@ -11,6 +12,7 @@ import {
   Plus,
   SendHorizonal,
   Square,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -23,6 +25,8 @@ import {
   VoicePlayer,
   formatVoiceDuration,
 } from "@/components/chat/voice-player";
+import { AdPicker } from "@/components/chat/ad-picker";
+import type { PickedAd } from "@/components/chat/ad-picker";
 
 export interface ComposerDraft {
   body?: string;
@@ -32,6 +36,8 @@ export interface ComposerDraft {
   location?: { latitude: number; longitude: number; accuracyMeters?: number };
   /** Recorded voice note; the caller encrypts and uploads it as an attachment. */
   voice?: { file: File; durationMs: number };
+  /** Listing card picked from "my ads"; rides the message as its context. */
+  listingId?: string;
 }
 
 interface StagedImage {
@@ -102,6 +108,9 @@ export function Composer({
   const [voice, setVoice] = useState<StagedVoice | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [ad, setAd] = useState<PickedAd | null>(null);
+  const [adPickerOpen, setAdPickerOpen] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -125,7 +134,8 @@ export function Composer({
     text.trim() !== "" ||
     staged.length > 0 ||
     location !== null ||
-    voice !== null;
+    voice !== null ||
+    ad !== null;
   const canSend = !disabled && !sending && !recording && hasContent;
   // Stay mounted while a send is in flight: submit clears the draft, and the
   // button must not disappear out from under the spinner.
@@ -334,6 +344,7 @@ export function Composer({
     // Only ever ask after an explicit click — a permission prompt on mount is
     // hostile, and most threads never share a position.
     if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setAttachOpen(false);
       toast.error(t("composer.locationUnsupported"));
       return;
     }
@@ -342,6 +353,7 @@ export function Composer({
       (position) => {
         if (!aliveRef.current) return;
         setLocating(false);
+        setAttachOpen(false);
         const accuracy = position.coords.accuracy;
         setLocation({
           latitude: position.coords.latitude,
@@ -354,6 +366,7 @@ export function Composer({
       () => {
         if (!aliveRef.current) return;
         setLocating(false);
+        setAttachOpen(false);
         toast.error(t("composer.locationError"));
       },
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
@@ -405,6 +418,7 @@ export function Composer({
       voice: voice
         ? { file: voice.file, durationMs: voice.durationMs }
         : undefined,
+      listingId: ad?.id,
     });
     // Detach the registry keys before clearing state: the caller keeps reading
     // the draft files while it uploads, so the unmount cleanup must not release
@@ -413,6 +427,8 @@ export function Composer({
     setText("");
     setStaged([]);
     setLocation(null);
+    setAd(null);
+    setAttachOpen(false);
     discardVoice();
     onActivity?.();
   }, [
@@ -421,6 +437,7 @@ export function Composer({
     staged,
     location,
     voice,
+    ad,
     onSend,
     onActivity,
     discardVoice,
@@ -460,32 +477,75 @@ export function Composer({
         </div>
       )}
 
+      {attachOpen && (
+        <div
+          role="group"
+          aria-label={t("composer.attachMenu")}
+          className="grid grid-cols-2 gap-2 px-3 pt-3 sm:grid-cols-4"
+        >
+          <AttachTile
+            icon={<ImageIcon className="size-5" />}
+            label={t("composer.tilePhoto")}
+            disabled={sending || remaining <= 0}
+            onClick={() => {
+              setAttachOpen(false);
+              fileInputRef.current?.click();
+            }}
+          />
+          <AttachTile
+            icon={<Mic className="size-5" />}
+            label={t("composer.tileVoice")}
+            disabled={sending || recording}
+            onClick={() => {
+              setAttachOpen(false);
+              void toggleRecording();
+            }}
+          />
+          <AttachTile
+            icon={
+              locating ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <MapPin className="size-5" />
+              )
+            }
+            label={
+              locating
+                ? t("composer.locationLocating")
+                : t("composer.tileLocation")
+            }
+            disabled={sending || locating}
+            onClick={() => requestLocation()}
+          />
+          <AttachTile
+            icon={<Tag className="size-5" />}
+            label={t("composer.tileAd")}
+            disabled={sending}
+            onClick={() => {
+              setAttachOpen(false);
+              setAdPickerOpen(true);
+            }}
+          />
+        </div>
+      )}
+
       <div className="flex items-center gap-0.5 px-2 py-2 sm:px-3">
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={sending || remaining <= 0}
-          aria-label={t("composer.attachImage")}
-          className={ICON_BUTTON_CLASS}
-        >
-          <Plus className="size-[18px]" />
-        </button>
-
-        <button
-          type="button"
-          onClick={requestLocation}
-          disabled={sending || locating}
+          onClick={() => setAttachOpen((open) => !open)}
+          disabled={sending}
+          aria-expanded={attachOpen}
           aria-label={
-            locating
-              ? t("composer.locationLocating")
-              : t("composer.shareLocation")
+            attachOpen
+              ? t("composer.attachMenuClose")
+              : t("composer.attachMenu")
           }
           className={ICON_BUTTON_CLASS}
         >
-          {locating ? (
-            <Loader2 className="size-[18px] animate-spin" />
+          {attachOpen ? (
+            <X className="size-[18px]" />
           ) : (
-            <MapPin className="size-[18px]" />
+            <Plus className="size-[18px]" />
           )}
         </button>
 
@@ -571,7 +631,7 @@ export function Composer({
         )}
       </div>
 
-      {(staged.length > 0 || location !== null || voice !== null) && (
+      {(staged.length > 0 || location !== null || voice !== null || ad) && (
         <div className="flex items-center gap-2 overflow-x-auto px-3 pb-2.5">
           {staged.map((item, index) => (
             <div
@@ -638,6 +698,23 @@ export function Composer({
             </div>
           )}
 
+          {ad && (
+            <div className="flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted/50 py-1 pl-2.5 pr-1">
+              <Tag className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-foreground">
+                {ad.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAd(null)}
+                aria-label={t("composer.removeAd")}
+                className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
           {staged.length > 0 && (
             <span
               className={cn(
@@ -674,6 +751,40 @@ export function Composer({
           e.target.value = "";
         }}
       />
+
+      <AdPicker
+        open={adPickerOpen}
+        onOpenChange={setAdPickerOpen}
+        onSelect={(picked) => {
+          setAd(picked);
+          onActivity?.();
+        }}
+      />
     </div>
+  );
+}
+
+/** One tile in the composer's "+" menu: icon above a short label. */
+function AttachTile({
+  icon,
+  label,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-border bg-muted/40 px-2 py-3 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <span className="text-muted-foreground">{icon}</span>
+      <span className="text-center leading-tight">{label}</span>
+    </button>
   );
 }

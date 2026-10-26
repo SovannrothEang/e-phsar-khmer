@@ -149,7 +149,18 @@
       "voiceTooLong": "សារសំឡេងអាចមានរយៈពេលរហូតដល់ {seconds} វិនាទី។",
       "voiceReady": "សារសំឡេងរួចរាល់",
       "cancelVoice": "បោះបង់សារសំឡេង",
-      "cancelRecording": "បោះបង់"
+      "cancelRecording": "បោះបង់",
+      "attachMenu": "បន្ថែមឯកសារ",
+      "attachMenuClose": "បិទឯកសារភ្ជាប់",
+      "tilePhoto": "រូបភាព",
+      "tileVoice": "សារសំឡេង",
+      "tileLocation": "ទីតាំង",
+      "tileAd": "ការផ្សាយរបស់ខ្ញុំ",
+      "adPickerTitle": "ចែករំលែកការផ្សាយរបស់អ្នក",
+      "adPickerLoading": "កំពុងទាញយកការផ្សាយរបស់អ្នក…",
+      "adPickerEmpty": "អ្នកមិនទាន់មានការផ្សាយសកម្មនៅឡើយទេ។",
+      "adPickerError": "មិនអាចទាញយកការផ្សាយរបស់អ្នកបានទេ។",
+      "removeAd": "លុបការផ្សាយចេញ"
     },
     "listing": {
       "noPrice": "សុំតម្លៃ",
