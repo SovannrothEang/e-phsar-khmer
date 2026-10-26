@@ -149,18 +149,7 @@
       "voiceTooLong": "Pesan suara maksimal {seconds} detik.",
       "voiceReady": "Pesan suara siap",
       "cancelVoice": "Batalkan pesan suara",
-      "cancelRecording": "Batal",
-      "attachMenu": "Tambah lampiran",
-      "attachMenuClose": "Tutup lampiran",
-      "tilePhoto": "Foto",
-      "tileVoice": "Pesan suara",
-      "tileLocation": "Lokasi",
-      "tileAd": "Iklan saya",
-      "adPickerTitle": "Bagikan salah satu iklan Anda",
-      "adPickerLoading": "Memuat iklan Anda…",
-      "adPickerEmpty": "Anda belum punya iklan aktif.",
-      "adPickerError": "Gagal memuat iklan Anda.",
-      "removeAd": "Hapus iklan"
+      "cancelRecording": "Batal"
     },
     "listing": {
       "noPrice": "Harga nego",

@@ -149,18 +149,7 @@
       "voiceTooLong": "Tin nhắn thoại tối đa {seconds} giây.",
       "voiceReady": "Tin nhắn thoại sẵn sàng",
       "cancelVoice": "Hủy tin nhắn thoại",
-      "cancelRecording": "Hủy",
-      "attachMenu": "Thêm tệp đính kèm",
-      "attachMenuClose": "Đóng tệp đính kèm",
-      "tilePhoto": "Ảnh",
-      "tileVoice": "Tin nhắn thoại",
-      "tileLocation": "Vị trí",
-      "tileAd": "Tin của tôi",
-      "adPickerTitle": "Chia sẻ một tin đăng của bạn",
-      "adPickerLoading": "Đang tải tin của bạn…",
-      "adPickerEmpty": "Bạn chưa có tin đăng nào đang hiển thị.",
-      "adPickerError": "Không tải được tin của bạn.",
-      "removeAd": "Xoá tin"
+      "cancelRecording": "Hủy"
     },
     "listing": {
       "noPrice": "Giá thương lượng",

@@ -396,14 +396,12 @@ export function MessageThread({
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
       if (pendingListingId) setListingSent(true);
-      // Location, voice and the ad picked from the composer's "+" menu must be
-      // forwarded here: the composer clears its staged state on send, so a
-      // dropped field is a silently lost message. An explicitly picked ad wins
-      // over the deep-linked listing card.
+      // Location and voice must be forwarded here: the composer clears its
+      // staged state on send, so a dropped field is a silently lost message.
       send({
         body: draft.body,
         draftKeys: draft.draftKeys,
-        listingId: draft.listingId ?? pendingListingId,
+        listingId: pendingListingId,
         location: draft.location,
         voice: draft.voice,
       });
