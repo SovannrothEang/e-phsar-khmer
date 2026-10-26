@@ -54,12 +54,12 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
     user.profilePhotoUrl ??
     `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00a0e9&color=fff`;
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Notifications */}
       <Button
         variant={"ghost"}
         onClick={() => router.push("/notifications")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconBellFilled className="scale-150 " />
         {/* <span className="absolute top-0 right-0 flex h-[10px] w-[10px] items-center justify-center rounded-full bg-[#f04d4e] text-[10px] font-bold text-white border-2 border-white">
@@ -70,7 +70,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       <Button
         variant={"ghost"}
         onClick={() => router.push("/chats")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconMessageFilled className="scale-150" />
         <ChatUnreadBadge />
@@ -78,8 +78,8 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       {/* User Dropdown */}
       <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
         <DropdownMenuTrigger className="outline-none ml-2">
-          <div className="relative h-10 w-10 cursor-pointer">
-            <div className="h-10 w-10 rounded-full overflow-hidden border border-muted-foreground/50">
+          <div className="relative h-11 w-11 cursor-pointer">
+            <div className="h-11 w-11 rounded-full overflow-hidden border border-muted-foreground/50">
               <Image
                 src={avatarUrl}
                 width={36}

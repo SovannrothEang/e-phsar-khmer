@@ -59,6 +59,7 @@ export function CategorySelecter({
                   <button
                     key={category.slug}
                     onMouseEnter={() => setActiveCategory(category)}
+                    onClick={() => setActiveCategory(category)}
                     className={clsx(
                       "flex w-full items-center justify-between px-5 py-3 transition-colors duration-100 cursor-pointer",
                       active

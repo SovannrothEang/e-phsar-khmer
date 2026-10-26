@@ -229,7 +229,7 @@ export function ListCardPost({ post }: { post: Post }) {
               reactions.toggleLike(listingId);
             }}
             disabled={reactions.isPending(listingId)}
-            className="group/heart p-1.5 rounded-full hover:bg-gray-500 transition-colors outline-none cursor-pointer"
+            className="group/heart h-11 w-11 shrink-0 flex items-center justify-center rounded-full hover:bg-gray-500 transition-colors outline-none cursor-pointer"
           >
             <HeartIcon
               className={`h-5 w-5 transition-transform ${

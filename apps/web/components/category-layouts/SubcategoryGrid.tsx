@@ -27,6 +27,16 @@ const SubcategoryNameFallback = ({ name }: { name: string }) => (
   <span className="text-xs text-zinc-700">{name}</span>
 );
 
+/** `cols` is only ever 5|6|7|8 (every entry in `SUBCATEGORY_LAYOUT`,
+ *  category/[categorySlug]/page.tsx). Tailwind can't JIT a class built from a
+ *  runtime-interpolated number, so every variant must appear literally here. */
+const GRID_COLS_CLASS: Record<number, string> = {
+  5: "grid-cols-3 sm:grid-cols-4 md:grid-cols-5",
+  6: "grid-cols-3 sm:grid-cols-4 md:grid-cols-6",
+  7: "grid-cols-3 sm:grid-cols-4 md:grid-cols-7",
+  8: "grid-cols-3 sm:grid-cols-4 md:grid-cols-8",
+};
+
 export default function SubcategoryGrid({
   categorySlug,
   subcategories,
@@ -41,10 +51,7 @@ export default function SubcategoryGrid({
   return (
     <div className="rounded ">
       <div
-        className="text-center leading-normal grid gap-2"
-        style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-        }}
+        className={`text-center leading-normal grid gap-2 ${GRID_COLS_CLASS[cols] ?? GRID_COLS_CLASS[6]}`}
       >
         {visibleItems.map((sub) => (
           <Link
