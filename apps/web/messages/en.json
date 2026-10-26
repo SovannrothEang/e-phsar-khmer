@@ -149,7 +149,18 @@
       "voiceTooLong": "Voice notes can be up to {seconds} seconds.",
       "voiceReady": "Voice note ready",
       "cancelVoice": "Cancel voice note",
-      "cancelRecording": "Cancel"
+      "cancelRecording": "Cancel",
+      "attachMenu": "Add attachment",
+      "attachMenuClose": "Close attachments",
+      "tilePhoto": "Photo",
+      "tileVoice": "Voice note",
+      "tileLocation": "Location",
+      "tileAd": "My ads",
+      "adPickerTitle": "Share one of your ads",
+      "adPickerLoading": "Loading your ads…",
+      "adPickerEmpty": "You don't have any active ads yet.",
+      "adPickerError": "Couldn't load your ads.",
+      "removeAd": "Remove ad"
     },
     "listing": {
       "noPrice": "Price on request",

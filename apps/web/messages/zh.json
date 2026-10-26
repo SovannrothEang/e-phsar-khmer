@@ -149,7 +149,18 @@
       "voiceTooLong": "语音消息最长 {seconds} 秒。",
       "voiceReady": "语音消息已准备好",
       "cancelVoice": "取消语音消息",
-      "cancelRecording": "取消"
+      "cancelRecording": "取消",
+      "attachMenu": "添加附件",
+      "attachMenuClose": "关闭附件",
+      "tilePhoto": "图片",
+      "tileVoice": "语音消息",
+      "tileLocation": "位置",
+      "tileAd": "我的广告",
+      "adPickerTitle": "分享你的一个广告",
+      "adPickerLoading": "正在加载你的广告…",
+      "adPickerEmpty": "你还没有在售的广告。",
+      "adPickerError": "无法加载你的广告。",
+      "removeAd": "移除广告"
     },
     "listing": {
       "noPrice": "价格面议",
