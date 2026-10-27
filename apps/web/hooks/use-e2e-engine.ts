@@ -11,6 +11,7 @@ import {
   runHeartbeatIfDue,
 } from "@/lib/e2e/heartbeat-schedule";
 import type { RatchetEngine } from "@/lib/e2e/types";
+import { startHeldSendsLoop } from "@/lib/e2e/held-sends-runtime";
 import { startVisiblePoller } from "@/lib/polling/visible-poller";
 
 /** Backoff between bootstrap retries after a failure (ms), capped at the last. */
@@ -117,6 +118,13 @@ export function useE2eEngine(userId: string | null): RatchetEngine | null {
       leaderKey: `e2e-heartbeat:${userId}:${deviceId}`,
     });
     return stop;
+  }, [userId, deviceId]);
+
+  // Retry sends held for recipients with no E2E device yet. Costs nothing
+  // while nothing is held; see held-sends-runtime.ts.
+  useEffect(() => {
+    if (!userId || !deviceId) return;
+    return startHeldSendsLoop(userId);
   }, [userId, deviceId]);
 
   if (!userId || resolved?.userId !== userId) return null;

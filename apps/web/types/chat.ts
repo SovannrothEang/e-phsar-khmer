@@ -197,6 +197,12 @@ export interface ThreadMessage extends ChatMessage {
   /** Decrypted body is the structured "listing card only" marker. */
   listingOnly?: boolean;
   /**
+   * Local-only row for a send the recipient cannot receive yet (no E2E device
+   * registered): "held" waits and sends by itself, "expired" gave up after the
+   * hold lifetime. Never present on server rows.
+   */
+  held?: "held" | "expired";
+  /**
    * This message could not be decrypted on this device and restoring the
    * encrypted history backup may recover it. `body` holds a neutral note,
    * never ciphertext; the bubble offers the restore action when available.

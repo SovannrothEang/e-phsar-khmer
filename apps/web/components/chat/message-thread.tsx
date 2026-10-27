@@ -252,6 +252,7 @@ export function MessageThread({
     loadOlder,
     send,
     retry,
+    cancelHeldSend,
     isSending,
     markActivity,
   } = thread;
@@ -618,6 +619,7 @@ export function MessageThread({
                       peerName={peerName}
                       peerAvatarUrl={peer.profilePhotoUrl}
                       onRetry={retry}
+                      onCancelHeld={cancelHeldSend}
                       onOpenImage={setLightbox}
                     />
                   ),
