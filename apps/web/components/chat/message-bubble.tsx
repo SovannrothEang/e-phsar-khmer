@@ -26,6 +26,7 @@ export function MessageBubble({
   peerName,
   peerAvatarUrl,
   onRetry,
+  onCancelHeld,
   onOpenImage,
 }: {
   message: ThreadMessage;
@@ -34,6 +35,7 @@ export function MessageBubble({
   peerName: string;
   peerAvatarUrl: string | null;
   onRetry?: (message: ThreadMessage) => void;
+  onCancelHeld?: (message: ThreadMessage) => void;
   onOpenImage?: (url: string) => void;
 }) {
   const t = useTranslations("Chat");
@@ -161,6 +163,7 @@ export function MessageBubble({
           {isMine &&
             !message.pending &&
             !message.failed &&
+            !message.held &&
             (read ? (
               <CheckCheck
                 aria-label={t("message.read")}
@@ -173,6 +176,30 @@ export function MessageBubble({
               />
             ))}
         </div>
+        {isMine && message.held && (
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 px-1 text-[10px]">
+            <span
+              className={
+                message.held === "expired"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }
+            >
+              {message.held === "expired"
+                ? t("message.heldExpired", { name: peerName })
+                : t("message.heldWaiting", { name: peerName })}
+            </span>
+            <button
+              type="button"
+              onClick={() => onCancelHeld?.(message)}
+              className="font-medium underline-offset-2 hover:underline"
+            >
+              {message.held === "expired"
+                ? t("message.heldRemove")
+                : t("message.heldCancel")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
