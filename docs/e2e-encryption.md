@@ -295,6 +295,38 @@ no longer sees "ask them to open Messages once".
 same exposure as the decrypted-message cache). The nudge reveals that someone wants to talk, never what
 they said. A held message survives only as long as the sender's browser profile does.
 
+### 9c. History availability (2026-10-27)
+
+A message is readable on a device only if (a) it carries an envelope for that device, or (b) some device of
+the account decrypted it while holding the backup key and uploaded it. Private keys, ratchet sessions and the
+backup key never reach the server in the clear. Device-to-device approval no longer exists: the backup
+passcode is the only way to unlock the backup key on a new device.
+
+1. **Catch-up decrypt** (`hooks/use-e2e-catch-up.ts`, `lib/e2e/catch-up.ts`, resume marks in the IndexedDB
+   `npic-e2e-catchup`). A signed-in tab that is **not** on `/chats` still decrypts incoming messages and
+   caches the plaintext, so (b) covers every message a device _received_, not only those it displayed. It
+   runs in one visible leader tab per browser, oldest first per conversation, in pages of 100 with a
+   200-message budget per tick, never advances a ratchet twice (the decrypt cache makes a re-run a no-op),
+   and runs whether the backup is locked or unlocked (the plaintext is uploaded once the device holds the
+   key). Triggers: a socket push, then a safety tick every 5 min (2 min without a socket).
+2. **Unavailable messages are one notice, not a wall.** A run of consecutive messages this device has no
+   envelope for renders as a single row with a count (`lib/chat/group-unavailable.ts`; a readable message
+   splits a run, own sent rows group like any other). Its text depends on the backup state: _locked with a
+   passcode_ ("Enter your backup passcode to see these N messages", with an inline button), _ready_ ("not in
+   your backup: sent before this device joined and none of your devices had opened it"), or _locked, no
+   passcode_ ("set a passcode on the device that has your history"). The "ready" state says honestly that
+   passcode entry cannot help.
+3. **Passcode prompt.** Opening a thread that has unavailable messages on a locked device with a passcode
+   opens the passcode dialog every time; "Not now" silences it for the browser session
+   (`sessionStorage` key `chat:e2e-restore-snoozed`), and the inline button or the chat banner reopens it.
+4. **Flush on hide.** The leader tab uploads pending plaintext when the tab becomes hidden
+   (`visibilitychange`); `pagehide` is only a best-effort second chance, because the browser can kill the
+   request on a real close.
+
+**Limit.** A message that **no** device ever received while signed in cannot be recovered by anyone. The "ready"
+notice says so instead of pointing at a passcode that cannot help. Resetting a forgotten or missing passcode
+(decision D1 in `Plans.md`) is not implemented.
+
 ## Deciding the numeric parameters — two different methods, bucketed by what the number actually depends on
 
 Don't treat every unresolved constant the same way. Split them by whether the right answer depends on **this app's content/traffic** or on **X3DH/Double Ratchet protocol mechanics that don't care whose app it is**:

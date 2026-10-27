@@ -21,6 +21,15 @@ How to use this file:
 
 ### Changed
 
+- **Older messages are one notice, and tabs off `/chats` keep the backup complete** (`Plans.md`, "Keep E2E, stop the
+  wall"; design in `docs/e2e-encryption.md` section 9c). A run of messages sent before this device joined is now a
+  single notice with a count instead of one identical note per bubble, with text that depends on whether the backup
+  is locked with a passcode, ready, or locked without one. Opening such a thread on a locked device re-opens the
+  passcode dialog each time; "Not now" silences it for the browser session. The leader tab also uploads pending
+  plaintext when the tab is hidden. Together with the catch-up decrypt (a tab on any page caches what it
+  receives), the backup now holds messages that were received but never displayed. Not browser-verified: the
+  "ready" and "locked, no passcode" notice states and the flush itself.
+
 - **A chat partner is never "not set up yet"** (`Plans.md`, "Signal-model key availability"; design in
   `docs/e2e-encryption.md` section 9b). (1) The browser registers its E2E device as part of signing in
   (password and OTP login, OTP registration), not when a layout happens to render. (2) A user who went quiet
