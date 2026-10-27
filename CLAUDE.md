@@ -241,6 +241,20 @@ Key columns:
 
 Seed (`brands.seed.ts`): `MODEL_SEEDS`/`MOTO_MODEL_SEEDS` are grouped by subcategory — that grouping IS the classification, and `seedModels` writes the links in a second pass. Model slugs spell `+` as `-plus`; until 2026-09-22 the trailing-`+` entries claimed the bare slugs and the plain Galaxy S21–S25 were silently dropped by `onConflictDoNothing` — migration `0020` renamed the six affected rows, and `findSlugCollisions` (pure, unit-tested by temporarily seeding a colliding name) now warns when a seeded name doesn't match the name stored at that `(brandId, slug)`. Models are insert-only; admin `PATCH /admin/models/:id` is the only other writer. Assigning a model to a subcategory its brand isn't linked to is refused with a warning (unreachable there). Brand sets: `BRANDS` (67 phone/tablet/watch/computer brands), `CAR_BRANDS` (91, design order, MG first), `MOTO_BRANDS` (31, Honda first; Honda/Suzuki/BMW take `-moto` slugs so each branch keeps its own row/icon/position). Shared slugs (`xiaomi`, `other`) only wire links on later occurrences so they can't clobber the first set's `sortOrder`. `BrandSeed.icon` lands **only on INSERT** — admin-uploaded icons survive re-seeds. Brands return `{id, slug, name, icon, sortOrder}` (`icon`, not `image`; models use `image`); brands never nest models.
 
+### Products (trusted specs, 2026-10-27)
+
+Admin-managed GSMArena-style spec pages built on the existing catalogue: one `product_specs` row per `models` row (`model_id` unique, `ON DELETE CASCADE`), holding ordered `spec_groups` JSONB (`[{title, rows:[{label,value}]}]`) and `is_published`. Nothing is scraped and no external link is used. `ProductsModule` (`src/products/`) follows the attributes precedent — public and `/admin/products` controllers in one module; admin routes are `@Roles('admin')`.
+
+```
+GET /api/v1/products?q=&limit=               @Public; published specs whose brand AND model are active; token search over brand/model name+slug
+GET /api/v1/products/:brandSlug/:modelSlug   @Public; 404 unless published
+GET/POST/PATCH/DELETE /api/v1/admin/products modelId immutable; duplicate model 409; missing model 400
+```
+
+`listings.product_model_id` (nullable FK → `models`, `SET NULL`) is the ad→page link. Create/update reject an unpublished target (`productModelId must reference a published product spec`); `GET /listings/:id` embeds `product: { modelId, brandSlug, brandName, modelSlug, modelName } | null` (null when unlinked or unpublished), alongside the stored `productModelId`.
+
+The `phones` subcategory declares `{ key: 'productSpec', type: 'product', required: true }` — the only subcategory with the key. `getListingFormConfig` loads up to 200 published products only when it is declared; `ListingPostForm` renders a required picker that searches "Brand Model", resolves a **pasted product URL** (`/en/product/<brand>/<model>`, absolute or relative) locally, auto-fills Brand+Model when empty, clears the link when either changes, and sends `productModelId` top-level (never inside `attributes`). Required-ness is form-only, like every other per-form rule. The detail shows "View full specs"; `/product/[brand]/[model]` (RSC, pathname declared in `i18n/routing.ts`) renders the groups plus active ads via the feed's display-name brand/model filters; `/search` adds a "Product specs" section above results when `q` is present. Admin page: `/wanderer/dashboard/products` (Attributes → Product Specs), shared AdminPage/AdminTable kit with a dynamic group/row editor; no image upload — `models.image` renders through `DbImage`.
+
 ### Listings
 
 `ListingsModule` (`src/listings/`) — cursor-based public feed + offset-based owner feed.
@@ -255,7 +269,7 @@ Seed (`brands.seed.ts`): `MODEL_SEEDS`/`MOTO_MODEL_SEEDS` are grouped by subcate
 
 **Cursor (feed):** sort-aware base64 JSON `{ s, v, id, f? }` (sort; last sort value as TEXT; fuzzy flag) — a cursor from one sort is ignored on another. Sort values round-trip as text (`created_at::text`, `effective_price::text`), never JS Dates (ms truncation would skip boundary rows). Invalid cursors are ignored; the legacy `{createdAt, id}` shape still pages old links.
 
-**Owner feed** (`GET /listings/me/all`): offset pagination + `status` filter.
+**Owner feed** (`GET /listings/me/all`): offset pagination + `status` filter. **Expiry is derived, never stored (2026-10-27):** nothing flips `status` when the 30-day window closes, so `findPublicById` reports a lapsed `active` ad as `expired` — its shared link keeps working, with an expired notice and contact disabled — and 404s `draft`/`deleted` ads; `findMine` derives the same status and maps the `active`/`expired` filters to date ranges (Active = live now; Expired = stored-expired ∪ lapsed-active), which is what makes Manage Ads' Expired tab real; the web detail page renders the notice, hides the phone/email/contact actions, and the Expired tab shows a badge. The hourly `ListingExpiryService` sweep notifies the owner (`listing.expiring` when 3 days remain, `listing.expired` once for ads that lapsed in the last 24 h — the lookback is deliberate so a deploy never blasts every historical lapse), and Manage Ads shows an "Expires in N days" chip on Active rows inside that 3-day window.
 
 ### Likes & Saved (`src/reactions/`, 2026-10-05)
 
@@ -365,7 +379,7 @@ DELETE /api/v1/notifications/:id
 DELETE /api/v1/notifications
 ```
 
-`notify()` fans out over an injected `NotificationChannel[]`; today's only channel is `InAppNotificationChannel`, which inserts the durable `notifications` row (migration `0024`) — email/push are the extension point (add a channel to the provider array, nothing else changes). `Promise.all`, not `allSettled`, on purpose: the durable row's failure must propagate (the payment handler answers `retry`). Producers today: `follow.created` (`users.service.ts`) and payment settlement (`payment/outbox/payment-settled-outbox-handler.ts`). **Web:** `/[locale]/(user)/notifications` is real (anonymous → login), page one server-fetched via `actions/notifications.ts`, mutations via server actions.
+`notify()` fans out over an injected `NotificationChannel[]`; today's only channel is `InAppNotificationChannel`, which inserts the durable `notifications` row (migration `0024`) — email/push are the extension point (add a channel to the provider array, nothing else changes). `Promise.all`, not `allSettled`, on purpose: the durable row's failure must propagate (the payment handler answers `retry`). Producers today: `follow.created` (`users.service.ts`), payment settlement (`payment/outbox/payment-settled-outbox-handler.ts`), and the hourly listing-expiry sweep (`listings/listing-expiry.service.ts`: `listing.expiring` at T-3 days, `listing.expired` once within 24 h of the lapse; both deduped by (listingId, expiresAt) in `data`). **Web:** `/[locale]/(user)/notifications` is real (anonymous → login), page one server-fetched via `actions/notifications.ts`, mutations via server actions.
 
 ### Chat
 
@@ -583,6 +597,8 @@ Grouped feature config — `src/config/config.validation.ts` (Zod) is the source
 Use `crypto.randomUUID()` from Node's `node:crypto`. There is no `uuid` package dependency.
 
 ## Known gaps (track as separate tickets)
+
+- **Trusted product specs only appear after a seed / targeted update, and the phones form blocks posting until one exists.** The `productSpec` field lives in the `phones` `field_schema`, which only `db:seed` writes (never run the full seed on prod — apply a targeted `UPDATE subcategories SET field_schema = … WHERE slug = 'phones'`). Once it lands, a phone ad cannot be submitted without a **published** product page, so staff must create specs for common models before posters can list them. The requirement is enforced in the web form only (the DTO stays optional), the attached product is not cross-checked against the ad's brand/model attributes, and the picker/resolver caps at 200 published products.
 
 - **Signed uploads are still unvalidated server-side** — no MIME or size check on `/files/sign` uploads, since the bytes never pass through the backend (server-side multipart uploads — avatar, cover, feedback — are capped at 5 MB in multer and limited to raster image types). Ownership is enforced since 2026-10-23: user scopes (`listing`, `avatar`, `cover`, `chat`, `report`, `resume`) sign into `{scope}/{userId}/`, catalog scopes are staff-only, and `DELETE /files` lets non-staff delete only their own folders (`ListingsService.assertPhotosOwned` also proves listing photos are the caller's own uploads). Objects under the old flat `listing/…` paths stay valid on their listings but are never cleaned up by the server.
 - **Feedback rows do not own their images.** Deleting a feedback row leaves its storage objects behind; feedback images live in the default `listings` bucket under `feedback/…`, not a private folder.

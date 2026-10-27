@@ -154,6 +154,7 @@ export async function buildRealDetailData(
     brand: toBreadcrumb("brand"),
     model: toBreadcrumb("model"),
     seller: await toSellerView(listing),
+    product: listing.product ?? null,
   };
 }
 
@@ -221,6 +222,15 @@ export interface BackendListingPhoto {
   sort: number;
 }
 
+/** Trusted product spec page linked to a listing (embedded by the backend). */
+export interface BackendProductRef {
+  modelId: string;
+  brandSlug: string;
+  brandName: string;
+  modelSlug: string;
+  modelName: string;
+}
+
 /** Subset of the backend `GET /listings/:id` row the detail page renders. */
 export interface BackendListing {
   id: string;
@@ -259,9 +269,15 @@ export interface BackendListing {
    * absent from feed rows. Drives the detail page's "N Likes" control.
    */
   likeCount?: number | null;
+  /** Trusted spec page id stored on the listing (always a column, may be null). */
+  productModelId?: string | null;
+  /** Resolved by the backend only while the linked page is published. */
+  product?: BackendProductRef | null;
   status: string;
   viewsCount: number;
   publishedAt: string | null;
+  /** End of the ad's 30-day window; null on legacy/seeded rows (always live). */
+  expiresAt: string | null;
   createdAt: string;
   photos: BackendListingPhoto[];
 }
@@ -556,6 +572,18 @@ export function toCardPost(l: BackendListing): Post {
     l.price !== null && Number.isFinite(Number(l.price))
       ? Number(l.price)
       : null;
+  // A zero/negative discount means "no discount": `applyDiscount` already
+  // leaves the price untouched, but the strikethrough price and the %-OFF /
+  // $-OFF badges derive from `oldPrice` separately, so they must be gated on a
+  // positive discount too (a `-0%` / `$0 OFF` badge on a normal ad).
+  const discountNumber =
+    l.discountValue !== null ? Number(l.discountValue) : null;
+  const hasDiscount =
+    price !== null &&
+    l.discountType !== null &&
+    discountNumber !== null &&
+    Number.isFinite(discountNumber) &&
+    discountNumber > 0;
   return {
     postId: l.id,
     userId: l.userId,
@@ -585,8 +613,7 @@ export function toCardPost(l: BackendListing): Post {
     // The card shows the design's short `district, province` — the commune and
     // the street address belong to the detail page (see `shortLocation`).
     location: l.locationKm ?? shortLocation(l.location),
-    oldPrice:
-      price !== null && l.discountValue && l.discountType ? price : undefined,
+    oldPrice: hasDiscount && price !== null ? price : undefined,
   };
 }
 

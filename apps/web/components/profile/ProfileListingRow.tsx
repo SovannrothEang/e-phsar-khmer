@@ -19,10 +19,13 @@ const PROFILE_ROW_PHOTO = "h-28 w-28";
 export function ProfileListingRow({
   post,
   action,
+  badge,
 }: {
   post: Post;
   /** Trailing control (like/save toggle); omit for a plain row. */
   action?: ReactNode;
+  /** Optional state chip beside the title (Manage Ads' Expired tab). */
+  badge?: ReactNode;
 }) {
   const t = useTranslations("Common");
   const photo = post.images[0];
@@ -62,7 +65,12 @@ export function ProfileListingRow({
 
       <div className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
         <div className="min-w-0 space-y-1">
-          <p className="type-body line-clamp-2 text-foreground">{post.title}</p>
+          <div className="flex min-w-0 items-start gap-2">
+            <p className="type-body line-clamp-2 text-foreground">
+              {post.title}
+            </p>
+            {badge ? <span className="shrink-0 pt-0.5">{badge}</span> : null}
+          </div>
           {post.location ? (
             <p className="type-meta truncate text-muted-foreground">
               {post.location}

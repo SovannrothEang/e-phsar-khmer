@@ -21,6 +21,27 @@ How to use this file:
 
 ### Added
 
+- **Trusted product specs (admin-managed, in-house).** A new `product_specs`
+  table (migration `0044_rapid_skaar`; one row per `models` row, grouped
+  label/value `spec_groups` JSONB, `is_published`) backs GSMArena-style spec
+  pages written by staff — nothing is scraped and no external link is used.
+  `GET /api/v1/products?q=&limit=` (public) powers product search and the
+  phones post-form picker; `GET /api/v1/products/:brandSlug/:modelSlug`
+  returns page one. `/api/v1/admin/products` is `@Roles('admin')` CRUD with
+  `modelId` immutable and duplicates answered `409`. `listings` gains a
+  nullable `product_model_id` (FK → `models`, `ON DELETE SET NULL`); create
+  and update validate that the target spec is **published**, and
+  `GET /listings/:id` embeds `product: { modelId, brandSlug, brandName,
+modelSlug, modelName } | null`. The `phones` `field_schema` declares a
+  required `productSpec` key: the post form's picker searches the published
+  catalogue, resolves a pasted product URL (`/en/product/apple/iphone-16`),
+  auto-fills Brand/Model when empty, and clears the link when either changes;
+  submit refuses an empty picker. The listing detail shows "View full specs",
+  the search page shows a Product specs section above the ad results, and
+  `/product/[brand]/[model]` renders the grouped specs plus active ads for
+  that model. Admin UI: `/wanderer/dashboard/products` (Attributes → Product
+  Specs) with a dynamic group/row editor. No image upload in v1 — the model's
+  existing image is used through `DbImage`.
 - **Trending listings replace the mock home Top Ads.** `GET /api/v1/listings/trending`
   (`limit` ≤ 20, `windowDays` ≤ 30) ranks live listings by weighted engagement from
   `listing_events` (view 1, chat/call/show_contact 3, apply_job 5 — impressions are
@@ -47,9 +68,79 @@ How to use this file:
   allowed, so the old 2.1 MB animated `flag-animation.gif` was re-encoded as a
   381 KB / 25-frame WebP and keeps its animation. Allowing GIF would be a
   Supabase bucket-settings change, not a code change.
+- **Expiry warnings for ads.** An hourly `ListingExpiryService` sweep (BullMQ
+  `listing-expiry` queue) notifies an ad's owner through the existing
+  notification feed at T-3 days (`listing.expiring`, "expires in N days") and
+  once after the lapse (`listing.expired`, only for ads that expired in the
+  last 24 h so a deploy never notifies every historical lapse). Each notice is
+  deduped by `(listingId, expiresAt)` in `notifications.data`, so a renewal —
+  which moves the date — earns a fresh warning. Manage Ads shows the same
+  3-day warning as an "Expires in N days" chip on Active rows. No migration;
+  the sweep only reads listings and writes notification rows.
 
 ### Changed
 
+- **Admin catalogue tables rebuilt on a shared kit.** Models, Brands, Categories and
+  Subcategories drop the raw-UUID ID column (Copy ID now sits in each row's menu), lead
+  with a logo/initial + name cell, show category and sub-category chips and one formatted
+  Updated date, and gain click-to-sort headers, whole-row search (name, slug, brand,
+  category, sub category), category filters (plus brand on Models) and a shared
+  pagination footer — `components/dashboard/admin-table.tsx` plus `admin-page.tsx`.
+  `getAdminModels` now derives a model's category from its own subcategory rows instead of
+  a brand's first link (the bug that listed phones under "Computers & Accessories"), and
+  Brands lists every category a brand spans. The Models delete dialog no longer says
+  "Delete Brand"; the Subcategories one no longer says "Delete Category".
+- **Admin Users rebuilt on the same shared table.** Seven columns instead of ten (the ID moved
+  into the row menu, the constant Role column dropped, Created/Updated collapsed into one
+  Joined date), a round avatar + name + email cell, `@username`, click-to-sort headers,
+  pagination at 20, and the All / Premium / Normal tabs kept. Two real fixes: the phone column
+  no longer doubles the `+` (`++855…` → `+855…`), and the row menu's View no longer
+  concatenates the username with the UUID — it opens the public profile at
+  `/{locale}/{username}`.
+- **Admin report queues rebuilt.** Report Users and Report Posts share one status badge, drop
+  the report-UUID and reviewer-UUID columns, show the reviewer under the status, format the
+  created date, clamp the description with the evidence thumbnails beneath it, and move the
+  actions into the shared row menu (View profile/post, Approve, Reject, Copy ID). Fixes: the
+  created column no longer prints a raw ISO string, the reviewer column shows the reviewer's
+  name, and Report Users' View Profile opens `/{locale}/{username}` instead of concatenating
+  the display name with the target's UUID.
+- **Admin navbar: storefront-style language picker and a real notification queue.** The language
+  trigger is now the current locale's flag with a flag radio list (`/flag/uk.png`,
+  `/flag/khmer.png`), matching the storefront selector while keeping the admin cookie switch. The
+  bell no longer shows hardcoded mock entries: it counts pending user/listing reports (same
+  react-query keys as the queues) and opens a right-side drawer of report cards that link to the
+  owning queue.
+- **Admin sidebar logo no longer clips in the icon rail.** `SidebarHeader` drops to 7 px padding
+  while the sidebar is collapsed (`group-data-[collapsible=icon]:p-[7px]`) and centres the mark,
+  so the 32 px tile no longer overflows through the old 16 px padding; the expanded header is
+  unchanged.
+- **Collapsed admin sidebar groups now open a dropdown.** In the icon rail the sidebar primitive
+  hides inline sub-lists, so Attributes, Manage Users, Subscriptions and Reports expanded into
+  nothing; each now opens its children in a right-side menu from the icon, while the expanded
+  sidebar keeps the inline collapsible.
+- **Job applications: hiring is a conversation, not a row action.** Both `/me` job lists drop
+  the application-status machinery — the poster's rows keep only View Resume + Message, the
+  status pills (New/Viewed/Hired/Rejected) and both status filters are gone — because applying
+  already opened the chat thread, which is where the recruiter/interviewer decides. The button
+  label now reads "View Resume".
+- **Body Types (and the other attribute pages) rebuilt on the shared admin table.** Six columns
+  instead of ten — icon/initial + name (+ Khmer name), slug, category chip, sub-category chips,
+  formatted updated date, row menu — with sorting, search and pagination from the kit. The
+  add/edit dialog and the Years read-only mode are unchanged.
+- **Team page rebuilt on the shared admin table.** Member (avatar + name + email), @username,
+  phone, role badge (Super Admin/Admin), status, one Joined date and the standard row menu
+  replace the raw-UUID ten-column table; sorting, search, tabs and pagination come from the kit.
+- **Advertisements: admin page on the shared kit, storefront dots on the brand colour.** The
+  admin table now has a 4:1 banner thumbnail with alt text and a Live/Hidden line, placement
+  chips, a truncated link, order, the brand-blue active switch and the standard row menu, with
+  search, sorting and pagination; the storefront carousel's active dot uses `#00a0e9` instead of
+  white.
+- **Admin dialogs cap at the viewport and scroll internally, with one button language.** Every
+  `DialogContent` is now `max-h-[calc(100svh-2rem)]` with an internal scroll, and the footer is an
+  in-flow bar at the end of the form sharing the dialog's surface — symmetric around its buttons,
+  never overlapped by content — so a long form no longer stretches the dialog past the screen.
+  Cancel buttons are the neutral outline (the red/blue fills across the Attributes, Users, Team
+  and Feedback dialogs are gone) and primary actions use the theme blue.
 - **Manage Ads: the ad list is split from the controls card and rows gain an
   actions menu.** The header, plan stats and Active/Expired tabs keep their own
   card; the ads (and the loading/empty states) render in a separate section
@@ -150,6 +241,10 @@ How to use this file:
 
 ### Fixed
 
+- **Editing an attribute with an empty Khmer name no longer 500s.** The admin web action sends
+  `nameKm: null` for an empty field, and `AttributesService.update` called `.trim()` on it; update
+  now mirrors create's null-safe trim (null clears the Khmer name). The same guard was added to
+  the category/subcategory update paths, and a regression spec pins both cases.
 - **Chat ignored the site theme.** The workspace forced the `dark` token scope on its panel
   (hardcoded `bg-[#1b1b1b]` / `border-white/10`, plus `dark` re-applied to the portaled delete
   menu and dialog), so `/chats` stayed dark in light mode. The panel now uses the normal theme
@@ -173,6 +268,43 @@ How to use this file:
   toggle. The header search bar's scope chip now follows the page: a category or subcategory page
   reads that category ("Cars For Sale" / "រថយន្តសម្រាប់លក់") and a submit from there searches inside
   it (`/search?q=…&category=…&sub=…`), instead of always starting from "All Categories".
+
+- **Expired listings vanished from browse while still reading as live.** Nothing flips
+  `listings.status` when the 30-day window closes, so a lapsed ad dropped out of every feed
+  (`liveConditions()`) but `GET /listings/:id` still served it with `status: "active"`, Manage Ads
+  still counted it under Active (its Expired tab asked for a status no row ever has), and the
+  detail page offered contact as if the offer were live. `findPublicById` now reports the derived
+  `expired` status and 404s drafts and owner-deleted ads; `findMine` derives the same status and
+  maps the Active/Expired filters to date ranges (`active` excludes lapsed rows, `expired` includes
+  both stored-expired and lapsed-active ones); the web detail page shows an expired notice and
+  disables contact/apply, and the Expired tab renders the ads with a badge. Unit tests pin the
+  derivation and both filters.
+
+- **Product Spec picker: a pasted link now explains itself.** The phones form's field advertised
+  "search or paste a product link", but only a published PhsarKhmer product URL resolves; an
+  external (GSMArena) link or a product page that is not published failed silently and the list
+  just read "No match found". A URL-shaped paste that does not resolve now toasts "That link
+  isn't a published PhsarKhmer product…", the placeholder names the source ("paste a PhsarKhmer
+  product link"), and the focused field (not only the open panel's search box) accepts a
+  keyboard paste.
+
+- **A price of 0 can no longer be submitted.** The price field accepted `0` (`min={0}`, and
+  submit only rejected `priceNum < 0`), so a real ad could be published at `$0`. The field now
+  requires a value greater than 0 (`min={0.01}`, submit `<= 0`) with the message "Enter a price
+  greater than 0". The fix applies to every subcategory that declares a price; existing ads keep
+  their stored price until edited.
+
+- **A zero/negative discount no longer renders as a discount.** `"0.00"` is a truthy string, so
+  the card and detail mappings treated any non-null discount as real: a `-0%` / `$0 OFF` badge
+  and a strikethrough price equal to the price. `toCardPost` and `toPostView` now require a
+  positive discount value before setting `oldPrice` or the percentage label, and the form never
+  sends a discount unless it is greater than 0.
+
+- **Number fields no longer change on scroll.** Chrome edits a focused `type="number"` input on
+  wheel, so scrolling the long post form with the cursor over the price/discount field silently
+  walked `1` → `0` (the reported `$0` ads and the stray `0%` discount). The shared `TextInput`
+  (number mode) and the discount input now blur on wheel, so the scroll moves the page instead
+  of the value.
 
 ### Removed
 

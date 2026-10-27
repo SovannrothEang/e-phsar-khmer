@@ -62,6 +62,12 @@ export type Post = {
    * the detail page's "N Likes" control before the first toggle.
    */
   likeCount?: number;
+  /**
+   * Real listings, Manage Ads only: whole days until the 30-day window
+   * closes, computed server-side by `getMyAdsPage` (a client render must not
+   * read the clock). Negative once the ad has lapsed.
+   */
+  expiresInDays?: number;
 };
 export type Province = {
   proId: string;

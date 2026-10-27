@@ -118,8 +118,10 @@ export default function AdvertisementCarousel({
               aria-current={i === index}
               onClick={() => api?.scrollTo(i)}
               className={cn(
-                "size-2 rounded-full transition-opacity",
-                i === index ? "bg-white opacity-100" : "bg-white opacity-50",
+                "size-2 rounded-full transition-colors",
+                i === index
+                  ? "bg-[#00a0e9] ring-2 ring-white/90"
+                  : "bg-white/70 ring-1 ring-black/10 hover:bg-white",
               )}
             />
           ))}

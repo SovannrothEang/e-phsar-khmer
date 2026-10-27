@@ -223,6 +223,8 @@
     "allAds": "All ads",
     "resultCount": "{count, plural, =0 {No ads} one {# ad} other {# ads}}",
     "categories": "Categories",
+    "products": "Product specs",
+    "viewSpecs": "View specs",
     "allCategories": "All categories",
     "removeFilter": "Remove {name}",
     "loadMore": "Load more",
@@ -440,6 +442,9 @@
     "showEmail": "Show Email Address",
     "membersSince": "Members Since {date}",
     "ownAdNote": "This is your own ads - buyers will see 'Chat' here",
+    "expiredNotice": "This ad has expired and is no longer available in the marketplace.",
+    "expiredContact": "Contact is unavailable because this ad has expired.",
+    "viewFullSpecs": "View full specs",
     "safetyTips": {
       "title": "Safety Tips for Buyers",
       "noMoney": "Do not send money before receiving the goods",
@@ -481,6 +486,16 @@
       "alreadyApplied": "You already applied to this job",
       "sent": "Application sent"
     }
+  },
+  "Product": {
+    "home": "Home",
+    "metaTitle": "{brand} {model} specs",
+    "metaDescription": "Full specifications for the {brand} {model} on PhsarKhmer.",
+    "notFound": "Product not found",
+    "trustedNote": "Specifications entered and maintained by PhsarKhmer staff.",
+    "specifications": "Specifications",
+    "activeAds": "Active ads for this model",
+    "noActiveAds": "No active ads for this model right now."
   },
   "Category": {
     "notFound": "Category not found"
@@ -757,6 +772,8 @@
       "renews": "Renews",
       "active": "Active",
       "expired": "Expired",
+      "expiresInDays": "Expires in {days} days",
+      "expiresWithinDay": "Expires within a day",
       "noResult": "No Result!",
       "noActive": "Oops! You don't have any active ads.",
       "sell": "Sell your stuff",
@@ -820,7 +837,7 @@
       "resumeChip": "Résumé",
       "noCv": "No CV file",
       "noResume": "No résumé",
-      "viewResume": "View résumé",
+      "viewResume": "View Resume",
       "message": "Message",
       "hire": "Hire",
       "reject": "Reject",
@@ -972,6 +989,7 @@
     "chooseOption": "Choose…",
     "loadingModels": "Loading...",
     "noModel": "No model found.",
+    "noProduct": "No published product spec yet.",
     "published": "Your ad was published",
     "labels": {
       "photos": "Photos",
@@ -980,6 +998,7 @@
       "jobTitle": "Job Title",
       "brand": "Brand",
       "model": "Model",
+      "productSpec": "Product Spec",
       "year": "Year",
       "taxType": "Tax Type",
       "condition": "Condition",
@@ -1018,6 +1037,7 @@
     "placeholders": {
       "chooseBrand": "Choose a brand",
       "chooseModel": "Choose a model",
+      "chooseProduct": "Search specs or paste a PhsarKhmer product link",
       "chooseYear": "Choose a year",
       "chooseColor": "Choose a color",
       "chooseBodyType": "Choose a body type",
@@ -1058,13 +1078,15 @@
     "errors": {
       "formNotLoaded": "Form data is not loaded yet",
       "titleRequired": "Title is required",
-      "priceInvalid": "Enter a valid price",
+      "priceInvalid": "Enter a price greater than 0",
       "typeRequired": "Choose a type",
       "jobTypeRequired": "Choose a job type",
       "experienceRequired": "Choose experience",
       "accessoryRequired": "Choose an accessory",
       "networkRequired": "Choose a network",
       "brandRequired": "Choose a brand",
+      "productRequired": "Choose the product spec for this phone",
+      "productLinkInvalid": "That link isn't a published PhsarKhmer product. Copy the link from one of our product pages, or search by name.",
       "screenSizeRequired": "Choose a screen size",
       "storageRequired": "Choose storage",
       "ramRequired": "Choose a RAM size",

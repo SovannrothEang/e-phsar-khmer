@@ -7,6 +7,7 @@ import type { Post } from "@/lib/posts";
 export type MyAdsTab = "active" | "expired";
 
 const PAGE_SIZE = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function fetchStatus(status: MyAdsTab, page: number, size: number) {
   const { data, meta } = await userServerFetch<BackendListing[]>(
@@ -40,7 +41,18 @@ export async function getMyAdsPage(
   const counts: Partial<Record<MyAdsTab, number>> = { [tab]: current.total };
   if (probe) counts[other] = probe.total;
   return {
-    items: current.rows.map(toCardPost),
+    items: current.rows.map((row) => {
+      // Derived here, not in the client: a React render must not read the
+      // clock, and this is where the row was fetched anyway.
+      const base = toCardPost(row);
+      const left = row.expiresAt
+        ? new Date(row.expiresAt).getTime() - Date.now()
+        : null;
+      return {
+        ...base,
+        expiresInDays: left === null ? undefined : Math.ceil(left / DAY_MS),
+      };
+    }),
     hasMore: current.hasMore,
     counts,
   };

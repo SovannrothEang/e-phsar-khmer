@@ -98,7 +98,7 @@ export default function SubscriptionCategoryPage() {
   const queryClient = useQueryClient();
   const { data: rawCategories = [] } = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: getSubCategories,
+    queryFn: () => getSubCategories(),
   });
   const subscriptionCategories = useMemo(
     () => rawCategories.map(toVerbose),

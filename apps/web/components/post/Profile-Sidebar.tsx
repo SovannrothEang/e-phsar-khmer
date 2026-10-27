@@ -47,6 +47,9 @@ export default function ProfileSidebar({
   const user = userProp ?? getUserById(userId);
   if (!user) return null;
   const isOwnAd = !!viewerId && viewerId === userId;
+  // An expired ad keeps its seller card (identity, follow) but offers no way
+  // to contact anyone: the offer is no longer live (captain, 2026-10-27).
+  const expired = listing?.status === "expired";
 
   const phone0 = user.phone?.[0];
   const phone1 = user.phone?.[1];
@@ -57,6 +60,40 @@ export default function ProfileSidebar({
   if (phone1) {
     phones.push({ value: phone1, badgeBg: "bg-green-600", letter: "S" });
   }
+
+  // One list serves both states: revealed (linked) and masked (the reveal
+  // button, or the expired row that offers no action at all).
+  const phoneNodes = (linked: boolean) => (
+    <>
+      {phones.map((phone) => (
+        <span key={phone.value} className="flex items-center gap-1 font-bold">
+          <CarrierBadge
+            phone={phone.value}
+            fallback={
+              <span
+                className={`${phone.badgeBg} w-4 h-4 rounded-sm flex items-center justify-center type-discount text-white`}
+              >
+                {phone.letter}
+              </span>
+            }
+          />
+          {linked ? (
+            <a
+              href={`tel:${phone.value}`}
+              onClick={() => {
+                if (listingId) trackEvent(listingId, "call");
+              }}
+              className="hover:underline"
+            >
+              {phone.value}
+            </a>
+          ) : (
+            maskPhone(phone.value)
+          )}
+        </span>
+      ))}
+    </>
+  );
 
   // Avatar + name + handle. It becomes a link to the seller's profile only
   // when there is a real handle to link to — the server joins it onto the
@@ -180,33 +217,12 @@ export default function ProfileSidebar({
                 </div>
                 {phoneRevealed ? (
                   <div className="flex flex-wrap items-center gap-3">
-                    {phones.map((phone) => (
-                      <span
-                        key={phone.value}
-                        className="flex items-center gap-1 font-bold"
-                      >
-                        <CarrierBadge
-                          phone={phone.value}
-                          fallback={
-                            <span
-                              className={`${phone.badgeBg} w-4 h-4 rounded-sm flex items-center justify-center type-discount text-white`}
-                            >
-                              {phone.letter}
-                            </span>
-                          }
-                        />
-                        <a
-                          href={`tel:${phone.value}`}
-                          onClick={() => {
-                            if (listingId) trackEvent(listingId, "call");
-                          }}
-                          className="hover:underline"
-                        >
-                          {phone.value}
-                        </a>
-                      </span>
-                    ))}
+                    {phoneNodes(true)}
                   </div>
+                ) : expired ? (
+                  <span className="flex flex-wrap items-center gap-3">
+                    {phoneNodes(false)}
+                  </span>
                 ) : (
                   <button
                     type="button"
@@ -217,24 +233,7 @@ export default function ProfileSidebar({
                     className="-m-1 flex cursor-pointer flex-col items-start gap-1 rounded-md p-1 text-left transition-colors hover:bg-muted"
                   >
                     <span className="flex flex-wrap items-center gap-3">
-                      {phones.map((phone) => (
-                        <span
-                          key={phone.value}
-                          className="flex items-center gap-1 font-bold"
-                        >
-                          <CarrierBadge
-                            phone={phone.value}
-                            fallback={
-                              <span
-                                className={`${phone.badgeBg} w-4 h-4 rounded-sm flex items-center justify-center type-discount text-white`}
-                              >
-                                {phone.letter}
-                              </span>
-                            }
-                          />
-                          {maskPhone(phone.value)}
-                        </span>
-                      ))}
+                      {phoneNodes(false)}
                     </span>
                     <span className="text-[#00a0e9] type-body-sm italic">
                       {t("showPhone")}
@@ -247,8 +246,9 @@ export default function ProfileSidebar({
           ) : null}
           {/* Email — same rule: no address, no row (captain, 2026-09-24:
               "if it has no data don't let it appear … I don't enter any then
-              it still show email row"). */}
-          {user?.email ? (
+              it still show email row"). An expired ad hides it entirely:
+              there is no live offer to reply to. */}
+          {!expired && user?.email ? (
             <>
               <div className="flex gap-3">
                 <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
@@ -274,6 +274,10 @@ export default function ProfileSidebar({
           {isOwnAd ? (
             <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm type-nav flex items-center justify-center text-center px-2">
               {t("ownAdNote")}
+            </div>
+          ) : expired ? (
+            <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm type-nav flex items-center justify-center text-center px-2">
+              {t("expiredContact")}
             </div>
           ) : (
             <ContactSellerButton

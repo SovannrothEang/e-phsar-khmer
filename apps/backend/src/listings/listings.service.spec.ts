@@ -21,11 +21,16 @@ function makeService(db: ReturnType<typeof makeDb>) {
   const reactionsService = {
     countLikes: jest.fn().mockResolvedValue(0),
   };
+  const productsService = {
+    assertPublishedModel: jest.fn().mockResolvedValue(undefined),
+    getPublishedRefByModelId: jest.fn().mockResolvedValue(null),
+  };
   return new ListingsService(
     db as never,
     filesService as never,
     reactionsService as never,
     {} as never,
+    productsService as never,
   );
 }
 
@@ -800,6 +805,7 @@ describe('ListingsService plan enforcement', () => {
       {} as never,
       {} as never,
       entitlements as never,
+      {} as never,
     );
     jest.spyOn(service, 'findById').mockResolvedValue({
       userId: 'u1',
@@ -875,6 +881,7 @@ describe('ListingsService photo ownership', () => {
         real.isOwnedPath(path, userId),
       publicUrlFor: url,
     } as never,
+    {} as never,
     {} as never,
     {} as never,
   ) as unknown as {
@@ -1035,5 +1042,317 @@ describe('trending score weights', () => {
       5,
     ]);
     expect(query.params).not.toContain('impression');
+  });
+});
+
+describe('ListingsService expiry', () => {
+  type Rec = Record<string, unknown[]>;
+  const dialect = new PgDialect();
+
+  let db: ReturnType<typeof makeDb>;
+  let service: ListingsService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  function chain(result: unknown[], rec: Rec) {
+    const c: Record<string, unknown> = {};
+    for (const m of [
+      'from',
+      'where',
+      'orderBy',
+      'limit',
+      'offset',
+      'leftJoin',
+    ]) {
+      c[m] = (...args: unknown[]) => {
+        rec[m] = args;
+        return c;
+      };
+    }
+    c.then = (
+      resolve: (v: unknown[]) => unknown,
+      reject: (e: unknown) => unknown,
+    ) => Promise.resolve(result).then(resolve, reject);
+    return c;
+  }
+
+  /** Queues one result per db.select() call; returns each call's record. */
+  function queue(...results: unknown[][]): Rec[] {
+    const recs: Rec[] = results.map(() => ({}));
+    let i = 0;
+    db.select.mockImplementation(() => {
+      const rec = recs[i] ?? {};
+      if (i >= recs.length) recs.push(rec);
+      return chain(results[i++] ?? [], rec);
+    });
+    return recs;
+  }
+
+  const whereOf = (rec: Rec) => dialect.sqlToQuery(rec.where[0] as never);
+
+  const lapsed = () => new Date(Date.now() - 60_000);
+  const future = () => new Date(Date.now() + 60_000);
+
+  function listingRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'l1',
+      userId: 'u1',
+      status: 'active',
+      expiresAt: lapsed(),
+      ...overrides,
+    };
+  }
+
+  /** findPublicById = the joined detail read, then the photos read. */
+  function mockPublicDetail(row: Record<string, unknown>) {
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      return call === 1
+        ? chain([{ listing: row, sellerUsername: 'seller' }], {})
+        : chain([], {});
+    });
+  }
+
+  it('hides a draft from the public detail route', async () => {
+    mockPublicDetail(listingRow({ status: 'draft' }));
+
+    await expect(service.findPublicById('l1')).rejects.toThrow(
+      'Listing not found',
+    );
+  });
+
+  it('hides an owner-deleted ad from the public detail route', async () => {
+    mockPublicDetail(listingRow({ status: 'deleted' }));
+
+    await expect(service.findPublicById('l1')).rejects.toThrow(
+      'Listing not found',
+    );
+  });
+
+  it('reports a lapsed active ad as expired instead of live', async () => {
+    mockPublicDetail(listingRow());
+
+    await expect(service.findPublicById('l1')).resolves.toMatchObject({
+      id: 'l1',
+      status: 'expired',
+    });
+  });
+
+  it('keeps a still-live ad active', async () => {
+    mockPublicDetail(listingRow({ expiresAt: future() }));
+
+    await expect(service.findPublicById('l1')).resolves.toMatchObject({
+      status: 'active',
+    });
+  });
+
+  it('filters the Expired tab by the date, not only the stored status', async () => {
+    const recs = queue([{ count: 0 }], []);
+
+    await service.findMine('u1', { status: 'expired' });
+
+    const { sql: text, params } = whereOf(recs[1]);
+    expect(text).toContain('"expires_at" <= now()');
+    expect(params).toEqual(expect.arrayContaining(['expired', 'active']));
+  });
+
+  it('keeps lapsed ads out of the Active tab', async () => {
+    const recs = queue([{ count: 0 }], []);
+
+    await service.findMine('u1', { status: 'active' });
+
+    const { sql: text } = whereOf(recs[1]);
+    expect(text).toContain('"expires_at" is null');
+    expect(text).toContain('"expires_at" > now()');
+  });
+
+  it('reports a lapsed ad as expired to its owner', async () => {
+    const recs = queue([{ count: 1 }], [listingRow()], []);
+
+    const result = await service.findMine('u1', {});
+
+    expect(recs[1]).toBeDefined();
+    expect(result.data[0].status).toBe('expired');
+  });
+
+  it('keeps a future-dated ad active for its owner', async () => {
+    queue([{ count: 1 }], [listingRow({ expiresAt: future() })], []);
+
+    const result = await service.findMine('u1', {});
+
+    expect(result.data[0].status).toBe('active');
+  });
+});
+
+describe('ListingsService product spec attachment', () => {
+  const productRef = {
+    modelId: 'm1',
+    brandSlug: 'apple',
+    brandName: 'Apple',
+    modelSlug: 'iphone-16',
+    modelName: 'iPhone 16',
+  };
+
+  function setup() {
+    const db = { ...makeDb(), transaction: jest.fn() };
+    const products = {
+      assertPublishedModel: jest.fn().mockResolvedValue(undefined),
+      getPublishedRefByModelId: jest.fn().mockResolvedValue(productRef),
+    };
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      { countLikes: jest.fn().mockResolvedValue(0) } as never,
+      { assertPhotos: jest.fn().mockResolvedValue(undefined) } as never,
+      products as never,
+    );
+    return { db, service, products };
+  }
+
+  /** `findById`'s own query: listing + owner handle, then photos. */
+  function detailQuery(result: object[]) {
+    const tail = { where: () => ({ limit: () => Promise.resolve(result) }) };
+    return { from: () => ({ ...tail, leftJoin: () => tail }) };
+  }
+  function photosQuery(result: object[]) {
+    return {
+      from: () => ({
+        where: () => ({ orderBy: () => Promise.resolve(result) }),
+      }),
+    };
+  }
+
+  it('rejects a create whose product page is not published', async () => {
+    const { db, service, products } = setup();
+    products.assertPublishedModel.mockRejectedValue(
+      new BadRequestException(
+        'productModelId must reference a published product spec',
+      ),
+    );
+    db.select
+      .mockReturnValueOnce(slugLookup([{ id: 'cat-1' }]))
+      .mockReturnValueOnce(slugLookup([{ id: 'sub-1' }]));
+
+    await expect(
+      service.create('u1', {
+        categoryId: 'cat-1',
+        subcategoryId: 'sub-1',
+        title: 'iPhone 16',
+        productModelId: 'm1',
+      } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('stores the product model id on a valid create', async () => {
+    const { db, service } = setup();
+    db.select
+      .mockReturnValueOnce(slugLookup([{ id: 'cat-1' }]))
+      .mockReturnValueOnce(slugLookup([{ id: 'sub-1' }]));
+    const values = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([{ id: 'l1' }]),
+    });
+    db.insert.mockReturnValue({ values });
+    db.transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({ insert: db.insert }),
+    );
+
+    await service.create('u1', {
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+      title: 'iPhone 16',
+      productModelId: 'm1',
+    } as never);
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ productModelId: 'm1' }),
+    );
+  });
+
+  it('rejects an update that points at an unpublished product', async () => {
+    const { db, service, products } = setup();
+    products.assertPublishedModel.mockRejectedValue(
+      new BadRequestException('nope'),
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      photos: [],
+      moderatedAt: null,
+    } as never);
+
+    await expect(
+      service.update('u1', 'l1', { productModelId: 'm1' } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('clears the product link when null is sent', async () => {
+    const { db, service, products } = setup();
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      photos: [],
+      moderatedAt: null,
+    } as never);
+    const set = jest.fn(() => ({
+      where: () => ({
+        returning: jest.fn().mockResolvedValue([{ id: 'l1' }]),
+      }),
+    }));
+    db.transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({
+          update: () => ({ set }),
+          select: () => photosQuery([]),
+        }),
+    );
+
+    await service.update('u1', 'l1', { productModelId: null } as never);
+
+    expect(products.assertPublishedModel).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ productModelId: null }),
+    );
+  });
+
+  it('embeds the published product ref on the detail read', async () => {
+    const { db, service, products } = setup();
+    db.select
+      .mockReturnValueOnce(
+        detailQuery([
+          {
+            listing: { id: 'l1', productModelId: 'm1' },
+            sellerUsername: 'seller',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(photosQuery([]));
+
+    const result = await service.findById('l1');
+
+    expect(result.product).toEqual(productRef);
+    expect(products.getPublishedRefByModelId).toHaveBeenCalledWith('m1');
+  });
+
+  it('reads no product ref when the listing has no link', async () => {
+    const { db, service, products } = setup();
+    db.select
+      .mockReturnValueOnce(
+        detailQuery([
+          { listing: { id: 'l1', productModelId: null }, sellerUsername: null },
+        ]),
+      )
+      .mockReturnValueOnce(photosQuery([]));
+
+    const result = await service.findById('l1');
+
+    expect(result.product).toBeNull();
+    expect(products.getPublishedRefByModelId).not.toHaveBeenCalled();
   });
 });

@@ -102,26 +102,28 @@ export default async function SlugPage({
     ]);
     if (UUID_RE.test(actualId)) {
       const real = await buildRealDetailData(actualId, await getLocale());
-      if (real) {
-        return (
-          <PostDetail
-            id={actualId}
-            real={real}
-            banners={banners}
-            viewerId={viewer?.id}
-            sellerFollowing={
-              viewer ? await getFollowStatus(real.listing.userId) : false
-            }
-            jobApply={await loadJobApplyState({
-              listingId: real.listing.id,
-              categorySlug: real.cate?.slug,
-              listingStatus: real.listing.status,
-              posterId: real.listing.userId,
-              viewerId: viewer?.id,
-            })}
-          />
-        );
-      }
+      // A real listing that is gone (draft, withdrawn, moderated, unknown id)
+      // must 404 rather than fall through to the mock template under a real
+      // UUID — that would render a fabricated ad at a dead link.
+      if (!real) notFound();
+      return (
+        <PostDetail
+          id={actualId}
+          real={real}
+          banners={banners}
+          viewerId={viewer?.id}
+          sellerFollowing={
+            viewer ? await getFollowStatus(real.listing.userId) : false
+          }
+          jobApply={await loadJobApplyState({
+            listingId: real.listing.id,
+            categorySlug: real.cate?.slug,
+            listingStatus: real.listing.status,
+            posterId: real.listing.userId,
+            viewerId: viewer?.id,
+          })}
+        />
+      );
     }
     return <PostDetail id={actualId} viewerId={viewer?.id} banners={banners} />;
   }

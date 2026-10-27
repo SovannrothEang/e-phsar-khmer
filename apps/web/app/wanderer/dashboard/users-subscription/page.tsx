@@ -161,7 +161,7 @@ export default function SubscriptionPage() {
   });
   const { data: grantCategories = [] } = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: getSubCategories,
+    queryFn: () => getSubCategories(),
     enabled: isGrantOpen,
   });
   const { data: grantPlans = [] } = useQuery({

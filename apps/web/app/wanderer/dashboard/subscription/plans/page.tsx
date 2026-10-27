@@ -117,10 +117,17 @@ const emptyForm = {
 
 export default function SubscriptionPlanPage() {
   const queryClient = useQueryClient();
-  const { data: subscriptionCategories = [] } = useQuery({
+  // Cache the raw rows: this key is shared with the categories page, which
+  // reads `id`/`subcategoryIds`. Mapping here would hand that page the wrong
+  // shape (its toVerbose would yield undefined ids).
+  const { data: rawCategories = [] } = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: async () => (await getSubCategories()).map(toVerbose),
+    queryFn: () => getSubCategories(),
   });
+  const subscriptionCategories = useMemo(
+    () => rawCategories.map(toVerbose),
+    [rawCategories],
+  );
   const { data: rawPlans = [] } = useQuery({
     queryKey: ["admin", "sub", "plans"],
     queryFn: () => getSubPlans(),

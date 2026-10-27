@@ -1035,6 +1035,16 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...phoneBrandModelFields,
+          // Trusted product spec (2026-10-27): every phone ad must link one of
+          // the admin-entered spec pages. Required in the form only — the
+          // create DTO keeps `productModelId` optional like every other
+          // per-form rule. Only `phones` declares this key.
+          {
+            key: 'productSpec',
+            label: { en: 'Product Spec' },
+            type: 'product',
+            required: true,
+          },
           conditionField,
           {
             key: 'price',

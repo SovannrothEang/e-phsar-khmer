@@ -63,6 +63,7 @@ const LABEL_KEYS: Record<string, string> = {
   "Job Title": "jobTitle",
   Brand: "brand",
   Model: "model",
+  "Product Spec": "productSpec",
   Year: "year",
   "Tax Type": "taxType",
   Condition: "condition",
@@ -200,6 +201,15 @@ function TextInput({
           min={min}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
+          // Chrome changes a focused number input on wheel — scrolling the
+          // page with the cursor over the field just typed silently walked
+          // "1" down to "0" (captain, 2026-10-28). Blur on wheel so the
+          // scroll moves the page, never the value.
+          onWheel={
+            type === "number"
+              ? (event) => event.currentTarget.blur()
+              : undefined
+          }
           className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
           } ${trailing ? "pr-11" : "pr-3"}`}
@@ -230,6 +240,7 @@ function SearchPicker({
   placeholder,
   emptyLabel,
   showOnlyKm,
+  resolveInput,
 }: {
   label: string;
   options: {
@@ -248,6 +259,12 @@ function SearchPicker({
   emptyLabel?: string;
   /** Drop the English half of `nameKm/name` (colours and the range pickers). */
   showOnlyKm?: boolean;
+  /**
+   * Optional paste resolver (the Product Spec picker): a pasted product URL is
+   * matched against the loaded options and selected outright. Normal search
+   * filtering is untouched — a miss simply falls through to it.
+   */
+  resolveInput?: (text: string) => { id: string; name: string } | null;
 }) {
   const t = useTranslations("PostForm");
   const locale = useLocale();
@@ -288,6 +305,22 @@ function SearchPicker({
           <button
             type="button"
             disabled={disabled}
+            // Keyboard paste on the focused (closed) trigger: the placeholder
+            // invites pasting a link, so it must work before the panel opens
+            // too — clicking the trigger opens the panel and pastes land in
+            // the CommandInput instead.
+            onPaste={
+              resolveInput
+                ? (event) => {
+                    const hit = resolveInput(
+                      event.clipboardData.getData("text"),
+                    );
+                    if (!hit) return;
+                    event.preventDefault();
+                    onChange(hit.id);
+                  }
+                : undefined
+            }
             className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left type-body focus:outline-none ${
               disabled
                 ? "cursor-not-allowed bg-gray-100 text-gray-400"
@@ -309,7 +342,22 @@ function SearchPicker({
           className="w-[var(--radix-popover-trigger-width)] p-0"
         >
           <Command>
-            <CommandInput placeholder={t("search")} />
+            <CommandInput
+              placeholder={t("search")}
+              onPaste={
+                resolveInput
+                  ? (event) => {
+                      const hit = resolveInput(
+                        event.clipboardData.getData("text"),
+                      );
+                      if (!hit) return;
+                      event.preventDefault();
+                      onChange(hit.id);
+                      setOpen(false);
+                    }
+                  : undefined
+              }
+            />
             <CommandList>
               <CommandEmpty>{emptyLabel ?? t("noMatch")}</CommandEmpty>
               {options.map((option) => {
@@ -431,6 +479,9 @@ export default function ListingPostForm({
   const [models, setModels] = useState<BackendModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [model, setModel] = useState("");
+  // The trusted spec page this phone ad links to (a `models` id). Kept apart
+  // from `attributes` — the backend stores it on `listings.product_model_id`.
+  const [productModelId, setProductModelId] = useState("");
   const [year, setYear] = useState("");
   const [condition, setCondition] = useState("");
   const [vehicleType, setVehicleType] = useState("");
@@ -516,6 +567,9 @@ export default function ListingPostForm({
   const onBrandChange = async (id: string) => {
     setBrandId(id);
     setModel("");
+    // Changing the ad's identity drops its spec link: the page is for one
+    // model, so a mismatched pair would advertise someone else's specs.
+    setProductModelId("");
     setModels([]);
     if (!id) return;
     setModelsLoading(true);
@@ -527,6 +581,73 @@ export default function ListingPostForm({
     } finally {
       setModelsLoading(false);
     }
+  };
+
+  /**
+   * Attach a trusted spec page. Selecting it also fills Brand/Model when they
+   * are still empty, so the ad and the linked page agree; a later Brand/Model
+   * change clears the link (see `onBrandChange` and the model picker).
+   */
+  const applyProductSelection = async (modelId: string) => {
+    setProductModelId(modelId);
+    const product = config?.products.find((p) => p.modelId === modelId);
+    if (!product) return;
+
+    if (has("brand") && brandId === "") {
+      if (!config?.brands.some((b) => b.id === product.brandId)) return;
+      setBrandId(product.brandId);
+      setModel("");
+      setModels([]);
+      setModelsLoading(true);
+      try {
+        const list = await getBrandModels(product.brandId, subcategorySlug);
+        setModels(list);
+        if (list.some((m) => m.name === product.modelName)) {
+          setModel(product.modelName);
+        }
+      } catch {
+        setModels([]);
+      } finally {
+        setModelsLoading(false);
+      }
+      return;
+    }
+
+    if (
+      has("model") &&
+      model === "" &&
+      models.some((m) => m.name === product.modelName)
+    ) {
+      setModel(product.modelName);
+    }
+  };
+
+  /**
+   * Pasted product URLs (`/en/product/apple/iphone-16`) resolve locally against
+   * the published list. A URL-shaped paste that does not resolve (an external
+   * link, or a product page that is not published) gets a toast — silently
+   * filtering the list read as "paste is not allowed" (2026-10-28).
+   */
+  const resolveProductPaste = (text: string) => {
+    const trimmed = text.trim();
+    const looksLikeUrl =
+      /^(https?:\/\/|\/)/i.test(trimmed) || trimmed.includes("/product/");
+    const match = trimmed.match(/\/?product\/([^/?#\s]+)\/([^/?#\s]+)\/?/);
+    const product = match
+      ? config?.products.find(
+          (p) =>
+            p.brandSlug === decodeURIComponent(match[1]) &&
+            p.modelSlug === decodeURIComponent(match[2]),
+        )
+      : undefined;
+    if (!product) {
+      if (looksLikeUrl) toast.error(t("errors.productLinkInvalid"));
+      return null;
+    }
+    return {
+      id: product.modelId,
+      name: `${product.brandName} ${product.modelName}`,
+    };
   };
 
   const submit = async () => {
@@ -541,7 +662,7 @@ export default function ListingPostForm({
     const priceNum = Number(price);
     if (
       has("price") &&
-      (price === "" || !Number.isFinite(priceNum) || priceNum < 0)
+      (price === "" || !Number.isFinite(priceNum) || priceNum <= 0)
     ) {
       toast.error(t("errors.priceInvalid"));
       return;
@@ -574,6 +695,12 @@ export default function ListingPostForm({
     }
     if (has("brand") && brandId === "") {
       toast.error(t("errors.brandRequired"));
+      return;
+    }
+    // The trusted spec link is starred on the phones form — enforce it here or
+    // the star is a lie (required-ness is never read from `field_schema`).
+    if (has("productSpec") && productModelId === "") {
+      toast.error(t("errors.productRequired"));
       return;
     }
     // The computers spec cluster — all starred on every form that declares them.
@@ -703,12 +830,18 @@ export default function ListingPostForm({
     if (has("condition")) {
       payload.condition = condition === "New" ? "new" : "used";
     }
-    if (has("discount") && discountValue !== "") {
+    // 0 / empty means "no discount" — never persist a zero discount, which the
+    // cards render as a real "-0%" badge and a pointless strikethrough price
+    // (captain, 2026-10-28).
+    if (has("discount") && Number(discountValue) > 0) {
       payload.discountValue = Number(discountValue);
       payload.discountType = discountType;
     }
     if (photos.length > 0) {
       payload.photos = photos.map((p, sort) => ({ ...p, sort }));
+    }
+    if (has("productSpec") && productModelId) {
+      payload.productModelId = productModelId;
     }
 
     setSubmitting(true);
@@ -1030,12 +1163,33 @@ export default function ListingPostForm({
             label={labelFor("model", "Model")}
             options={models.map((m) => ({ id: m.name, name: m.name }))}
             value={model}
-            onChange={setModel}
+            onChange={(id) => {
+              setModel(id);
+              // A different model means a different spec page — keep them in
+              // lockstep rather than linking an unrelated handset's specs.
+              setProductModelId("");
+            }}
             disabled={has("brand") && brandId === ""}
             placeholder={
               modelsLoading ? t("loadingModels") : t("placeholders.chooseModel")
             }
             emptyLabel={t("noModel")}
+          />
+        )}
+        {has("productSpec") && (
+          <SearchPicker
+            label={labelFor("productSpec", "Product Spec")}
+            options={config.products.map((p) => ({
+              id: p.modelId,
+              name: `${p.brandName} ${p.modelName}`,
+              image: p.image,
+            }))}
+            value={productModelId}
+            onChange={applyProductSelection}
+            resolveInput={resolveProductPaste}
+            placeholder={t("placeholders.chooseProduct")}
+            emptyLabel={t("noProduct")}
+            required
           />
         )}
         {conditionSlot === "lead" && conditionBlock}
@@ -1226,7 +1380,7 @@ export default function ListingPostForm({
             label={labelFor("price", "Price")}
             required
             type="number"
-            min={0}
+            min={0.01}
             prefix="$"
             value={price}
             onChange={setPrice}
@@ -1242,6 +1396,10 @@ export default function ListingPostForm({
                 min={0}
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
+                // Same wheel guard as TextInput: a scrolled focused field must
+                // not turn an untouched discount into "0" (which then rendered
+                // as a 0% discount).
+                onWheel={(event) => event.currentTarget.blur()}
                 className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
               <div className="flex shrink-0 overflow-hidden rounded-sm border border-gray-200">

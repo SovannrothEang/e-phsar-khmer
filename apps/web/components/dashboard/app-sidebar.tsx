@@ -32,6 +32,7 @@ import {
   IconUserCog,
   IconUserDollar,
   IconListDetails,
+  IconDeviceMobile,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { BrandWordmark } from "@/components/web/BrandWordmark";
@@ -49,7 +50,16 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Collapsible,
   CollapsibleContent,
@@ -153,6 +163,11 @@ export const menuItems: MenuItem[] = [
         icon: IconCalendarStats,
         href: "/wanderer/dashboard/attributes/years",
       },
+      {
+        title: "Product Specs",
+        icon: IconDeviceMobile,
+        href: "/wanderer/dashboard/products",
+      },
     ],
   },
   {
@@ -240,8 +255,63 @@ const documentItems: DocumentItem[] = [
   },
 ] as const; // <--- Add this
 
+type SubMenuItem = {
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  href: string;
+};
+
+/**
+ * The collapsed rail's version of a group: the parent icon opens its children
+ * in a dropdown. The label uses the native `title` (not SidebarMenuButton's
+ * `tooltip`) because a Radix dropdown trigger cannot be nested inside a Radix
+ * tooltip trigger via `asChild` — the tooltip wrapper swallows the trigger.
+ */
+function CollapsedGroupItem({
+  title,
+  icon: Icon,
+  items,
+}: {
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  items: readonly SubMenuItem[];
+}) {
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton title={title}>
+            <Icon className="size-4" />
+            <span>{title}</span>
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="start" className="w-48">
+          <DropdownMenuLabel>{title}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {items.map((subItem) => (
+            <DropdownMenuItem key={subItem.title} asChild>
+              <Link
+                href={subItem.href}
+                className="flex cursor-pointer items-center gap-2"
+              >
+                <subItem.icon className="size-4" />
+                <span>{subItem.title}</span>
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
+}
+
 export function AppSidebar({ userRole }: { userRole: string }) {
   const role = userRole as StaffRole;
+  const { state, isMobile } = useSidebar();
+  // The sidebar primitive hides SidebarMenuSub in the icon rail, so a group's
+  // parent has to open its children in a dropdown there instead of an inline
+  // collapsible that would render nowhere.
+  const collapsed = state === "collapsed" && !isMobile;
   // super_admin is a governance tier, not a bigger admin tier: it sees only
   // the entries that name it, which is why this filters in both directions.
   const visibleMenuItems = menuItems.filter(
@@ -249,13 +319,13 @@ export function AppSidebar({ userRole }: { userRole: string }) {
   );
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-[7px]">
         <div className="flex items-center justify-between">
           {/* LEFT SIDE */}
 
           <Link
             href="/"
-            className="flex items-center gap-2 w-full justify-start overflow-hidden"
+            className="flex items-center gap-2 w-full justify-start overflow-hidden group-data-[collapsible=icon]:justify-center"
           >
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-foreground text-background">
               <span className="text-sm font-bold">P</span>
@@ -273,6 +343,16 @@ export function AppSidebar({ userRole }: { userRole: string }) {
               {visibleMenuItems.map((item) => {
                 // If the item has sub-items (like Attributes), render a Collapsible group
                 if (item.items) {
+                  if (collapsed) {
+                    return (
+                      <CollapsedGroupItem
+                        key={item.title}
+                        title={item.title}
+                        icon={item.icon}
+                        items={item.items}
+                      />
+                    );
+                  }
                   return (
                     <Collapsible key={item.title} className="group/collapsible">
                       <SidebarMenuItem>
@@ -315,33 +395,42 @@ export function AppSidebar({ userRole }: { userRole: string }) {
               })}
             </SidebarMenu>
           </SidebarGroupContent>
-          {role === "admin" && (
-            <Collapsible className="group/collapsible">
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton tooltip="Subscriptions">
-                    <CreditCard className="size-4" />
-                    <span>Subscriptions</span>
-                    <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {subscriptionSubItems.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild>
-                          <Link href={subItem.href}>
-                            <subItem.icon className="size-4" />
-                            <span>{subItem.title}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          )}
+          {role === "admin" &&
+            (collapsed ? (
+              <SidebarMenu>
+                <CollapsedGroupItem
+                  title="Subscriptions"
+                  icon={CreditCard}
+                  items={subscriptionSubItems}
+                />
+              </SidebarMenu>
+            ) : (
+              <Collapsible className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip="Subscriptions">
+                      <CreditCard className="size-4" />
+                      <span>Subscriptions</span>
+                      <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {subscriptionSubItems.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild>
+                            <Link href={subItem.href}>
+                              <subItem.icon className="size-4" />
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            ))}
         </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Moderation</SidebarGroupLabel>
@@ -350,6 +439,16 @@ export function AppSidebar({ userRole }: { userRole: string }) {
               {documentItems.map((item) => {
                 // If the item has sub-items (like Attributes), render a Collapsible group
                 if (item.items) {
+                  if (collapsed) {
+                    return (
+                      <CollapsedGroupItem
+                        key={item.title}
+                        title={item.title}
+                        icon={item.icon}
+                        items={item.items}
+                      />
+                    );
+                  }
                   return (
                     <Collapsible key={item.title} className="group/collapsible">
                       <SidebarMenuItem>

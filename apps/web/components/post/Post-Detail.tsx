@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useFormatter, useTranslations } from "next-intl";
+import { Link } from "@/i18n/routing";
 import { Truck } from "lucide-react";
 import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
 import type { AdvertisementCard } from "@/lib/api/advertisements";
@@ -26,7 +27,7 @@ import { PostSocialActions } from "./PostSocialActions";
 import { ApplyJobButton } from "./ApplyJobButton";
 import type { ApplyResumeSummary } from "./ApplyJobDialog";
 import ListingSpecs from "./ListingSpecs";
-import type { BackendListing } from "@/lib/api/categories";
+import type { BackendListing, BackendProductRef } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
 import type { ListingContext } from "@/types/chat";
@@ -47,6 +48,8 @@ export interface RealDetailData {
   subcate?: { slug: string; name: string };
   brand?: { slug: string; name: string };
   model?: { slug: string; name: string };
+  /** Trusted spec page linked to this listing, while published. */
+  product?: BackendProductRef | null;
   seller: User;
 }
 
@@ -70,9 +73,18 @@ function toPostView(l: BackendListing): Post {
       ? Number(l.price)
       : null;
   const discount =
-    l.discountValue !== null && l.discountType !== null
+    l.discountValue !== null &&
+    l.discountType !== null &&
+    Number(l.discountValue) > 0
       ? `${Number(l.discountValue)}${l.discountType === "percent" ? "%" : " $"}`.trim()
       : undefined;
+  // A zero/negative discount is "no discount" — do not strike through the
+  // price for it (the "-0%" badge bug, captain 2026-10-28).
+  const hasDiscount =
+    price !== null &&
+    l.discountType !== null &&
+    l.discountValue !== null &&
+    Number(l.discountValue) > 0;
   return {
     postId: l.id,
     userId: l.userId,
@@ -89,8 +101,7 @@ function toPostView(l: BackendListing): Post {
     subId: "",
     brandId: undefined,
     modelId: undefined,
-    oldPrice:
-      price !== null && l.discountValue && l.discountType ? price : undefined,
+    oldPrice: hasDiscount ? (price ?? undefined) : undefined,
     discount,
     description: l.description ?? "",
     createdat: new Date(l.createdAt),
@@ -172,6 +183,9 @@ export default function PostDetail({
   const subcate = isReal ? real.subcate : getSubCategoryById(post.subId);
   const brand = isReal ? real.brand : getBrandById(post.brandId ?? "");
   const model = isReal ? real.model : getModelById(post.modelId ?? "");
+  // Only real listings can carry a trusted spec page; the backend nulls it
+  // once the page is unpublished, so the link hides by itself.
+  const product = isReal ? real.product : undefined;
 
   const hasBrand = !!brand;
   const hasModel = !!model;
@@ -180,6 +194,11 @@ export default function PostDetail({
   // pair beside the title and carries the Apply control (captain's mock,
   // 2026-10-16). Every other listing renders exactly as before.
   const isJobListing = isReal && cate?.slug === "jobs";
+
+  // A lapsed ad keeps its link (shares, old messages) but is no longer a live
+  // offer: the API reports it as `expired`, and the page must say so and stop
+  // offering contact (captain, 2026-10-27).
+  const isExpired = isReal && real.listing.status === "expired";
 
   // Mock listings have no matching row in the real `listings` table — attaching
   // their id would only 400 once a message actually tries to send it.
@@ -280,6 +299,11 @@ export default function PostDetail({
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 w-full min-w-38 space-y-4">
             <div className="bg-card border rounded-sm overflow-hidden">
+              {isExpired && (
+                <div className="border-l-3 border-l-[#f68b1e] bg-[#fdf0e6] px-4 py-3 type-body-sm text-foreground">
+                  {t("Post.expiredNotice")}
+                </div>
+              )}
               {/* A job ad leads with its logo beside the details, not with a
                   full-bleed banner (the captain's mock): the strip of small
                   images is the gallery, the title/price/Apply block sits next
@@ -326,6 +350,22 @@ export default function PostDetail({
                       })}
                     </div>
                   </div>
+                  {product && (
+                    <div className="mt-3">
+                      <Link
+                        href={{
+                          pathname: "/product/[brand]/[model]",
+                          params: {
+                            brand: product.brandSlug,
+                            model: product.modelSlug,
+                          },
+                        }}
+                        className="inline-flex items-center gap-1 rounded-sm border border-sky-100 bg-blue-50 px-2 py-1 type-body-sm text-[#00a0e9] hover:underline"
+                      >
+                        {t("Post.viewFullSpecs")}
+                      </Link>
+                    </div>
+                  )}
                   {post.freeDelivery && (
                     <div className="mt-3">
                       <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-[#00a0e9] type-button-sm rounded-sm border border-blue-100">
@@ -392,6 +432,7 @@ export default function PostDetail({
                   locationLine={isReal ? fullLocation : undefined}
                   addressLine={addressLine}
                   listingId={real?.listing.id}
+                  contactDisabled={isExpired}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
                 <ThreeButton post={post} viewerId={viewerId} />

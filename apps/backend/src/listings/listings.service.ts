@@ -24,6 +24,8 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
 import { ReactionsService } from '../reactions/reactions.service';
 import { EntitlementsService } from '../subscriptions/entitlements.service';
+import { ProductsService } from '../products/products.service';
+import type { ProductRef } from '../products/products.service';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { listingEvents } from '../db/schema/insights.schema';
@@ -82,6 +84,14 @@ export interface ListingWithPhotos extends ListingRow {
    * starts truthful. Counted on read; there is no counter column to drift.
    */
   likeCount?: number;
+  /**
+   * The trusted spec page linked to this ad, resolved by `findById` only.
+   * Null when the listing has no `productModelId`, or the spec has since been
+   * unpublished / its brand or model deactivated — the detail page hides the
+   * "View full specs" link on null, while `productModelId` still reports the
+   * stored link.
+   */
+  product?: ProductRef | null;
 }
 
 export interface FeedFacet {
@@ -104,6 +114,21 @@ interface ResolvedFilters {
   geo: SQL[];
 }
 
+/**
+ * What a listing's status means to a client. Nothing flips `status` when the
+ * 30-day window closes (see `liveConditions`), so a lapsed `active` row must
+ * read as `expired` wherever the stored word would otherwise claim it is live.
+ */
+function effectiveStatus(
+  listing: Pick<ListingRow, 'status' | 'expiresAt'>,
+): ListingRow['status'] {
+  return listing.status === 'active' &&
+    listing.expiresAt !== null &&
+    listing.expiresAt.getTime() <= Date.now()
+    ? 'expired'
+    : listing.status;
+}
+
 @Injectable()
 export class ListingsService {
   constructor(
@@ -111,6 +136,7 @@ export class ListingsService {
     private readonly filesService: FilesService,
     private readonly reactionsService: ReactionsService,
     private readonly entitlements: EntitlementsService,
+    private readonly products: ProductsService,
   ) {}
 
   /**
@@ -152,6 +178,13 @@ export class ListingsService {
       .limit(1);
     if (!sub) throw new NotFoundException('Subcategory not found');
 
+    // Trusted spec link: only a published page is a legal target. The read
+    // happens before the transactional write (see the TOCTOU note in the
+    // products service); the column is nullable for pre-existing ads.
+    if (dto.productModelId) {
+      await this.products.assertPublishedModel(dto.productModelId);
+    }
+
     const values: NewListing = {
       userId,
       categoryId: dto.categoryId,
@@ -172,6 +205,7 @@ export class ListingsService {
       provinceId: dto.provinceId ?? null,
       districtId: dto.districtId ?? null,
       communeId: dto.communeId ?? null,
+      productModelId: dto.productModelId ?? null,
       deliveryFree: dto.deliveryFree ?? false,
       contactName: dto.contactName ?? null,
       contactPhones: dto.contactPhones ?? [],
@@ -270,6 +304,12 @@ export class ListingsService {
       updates.discountType = dto.discountType ?? null;
     if (dto.condition !== undefined) updates.condition = dto.condition ?? null;
     if (dto.attributes !== undefined) updates.attributes = dto.attributes;
+    if (dto.productModelId !== undefined) {
+      if (dto.productModelId) {
+        await this.products.assertPublishedModel(dto.productModelId);
+      }
+      updates.productModelId = dto.productModelId ?? null;
+    }
     if (dto.location !== undefined) updates.location = dto.location;
     if (dto.address !== undefined) updates.address = dto.address;
     if (dto.latitude !== undefined)
@@ -357,13 +397,16 @@ export class ListingsService {
       .limit(1);
     if (!row) throw new NotFoundException('Listing not found');
 
-    const [photos, likeCount] = await Promise.all([
+    const [photos, likeCount, product] = await Promise.all([
       this.db
         .select()
         .from(listingPhotos)
         .where(eq(listingPhotos.listingId, row.listing.id))
         .orderBy(listingPhotos.sort),
       this.reactionsService.countLikes(row.listing.id),
+      row.listing.productModelId
+        ? this.products.getPublishedRefByModelId(row.listing.productModelId)
+        : Promise.resolve(null),
     ]);
 
     return {
@@ -371,6 +414,7 @@ export class ListingsService {
       photos,
       sellerUsername: row.sellerUsername ?? null,
       likeCount,
+      product,
     };
   }
 
@@ -642,7 +686,22 @@ export class ListingsService {
     const limit = query.limit ?? 20;
     const conditions: SQL[] = [eq(listings.userId, userId)];
 
-    if (query.status) {
+    if (query.status === 'active') {
+      // "Active" means live right now, not merely the stored word: an ad past
+      // its 30-day window belongs to the Expired tab below.
+      conditions.push(...this.liveConditions());
+    } else if (query.status === 'expired') {
+      conditions.push(
+        or(
+          eq(listings.status, 'expired'),
+          and(
+            eq(listings.status, 'active'),
+            isNotNull(listings.expiresAt),
+            sql`${listings.expiresAt} <= now()`,
+          ),
+        )!,
+      );
+    } else if (query.status) {
       conditions.push(
         eq(listings.status, query.status as ListingRow['status']),
       );
@@ -684,6 +743,9 @@ export class ListingsService {
     const photosMap = await this.batchLoadPhotos(rows.map((l) => l.id));
     const dataWithPhotos = rows.map((l) => ({
       ...l,
+      // Same derived status the public detail reports, so the owner's tabs and
+      // the card badge never disagree with what browsing shows.
+      status: effectiveStatus(l),
       photos: photosMap.get(l.id) ?? [],
     }));
 
@@ -1047,7 +1109,17 @@ export class ListingsService {
   async findPublicById(id: string): Promise<ListingWithPhotos> {
     const listing = await this.findById(id);
     if (listing.moderatedAt) throw new NotFoundException('Listing not found');
-    return listing;
+    // The public detail must not serve what the marketplace already hides:
+    // a never-published draft, or an ad its owner withdrew. (Moderated rows
+    // are `deleted` too, and are rejected just above with their own comment.)
+    if (listing.status === 'draft' || listing.status === 'deleted') {
+      throw new NotFoundException('Listing not found');
+    }
+    // A lapsed ad keeps its link (shares, old messages, search history) but
+    // must read as expired — the page shows the notice and stops offering
+    // contact instead of pretending the offer is still live.
+    const status = effectiveStatus(listing);
+    return status === listing.status ? listing : { ...listing, status };
   }
 
   /**

@@ -354,7 +354,7 @@ export default function FeedbackPage() {
             </DialogHeader>
             <DialogFooter>
               <Button
-                className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+                className="h-9 rounded-sm cursor-pointer"
                 onClick={() => setIsDeleteDialogOpen(false)}
               >
                 Cancel

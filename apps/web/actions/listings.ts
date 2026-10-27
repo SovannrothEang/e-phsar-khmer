@@ -24,6 +24,8 @@ import {
   type ListingsFeedParams,
 } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
+import type { ProductSummary } from "@/types/product";
+import { getProducts } from "@/lib/api/products";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
@@ -176,6 +178,12 @@ export interface ListingFormConfig {
   labels: Record<string, string>;
   brands: BackendBrand[];
   /**
+   * Published trusted product pages — only fetched when this subcategory
+   * declares `productSpec` (the phones form). Drives the required picker and
+   * local resolution of pasted product URLs; capped at 200 for v1.
+   */
+  products: ProductSummary[];
+  /**
    * Resolved options for whichever "kind of vehicle" field this subcategory
    * declares — `bodyType` (cars, lorries, motorcycles) or `vehicleType`
    * (Vehicles For Rent, Parts & Accessories). See the resolver in
@@ -240,16 +248,25 @@ export async function getListingFormConfig(
     ),
   ];
 
-  const [brands, bodyTypes, colors, years, provinces, contact, pickerRows] =
-    await Promise.all([
-      has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
-      has("bodyType") || has("vehicleType") ? getBodyTypes() : [],
-      has("color") ? getColors() : [],
-      has("year") ? getYears() : [],
-      getProvinces(),
-      getUserContactPrefill(),
-      Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
-    ]);
+  const [
+    brands,
+    bodyTypes,
+    colors,
+    years,
+    provinces,
+    contact,
+    pickerRows,
+    products,
+  ] = await Promise.all([
+    has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
+    has("bodyType") || has("vehicleType") ? getBodyTypes() : [],
+    has("color") ? getColors() : [],
+    has("year") ? getYears() : [],
+    getProvinces(),
+    getUserContactPrefill(),
+    Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
+    has("productSpec") ? getProducts(undefined, 200) : [],
+  ]);
 
   /**
    * Scope an option set to this subcategory.
@@ -383,6 +400,7 @@ export async function getListingFormConfig(
     fields,
     labels,
     brands,
+    products,
     vehicleKinds,
     colors: forSub(colors),
     pickLists,
@@ -609,6 +627,8 @@ export interface CreateListingPayload {
   provinceId?: string;
   districtId?: string;
   communeId?: string;
+  /** Trusted spec page (a `models` id) — required by the phones form. */
+  productModelId?: string;
   latitude?: number;
   longitude?: number;
   deliveryFree?: boolean;

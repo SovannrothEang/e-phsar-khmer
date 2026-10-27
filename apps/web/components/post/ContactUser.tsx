@@ -16,6 +16,7 @@ export default function ContactUser({
   locationLine,
   addressLine,
   listingId,
+  contactDisabled = false,
 }: {
   user: { phone?: string[] };
   district?: { name?: string };
@@ -28,6 +29,8 @@ export default function ContactUser({
   addressLine?: string;
   /** Present on a real listing; drives call/show-contact tracking. */
   listingId?: string;
+  /** An expired ad: numbers stay masked and the reveal is never offered. */
+  contactDisabled?: boolean;
 }) {
   const t = useTranslations("Post");
   // Numbers stay masked until the visitor asks for them. The whole
@@ -63,6 +66,41 @@ export default function ContactUser({
   // The map link searches the most precise text we have, address included.
   const mapQuery = [heading, addressLine].filter(Boolean).join(", ");
 
+  // One list serves all three states: revealed (linked), expired (masked, no
+  // action offered) and the normal masked reveal button.
+  const phoneNodes = (linked: boolean) => (
+    <>
+      {phones.map((phone) => (
+        <span key={phone.value} className={`flex items-center ${phone.color}`}>
+          <CarrierBadge
+            phone={phone.value}
+            className="mr-1"
+            fallback={
+              <span
+                className={`${phone.badgeBg} text-white type-discount w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2`}
+              >
+                {phone.letter}
+              </span>
+            }
+          />
+          {linked ? (
+            <a
+              href={`tel:${phone.value}`}
+              onClick={() => {
+                if (listingId) trackEvent(listingId, "call");
+              }}
+              className="hover:underline"
+            >
+              {phone.value}
+            </a>
+          ) : (
+            maskPhone(phone.value)
+          )}
+        </span>
+      ))}
+    </>
+  );
+
   return (
     <>
       <div className="mt-4">
@@ -78,34 +116,12 @@ export default function ContactUser({
             <h3 className="type-card-heading mb-2">{t("contactPhones")}</h3>
             {revealed ? (
               <div className="flex flex-wrap items-center gap-5 type-nav">
-                {phones.map((phone) => (
-                  <span
-                    key={phone.value}
-                    className={`flex items-center ${phone.color}`}
-                  >
-                    <CarrierBadge
-                      phone={phone.value}
-                      className="mr-1"
-                      fallback={
-                        <span
-                          className={`${phone.badgeBg} text-white type-discount w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2`}
-                        >
-                          {phone.letter}
-                        </span>
-                      }
-                    />
-                    <a
-                      href={`tel:${phone.value}`}
-                      onClick={() => {
-                        if (listingId) trackEvent(listingId, "call");
-                      }}
-                      className="hover:underline"
-                    >
-                      {phone.value}
-                    </a>
-                  </span>
-                ))}
+                {phoneNodes(true)}
               </div>
+            ) : contactDisabled ? (
+              <span className="flex flex-wrap items-center gap-5 type-nav">
+                {phoneNodes(false)}
+              </span>
             ) : (
               <button
                 type="button"
@@ -116,25 +132,7 @@ export default function ContactUser({
                 className="-m-2 inline-block max-w-full cursor-pointer rounded-md p-2 text-left transition-colors hover:bg-muted"
               >
                 <span className="flex flex-wrap items-center gap-5 type-nav">
-                  {phones.map((phone) => (
-                    <span
-                      key={phone.value}
-                      className={`flex items-center ${phone.color}`}
-                    >
-                      <CarrierBadge
-                        phone={phone.value}
-                        className="mr-1"
-                        fallback={
-                          <span
-                            className={`${phone.badgeBg} text-white type-discount w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2`}
-                          >
-                            {phone.letter}
-                          </span>
-                        }
-                      />
-                      {maskPhone(phone.value)}
-                    </span>
-                  ))}
+                  {phoneNodes(false)}
                 </span>
                 <span className="mt-2 block text-[#00a0e9] type-meta italic">
                   {t("showPhone")}

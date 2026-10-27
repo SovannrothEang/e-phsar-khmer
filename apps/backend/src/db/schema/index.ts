@@ -13,6 +13,7 @@ export * from './notifications.schema';
 export * from './reactions.schema';
 export * from './feedback.schema';
 export * from './advertisements.schema';
+export * from './products.schema';
 export * from './resume.schema';
 export * from './applications.schema';
 export * from './insights.schema';

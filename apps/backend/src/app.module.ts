@@ -38,6 +38,7 @@ import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
+import { ProductsModule } from './products/products.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { BullModule } from '@nestjs/bullmq';
@@ -112,6 +113,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     NotificationsModule,
     OutboxModule,
     AttributesModule,
+    ProductsModule,
     AdminModule,
     PaymentModule,
     SubscriptionsModule,

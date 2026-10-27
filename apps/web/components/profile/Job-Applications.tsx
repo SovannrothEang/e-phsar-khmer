@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { FileUser, Loader2 } from "lucide-react";
+import { FileUser } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -13,49 +13,30 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "../ui/button";
 import { Link } from "@/i18n/routing";
-import { toast } from "@/components/ui/sonner";
 import { JobApplicationRow } from "./JobApplicationRow";
 import { ApplicantResumeDialog } from "./ApplicantResumeDialog";
 import { ContactSellerButton } from "@/components/chat/contact-seller-button";
-import {
-  loadMyReceivedApplications,
-  setApplicationStatus,
-} from "@/actions/applications";
-import type {
-  JobApplicationStatus,
-  ReceivedApplication,
-} from "@/types/applications";
-
-const STATUS_FILTERS: {
-  value: "all" | JobApplicationStatus;
-  labelKey: string;
-}[] = [
-  { value: "all", labelKey: "statusAll" },
-  { value: "pending", labelKey: "statusNew" },
-  { value: "viewed", labelKey: "statusViewed" },
-  { value: "hired", labelKey: "statusHired" },
-  { value: "rejected", labelKey: "statusRejected" },
-];
+import { loadMyReceivedApplications } from "@/actions/applications";
+import type { ReceivedApplication } from "@/types/applications";
 
 /**
  * `/me/job-applications` — applications to this account's job listings.
  *
- * The row is the whole workflow: open the résumé (which is also what marks the
- * application viewed, server-side), hire or reject, or continue in chat — the
- * thread already exists, because the application *was* the first message.
+ * The row is the workflow, and the workflow is conversation: open the résumé
+ * (which is also what marks the application viewed, server-side) or continue
+ * in chat — the thread already exists, because the application *was* the first
+ * message. There is deliberately no hire/reject action here: the decision
+ * belongs to the recruiter/interviewer in the conversation, not to a button
+ * that flips a status.
  */
 export default function JobApplications() {
   const t = useTranslations("Me.jobsPage");
   const tCommon = useTranslations("Common");
-  const [status, setStatus] = React.useState<"all" | JobApplicationStatus>(
-    "all",
-  );
   const [sort, setSort] = React.useState<"newest" | "oldest">("newest");
   const [items, setItems] = React.useState<ReceivedApplication[] | null>(null);
   const [page, setPage] = React.useState(1);
   const [hasMore, setHasMore] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
-  const [busyId, setBusyId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [resumeFor, setResumeFor] = React.useState<ReceivedApplication | null>(
     null,
@@ -65,10 +46,7 @@ export default function JobApplications() {
     let cancelled = false;
     void (async () => {
       setItems(null);
-      const result = await loadMyReceivedApplications({
-        page: 1,
-        status: status === "all" ? undefined : status,
-      });
+      const result = await loadMyReceivedApplications({ page: 1 });
       if (cancelled) return;
       setItems(result.items);
       setHasMore(result.hasMore);
@@ -77,17 +55,14 @@ export default function JobApplications() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, []);
 
   const loadMore = () => {
     if (loadingMore) return;
     setLoadingMore(true);
     void (async () => {
       const next = page + 1;
-      const result = await loadMyReceivedApplications({
-        page: next,
-        status: status === "all" ? undefined : status,
-      });
+      const result = await loadMyReceivedApplications({ page: next });
       setLoadingMore(false);
       if (result.error) {
         setError(result.error);
@@ -103,24 +78,6 @@ export default function JobApplications() {
       ]);
     })();
   };
-
-  async function decide(row: ReceivedApplication, next: "hired" | "rejected") {
-    setBusyId(row.id);
-    const result = await setApplicationStatus(row.id, next);
-    setBusyId(null);
-    if (!result.ok) {
-      toast.error(result.message);
-      return;
-    }
-    // Local, not a refetch: the row is already on screen and the server
-    // returned the state it now holds.
-    setItems((current) =>
-      (current ?? []).map((item) =>
-        item.id === row.id ? { ...item, status: result.data.status } : item,
-      ),
-    );
-    toast.success(next === "hired" ? t("markedHired") : t("markedRejected"));
-  }
 
   const rows = React.useMemo(() => {
     const list = [...(items ?? [])];
@@ -155,30 +112,6 @@ export default function JobApplications() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Select
-              value={status}
-              onValueChange={(value) =>
-                setStatus(value as "all" | JobApplicationStatus)
-              }
-            >
-              <SelectTrigger className="w-[180px] bg-card">
-                <SelectValue placeholder={t("statusAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_FILTERS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="cursor-pointer"
-                  >
-                    {option.value === "all"
-                      ? t("statusAll")
-                      : t("statusPrefix", { status: t(option.labelKey) })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select
               value={sort}
               onValueChange={(value) => setSort(value as "newest" | "oldest")}
@@ -251,7 +184,6 @@ export default function JobApplications() {
                       key={row.id}
                       view="received"
                       listing={row.listing}
-                      status={row.status}
                       createdAt={row.createdAt}
                       title={name}
                       subtitle={row.listing.company}
@@ -293,32 +225,6 @@ export default function JobApplications() {
                             variant="outline"
                             className="cursor-pointer"
                           />
-                          {row.status !== "hired" ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={busyId === row.id}
-                              onClick={() => void decide(row, "hired")}
-                              className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              {busyId === row.id ? (
-                                <Loader2 className="size-4 animate-spin" />
-                              ) : null}
-                              {t("hire")}
-                            </Button>
-                          ) : null}
-                          {row.status !== "rejected" ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={busyId === row.id}
-                              onClick={() => void decide(row, "rejected")}
-                              className="cursor-pointer text-destructive"
-                            >
-                              {t("reject")}
-                            </Button>
-                          ) : null}
                         </>
                       }
                     />

@@ -107,12 +107,31 @@ export default function ManageAds() {
     })();
   };
 
+  /**
+   * Row badge: the Expired chip on that tab, and — on Active — a warning once
+   * the 30-day window is within three days, so the owner sees it coming
+   * before the ad leaves the feed (and gets the matching notification).
+   */
+  function rowBadge(post: Post) {
+    const chip = (label: string) => (
+      <span className="rounded-sm bg-amber-500/10 px-1.5 py-0.5 type-discount text-amber-700 dark:text-amber-400">
+        {label}
+      </span>
+    );
+    if (activeTab === "expired") return chip(t("expired"));
+    const days = post.expiresInDays;
+    if (days === undefined || days <= 0 || days > 3) return undefined;
+    return chip(
+      days <= 1 ? t("expiresWithinDay") : t("expiresInDays", { days }),
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted pt-4">
       <div className="max-w-7xl mx-auto">
         {/* Controls card. The ad list is its own section below it (captain,
             2026-10-27): the listings must not share the Active/Expired card. */}
-        <div className="bg-card rounded-sm">
+        <div className="bg-card rounded-sm pb-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border">
             <h1 className="text-foreground text-xl py-2 px-4 pt-6">
               {t("title")}
@@ -154,7 +173,7 @@ export default function ManageAds() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mx-4 mb-4">
+          <div className="grid grid-cols-2 gap-3 mx-4">
             <button
               onClick={() => setActiveTab("active")}
               className={`h-10 rounded-md border text-base font-semibold transition-colors cursor-pointer ${
@@ -198,6 +217,7 @@ export default function ManageAds() {
                   <ProfileListingRow
                     key={post.postId}
                     post={post}
+                    badge={rowBadge(post)}
                     action={
                       <ManageAdActions
                         post={post}

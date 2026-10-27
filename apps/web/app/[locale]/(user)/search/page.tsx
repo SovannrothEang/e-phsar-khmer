@@ -15,12 +15,14 @@ import PriceFilter from "@/components/filter/PriceFilter";
 import MoreFilters from "@/components/filter/MoreFilters";
 import { FeedResults } from "@/components/search/FeedResults";
 import { CategoryFacets } from "@/components/search/CategoryFacets";
+import { ProductCard } from "@/components/product/ProductCard";
 import {
   getAllCategories,
   getListingsFeed,
   toCardPost,
   type ListingsFeedParams,
 } from "@/lib/api/categories";
+import { getProducts } from "@/lib/api/products";
 import {
   CATEGORY_PARAM,
   FILTER_PARAMS,
@@ -61,12 +63,14 @@ export default async function SearchPage({
   const t = await getTranslations("Search");
 
   const query: ListingsFeedParams = parseFeedParams(sp, { withCategory: true });
-  const [feed, tree] = await Promise.all([
+  const [feed, tree, products] = await Promise.all([
     getListingsFeed(
       { ...query, includeTotal: true, includeFacets: true },
       locale,
     ),
     getAllCategories(locale),
+    // Trusted product pages: only a keyword search has something to match on.
+    query.q ? getProducts(query.q, 6) : Promise.resolve([]),
   ]);
   const categories = tree ?? [];
   const posts = (feed?.items ?? []).map(toCardPost);
@@ -197,6 +201,21 @@ export default async function SearchPage({
               >
                 {t("fuzzyNotice", { q })}
               </p>
+            )}
+
+            {q && products.length > 0 && (
+              <section className="mt-4 rounded-sm border bg-card p-4">
+                <h2 className="type-section-title">{t("products")}</h2>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      viewSpecsLabel={t("viewSpecs")}
+                    />
+                  ))}
+                </div>
+              </section>
             )}
 
             {posts.length === 0 ? (

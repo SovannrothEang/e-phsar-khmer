@@ -7,21 +7,19 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import DbImage from "@/components/common/DbImage";
 import { formatPrice } from "@/lib/chat/format";
-import type {
-  ApplicationListing,
-  JobApplicationStatus,
-} from "@/types/applications";
+import type { ApplicationListing } from "@/types/applications";
 
 /**
  * One row of either /me job list. The two sides lead with different things —
  * a seeker reads the job, a poster reads the applicant — so the caller passes
  * what leads and this renders the shared shape: leading block, headline,
- * second line, meta line, badge, actions.
+ * second line, meta line, chips, actions. There is deliberately no status
+ * pill: the application workflow is the chat thread, not a hired/rejected
+ * state machine.
  */
 export function JobApplicationRow({
   view,
   listing,
-  status,
   createdAt,
   title,
   subtitle,
@@ -32,7 +30,6 @@ export function JobApplicationRow({
 }: {
   view: "applied" | "received";
   listing: ApplicationListing;
-  status: JobApplicationStatus;
   /** ISO — when the application was sent. */
   createdAt: string;
   /** The headline: the job title (seeker) or the applicant's name (poster). */
@@ -151,46 +148,10 @@ export function JobApplicationRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
-        <StatusBadge status={status} view={view} />
         {actions ? (
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </li>
-  );
-}
-
-/**
- * The status pill. `pending` reads "New" to the poster and "Pending" to the
- * seeker — the same state, named for the side looking at it (the two mocks
- * say so).
- */
-function StatusBadge({
-  status,
-  view,
-}: {
-  status: JobApplicationStatus;
-  view: "applied" | "received";
-}) {
-  const t = useTranslations("Me.jobsPage");
-  const styles: Record<JobApplicationStatus, string> = {
-    pending: "bg-amber-50 text-amber-700 border-amber-100",
-    viewed: "bg-blue-50 text-[#00a0e9] border-blue-100",
-    hired: "bg-green-50 text-green-700 border-green-100",
-    rejected: "bg-red-50 text-[#e3281b] border-red-100",
-  };
-  const labels: Record<JobApplicationStatus, string> = {
-    pending: view === "received" ? t("statusNew") : t("statusPending"),
-    viewed: t("statusViewed"),
-    hired: t("statusHired"),
-    rejected: t("statusRejected"),
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-sm border px-2 py-0.5 type-button-sm whitespace-nowrap ${styles[status]}`}
-    >
-      {labels[status]}
-    </span>
   );
 }
