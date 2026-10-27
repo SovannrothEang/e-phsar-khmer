@@ -254,6 +254,46 @@ belonging to (this account, this install)
 
 **Fail-closed on missing recipient keys (decision #6):** if `GET .../keys/:userId/bundle` 404s (recipient's client hasn't bootstrapped yet), the sender's client refuses the E2E send with a clear error — no plaintext fallback, no silent queue-and-retry. Dev-stage, this is easy: every test client can be forced through the bootstrap flow above before it's usable at all, so the 404 case becomes rare by construction rather than something to design a fallback UX around.
 
+### 9b. Key availability — a chat partner is never "not set up yet" (2026-10-27)
+
+End-to-end encryption is unchanged and strict (decision #6: no plaintext fallback, the server never holds a
+body it can read). What changed is that an account that has signed in is always reachable, and the sender
+no longer sees "ask them to open Messages once".
+
+1. **Registration invariant.** Every successful sign-in registers this browser as a device straight away:
+   `bootstrapE2eAfterAuth` (`apps/web/lib/e2e/bootstrap-after-auth.ts`) runs after a password login and
+   after an OTP verify (login and registration). Measured in a fresh browser profile: the device row exists
+   ~0.75 s after submit, before the redirect, with no reload. `E2eBackupProvider` remains the safety net.
+2. **Targetability rule** (`loadTargetDevices`, `apps/backend/src/chat/e2e/e2e-devices.util.ts`). Per user:
+   the non-revoked devices seen within `DEVICE_STALE_DAYS` (30); if there are none, the
+   `STALE_FALLBACK_DEVICES` (2) most recently seen non-revoked devices. The devices list, the bundle fetch
+   and both send-path set checks all call it, so the sender's envelope set and the server's expected set
+   cannot disagree. A user with at least one non-revoked device is therefore always targetable.
+   **Limit:** a message to a stale device is readable only if the person comes back on that same browser; a
+   different browser or cleared data is a new device with no envelope for it (only the history backup helps).
+3. **Staying fresh.** The leader tab re-runs the device heartbeat and prekey top-up about every 6 h and on
+   becoming visible after a long gap (`heartbeat-schedule.ts`). After the first bootstrap the browser is
+   asked for persistent storage (`navigator.storage.persist()`), since identity keys live only in
+   IndexedDB. Consecutive bootstrap failures are counted (`bootstrap-health.ts`) and one dismissible notice
+   appears in the chat column after two in a row (storage blocked vs other).
+4. **A recipient with no device at all** (never signed in on an E2E build). The sender **holds** the sealed
+   message locally (`held-sends.ts`, IndexedDB `npic-e2e-held-sends`, glue in `held-sends-runtime.ts`):
+   - the bubble reads "Waiting for <name> to join secure chat. It will send automatically." with Cancel;
+   - it is retried when the thread opens and by one app-wide loop that exists only while something is held
+     (30 s, doubling to 2 min; leader tab, visible tabs only); a send happens at most once (per-recipient
+     Web Lock plus a re-read before each send, and the server dedups on `clientMessageId`);
+   - after 14 days, or on a permanent 4xx error, it becomes a visible "not sent" row with Remove;
+   - encrypted-attachment sends use the same hold through the attachment outbox.
+5. **Nudge.** The first held message for a recipient calls `POST /chats/e2e/nudge/:userId`: JWT, 404 unknown
+   user, 403 when either side blocked the other, a no-op when this sender already nudged this recipient in
+   the last 24 h (checked against the `notifications` table, no migration). It creates an in-app
+   notification `chat.e2e_nudge` with a fixed title (or the title of an optional attached listing) and no
+   body. **No Telegram delivery yet**: the codebase has no Telegram messaging channel (Telegram is login only).
+
+**Residual limits.** Held plaintext sits in the sender's IndexedDB until sent, cancelled or expired (the
+same exposure as the decrypted-message cache). The nudge reveals that someone wants to talk, never what
+they said. A held message survives only as long as the sender's browser profile does.
+
 ## Deciding the numeric parameters — two different methods, bucketed by what the number actually depends on
 
 Don't treat every unresolved constant the same way. Split them by whether the right answer depends on **this app's content/traffic** or on **X3DH/Double Ratchet protocol mechanics that don't care whose app it is**:

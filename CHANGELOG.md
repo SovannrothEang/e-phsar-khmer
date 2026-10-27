@@ -21,6 +21,25 @@ How to use this file:
 
 ### Changed
 
+- **A chat partner is never "not set up yet"** (`Plans.md`, "Signal-model key availability"; design in
+  `docs/e2e-encryption.md` section 9b). (1) The browser registers its E2E device as part of signing in
+  (password and OTP login, OTP registration), not when a layout happens to render. (2) A user who went quiet
+  is still reachable: when none of a user's devices was seen within 30 days, their 2 most recently seen
+  non-revoked devices stay targets (`loadTargetDevices`, the one helper behind the devices list, the bundle
+  fetch and the send-path set check). (3) A message to someone with no device at all is **held** in the
+  sender's browser ("Waiting for <name> to join secure chat"), retried by a loop that only runs while
+  something is held, sent at most once, and shown as "not sent" after 14 days; the first one sends a
+  content-free in-app nudge (`POST /chats/e2e/nudge/:userId`, 24 h per sender and recipient). (4) A visible
+  tab re-runs the device heartbeat every ~6 h, asks for persistent storage, and shows a notice when the
+  browser repeatedly cannot create keys. The "Ask them to open Messages once" error is gone in all six
+  locales. Nothing is ever sent in the clear. Known gaps: no Telegram nudge (no messaging channel exists);
+  a message to a stale device is readable only if that person returns on the same browser; the
+  release-on-registration path is unit-tested but was not exercised against a real registering account.
+
+- **Chat "share location" opens a map picker.** The Location tile opens a dialog with a map; "Use current
+  location" is the only thing that asks the browser for GPS (inline messages for denied, timeout,
+  unavailable and unsupported). `LocationMapCanvas` gained an optional `flyTo` prop.
+
 - **Hidden tabs no longer poll the backend** (Vercel usage investigation; plan in `Plans.md`). The backend runs
   as a container that scales to zero within about a minute, and a hidden tab's throttled timer fired the E2E
   backup sync and approvals poll once a minute, which is just slow enough that **every call cold-started the
