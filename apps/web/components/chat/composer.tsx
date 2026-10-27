@@ -27,6 +27,7 @@ import {
 } from "@/components/chat/voice-player";
 import { AdPicker } from "@/components/chat/ad-picker";
 import type { PickedAd } from "@/components/chat/ad-picker";
+import { LocationPickerDialog } from "@/components/chat/location-picker-dialog";
 
 export interface ComposerDraft {
   body?: string;
@@ -107,13 +108,16 @@ export function Composer({
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedImage[]>([]);
   const [location, setLocation] = useState<StagedLocation | null>(null);
-  const [locating, setLocating] = useState(false);
   const [voice, setVoice] = useState<StagedVoice | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [attachOpen, setAttachOpen] = useState(false);
   const [ad, setAd] = useState<PickedAd | null>(null);
   const [adPickerOpen, setAdPickerOpen] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  // Bumped on every open so `LocationPickerDialog` remounts fresh instead of
+  // carrying over a previous pick, GPS fix or error message.
+  const [locationPickerKey, setLocationPickerKey] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -342,38 +346,12 @@ export function Composer({
     else void startRecording();
   }
 
-  function requestLocation() {
-    if (locating) return;
-    // Only ever ask after an explicit click — a permission prompt on mount is
-    // hostile, and most threads never share a position.
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setAttachOpen(false);
-      toast.error(t("composer.locationUnsupported"));
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!aliveRef.current) return;
-        setLocating(false);
-        setAttachOpen(false);
-        const accuracy = position.coords.accuracy;
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          ...(Number.isFinite(accuracy) ? { accuracyMeters: accuracy } : {}),
-        });
-        toast.success(t("composer.locationReady"));
-        onActivity?.();
-      },
-      () => {
-        if (!aliveRef.current) return;
-        setLocating(false);
-        setAttachOpen(false);
-        toast.error(t("composer.locationError"));
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
-    );
+  function openLocationPicker() {
+    // Only ever opens the dialog here — the GPS prompt itself lives inside
+    // `LocationPickerDialog`, behind its own "use current location" button.
+    setAttachOpen(false);
+    setLocationPickerKey((key) => key + 1);
+    setLocationPickerOpen(true);
   }
 
   function addFiles(files: File[]) {
@@ -632,16 +610,10 @@ export function Composer({
                 }}
               />
               <AttachTile
-                icon={
-                  locating ? <Loader2 className="animate-spin" /> : <MapPin />
-                }
-                label={
-                  locating
-                    ? t("composer.locationLocating")
-                    : t("composer.tileLocation")
-                }
-                disabled={sending || locating}
-                onClick={() => requestLocation()}
+                icon={<MapPin />}
+                label={t("composer.tileLocation")}
+                disabled={sending}
+                onClick={openLocationPicker}
               />
               <AttachTile
                 icon={<Tag />}
@@ -783,6 +755,16 @@ export function Composer({
         onOpenChange={setAdPickerOpen}
         onSelect={(picked) => {
           setAd(picked);
+          onActivity?.();
+        }}
+      />
+
+      <LocationPickerDialog
+        key={locationPickerKey}
+        open={locationPickerOpen}
+        onOpenChange={setLocationPickerOpen}
+        onConfirm={(picked) => {
+          setLocation(picked);
           onActivity?.();
         }}
       />
