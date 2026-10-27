@@ -204,12 +204,13 @@ export class SendMessageDto {
 
 `chat.gateway.ts`'s `send_message` event already forwards the full DTO into `ChatService.sendMessage`. `e2eHeader` rides along for free. This is the one place the module's existing "one write path, REST or WS" design (documented in `chat/README.md`) pays off directly for this feature — zero WS-specific crypto work.
 
-### 7b. Realtime hints for backup and approvals (shipped 2026-10-26)
+### 7b. Realtime hint for the backup (2026-10-26)
 
-The three history-backup events (`e2e.history_requested`, `e2e.history_resolved`, `e2e.backup_updated`) ride the same
-`notification` frame as any other push, to the user's own tabs only, with ids and no ciphertext. They replace the
-old 20 s approvals poll and 60 s backup pull while the socket is up; the poll stays as a 5-minute safety net and as
-the fallback when the socket is down. Contract and delivery rules: `apps/backend/src/chat/README.md`.
+The one backup event (`e2e.backup_updated`, fired when another device uploads segments) rides the same
+`notification` frame as any other push, to the user's own tabs only, with ids and no ciphertext. It replaces the
+old 60 s backup pull while the socket is up; the poll stays as a 5-minute safety net and as the fallback when the
+socket is down. Contract and delivery rules: `apps/backend/src/chat/README.md`. Device approval was removed the
+same day — the backup passcode is the only way a new device obtains the backup key.
 
 ### 8. Client-side key storage
 

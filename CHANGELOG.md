@@ -69,6 +69,27 @@ How to use this file:
   The first input, or the tab being shown again, reopens everything and the reconnect refreshes inbox and unread. A
   message that arrives meanwhile appears on that first input, not before.
 
+### Removed
+
+- **New-device approval is gone; the backup passcode is the only restore path.** A device that cannot read older
+  history can now only unlock the account's backup key with the passcode. Removed end to end: the
+  `history-requests` API (`create` / `mine` / `pending` / `approve` / `decline` / `consume`), the
+  device-to-device key envelope and its Double Ratchet handling, the `e2e.history_requested` /
+  `e2e.history_resolved` push events, the approval dialog and "Ask my other device" UI, and the
+  `chat.e2e_history_requests` table (migration `0041_brainy_plazm`). The only realtime hint left is
+  `e2e.backup_updated` (another device uploaded segments), which still drives a sync.
+
+### Changed
+
+- **A backup passcode is required before the backup is usable elsewhere.** It was optional (a dismissible nudge);
+  without approval, a backup with no passcode is a dead end — a new device has no way in. A device that holds the
+  key and has no passcode now gets a forced, non-dismissible "Set a backup passcode" dialog. Accounts that already
+  have a backup without a passcode keep working on the devices that hold the key; setting one there makes the
+  history restorable on a new device. The locked-device copy now explains the passcode-only path (and what to do
+  when no passcode was ever set) instead of offering approval. A locked device now asks for the passcode when the
+  user first opens a conversation (once per browser session); the per-message "Restore chat history" link was
+  removed, and the undecryptable-message note now points at the backup passcode instead of another device.
+
 ### Known issues
 
 - The cause of the high Vercel usage is inferred from a 50-row log sample and the code: per-project and

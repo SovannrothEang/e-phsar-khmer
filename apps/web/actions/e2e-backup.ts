@@ -1,13 +1,13 @@
 "use server";
 
 import { userServerFetch, ApiError } from "@/lib/api/user-client";
-import type { ChatActionResult, E2eHeader } from "@/types/chat";
+import type { ChatActionResult } from "@/types/chat";
 
 /**
- * Server actions for the encrypted chat-history backup and new-device
- * approval (`/chats/e2e/backup`, `/chats/e2e/history-requests`). Everything
- * crossing this boundary is ciphertext or a passcode-DERIVED auth key —
- * never the passcode, the backup key, or plaintext.
+ * Server actions for the encrypted chat-history backup
+ * (`/chats/e2e/backup`, `/chats/e2e/backup/segments`). Everything crossing this
+ * boundary is ciphertext or a passcode-DERIVED auth key — never the passcode or
+ * the backup key.
  */
 
 export interface BackupKdfParams {
@@ -30,18 +30,6 @@ export interface BackupSegmentPage {
   items: { id: string; ciphertext: string; messageCount: number }[];
   nextCursor: string | null;
   latestCursor: string | null;
-}
-
-export interface HistoryRequest {
-  id: string;
-  requesterDeviceId: string;
-  requesterLabel: string | null;
-  status: "pending" | "approved" | "declined" | "expired" | "consumed";
-  approverDeviceId: string | null;
-  header: E2eHeader | null;
-  wrappedKey: string | null;
-  createdAt: string;
-  expiresAt: string;
 }
 
 function toFailure(err: unknown): ChatActionResult<never> {
@@ -128,54 +116,5 @@ export async function fetchBackupSegments(deviceId: string, cursor?: string) {
   if (cursor) params.set("cursor", cursor);
   return call<BackupSegmentPage>(
     `/chats/e2e/backup/segments?${params.toString()}`,
-  );
-}
-
-export async function createHistoryRequest(deviceId: string) {
-  return call<HistoryRequest>(
-    "/chats/e2e/history-requests",
-    post({ deviceId }),
-  );
-}
-
-export async function fetchMyHistoryRequest(deviceId: string) {
-  return call<HistoryRequest | null>(
-    `/chats/e2e/history-requests/mine?deviceId=${deviceId}`,
-  );
-}
-
-export async function fetchPendingHistoryRequests(deviceId: string) {
-  return call<HistoryRequest[]>(
-    `/chats/e2e/history-requests/pending?deviceId=${deviceId}`,
-  );
-}
-
-export async function approveHistoryRequest(
-  requestId: string,
-  input: { approverDeviceId: string; header: E2eHeader; wrappedKey: string },
-) {
-  return call<{ ok: true }>(
-    `/chats/e2e/history-requests/${requestId}/approve`,
-    post(input),
-  );
-}
-
-export async function declineHistoryRequest(
-  requestId: string,
-  approverDeviceId: string,
-) {
-  return call<{ ok: true }>(
-    `/chats/e2e/history-requests/${requestId}/decline`,
-    post({ approverDeviceId }),
-  );
-}
-
-export async function consumeHistoryRequest(
-  requestId: string,
-  deviceId: string,
-) {
-  return call<{ ok: true }>(
-    `/chats/e2e/history-requests/${requestId}/consume`,
-    post({ deviceId }),
   );
 }

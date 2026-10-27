@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState } from "react";
 import { useTranslations } from "next-intl";
-import { KeyRound, Loader2, Smartphone } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,9 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useE2eBackup } from "@/hooks/use-e2e-backup";
+import { useE2eCatchUp } from "@/hooks/use-e2e-catch-up";
 import type { E2eBackupApi } from "@/hooks/use-e2e-backup";
 import { MIN_PASSCODE_LENGTH } from "@/lib/e2e/backup-crypto";
-import type { HistoryRequest } from "@/actions/e2e-backup";
 
 const E2eBackupContext = createContext<E2eBackupApi | null>(null);
 
@@ -29,11 +29,10 @@ export function useE2eBackupContext(): E2eBackupApi | null {
 /**
  * Mounted once per signed-in app shell (the (user) and (chat) layouts).
  *
- * The backup must run even when the chat page is closed: uploads, pulls, the
- * new-device approval prompt and the restore flows are all global. The
- * provider owns the single useE2eBackup instance, exposes it through context,
- * and renders its dialogs at the app root so any page can open the restore
- * flow.
+ * The backup must run even when the chat page is closed: uploads, pulls and
+ * the restore flows are all global. The provider owns the single
+ * useE2eBackup instance, exposes it through context, and renders its dialogs
+ * at the app root so any page can open the restore flow.
  */
 export function E2eBackupProvider({
   userId,
@@ -44,6 +43,8 @@ export function E2eBackupProvider({
 }) {
   const engine = useE2eEngine(userId);
   const backup = useE2eBackup(engine);
+  // Decrypt what arrives even while no thread is open, so it reaches the backup.
+  useE2eCatchUp(engine);
 
   return (
     <E2eBackupContext.Provider value={backup}>
@@ -53,11 +54,18 @@ export function E2eBackupProvider({
   );
 }
 
+/**
+ * Renders the backup dialogs at the app root.
+ *
+ * A device that holds the backup key but has no passcode is forced to set one:
+ * the passcode is the only way another device can restore the history, so a
+ * backup without one is a dead end (there is no device-approval fallback).
+ */
 function E2eBackupDialogs({ backup }: { backup: E2eBackupApi }) {
-  const request = backup.incoming[0] ?? null;
+  const passcodeMissing =
+    backup.state?.kind === "ready" && !backup.state.hasPasscode;
   return (
     <>
-      <ApproveRequestDialog request={request} backup={backup} />
       <RestoreDialog backup={backup} />
       <EnterPasscodeDialog
         open={backup.dialog === "enter"}
@@ -65,58 +73,30 @@ function E2eBackupDialogs({ backup }: { backup: E2eBackupApi }) {
         onSubmit={backup.enterPasscode}
       />
       <SetPasscodeDialog
-        open={backup.dialog === "set"}
-        onOpenChange={(open) => backup.setDialog(open ? "set" : "none")}
+        open={passcodeMissing}
         onSubmit={backup.savePasscode}
       />
     </>
   );
 }
 
-/** Another device asks this one for the backup key. */
-function ApproveRequestDialog({
-  request,
-  backup,
-}: {
-  request: HistoryRequest | null;
-  backup: E2eBackupApi;
-}) {
-  const t = useTranslations("Chat.backup");
-  return (
-    <Dialog open={request !== null}>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>{t("approveTitle")}</DialogTitle>
-          <DialogDescription>
-            {t("approveDescription", {
-              device: request?.requesterLabel ?? t("unknownDevice"),
-            })}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => request && void backup.decline(request)}
-          >
-            {t("decline")}
-          </Button>
-          <Button onClick={() => request && void backup.approve(request)}>
-            {t("allow")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /**
- * Opened by openRestore(): the passcode form (when the account has one) and
- * the "ask my other device" fallback, with the waiting/declined states.
+ * Opened by openRestore() when this device cannot read older history.
+ *
+ * The passcode is the only way into the backup, so the action must not depend
+ * on the device being in the "locked" state: on a device that already holds
+ * the key the passcode still re-downloads the history, and the backup status
+ * may not have loaded yet when the dialog opens.
  */
 function RestoreDialog({ backup }: { backup: E2eBackupApi }) {
   const t = useTranslations("Chat.backup");
-  const { state, requestState } = backup;
-  const locked = state?.kind === "locked" ? state : null;
+  const tMessage = useTranslations("Chat.message");
+  const { state } = backup;
+  // Ready or locked: both know whether the account has a passcode.
+  const hasPasscode =
+    state?.kind === "locked" || state?.kind === "ready"
+      ? state.hasPasscode
+      : false;
 
   return (
     <Dialog
@@ -125,43 +105,36 @@ function RestoreDialog({ backup }: { backup: E2eBackupApi }) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("lockedTitle")}</DialogTitle>
+          <DialogTitle>
+            {state?.kind === "ready" ? t("readyTitle") : t("lockedTitle")}
+          </DialogTitle>
           <DialogDescription>
-            {locked && !locked.hasPasscode
-              ? t("lockedNoPasscode")
-              : t("lockedDescription")}
+            {state === null
+              ? t("checkingBackup")
+              : state.kind === "error"
+                ? t("genericError")
+                : state.kind === "ready"
+                  ? t("readyDescription")
+                  : hasPasscode
+                    ? t("lockedDescription")
+                    : t("lockedNoPasscode")}
           </DialogDescription>
         </DialogHeader>
-        {requestState === "pending" && (
-          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" />
-            {t("waitingApproval")}
-          </p>
-        )}
-        {requestState === "declined" && (
-          <p className="text-sm text-destructive">{t("declined")}</p>
-        )}
-        {requestState === "expired" && (
-          <p className="text-sm text-muted-foreground">{t("expired")}</p>
-        )}
-        {requestState === "error" && (
-          <p className="text-sm text-destructive">{t("genericError")}</p>
-        )}
         <DialogFooter>
-          {locked?.hasPasscode && (
+          {state === null && (
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          )}
+          {state?.kind === "error" && (
+            <Button variant="outline" onClick={backup.retry}>
+              {tMessage("retry")}
+            </Button>
+          )}
+          {hasPasscode && (
             <Button onClick={() => backup.setDialog("enter")}>
               <KeyRound className="size-4" />
               {t("enterPasscode")}
             </Button>
           )}
-          <Button
-            variant="outline"
-            disabled={requestState === "pending"}
-            onClick={() => void backup.askOtherDevice()}
-          >
-            <Smartphone className="size-4" />
-            {t("askOtherDevice")}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -237,13 +210,15 @@ function EnterPasscodeDialog({
   );
 }
 
+/**
+ * Forced: a device that holds the backup key but has no passcode cannot
+ * dismiss this. The passcode is the only way another device ever gets the key.
+ */
 function SetPasscodeDialog({
   open,
-  onOpenChange,
   onSubmit,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
   onSubmit: E2eBackupApi["savePasscode"];
 }) {
   const t = useTranslations("Chat.backup");
@@ -265,13 +240,12 @@ function SetPasscodeDialog({
     if (result.ok) {
       setFirst("");
       setSecond("");
-      onOpenChange(false);
     } else setError(t("genericError"));
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={() => undefined}>
+      <DialogContent showCloseButton={false}>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{t("setTitle")}</DialogTitle>

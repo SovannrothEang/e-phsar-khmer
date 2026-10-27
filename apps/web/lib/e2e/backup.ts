@@ -1,19 +1,12 @@
 import {
-  approveHistoryRequest,
-  consumeHistoryRequest,
-  createHistoryRequest,
-  declineHistoryRequest,
   fetchBackupSegments,
   fetchBackupStatus,
-  fetchMyHistoryRequest,
-  fetchPendingHistoryRequests,
   initBackup,
   setBackupPasscode,
   unlockBackup,
   uploadBackupSegment,
 } from "@/actions/e2e-backup";
-import type { BackupStatus, HistoryRequest } from "@/actions/e2e-backup";
-import { fetchE2eDeviceBundle } from "@/actions/e2e";
+import type { BackupStatus } from "@/actions/e2e-backup";
 import { base64ToBytes, bytesToBase64 } from "./crypto/base64";
 import {
   DEFAULT_KDF,
@@ -29,19 +22,15 @@ import {
   unwrapBackupKey,
   wrapBackupKey,
 } from "./backup-crypto";
-import { isNewSessionHeader } from "./decrypt-message";
+import { openSegments } from "./backup-segments";
 import { loadIdentity, saveIdentity } from "./keys";
-import { V2_LOCK, withConversationLock } from "./lock";
 import {
-  createIndexedDbStore,
   listLocalPlaintext,
   listUploadedIds,
   markUploaded,
-  peerKey,
   saveRestored,
 } from "./store";
 import type { PlaintextItem } from "./store";
-import type { RatchetEngine } from "./types";
 
 /**
  * Chat-history backup flows (tasks/plan-e2e-multi-device.md, Phase 4/5).
@@ -252,33 +241,21 @@ async function pullFromBackup(
   for (;;) {
     const page = await fetchBackupSegments(deviceId, cursor);
     if (!page.ok) throw new Error(page.message);
-    const items: PlaintextItem[] = [];
-    let unreadable = false;
-    for (const segment of page.data.items) {
-      try {
-        items.push(...openSegment(bk, segment.ciphertext));
-      } catch {
-        // A segment under a different/old key — keep what opened, but the
-        // cursor must NOT advance past this page: skipping it would silently
-        // lose every readable segment after it. Retry once this device has
-        // the right BK (passcode or another device's approval).
-        unreadable = true;
-      }
-    }
+    // Callers validated `bk` against the account's keyCheck, so an unopenable
+    // segment is skipped, never a reason to stop (see backup-segments.ts).
+    const { items, skipped } = openSegments(page.data.items, (ciphertext) =>
+      openSegment(bk, ciphertext),
+    );
+    if (skipped > 0)
+      console.warn(
+        `[e2e] skipped ${skipped} backup segment(s) this key cannot open`,
+      );
     if (items.length > 0) await saveRestored(items);
     restored += items.length;
-    if (unreadable) {
-      console.warn(
-        "[e2e] backup segment could not be opened; not advancing cursor",
-      );
-      break;
-    }
     cursor = page.data.latestCursor ?? cursor;
     if (!page.data.nextCursor) break;
   }
 
-  // Only the last fully-readable page's cursor is persisted, so a retry
-  // re-fetches the unreadable page.
   const identity = await loadIdentity(userId);
   if (identity && cursor && identity.backupCursor !== cursor)
     await saveIdentity({ ...identity, backupCursor: cursor });
@@ -413,146 +390,4 @@ export async function setPasscode(
     authKey,
   });
   return res.ok ? { ok: true } : { ok: false, message: res.message };
-}
-
-// ── Approval by another device ─────────────────────────────────────────────
-
-export function requestApproval(engine: RatchetEngine) {
-  if (!engine.deviceId) throw new Error("device not registered");
-  return createHistoryRequest(engine.deviceId);
-}
-
-/**
- * Requester side: poll this device's request. Once approved, unwrap BK from
- * the approver's envelope (same Double Ratchet session the two devices use
- * for chat), adopt it, restore, and tell the server to drop the copy.
- */
-export async function checkApproval(
-  engine: RatchetEngine,
-): Promise<
-  | { status: "none" | "pending" | "declined" | "expired" }
-  | { status: "restored"; restored: number }
-  | { status: "error"; message: string }
-> {
-  if (!engine.userId || !engine.deviceId)
-    return { status: "error", message: "device not registered" };
-  const userId = engine.userId;
-  const deviceId = engine.deviceId;
-
-  const res = await fetchMyHistoryRequest(deviceId);
-  if (!res.ok) return { status: "error", message: res.message };
-  const request = res.data;
-  if (!request) return { status: "none" };
-  if (request.status === "pending") return { status: "pending" };
-  if (request.status === "declined" || request.status === "expired")
-    return { status: request.status };
-  if (
-    request.status !== "approved" ||
-    !request.header ||
-    !request.wrappedKey ||
-    !request.approverDeviceId
-  )
-    return { status: "none" };
-
-  const header = request.header;
-  const wrappedKey = request.wrappedKey;
-  const key = peerKey(userId, request.approverDeviceId);
-  const store = createIndexedDbStore();
-  try {
-    const bk = await withConversationLock(V2_LOCK, async () => {
-      const session = isNewSessionHeader(header)
-        ? null
-        : await store.getDeviceSession(key);
-      const unwrapped = await engine.decryptBytes(session, header, wrappedKey);
-      // Validate and persist the received BK BEFORE advancing the ratchet and
-      // BEFORE consuming the request. If either step fails here the request
-      // stays approved and retryable, and no one-shot session state is lost.
-      const status = await fetchBackupStatus();
-      if (!status.ok) throw new Error(status.message);
-      if (
-        !status.data.keyCheck ||
-        keyCheckOf(unwrapped.plaintext) !== status.data.keyCheck
-      )
-        throw new Error("backup key does not match this account");
-      await saveBackupKey(userId, unwrapped.plaintext);
-      // Only now advance our side of the ratchet — the envelope is one-shot.
-      await store.commitSessions([
-        { peerKey: key, session: unwrapped.session },
-      ]);
-      return unwrapped.plaintext;
-    });
-
-    // The BK is local from here on, so the approved request can never be
-    // stranded: consuming and pulling are best-effort, and a later pullBackup
-    // finishes a pull that failed.
-    const consumed = await consumeHistoryRequest(request.id, deviceId);
-    if (!consumed.ok)
-      console.warn(
-        "[e2e] could not consume the approved history request",
-        consumed.message,
-      );
-    let restored = 0;
-    try {
-      restored = await pullFromBackup(userId, deviceId, bk, undefined);
-    } catch (err) {
-      console.warn("[e2e] backup pull after approval failed; will retry", err);
-    }
-    return { status: "restored", restored };
-  } catch (err) {
-    return {
-      status: "error",
-      message: err instanceof Error ? err.message : "approval failed",
-    };
-  }
-}
-
-/** Approver side: other devices' requests waiting on this one. */
-export async function listPendingApprovals(
-  engine: RatchetEngine,
-): Promise<HistoryRequest[]> {
-  if (!engine.deviceId) return [];
-  const res = await fetchPendingHistoryRequests(engine.deviceId);
-  return res.ok ? res.data : [];
-}
-
-/** Approver side: send BK to the requesting device over its E2E session. */
-export async function approveRequest(
-  engine: RatchetEngine,
-  request: HistoryRequest,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!engine.userId || !engine.deviceId)
-    return { ok: false, message: "device not registered" };
-  const userId = engine.userId;
-  const approverDeviceId = engine.deviceId;
-  const bk = await localBackupKey(userId);
-  if (!bk) return { ok: false, message: "no-backup-key" };
-
-  const key = peerKey(userId, request.requesterDeviceId);
-  const store = createIndexedDbStore();
-  return withConversationLock(V2_LOCK, async () => {
-    const session = await store.getDeviceSession(key);
-    let bundle;
-    if (!session) {
-      const b = await fetchE2eDeviceBundle(request.requesterDeviceId);
-      if (!b.ok) return { ok: false as const, message: b.message };
-      bundle = b.data;
-    }
-    const wrapped = await engine.encryptBytes(session, bk, bundle);
-    const res = await approveHistoryRequest(request.id, {
-      approverDeviceId,
-      header: wrapped.header,
-      wrappedKey: wrapped.ciphertext,
-    });
-    if (!res.ok) return { ok: false as const, message: res.message };
-    // Advance our side only once the server holds the envelope.
-    await store.commitSessions([{ peerKey: key, session: wrapped.session }]);
-    return { ok: true as const };
-  });
-}
-
-export async function declineRequest(
-  engine: RatchetEngine,
-  request: HistoryRequest,
-): Promise<void> {
-  if (engine.deviceId) await declineHistoryRequest(request.id, engine.deviceId);
 }

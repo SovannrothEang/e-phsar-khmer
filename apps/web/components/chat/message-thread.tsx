@@ -336,13 +336,9 @@ export function MessageThread({
       if (outcome?.status === "ok")
         out.push(withDecryptedContent(m, outcome.plaintext));
       else if (outcome?.status === "unavailable")
-        // The note stays neutral (never ciphertext) and flags the restore
-        // affordance the bubble renders when the backup context is mounted.
-        out.push({
-          ...m,
-          body: t("message.notOnThisDevice"),
-          needsHistoryRestore: true,
-        });
+        // The note stays neutral (never ciphertext). The passcode prompt is
+        // shown once when a conversation opens, not per message.
+        out.push({ ...m, body: t("message.notOnThisDevice") });
       else if (outcome?.status === "failed")
         out.push({ ...m, body: t("message.decryptFailed") });
       // Still decrypting. With a live engine, hold the row back — a new
