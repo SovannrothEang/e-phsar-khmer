@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { MapCoords } from "@/components/post/LocationMapCanvas";
-import { DEFAULT_CENTER } from "@/components/post/LocationMapCanvas";
+import { DEFAULT_CENTER } from "@/lib/map/default-center";
 import type { SharedLocation } from "@/lib/e2e/chat-content";
 
 // Leaflet touches `window` at module scope — keep it client-only, same as the

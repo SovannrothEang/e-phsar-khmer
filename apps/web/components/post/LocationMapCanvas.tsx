@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-/** Phnom Penh — the view before anything is picked. */
-export const DEFAULT_CENTER = { lat: 11.5564, lng: 104.9282 };
+// Defined outside this module so chat can read it without importing leaflet.
+import { DEFAULT_CENTER } from "@/lib/map/default-center";
+export { DEFAULT_CENTER };
 
 export interface MapCoords {
   lat: number;
