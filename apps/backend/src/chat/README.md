@@ -195,6 +195,7 @@ the socket was down is not replayed.
 | Active device set                        | `loadTargetDevices` (`e2e/e2e-devices.util.ts`): non-revoked devices seen within 30 days, else the 2 most recently seen non-revoked devices. Used by `GET /chats/e2e/devices/:userId`, the bundle fetch and the send path's set check (fast read and locked re-read), so a sender and the server always agree. |
 | `POST /chats/e2e/nudge/:userId`          | Body `{ listingId? }`. 404 unknown user, 403 blocked either way, `{ sent: false }` if this sender already nudged this recipient in the last 24 h, otherwise one `chat.e2e_nudge` notification with no body and no sender text. In-app only; no Telegram channel exists.                                        |
 | `E2E_NO_RECIPIENT_DEVICES` (404 on send) | Now only for a recipient with no non-revoked device at all. The web client holds the message and retries instead of failing; see `docs/e2e-encryption.md` section 9b.                                                                                                                                          |
+
 ## Current state
 
 | Piece                                                             | Status                                                                                                                                                                                                                        |
