@@ -292,8 +292,15 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs key={activeTab} defaultValue={activeTab} className="flex-1">
-              <TabsList variant="line" className="w-full">
+            <Tabs
+              key={activeTab}
+              defaultValue={activeTab}
+              className="flex-1 min-w-0"
+            >
+              <TabsList
+                variant="line"
+                className="w-full justify-start overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group-data-horizontal/tabs:h-auto"
+              >
                 {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
