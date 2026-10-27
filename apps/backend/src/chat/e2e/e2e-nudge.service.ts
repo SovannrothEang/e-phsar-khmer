@@ -70,27 +70,44 @@ export class E2eNudgeService {
       .limit(1);
     if (recent) return { sent: false };
 
+    // The title is shown to the recipient, so it must be one they could see
+    // anyway: an ACTIVE listing of one of the two participants (the same
+    // ownership rule chat.service.ts applies to a listing context card). A
+    // draft, a moderated or expired listing, or somebody else's listing falls
+    // back to the generic text, and its id is not echoed either.
+    let listingId: string | null = null;
     let listingTitle: string | null = null;
     if (dto.listingId) {
       const [listing] = await this.db
-        .select({ title: listings.title })
+        .select({
+          title: listings.title,
+          userId: listings.userId,
+          status: listings.status,
+        })
         .from(listings)
         .where(eq(listings.id, dto.listingId))
         .limit(1);
-      listingTitle = listing?.title ?? null;
+      if (
+        listing &&
+        listing.status === 'active' &&
+        (listing.userId === senderId || listing.userId === recipientId)
+      ) {
+        listingId = dto.listingId;
+        listingTitle = listing.title;
+      }
     }
 
     await this.notifications.notify({
       userId: recipientId,
       type: E2E_NUDGE_NOTIFICATION_TYPE,
       // No sender-provided text of any kind — only the listing's own stored
-      // title, when one was attached and still exists.
+      // title, when one was attached and the recipient may see it.
       title: listingTitle
         ? `Someone wants to chat with you about "${listingTitle}"`
         : 'Someone wants to chat with you',
       data: {
         senderId,
-        listingId: dto.listingId ?? null,
+        listingId,
         listingTitle,
       },
     });
