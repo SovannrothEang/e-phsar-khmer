@@ -17,7 +17,17 @@
  * suspenders, not either alone.
  */
 
+/**
+ * `sending` is only meaningful while `release()` holds the per-recipient claim.
+ * A `sending` row seen by anyone who can take that claim was left behind by a
+ * tab that died mid-send, so it is treated as retryable (`isPending`).
+ */
 export type HeldSendState = "held" | "sending" | "expired";
+
+/** Not expired: still waiting to be delivered (held, or stranded in `sending`). */
+export function isPending(state: HeldSendState): boolean {
+  return state !== "expired";
+}
 
 export interface HeldSendRecord<P> {
   clientMessageId: string;
@@ -114,7 +124,13 @@ export async function hold<P>(
   });
 }
 
-/** Remove a held send (e.g. the user deleted the draft). No-op if missing. */
+/**
+ * Remove a held send (e.g. the user deleted the draft). No-op if missing.
+ *
+ * Known race: if another tab is delivering this very item right now, Cancel
+ * cannot recall that request, so the message can still arrive (the window is
+ * one network round trip).
+ */
 export async function cancel<P>(
   deps: HeldSendDeps<P>,
   clientMessageId: string,
@@ -133,7 +149,7 @@ export async function list<P>(
 ): Promise<HeldSendRecord<P>[]> {
   const items = await deps.store.list(recipientId);
   for (const item of items) {
-    if (item.state === "held" && isExpired(deps, item)) {
+    if (isPending(item.state) && isExpired(deps, item)) {
       await deps.store.setState(item.clientMessageId, "expired");
       item.state = "expired";
     }
@@ -153,14 +169,16 @@ export async function release<P>(
   return deps.claim(`held-send:${recipientId}`, async () => {
     const result: ReleaseResult = { sent: [], stillHeld: [], expired: [] };
     const items = (await deps.store.list(recipientId))
-      .filter((item) => item.state === "held")
+      .filter((item) => isPending(item.state))
       .sort(byAge);
 
     for (const item of items) {
       // Another claimant (same lock, re-entered after this snapshot) may
       // already have handled it; re-read before acting.
       const current = await deps.store.get(item.clientMessageId);
-      if (!current || current.state !== "held") continue;
+      // Under the claim nobody else can be mid-send, so `sending` here is a
+      // stranded row, not a live one.
+      if (!current || !isPending(current.state)) continue;
 
       if (isExpired(deps, current)) {
         await deps.store.setState(current.clientMessageId, "expired");
@@ -198,7 +216,7 @@ export async function releaseAll<P>(
   const all = await deps.store.list();
   const recipientIds = [
     ...new Set(
-      all.filter((item) => item.state === "held").map((i) => i.recipientId),
+      all.filter((item) => isPending(item.state)).map((i) => i.recipientId),
     ),
   ];
   const combined: ReleaseResult = { sent: [], stillHeld: [], expired: [] };

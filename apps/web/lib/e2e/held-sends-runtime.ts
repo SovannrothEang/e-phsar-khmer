@@ -6,6 +6,7 @@ import {
   browserClaim,
   cancel,
   hold,
+  isPending,
   list,
   release,
   releaseAll,
@@ -258,7 +259,7 @@ export function startHeldSendsLoop(viewerId: string): () => void {
   const arm = async () => {
     const items = await listHeld(viewerId);
     if (disposed) return;
-    const anyHeld = items.some((i) => i.state === "held");
+    const anyHeld = items.some((i) => isPending(i.state));
     if (anyHeld && !poller) {
       delay = RETRY_BASE_MS;
       poller = startVisiblePoller({

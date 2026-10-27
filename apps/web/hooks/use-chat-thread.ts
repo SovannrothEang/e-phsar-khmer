@@ -468,6 +468,9 @@ export function useChatThread({
 
   useEffect(() => {
     let active = true;
+    // A different recipient starts from an empty baseline, so its first load
+    // is not mistaken for "a held send disappeared".
+    heldIdsRef.current = new Set();
     const run = () => {
       if (active) void refreshHeld();
     };

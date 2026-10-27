@@ -283,3 +283,47 @@ describe("held-sends", () => {
     assert.equal(deps.sendCalls.length, 2);
   });
 });
+
+describe("recovery of an item left in `sending` by a tab that died mid-send", () => {
+  it("release() retries it instead of leaving it stuck forever", async () => {
+    const deps = makeDeps();
+    await hold(deps, item("m1"));
+    // The tab was killed after marking the item `sending` and before it settled.
+    await deps.store.setState("m1", "sending");
+
+    const result = await release(deps, "bob");
+
+    assert.deepEqual(result.sent, ["m1"]);
+    assert.equal(deps.sendCalls.length, 1);
+    assert.equal(await deps.store.get("m1"), null);
+  });
+
+  it("keeps it held (not stuck) when the recipient still has no device", async () => {
+    const deps = makeDeps({
+      async send() {
+        return { ok: false, reason: "no-recipient-keys" };
+      },
+    });
+    await hold(deps, item("m1"));
+    await deps.store.setState("m1", "sending");
+
+    const result = await release(deps, "bob");
+
+    assert.deepEqual(result.stillHeld, ["m1"]);
+    assert.equal((await deps.store.get("m1"))?.state, "held");
+  });
+
+  it("an old `sending` item still expires into the visible state", async () => {
+    const deps = makeDeps();
+    await hold(deps, item("m1"));
+    await deps.store.setState("m1", "sending");
+    deps.setClock(
+      Date.parse("2026-10-01T00:00:00.000Z") + DEFAULT_LIFETIME_MS + 1,
+    );
+
+    const listed = await list(deps, "bob");
+
+    assert.equal(listed[0].state, "expired");
+    assert.equal(deps.sendCalls.length, 0);
+  });
+});
