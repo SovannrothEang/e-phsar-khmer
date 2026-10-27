@@ -27,20 +27,20 @@ converted to verified findings quickly once a shell/browser tool is available.
 
 ## 1. Method & coverage
 
-| Surface | Route(s) | Visually verified? | Viewports | Screenshots |
-|---|---|---|---|---|
-| Global shell (NavBar/Footer/layouts) | all routes | **No** | — (static only) | none |
-| Homepage | `/[locale]` | No | — | none |
-| Category page | `/[locale]/category/[slug]` | No | — | none |
-| Subcategory feed | `/[locale]/category/[slug]/[subslug]` | No | — | none |
-| All-ads | `/[locale]/all-ads` | No | — | none |
-| Search | `/[locale]/search` | No | — | none |
-| Listing detail | `/[locale]/[slug]` | No | — | none |
-| Login / Register | `/[locale]/login`, `/register` | No | — | none |
-| Post-ad form | `/[locale]/post/(publish)` | No | — | none |
-| Admin dashboard | `/wanderer/dashboard/*` | No | — | none |
-| Chat workspace | `/[locale]/chats` | No (also WIP, see §8) | — | none |
-| `/me`, settings | `/[locale]/me/*`, `/settings/*` | No | — | none |
+| Surface                              | Route(s)                              | Visually verified?    | Viewports       | Screenshots |
+| ------------------------------------ | ------------------------------------- | --------------------- | --------------- | ----------- |
+| Global shell (NavBar/Footer/layouts) | all routes                            | **No**                | — (static only) | none        |
+| Homepage                             | `/[locale]`                           | No                    | —               | none        |
+| Category page                        | `/[locale]/category/[slug]`           | No                    | —               | none        |
+| Subcategory feed                     | `/[locale]/category/[slug]/[subslug]` | No                    | —               | none        |
+| All-ads                              | `/[locale]/all-ads`                   | No                    | —               | none        |
+| Search                               | `/[locale]/search`                    | No                    | —               | none        |
+| Listing detail                       | `/[locale]/[slug]`                    | No                    | —               | none        |
+| Login / Register                     | `/[locale]/login`, `/register`        | No                    | —               | none        |
+| Post-ad form                         | `/[locale]/post/(publish)`            | No                    | —               | none        |
+| Admin dashboard                      | `/wanderer/dashboard/*`               | No                    | —               | none        |
+| Chat workspace                       | `/[locale]/chats`                     | No (also WIP, see §8) | —               | none        |
+| `/me`, settings                      | `/[locale]/me/*`, `/settings/*`       | No                    | —               | none        |
 
 No screenshots exist (`tasks/mobile-audit-shots/` is empty — directory was never
 populated because no screenshot tool was reachable). **Every row in the per-surface
@@ -49,11 +49,11 @@ tables below is `confidence: static-only`.**
 ## 2. Executive summary
 
 | Severity | Count |
-|---|---|
-| Blocker | 3 |
-| Major | 4 |
-| Minor | 3 |
-| Nit | 1 |
+| -------- | ----- |
+| Blocker  | 3     |
+| Major    | 4     |
+| Minor    | 3     |
+| Nit      | 1     |
 
 **Top issues by estimated user impact:**
 
@@ -68,33 +68,34 @@ tables below is `confidence: static-only`.**
 
 ## 3. Global shell findings
 
-| Finding | File | Severity |
-|---|---|---|
-| No mobile nav of any kind (no `Sheet`/`Drawer`/hamburger/`hidden md:` anywhere in `components/web`) | `NavBar.tsx` | Blocker |
-| Fixed-width scope dropdown button in search bar | `SearchBar.tsx:130` | Major (contributes to Blocker) |
-| Footer is desktop-safe (responsive grid, no issues found) | `Footer.tsx` | — |
-| Admin sidebar uses shadcn's standard responsive `Sidebar` primitive (collapses to a sheet on mobile by convention) — **not independently verified**, but the primitive is designed for this | `app/wanderer/dashboard/layout.tsx` | low risk |
-| `Dialog`/`DialogContent` base component is properly responsive (`max-w-[calc(100%-2rem)]`, `sm:max-w-xl`) | `components/ui/dialog.tsx:64` | — (good baseline) |
-| `Input` uses `text-base` (16px) on mobile, `md:text-sm` on desktop — correctly avoids iOS auto-zoom | `components/ui/input.tsx:11` | — (good baseline) |
+| Finding                                                                                                                                                                                     | File                                | Severity                       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------ |
+| No mobile nav of any kind (no `Sheet`/`Drawer`/hamburger/`hidden md:` anywhere in `components/web`)                                                                                         | `NavBar.tsx`                        | Blocker                        |
+| Fixed-width scope dropdown button in search bar                                                                                                                                             | `SearchBar.tsx:130`                 | Major (contributes to Blocker) |
+| Footer is desktop-safe (responsive grid, no issues found)                                                                                                                                   | `Footer.tsx`                        | —                              |
+| Admin sidebar uses shadcn's standard responsive `Sidebar` primitive (collapses to a sheet on mobile by convention) — **not independently verified**, but the primitive is designed for this | `app/wanderer/dashboard/layout.tsx` | low risk                       |
+| `Dialog`/`DialogContent` base component is properly responsive (`max-w-[calc(100%-2rem)]`, `sm:max-w-xl`)                                                                                   | `components/ui/dialog.tsx:64`       | — (good baseline)              |
+| `Input` uses `text-base` (16px) on mobile, `md:text-sm` on desktop — correctly avoids iOS auto-zoom                                                                                         | `components/ui/input.tsx:11`        | — (good baseline)              |
 
 ## 4. Per-surface findings (compact)
 
-| Surface | Issue | Severity | ID |
-|---|---|---|---|
-| All routes | No mobile nav | Blocker | MR-001 |
-| `/all-ads` | Fixed `grid-cols-6` category strip | Blocker | MR-002 |
-| All 12 category pages | Fixed 5–8 col subcategory grid, inline style | Blocker | MR-003 |
-| Homepage | `w-5xl` fixed-width CTA link | Major | MR-004 |
-| Card grids (home/all-ads/search/category feeds) | Sub-44px heart/icon touch targets | Minor | MR-005 |
-| NavBar/SearchBar | Fixed `w-[170px]` scope button | Major | MR-006 |
-| Mock post form (fallback for admin-created subcats) | Hover-only category switch, no touch handler | Major | MR-008 |
-| `subcategory-layouts/` | 4 dead header components (not a mobile bug) | Nit | MR-007 |
-| Post form (`ListingPostForm.tsx`) | 28px delete-row button | Minor | MR-009 |
-| Search page, subcategory filter bars | Generally well-handled (chip row, `hidden lg:` sidebar, `flex-wrap`) — no blocking issues found | — | — |
+| Surface                                             | Issue                                                                                           | Severity | ID     |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------- | ------ |
+| All routes                                          | No mobile nav                                                                                   | Blocker  | MR-001 |
+| `/all-ads`                                          | Fixed `grid-cols-6` category strip                                                              | Blocker  | MR-002 |
+| All 12 category pages                               | Fixed 5–8 col subcategory grid, inline style                                                    | Blocker  | MR-003 |
+| Homepage                                            | `w-5xl` fixed-width CTA link                                                                    | Major    | MR-004 |
+| Card grids (home/all-ads/search/category feeds)     | Sub-44px heart/icon touch targets                                                               | Minor    | MR-005 |
+| NavBar/SearchBar                                    | Fixed `w-[170px]` scope button                                                                  | Major    | MR-006 |
+| Mock post form (fallback for admin-created subcats) | Hover-only category switch, no touch handler                                                    | Major    | MR-008 |
+| `subcategory-layouts/`                              | 4 dead header components (not a mobile bug)                                                     | Nit      | MR-007 |
+| Post form (`ListingPostForm.tsx`)                   | 28px delete-row button                                                                          | Minor    | MR-009 |
+| Search page, subcategory filter bars                | Generally well-handled (chip row, `hidden lg:` sidebar, `flex-wrap`) — no blocking issues found | —        | —      |
 
 ## 5. Detailed findings
 
 ### MR-001 — No responsive navigation anywhere in the global shell
+
 - **Severity:** Blocker
 - **Surface:** Global shell (affects all 71 routes except `/wanderer/*`, which has its own sidebar shell)
 - **Route(s):** every `(user)` and `(chat)` route
@@ -106,6 +107,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-002 — `/all-ads` category strip: fixed 6-column grid
+
 - **Severity:** Blocker
 - **Surface:** All Ads
 - **Route(s):** `/[locale]/all-ads`
@@ -117,17 +119,19 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-003 — Category-page subcategory grid: fixed 5–8 columns via inline style
+
 - **Severity:** Blocker
 - **Surface:** Category pages (all 12 main categories)
 - **Route(s):** `/[locale]/category/[categorySlug]` (via `CommonCategoryLayout`/`CarsCategoryLayout`/etc. → `SubcategoryGrid`)
 - **Viewport(s) reproduced:** none (static only).
-- **Measured evidence (static):** `SubcategoryGrid.tsx:44-48`: `style={{ gridTemplateColumns: \`repeat(${cols}, minmax(0, 1fr))\` }}`, where `cols` comes from the `SUBCATEGORY_LAYOUT` map in `category/[categorySlug]/page.tsx:23-36` — values `5, 6, 7, 8` (default `6`) with **no breakpoint logic**, and because it's an inline `style` prop rather than a Tailwind class, it **cannot** be overridden with a `sm:`/`md:` utility class at all — it is responsive-proof by construction. Each tile is a `w-16 h-16` (64px) circle plus `p-3` (24px) padding on the `<Link>` (`:60-62`), i.e. ≥88px of unavoidable content per tile. At `cols=8` and 390px width, each column is `390/8 ≈ 49px` — the 88px tile content is ~1.8× the column width.
+- **Measured evidence (static):** `SubcategoryGrid.tsx:44-48`: `style={{ gridTemplateColumns: \`repeat(${cols}, minmax(0, 1fr))\` }}`, where `cols`comes from the`SUBCATEGORY_LAYOUT`map in`category/[categorySlug]/page.tsx:23-36`— values`5, 6, 7, 8`(default`6`) with **no breakpoint logic**, and because it's an inline `style`prop rather than a Tailwind class, it **cannot** be overridden with a`sm:`/`md:`utility class at all — it is responsive-proof by construction. Each tile is a`w-16 h-16`(64px) circle plus`p-3`(24px) padding on the`<Link>` (`:60-62`), i.e. ≥88px of unavoidable content per tile. At `cols=8`and 390px width, each column is`390/8 ≈ 49px` — the 88px tile content is ~1.8× the column width.
 - **Root cause:** `apps/web/components/category-layouts/SubcategoryGrid.tsx:44-48` (inline style) combined with the fixed `cols` values in `apps/web/app/[locale]/(user)/category/[categorySlug]/page.tsx:23-36`.
 - **Recommended fix direction:** Replace the inline `gridTemplateColumns` with a responsive Tailwind class driven by a lookup table of pre-defined column classes (e.g. `grid-cols-3 sm:grid-cols-4 md:grid-cols-{cols}`), since arbitrary dynamic Tailwind classes can't be generated at runtime — a small `COLS_CLASS: Record<number, string>` map resolved from `cols` would work without inline styles.
 - **Effort:** M (touches a shared component used by all 12 category pages; needs a safe column-class lookup instead of string interpolation, since Tailwind can't JIT-compile a runtime-interpolated class name)
 - **Confidence:** static-only
 
 ### MR-004 — Homepage "View all ads" CTA is a literal 1024px-wide element
+
 - **Severity:** Major
 - **Surface:** Homepage
 - **Route(s):** `/[locale]`
@@ -139,6 +143,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-005 — Sub-44px touch targets recur across post-card grids
+
 - **Severity:** Minor (systemic — recurs on every feed)
 - **Surface:** Homepage, All Ads, Search, Category/Subcategory feeds (anywhere `GridCardPost` renders)
 - **Route(s):** `/[locale]`, `/all-ads`, `/search`, `/category/*`, `/category/*/*`
@@ -150,6 +155,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-006 — Search bar's category-scope button is fixed-width
+
 - **Severity:** Major (contributing cause of MR-001's overflow, but independently fixable)
 - **Surface:** Global shell (navbar search)
 - **Route(s):** all routes
@@ -161,6 +167,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-007 — Four unused mock subcategory headers
+
 - **Severity:** Nit
 - **Surface:** N/A (dead code, not rendered)
 - **Route(s):** none — not reachable
@@ -172,6 +179,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only (pure grep-reachability check — high confidence for "unreferenced," doesn't itself require visual verification)
 
 ### MR-008 — Mock category picker's active-category switch is hover-only
+
 - **Severity:** Major
 - **Surface:** Post-ad form — the mock `DynamicForm` fallback path (reached by any subcategory created via the admin UI after the 146-subcategory seed, per `CLAUDE.md`'s "A subcategory created through the admin UI still has no working post form" known gap — this makes the component load-bearing, not dead)
 - **Route(s):** `/[locale]/post/(publish)` (conditionally, for non-seeded subcategories only)
@@ -183,6 +191,7 @@ tables below is `confidence: static-only`.**
 - **Confidence:** static-only
 
 ### MR-009 — Post-form row-delete button is 28px
+
 - **Severity:** Minor
 - **Surface:** Post-ad form (real `ListingPostForm`)
 - **Route(s):** `/[locale]/post/(publish)` (repeatable-field blocks, e.g. phone numbers / multi-value fields)
@@ -199,7 +208,7 @@ tables below is `confidence: static-only`.**
 2. **Fixed pixel widths used where a percentage/`max-w` was meant.** `w-5xl` instead of `max-w-5xl` (MR-004) and `w-[170px]` without a narrower variant (MR-006) are both "someone meant to cap width, and either typo'd the Tailwind utility or never circled back to add a mobile override."
 3. **Inline `style` for `gridTemplateColumns` defeats Tailwind's responsive system entirely** (MR-003) — this is the one finding that can't be fixed with a simple breakpoint-class addition; it needs a small lookup table because Tailwind cannot JIT a class name built from a runtime variable.
 4. **Sub-44px touch targets cluster around icon-only circular buttons** (`h-9 w-9`, `h-10 w-10`, `h-7 w-7`) — a repeated `size-N` shorthand pattern across `GridCardPost`, `SocialBar`, and `ListingPostForm`. A shared `IconButton` component with a baked-in 44px minimum (visual circle can stay smaller via inner padding) would prevent recurrence, but that's a larger refactor than this audit's effort budget — the immediate fix is per-site class bumps.
-5. **Where the team *did* think about mobile, the result is solid**: the Search page (`search/page.tsx`) has a `lg:hidden` chip-row fallback for its category sidebar, the subcategory filter bars use `flex-wrap`, `MoreFilters`' dialog is capped at `max-w-md`/`max-h-[90vh]`, the base `Dialog` and `Input` components already have correct responsive/zoom-safe defaults, and the admin dashboard uses shadcn's standard responsive `Sidebar` primitive. The gaps are concentrated in a handful of specific files, not systemic to the whole codebase.
+5. **Where the team _did_ think about mobile, the result is solid**: the Search page (`search/page.tsx`) has a `lg:hidden` chip-row fallback for its category sidebar, the subcategory filter bars use `flex-wrap`, `MoreFilters`' dialog is capped at `max-w-md`/`max-h-[90vh]`, the base `Dialog` and `Input` components already have correct responsive/zoom-safe defaults, and the admin dashboard uses shadcn's standard responsive `Sidebar` primitive. The gaps are concentrated in a handful of specific files, not systemic to the whole codebase.
 6. **Hover-only interaction appears at least once on a load-bearing surface** (MR-008), in code whose own repo documentation (`CLAUDE.md`) already flags it as "not dead code" — worth a second look since this audit's static read strongly suggests it's untestable by touch at all today.
 
 ## 7. Screenshot index
@@ -222,23 +231,23 @@ None. See §0 — no visual-verification tool was reachable in this session.
 
 A measured sweep was run against the production preview at `http://localhost:3011` (backend on `:8080`),
 headless Chromium 156, layout viewport forced via `Emulation.setDeviceMetricsOverride({mobile:false})`
-(Chrome 156 only changes the *layout* viewport when `mobile:false` is used). Screenshots:
+(Chrome 156 only changes the _layout_ viewport when `mobile:false` is used). Screenshots:
 `tasks/mobile-audit-shots/<surface>-<width>.png`; raw rows in `tasks/mobile-audit-visual.json`.
 
 ### 9.1 Measured page overflow
 
-| Surface | Viewport | innerWidth | scrollWidth | Overflow | Main offenders |
-|---|---|---|---|---|---|
-| Home | 390x844 | 390 | **785** | **+395px** | nav search form `[265..496]` (231 wide), "All Categories" trigger `[266..436]` (w170), auth/Sell block `[520..785]` |
-| All Ads | 390 | 390 | **785** | +395px | same shell; `w-16` category circles `[332..396]`; fixed-width cards `[203..463]` (w260) |
-| Category page | 390 | 390 | **785** | +395px | same shell; subcategory circles `[330..394]` |
-| Search | 390 | 390 | **785** | +395px | same shell; cards |
-| Login | 390 | 390 | **785** | +395px | **global shell only** — the page body fits |
-| Listing detail | 390 | 390 | **785** | +395px | global shell only |
-| Home | 320x568 | 320 | **785** | **+465px** | same shell |
-| Home | 768x1024 | 768 | **824** | **+56px** | nav auth/Sell block `[520..785]`; latest-ads cards `[564..824]` (w260) |
-| Home `km` | 360x640 | 360 | 785 | +425px | same shell; Khmer label renders 94px wide |
-| Home `zh` | 360x640 | 360 | 785 | +425px | same shell; Chinese label 56px wide |
+| Surface        | Viewport | innerWidth | scrollWidth | Overflow   | Main offenders                                                                                                      |
+| -------------- | -------- | ---------- | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| Home           | 390x844  | 390        | **785**     | **+395px** | nav search form `[265..496]` (231 wide), "All Categories" trigger `[266..436]` (w170), auth/Sell block `[520..785]` |
+| All Ads        | 390      | 390        | **785**     | +395px     | same shell; `w-16` category circles `[332..396]`; fixed-width cards `[203..463]` (w260)                             |
+| Category page  | 390      | 390        | **785**     | +395px     | same shell; subcategory circles `[330..394]`                                                                        |
+| Search         | 390      | 390        | **785**     | +395px     | same shell; cards                                                                                                   |
+| Login          | 390      | 390        | **785**     | +395px     | **global shell only** — the page body fits                                                                          |
+| Listing detail | 390      | 390        | **785**     | +395px     | global shell only                                                                                                   |
+| Home           | 320x568  | 320        | **785**     | **+465px** | same shell                                                                                                          |
+| Home           | 768x1024 | 768        | **824**     | **+56px**  | nav auth/Sell block `[520..785]`; latest-ads cards `[564..824]` (w260)                                              |
+| Home `km`      | 360x640  | 360        | 785         | +425px     | same shell; Khmer label renders 94px wide                                                                           |
+| Home `zh`      | 360x640  | 360        | 785         | +425px     | same shell; Chinese label 56px wide                                                                                 |
 
 ### 9.2 What the measurements confirm and correct
 
@@ -250,7 +259,7 @@ headless Chromium 156, layout viewport forced via `Emulation.setDeviceMetricsOve
 - **New finding — tablet card row:** at 768px the latest-ads row is 260px-wide fixed cards ending at 824px (tablet overflow independent of the navbar).
 - **New finding — tiny type:** 10-11px discount/delivery badges, 34 instances on the home feed.
 - `/en/me` redirects to `/en/login` when unauthenticated; `/en/chats` renders a login-gated state. Authenticated and admin surfaces remain **static-only**.
-- **Cascade warning:** because the nav currently widens the whole document to 785px, secondary grid overflows (MR-002/MR-003/MR-010) are partially masked. Acceptance criteria must re-measure them *after* the shell fix.
+- **Cascade warning:** because the nav currently widens the whole document to 785px, secondary grid overflows (MR-002/MR-003/MR-010) are partially masked. Acceptance criteria must re-measure them _after_ the shell fix.
 
 ## 10. Post-fix verification — PASSED (added 2026-10-26, final build)
 
@@ -261,16 +270,16 @@ headless Chromium with `Emulation.setDeviceMetricsOverride({mobile:false})`, scr
 
 **Result: 36/36 checks pass — 0 overflow failures.**
 
-| Surface | 320 | 390 | 768 | 1024 |
-|---|---|---|---|---|
-| `/en` homepage | PASS 320/320 | PASS 390/390 | PASS 768/768 | PASS 1024/1024 |
-| `/en/all-ads` | PASS | PASS | PASS | PASS |
-| `/en/category/cars-and-vehicles` | PASS | PASS | PASS | PASS |
-| `/en/search` | PASS | PASS | PASS | PASS |
-| `/en/login` | PASS | PASS | PASS | PASS |
-| `/en/chats` (login-gated shell) | PASS | PASS | PASS | PASS |
-| `/en/<listing-id>` detail | PASS | PASS | PASS | PASS |
-| `/km`, `/zh` home | PASS | PASS | PASS | PASS |
+| Surface                          | 320          | 390          | 768          | 1024           |
+| -------------------------------- | ------------ | ------------ | ------------ | -------------- |
+| `/en` homepage                   | PASS 320/320 | PASS 390/390 | PASS 768/768 | PASS 1024/1024 |
+| `/en/all-ads`                    | PASS         | PASS         | PASS         | PASS           |
+| `/en/category/cars-and-vehicles` | PASS         | PASS         | PASS         | PASS           |
+| `/en/search`                     | PASS         | PASS         | PASS         | PASS           |
+| `/en/login`                      | PASS         | PASS         | PASS         | PASS           |
+| `/en/chats` (login-gated shell)  | PASS         | PASS         | PASS         | PASS           |
+| `/en/<listing-id>` detail        | PASS         | PASS         | PASS         | PASS           |
+| `/km`, `/zh` home                | PASS         | PASS         | PASS         | PASS           |
 
 (Each cell is `scrollWidth === innerWidth`; pre-fix the same routes were 785 at 320/390 and 824 at 768.)
 
