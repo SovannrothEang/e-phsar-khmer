@@ -21,6 +21,7 @@ import {
   removeDraftImage,
 } from "@/lib/chat-draft-images";
 import { nudgeRecipient } from "@/actions/e2e-nudge";
+import { isPending } from "@/lib/e2e/held-sends";
 import { getE2eEngine } from "@/lib/e2e/engine-provider";
 import {
   cancelHeld,
@@ -500,8 +501,8 @@ export function useChatThread({
       listingId?: string,
     ) => {
       if (!viewerId || !recipientId) return;
-      const first = !(await listHeld(viewerId, recipientId)).some(
-        (i) => i.state === "held",
+      const first = !(await listHeld(viewerId, recipientId)).some((i) =>
+        isPending(i.state),
       );
       await holdSend(viewerId, { clientMessageId, recipientId, payload });
       if (first) void nudgeRecipient(recipientId, listingId);

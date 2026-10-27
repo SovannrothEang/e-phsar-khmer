@@ -71,10 +71,11 @@ export class E2eNudgeService {
     if (recent) return { sent: false };
 
     // The title is shown to the recipient, so it must be one they could see
-    // anyway: an ACTIVE listing of one of the two participants (the same
-    // ownership rule chat.service.ts applies to a listing context card). A
-    // draft, a moderated or expired listing, or somebody else's listing falls
-    // back to the generic text, and its id is not echoed either.
+    // anyway: an ACTIVE listing of one of the two participants. That is the
+    // ownership rule chat.service.ts applies to a listing context card, plus an
+    // active-status requirement of its own (a draft, a moderated or expired
+    // listing, or somebody else's listing falls back to the generic text, and
+    // its id is not echoed either).
     let listingId: string | null = null;
     let listingTitle: string | null = null;
     if (dto.listingId) {
