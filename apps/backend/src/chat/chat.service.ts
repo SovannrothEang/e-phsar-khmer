@@ -28,15 +28,15 @@ import {
   conversations,
   messageEnvelopes,
   messages,
-  userE2eDevices,
   userE2eIdentities,
 } from '../db/schema/chat.schema';
 import type { ConversationRow, MessageRow } from '../db/schema/chat.schema';
 import {
-  activeDeviceCondition,
   diffDevices,
+  loadTargetDevices,
   lockE2eDeviceKeys,
 } from './e2e/e2e-devices.util';
+import type { ActiveDevice } from './e2e/e2e-devices.util';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { isBlockedEitherWay } from './blocks.util';
@@ -66,12 +66,6 @@ import type {
 interface ConversationPollContext extends ConversationRow {
   /** max(readAt) of MY messages in this conversation. */
   peerLastReadAt: Date | null;
-}
-
-/** Projection of user_e2e_devices used by the v2 active-set checks. */
-interface ActiveDeviceRef {
-  id: string;
-  userId: string;
 }
 
 @Injectable()
@@ -140,18 +134,14 @@ export class ChatService {
   /**
    * Active device rows for a send's two participants. Shared by the
    * fast-fail read and the authoritative re-read inside the insert
-   * transaction, so both apply the exact same "active" predicate.
+   * transaction, so both apply the exact same "active" rule — the one the
+   * devices endpoint hands senders (loadTargetDevices).
    */
   private loadParticipantActiveDevices(
     executor: DbExecutor,
     userIds: [string, string],
-  ): Promise<ActiveDeviceRef[]> {
-    return executor
-      .select({ id: userE2eDevices.id, userId: userE2eDevices.userId })
-      .from(userE2eDevices)
-      .where(
-        and(inArray(userE2eDevices.userId, userIds), activeDeviceCondition()),
-      );
+  ): Promise<ActiveDevice[]> {
+    return loadTargetDevices(executor, userIds);
   }
 
   /**
@@ -165,7 +155,7 @@ export class ChatService {
    * registering concurrently can no longer slip in between check and insert.
    */
   private assertEnvelopesCoverActiveDevices(
-    activeDevices: ActiveDeviceRef[],
+    activeDevices: ActiveDevice[],
     senderId: string,
     recipientId: string,
     e2e: E2eV2PayloadDto,

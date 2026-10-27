@@ -79,3 +79,74 @@ these is fixed yet.
 
 - Filter-bar sort labels and chips are English-only.
 - Pages scroll horizontally by about 395px at 390px width (navbar + card component).
+
+## 2026-10-27 — Signal-model key availability (Plans.md K0.1, K0.2, K2.1)
+
+### K0.1 — device census (dev DB, read-only)
+
+Run 2026-10-27 inside `BEGIN READ ONLY`, counts only (no row content read). Non-deleted accounts
+only. "Active listing" = `listings.status = 'active'`; "in a conversation" = either side of any
+`chat.conversations` row. Buckets are evaluated in order, so each account lands in exactly one.
+
+| Bucket                                         | All accounts | With active listings | In a conversation |
+| ---------------------------------------------- | -----------: | -------------------: | ----------------: |
+| never registered (no device row)               |           36 |                   11 |                 8 |
+| all revoked                                    |            0 |                    0 |                 0 |
+| stale only (non-revoked, none seen in 30 days) |            1 |                    0 |                 1 |
+| targetable (≥ 1 non-revoked, seen in 30 days)  |           14 |                    7 |                14 |
+| **total**                                      |       **51** |               **18** |            **23** |
+
+**Production: unknown** — not read (owner decision D4 not taken). Before K2.1, the 1 stale-only
+account got "not set up yet"; after K2.1 it is targetable through the newest-two fallback. The 36
+never-registered accounts (8 of them already in a conversation) are the hold-and-send case (K3.x).
+
+```sql
+with acct as (
+  select u.id,
+    case
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id) then 'never_registered'
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id and d.revoked_at is null) then 'all_revoked'
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id and d.revoked_at is null
+                       and d.last_seen_at > now() - make_interval(days => 30)) then 'stale_only'
+      else 'targetable'
+    end as bucket,
+    exists (select 1 from listings l where l.user_id = u.id and l.status = 'active') as has_active_listing,
+    exists (select 1 from chat.conversations c where c.user_a_id = u.id or c.user_b_id = u.id) as in_conversation
+  from users u
+  where u.deleted_at is null
+)
+select bucket, count(*)::int as all_accounts,
+  count(*) filter (where has_active_listing)::int as with_active_listings,
+  count(*) filter (where in_conversation)::int as in_a_conversation
+from acct group by bucket order by bucket;
+```
+
+### K2.1 — a registered account is never untargetable
+
+- `loadTargetDevices` (`apps/backend/src/chat/e2e/e2e-devices.util.ts`) is now the only place
+  that decides the device set: per user, the non-revoked devices seen within
+  `DEVICE_STALE_DAYS`; if none, the `STALE_FALLBACK_DEVICES = 2` most recently seen non-revoked
+  ones (ties broken by id). `activeDeviceCondition` is gone.
+- Routed through it: `GET` devices (`listActiveDevices`), `loadActiveDevices`, the bundle fetch
+  (`getDeviceBundle` — otherwise a listed fallback device would 404 on its bundle) and both send
+  checks in `ChatService` (fast-fail read and locked in-transaction re-read).
+- Verified: new specs failed first (17 red: missing exports / old query shape), then pass.
+  Backend jest 62 suites / 811 tests green; `nest build` and eslint on the touched files clean.
+  `tsc --noEmit` over specs still reports 2 errors at `e2e-keys.service.spec.ts:180,191` that are
+  already on HEAD (untouched lines).
+- Review: independent `harness:reviewer` pass returned **APPROVE** (minor notes only). Its one
+  follow-up — the `fresh` column is the backend's first `sql<boolean>` and every spec mocks the
+  DB — was checked on the dev DB through `postgres-js` (read-only): the expression arrives as a
+  real JS `boolean` (`true`/`false`), not a string.
+- Known, accepted (owner decision D3): a user with 3+ non-revoked devices that are all stale has
+  only the newest two targetable; sending from an older one gets `E2E_DEVICE_INACTIVE`, which the
+  client already recovers from by re-registering (strictly narrower than before K2.1).
+
+### K0.2 — does each sign-in bootstrap the E2E device without a reload?
+
+- **Telegram: no web flow.** The "Sign in or register with Telegram" buttons in
+  `components/auth/LoginForm.tsx` and `RegisterForm.tsx` have no handler; nothing to measure.
+- Password, phone-OTP login and OTP registration all end identically: a server action
+  (`actions/login.ts` `login`, `actions/otp.ts` `verifyOtp`) calls `setUserSession`, then the
+  client does `router.push("/me")` inside the same `(user)` layout that hosts
+  `E2eBackupProvider`. Browser measurement pending a dev test account.

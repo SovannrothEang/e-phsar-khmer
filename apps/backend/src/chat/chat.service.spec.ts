@@ -533,11 +533,19 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
     ({ service, pubsub } = makeService(db));
   });
 
+  /** A non-revoked device row as loadTargetDevices reads it. */
+  const device = (id: string, userId: string, fresh = true, seenDay = 25) => ({
+    id,
+    userId,
+    lastSeenAt: new Date(Date.UTC(2026, 9, seenDay)),
+    fresh,
+  });
+
   /** Active devices: u1 = [d-me, d-me2], u2 = [d-peer]. */
   const activeDevices = [
-    { id: 'd-me', userId: 'u1' },
-    { id: 'd-me2', userId: 'u1' },
-    { id: 'd-peer', userId: 'u2' },
+    device('d-me', 'u1'),
+    device('d-me2', 'u1'),
+    device('d-peer', 'u2'),
   ];
 
   function selectsWithDevices(devices = activeDevices) {
@@ -621,15 +629,83 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
   });
 
   it('rejects a sending device that is not active with 403', async () => {
-    selectsWithDevices([{ id: 'd-peer', userId: 'u2' }]);
+    selectsWithDevices([device('d-peer', 'u2')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(ForbiddenException);
   });
 
   it('returns 404 E2E_NO_RECIPIENT_DEVICES when the peer has no active device', async () => {
-    selectsWithDevices([{ id: 'd-me', userId: 'u1' }]);
+    selectsWithDevices([device('d-me', 'u1')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(NotFoundException);
+  });
+
+  describe('recipient whose every device is stale', () => {
+    // u2 went quiet past DEVICE_STALE_DAYS on three browsers. The fallback
+    // keeps their two most recently seen devices targetable instead of
+    // answering E2E_NO_RECIPIENT_DEVICES.
+    const quietPeer = [
+      device('d-me', 'u1'),
+      device('p-old', 'u2', false, 1),
+      device('p-new', 'u2', false, 9),
+      device('p-mid', 'u2', false, 5),
+    ];
+
+    function mockConversationUpsert() {
+      db.insert.mockImplementation(() => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            returning: () => Promise.resolve([conversation]),
+          }),
+        }),
+      }));
+    }
+
+    it('accepts envelopes for exactly the newest two devices', async () => {
+      selectsWithDevices(quietPeer);
+      mockConversationUpsert();
+      const tx = mockSendTx(quietPeer);
+      let txInsert = 0;
+      tx.insert.mockImplementation(() => ({
+        values: (v: unknown) => ({
+          returning: () =>
+            Promise.resolve(
+              ++txInsert === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : (v as Record<string, unknown>[]),
+            ),
+        }),
+      }));
+
+      const result = await send([env('p-new'), env('p-mid')]);
+
+      expect(result.message.envelopes).toHaveLength(2);
+    });
+
+    it('rejects an envelope for a stale device outside the fallback', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new'), env('p-mid'), env('p-old')]).catch(
+        (e: unknown) => e,
+      );
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [], stale: ['p-old'] },
+      });
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a send missing one of the fallback devices', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new')]).catch((e: unknown) => e);
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [{ userId: 'u2', deviceId: 'p-mid' }], stale: [] },
+      });
+    });
   });
 
   it('stores message + envelopes in one transaction and pushes to both users', async () => {
@@ -694,7 +770,7 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
     // The locked re-read inside the transaction sees the device registered
     // after that read. Inserting now would hand every recipient a message the
     // new device has no envelope for — reject instead.
-    const tx = mockSendTx([...activeDevices, { id: 'd-new', userId: 'u2' }]);
+    const tx = mockSendTx([...activeDevices, device('d-new', 'u2')]);
     db.insert.mockImplementation(() => ({
       values: () => ({
         onConflictDoUpdate: () => ({
