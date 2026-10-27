@@ -91,7 +91,10 @@ function makeDeps(
   };
 }
 
-function item(clientMessageId: string, recipientId = "bob"): {
+function item(
+  clientMessageId: string,
+  recipientId = "bob",
+): {
   clientMessageId: string;
   recipientId: string;
   payload: Payload;

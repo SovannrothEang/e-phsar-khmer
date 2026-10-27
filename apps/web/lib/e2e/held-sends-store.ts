@@ -4,7 +4,11 @@
  * stores, so opening it never waits on another tab's connection to a
  * different database.
  */
-import type { HeldSendRecord, HeldSendState, HeldSendStore } from "./held-sends";
+import type {
+  HeldSendRecord,
+  HeldSendState,
+  HeldSendStore,
+} from "./held-sends";
 
 const DB_NAME = "npic-e2e-held-sends";
 const DB_VERSION = 1;
@@ -27,9 +31,7 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export function createIndexedDbHeldSendStore<
-  P,
->(): HeldSendStore<P> {
+export function createIndexedDbHeldSendStore<P>(): HeldSendStore<P> {
   return {
     async put(record) {
       const db = await openDb();
@@ -90,8 +92,7 @@ export function createIndexedDbHeldSendStore<
             recipientId === undefined
               ? store.getAll()
               : store.index(RECIPIENT_INDEX).getAll(recipientId);
-          req.onsuccess = () =>
-            resolve(req.result as HeldSendRecord<P>[]);
+          req.onsuccess = () => resolve(req.result as HeldSendRecord<P>[]);
           req.onerror = () => reject(req.error);
         });
       } finally {
