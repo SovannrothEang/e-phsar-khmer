@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { ChatModule } from '../chat/chat.module';
@@ -15,7 +15,10 @@ import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
  */
 @Module({
   // ChatModule provides the socket push transport for the realtime channel.
-  imports: [ChatModule],
+  // forwardRef because ChatModule's own E2eNudgeController/Service needs
+  // NotificationsService to post the "someone wants to chat" nudge — a
+  // genuine two-way dependency between these two modules.
+  imports: [forwardRef(() => ChatModule)],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,
