@@ -316,3 +316,14 @@ from acct group by bucket order by bucket;
   need production access, a deploy or an owner decision (marked blocked/needs-browser in Plans.md).
 - H2.1/H2.2 (backup reset): owner decision D1. H4.1/H4.2: need the WIP committed first and a
   two-profile restore run.
+
+### Independent review (harness:reviewer)
+
+- K2.1 (earlier): APPROVE. Key-availability + location picker + H-plan hunks: **REQUEST_CHANGES**
+  with two majors, both fixed test-first and re-reviewed to **APPROVE** (no critical/major left):
+  (1) a held text send stranded in `sending` by a dead tab was never retried or expired
+  (`7ae00b9`, 3 tests); (2) the nudge echoed the title of any listing id, including drafts,
+  moderated ones and other people's (`8752a6f`, 7 specs). Minor items left open on purpose: the
+  nudge 24 h dedupe is select-then-insert (two simultaneous calls can both pass; cosmetic), held
+  rows can render out of order next to unrelated pending sends, Cancel cannot recall a send
+  another tab has in flight, and two independent retry schedules run after sign-in during an outage.
