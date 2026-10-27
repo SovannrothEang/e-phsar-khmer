@@ -21,6 +21,22 @@ import { MIN_PASSCODE_LENGTH } from "@/lib/e2e/backup-crypto";
 
 const E2eBackupContext = createContext<E2eBackupApi | null>(null);
 
+/**
+ * Set by "Not now" on the passcode re-prompt (`message-thread.tsx` opens the
+ * "enter" dialog whenever a thread with unavailable messages loads on a
+ * locked, passcoded device). Session-scoped on purpose: the prompt is meant
+ * to return on the next browser session, just not again in this one.
+ */
+export const E2E_RESTORE_SNOOZE_KEY = "chat:e2e-restore-snoozed";
+
+function snoozeRestorePrompt(): void {
+  try {
+    sessionStorage.setItem(E2E_RESTORE_SNOOZE_KEY, "1");
+  } catch {
+    // Private mode / quota — the prompt returning next thread-open is harmless.
+  }
+}
+
 /** The app-wide history-backup surface (null outside the provider). */
 export function useE2eBackupContext(): E2eBackupApi | null {
   return useContext(E2eBackupContext);
@@ -199,6 +215,17 @@ function EnterPasscodeDialog({
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                snoozeRestorePrompt();
+                onOpenChange(false);
+              }}
+            >
+              {t("notNow")}
+            </Button>
             <Button type="submit" disabled={!value || busy}>
               {busy && <Loader2 className="size-4 animate-spin" />}
               {busy ? t("unlocking") : t("unlock")}

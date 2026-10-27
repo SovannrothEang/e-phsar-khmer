@@ -120,7 +120,9 @@
       "heldExpired": "Tidak terkirim: {name} tidak bergabung ke chat aman tepat waktu.",
       "heldCancel": "Batal",
       "heldRemove": "Hapus",
-      "notOnThisDevice": "Dikirim sebelum perangkat ini disiapkan. Pulihkan riwayat Anda dengan kode sandi cadangan.",
+      "unavailableReady": "{count, plural, other {# pesan tidak ada di cadangan Anda: dikirim sebelum perangkat ini bergabung dan tidak ada perangkat Anda yang membukanya.}}",
+      "unavailableLockedWithPasscode": "{count, plural, other {Masukkan kode sandi cadangan Anda untuk melihat # pesan ini.}}",
+      "unavailableLockedNoPasscode": "{count, plural, other {Setel kode sandi di perangkat yang menyimpan riwayat Anda untuk melihat # pesan ini.}}",
       "download": "Unduh",
       "downloadFailed": "Tidak dapat menyimpan file"
     },
@@ -215,7 +217,8 @@
       "mismatch": "Kode sandi tidak cocok.",
       "setTitle": "Atur kode sandi cadangan",
       "setDescription": "Minimal {count} karakter. Anda memerlukannya untuk membaca chat di perangkat baru. Kami tidak dapat memulihkannya.",
-      "save": "Simpan kode sandi"
+      "save": "Simpan kode sandi",
+      "notNow": "Nanti saja"
     },
     "voice": {
       "play": "Putar pesan suara",

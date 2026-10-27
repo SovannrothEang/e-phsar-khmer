@@ -74,6 +74,10 @@ export function useE2eBackup(engine: RatchetEngine | null): E2eBackupApi {
   // `socketUp` is what the poller reads to pick its cadence.
   const syncPoller = useRef<VisiblePoller | null>(null);
   const socketUp = useRef(false);
+  // True once this tab's poller has actually run the periodic sync at least
+  // once — i.e. this tab held leadership. Read by the flush-on-hide effect
+  // below so a background tab that never led the sync stays silent.
+  const isLeaderRef = useRef(false);
   const { isConnected } = useNotificationEvents({
     enabled: Boolean(engine && deviceId),
     onNotification: (notification) => {
@@ -137,16 +141,52 @@ export function useE2eBackup(engine: RatchetEngine | null): E2eBackupApi {
         console.warn("[e2e] backup pull failed; will retry", err);
       });
     const poller = startVisiblePoller({
-      run: () => Promise.allSettled([upload(), pull()]),
+      run: () => {
+        isLeaderRef.current = true;
+        return Promise.allSettled([upload(), pull()]);
+      },
       intervalMs: () => (socketUp.current ? SAFETY_SYNC_MS : SYNC_INTERVAL_MS),
       leaderKey: `e2e-backup-sync:${userId}:${deviceId}`,
     });
     syncPoller.current = poller;
     return () => {
+      isLeaderRef.current = false;
       syncPoller.current = null;
       poller();
     };
   }, [engine, userId, deviceId, state?.kind]);
+
+  // Flush the pending upload the moment the tab is hidden or the page starts
+  // closing, so a message decrypted just before a tab switch isn't left for
+  // the 5 s cached-plaintext debounce or the 60 s/5 min poll above.
+  // `visibilitychange` is the reliable signal here — it fires before the tab
+  // backgrounds, and `syncBackup` below is an ordinary async server action
+  // that keeps running after the handler returns. `pagehide` is best-effort
+  // only: on an actual tab close the browser can kill the page mid-request,
+  // so it does NOT guarantee the upload lands — it is kept only as a second
+  // chance for the case `visibilitychange` misses (e.g. the OS freezing the
+  // tab without a visibility transition). Gated on `isLeaderRef` so a
+  // background tab that never led the periodic sync stays silent; `syncBackup`
+  // also self-serializes and skips plaintext already marked uploaded, so a
+  // duplicate call from both events firing is harmless.
+  useEffect(() => {
+    if (!userId || !deviceId || state?.kind !== "ready") return;
+    const flush = () => {
+      if (!isLeaderRef.current) return;
+      void syncBackup(userId, deviceId).catch((err: unknown) => {
+        console.warn("[e2e] backup flush-on-hide failed; will retry", err);
+      });
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [userId, deviceId, state?.kind]);
 
   // Newly cached plaintext: upload it promptly (debounced — a page of history
   // decrypts in one burst).

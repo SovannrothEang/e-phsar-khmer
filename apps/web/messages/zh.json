@@ -120,7 +120,9 @@
       "heldExpired": "未发送：{name} 未能及时加入加密聊天。",
       "heldCancel": "取消",
       "heldRemove": "移除",
-      "notOnThisDevice": "在此设备设置之前发送。请使用备份密码恢复聊天记录。",
+      "unavailableReady": "{count, plural, other {# 条消息不在你的备份中：它们发送于此设备加入之前，且你的所有设备都没有打开过。}}",
+      "unavailableLockedWithPasscode": "{count, plural, other {输入备份密码以查看这 # 条消息。}}",
+      "unavailableLockedNoPasscode": "{count, plural, other {请在存有聊天记录的设备上设置密码，才能查看这 # 条消息。}}",
       "download": "下载",
       "downloadFailed": "无法保存文件"
     },
@@ -215,7 +217,8 @@
       "mismatch": "两次输入的密码不一致。",
       "setTitle": "设置备份密码",
       "setDescription": "至少 {count} 个字符。在新设备上查看聊天记录时需要它。我们无法为您找回。",
-      "save": "保存密码"
+      "save": "保存密码",
+      "notNow": "暂不"
     },
     "voice": {
       "play": "播放语音消息",

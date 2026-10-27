@@ -38,7 +38,6 @@ import { CHAT_POLL } from "@/hooks/use-chat-polling";
 import { useTabAttending } from "@/hooks/use-tab-attention";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
-import { useE2eBackupContext } from "@/components/chat/e2e-backup-provider";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import { E2eBackupPanel } from "@/components/chat/e2e-backup-panel";
@@ -178,30 +177,12 @@ export function ChatWorkspace({
   // Warm E2E bootstrap as soon as the viewer is known so key registration
   // races ahead of the first send (fail-closed on send if still pending). The
   // backup panel reads the same engine through E2eBackupProvider.
+  //
+  // The passcode re-prompt itself now lives in `MessageThread`: it re-opens
+  // whenever a thread with unavailable messages loads (not once per browser
+  // session — that one-shot version used to live here), because only the
+  // thread knows whether the conversation it is showing actually has any.
   useE2eEngine(viewer.isSuccess ? (viewer.data?.id ?? null) : null);
-
-  // ── Passcode prompt ───────────────────────────────────────────────────────
-  // On a locked device the backup passcode is the only way in, so ask for it
-  // when the user first opens a conversation instead of relying on a
-  // per-message link. Once per browser session; the chat banner stays as the
-  // re-entry point if this dialog is dismissed.
-  const backup = useE2eBackupContext();
-  const backupKind = backup?.state?.kind ?? null;
-  const backupHasPasscode =
-    backup?.state?.kind === "locked" && backup.state.hasPasscode;
-  const backupUserId = backup?.userId ?? null;
-  useEffect(() => {
-    if (!backup || selectedPeerId === null || backupKind !== "locked") return;
-    if (!backupHasPasscode) return;
-    const key = `e2e-restore-prompted:${backupUserId ?? "anon"}`;
-    try {
-      if (sessionStorage.getItem(key) === "1") return;
-      sessionStorage.setItem(key, "1");
-    } catch {
-      /* private mode — prompting again next visit is harmless */
-    }
-    backup.setDialog("enter");
-  }, [backup, selectedPeerId, backupKind, backupHasPasscode, backupUserId]);
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
   // The nav badge's own socket subscription keeps the shared connection alive

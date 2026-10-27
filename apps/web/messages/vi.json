@@ -120,7 +120,9 @@
       "heldExpired": "Chưa gửi: {name} đã không tham gia trò chuyện bảo mật kịp thời.",
       "heldCancel": "Hủy",
       "heldRemove": "Xóa",
-      "notOnThisDevice": "Được gửi trước khi thiết bị này được thiết lập. Khôi phục lịch sử của bạn bằng mã khóa sao lưu.",
+      "unavailableReady": "{count, plural, other {# tin nhắn không có trong bản sao lưu của bạn: được gửi trước khi thiết bị này tham gia và không thiết bị nào của bạn đã mở chúng.}}",
+      "unavailableLockedWithPasscode": "{count, plural, other {Nhập mã khóa sao lưu của bạn để xem # tin nhắn này.}}",
+      "unavailableLockedNoPasscode": "{count, plural, other {Hãy đặt mã khóa trên thiết bị đang có lịch sử của bạn để xem # tin nhắn này.}}",
       "download": "Tải xuống",
       "downloadFailed": "Không thể lưu tệp"
     },
@@ -215,7 +217,8 @@
       "mismatch": "Mã khóa không khớp.",
       "setTitle": "Đặt mã khóa sao lưu",
       "setDescription": "Ít nhất {count} ký tự. Bạn cần nó để đọc trò chuyện trên thiết bị mới. Chúng tôi không thể khôi phục giúp bạn.",
-      "save": "Lưu mã khóa"
+      "save": "Lưu mã khóa",
+      "notNow": "Để sau"
     },
     "voice": {
       "play": "Phát tin nhắn thoại",

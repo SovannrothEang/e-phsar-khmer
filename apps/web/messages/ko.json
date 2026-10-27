@@ -120,7 +120,9 @@
       "heldExpired": "전송되지 않음: {name}님이 제때 보안 채팅에 참여하지 않았습니다.",
       "heldCancel": "취소",
       "heldRemove": "삭제",
-      "notOnThisDevice": "이 기기가 설정되기 전에 보낸 메시지입니다. 백업 암호로 기록을 복원하세요.",
+      "unavailableReady": "{count, plural, other {메시지 #개가 백업에 없습니다. 이 기기가 추가되기 전에 전송되었고 어떤 기기에서도 열어 보지 않았습니다.}}",
+      "unavailableLockedWithPasscode": "{count, plural, other {백업 암호를 입력하면 메시지 #개를 볼 수 있습니다.}}",
+      "unavailableLockedNoPasscode": "{count, plural, other {기록이 있는 기기에서 암호를 설정하면 메시지 #개를 볼 수 있습니다.}}",
       "download": "다운로드",
       "downloadFailed": "파일을 저장할 수 없습니다"
     },
@@ -215,7 +217,8 @@
       "mismatch": "암호가 일치하지 않습니다.",
       "setTitle": "백업 암호 설정",
       "setDescription": "{count}자 이상. 새 기기에서 채팅을 읽을 때 필요합니다. 분실 시 복구할 수 없습니다.",
-      "save": "암호 저장"
+      "save": "암호 저장",
+      "notNow": "나중에"
     },
     "voice": {
       "play": "음성 메시지 재생",

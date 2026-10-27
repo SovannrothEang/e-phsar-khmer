@@ -120,7 +120,9 @@
       "heldExpired": "Not sent: {name} didn't join secure chat in time.",
       "heldCancel": "Cancel",
       "heldRemove": "Remove",
-      "notOnThisDevice": "Sent before this device was set up. Restore your history with the backup passcode.",
+      "unavailableReady": "{count, plural, one {Isn't in your backup: it was sent before this device joined and none of your devices had opened it.} other {# messages aren't in your backup: they were sent before this device joined and none of your devices had opened them.}}",
+      "unavailableLockedWithPasscode": "{count, plural, one {Enter your backup passcode to see this message.} other {Enter your backup passcode to see these # messages.}}",
+      "unavailableLockedNoPasscode": "{count, plural, one {Set a passcode on the device that has your history to see this message.} other {Set a passcode on the device that has your history to see these # messages.}}",
       "download": "Download",
       "downloadFailed": "Couldn’t save the file"
     },
@@ -215,7 +217,8 @@
       "mismatch": "Passcodes don't match.",
       "setTitle": "Set a backup passcode",
       "setDescription": "At least {count} characters. You will need it to read your chats on a new device. We cannot recover it for you.",
-      "save": "Save passcode"
+      "save": "Save passcode",
+      "notNow": "Not now"
     },
     "voice": {
       "play": "Play voice note",
