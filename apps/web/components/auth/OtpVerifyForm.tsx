@@ -25,6 +25,7 @@ import {
   clearOtpRegistration,
   readOtpRegistration,
 } from "@/lib/otp-registration";
+import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -75,6 +76,9 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
         if (res.success) {
           doneRef.current = true;
           clearOtpRegistration();
+          // Covers both OTP login and registration: the new account gets its
+          // E2E device before any other page renders.
+          bootstrapE2eAfterAuth(res.user.id);
           toast.success("Phone verified. Welcome!");
           router.push("/me");
         } else {

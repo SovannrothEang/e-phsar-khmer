@@ -6,6 +6,7 @@ import { login } from "@/actions/login";
 import { requestLoginOtp } from "@/actions/otp";
 import { isLocalPhone, normalizePhone } from "@/lib/phone";
 import { storeOtpRegistration } from "@/lib/otp-registration";
+import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
 import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,9 @@ export function LoginForm({
       const result = await login(value);
 
       if (result.success) {
+        // Register this browser for E2E chat as part of signing in, not when
+        // some later page happens to render the provider.
+        if (result.user) bootstrapE2eAfterAuth(result.user.id);
         form.reset();
         toast.success("Login successfully!", { position: "top-right" });
         router.push("/me");
