@@ -224,6 +224,12 @@
       "pause": "Jeda pesan suara",
       "seek": "Geser pesan suara",
       "speed": "Kecepatan putar {rate}×"
+    },
+    "e2eSetup": {
+      "title": "Chat aman tidak tersedia di browser ini",
+      "storage": "Browser ini memblokir penyimpanan yang dibutuhkan chat terenkripsi (misalnya jendela pribadi, atau data situs dimatikan). Buka Pesan di jendela biasa, atau izinkan data situs untuk situs ini.",
+      "generic": "Kami belum bisa menyiapkan pesan terenkripsi di browser ini. Kami akan terus mencoba; periksa koneksi Anda atau muat ulang halaman.",
+      "dismiss": "Tutup"
     }
   },
   "Search": {

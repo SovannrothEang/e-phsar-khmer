@@ -224,6 +224,12 @@
       "pause": "Tạm dừng tin nhắn thoại",
       "seek": "Tua tin nhắn thoại",
       "speed": "Tốc độ phát {rate}×"
+    },
+    "e2eSetup": {
+      "title": "Không thể dùng trò chuyện bảo mật trên trình duyệt này",
+      "storage": "Trình duyệt này đang chặn bộ nhớ mà trò chuyện mã hóa cần (ví dụ cửa sổ ẩn danh, hoặc đã tắt dữ liệu trang web). Hãy mở Tin nhắn trong cửa sổ thường, hoặc cho phép dữ liệu trang web cho trang này.",
+      "generic": "Chúng tôi chưa thể thiết lập nhắn tin mã hóa trên trình duyệt này. Chúng tôi sẽ tiếp tục thử; hãy kiểm tra kết nối hoặc tải lại trang.",
+      "dismiss": "Đóng"
     }
   },
   "Search": {

@@ -224,6 +224,12 @@
       "pause": "Pause voice note",
       "seek": "Seek voice note",
       "speed": "Playback speed {rate}×"
+    },
+    "e2eSetup": {
+      "title": "Secure chat isn't available in this browser",
+      "storage": "This browser is blocking the storage that encrypted chat needs (for example a private window, or site data turned off). Open Messages in a normal window, or allow site data for this site.",
+      "generic": "We couldn't set up encrypted messaging on this browser yet. We'll keep trying; check your connection or reload the page.",
+      "dismiss": "Dismiss"
     }
   },
   "Search": {

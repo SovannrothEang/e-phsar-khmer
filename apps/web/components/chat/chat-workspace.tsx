@@ -41,6 +41,7 @@ import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import { E2eBackupPanel } from "@/components/chat/e2e-backup-panel";
+import { E2eBootstrapNotice } from "@/components/chat/e2e-bootstrap-notice";
 import type {
   ConversationWithUser,
   InboxItem,
@@ -536,6 +537,7 @@ export function ChatWorkspace({
           threadOpen ? "flex" : "hidden md:flex",
         )}
       >
+        <E2eBootstrapNotice />
         <E2eBackupPanel />
         {!threadOpen && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
