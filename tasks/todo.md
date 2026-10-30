@@ -327,3 +327,12 @@ from acct group by bucket order by bucket;
   nudge 24 h dedupe is select-then-insert (two simultaneous calls can both pass; cosmetic), held
   rows can render out of order next to unrelated pending sends, Cancel cannot recall a send
   another tab has in flight, and two independent retry schedules run after sign-in during an outage.
+
+### /harness-work all — 2026-10-30 (what was and was not possible)
+
+- **Gates on the committed tree** (clean working tree at `b6df114`): web `tsc --noEmit` clean, `pnpm --filter web test` 67/67, backend jest (chat, notifications, outbox, payment) 28 suites / 409 tests.
+- **H4.2** closed: `docs/e2e-encryption.md` §9b (key availability) and §9c (history availability), `apps/backend/src/chat/README.md` (nudge, device-set rule), `CHANGELOG.md` `Unreleased`; independent review APPROVE after `8752a6f` / `7ae00b9`.
+- **Not done, and why** (nothing was guessed or simulated):
+  - K4.1 scenario 2 (release on registration), scenario 1 (new signup, needs an OTP), scenario 4 (real private window), H1.2 backup upload, H3.2 "ready" and "locked, no passcode" states, H1.3 flush, K1.2 6 h advance, H4.1 two-profile restore: all need a signed-in browser. The dev test-account logins are not in the repo or these notes, and I did not read the env file or reuse a browser session.
+  - H2.1 / H2.2: owner decision D1 (backup reset) is still open.
+  - Backend audit 0.1 / 0.2 / 1.1 / 3.x / 5.1, Vercel usage 0.1 / 2.1 / 3.x / 4.1, push plan P0.1 / P2.2 / P3.1: need production access or a deploy.
