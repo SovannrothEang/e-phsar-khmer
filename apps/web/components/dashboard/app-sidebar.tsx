@@ -15,7 +15,6 @@ import {
 import {
   IconCalendarDollar,
   IconMessageChatbot,
-  IconCategory2,
   IconPackages,
   IconClockHour4,
   IconGift,
@@ -33,8 +32,13 @@ import {
   IconUserDollar,
   IconListDetails,
   IconDeviceMobile,
+  IconCar,
+  IconMotorbike,
+  IconDeviceTablet,
+  IconDeviceWatch,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { FAMILY_PAGES } from "@/lib/product-spec-families";
 import { BrandWordmark } from "@/components/web/BrandWordmark";
 import {
   Sidebar,
@@ -91,6 +95,14 @@ export type DocumentItem = {
     href: string;
   }[];
 };
+
+const SPEC_FAMILY_ICONS = {
+  car: IconCar,
+  motorcycle: IconMotorbike,
+  phone: IconDeviceMobile,
+  tablet: IconDeviceTablet,
+  smartwatch: IconDeviceWatch,
+} as const;
 
 export const menuItems: MenuItem[] = [
   {
@@ -163,12 +175,18 @@ export const menuItems: MenuItem[] = [
         icon: IconCalendarStats,
         href: "/wanderer/dashboard/attributes/years",
       },
-      {
-        title: "Product Specs",
-        icon: IconDeviceMobile,
-        href: "/wanderer/dashboard/products",
-      },
     ],
+  },
+  {
+    title: "Product Specifications",
+    icon: IconDeviceMobile,
+    href: "/wanderer/dashboard/product-specifications/cars",
+    roles: ["admin"],
+    items: FAMILY_PAGES.map((page) => ({
+      title: page.label,
+      icon: SPEC_FAMILY_ICONS[page.family],
+      href: `/wanderer/dashboard/product-specifications/${page.slug}`,
+    })),
   },
   {
     title: "Team",
@@ -204,19 +222,14 @@ export const menuItems: MenuItem[] = [
 
 const subscriptionSubItems = [
   {
-    title: "Categories",
-    icon: IconCategory2,
-    href: "/wanderer/dashboard/subscription/categories",
-  },
-  {
-    title: "Plans",
+    title: "Subscriptions",
     icon: IconCalendarDollar,
-    href: "/wanderer/dashboard/subscription/plans",
+    href: "/wanderer/dashboard/subscription",
   },
   {
-    title: "Packages",
+    title: "Tiers",
     icon: IconPackages,
-    href: "/wanderer/dashboard/subscription/packages",
+    href: "/wanderer/dashboard/subscription/tiers",
   },
   {
     title: "Terms",
@@ -399,7 +412,7 @@ export function AppSidebar({ userRole }: { userRole: string }) {
             (collapsed ? (
               <SidebarMenu>
                 <CollapsedGroupItem
-                  title="Subscriptions"
+                  title="Premium"
                   icon={CreditCard}
                   items={subscriptionSubItems}
                 />
@@ -408,9 +421,9 @@ export function AppSidebar({ userRole }: { userRole: string }) {
               <Collapsible className="group/collapsible">
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip="Subscriptions">
+                    <SidebarMenuButton tooltip="Premium">
                       <CreditCard className="size-4" />
-                      <span>Subscriptions</span>
+                      <span>Premium</span>
                       <ChevronRight className="ml-auto size-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>

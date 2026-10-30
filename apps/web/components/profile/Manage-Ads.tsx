@@ -9,47 +9,36 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import { ProfileListingRow } from "@/components/profile/ProfileListingRow";
 import { ManageAdActions } from "@/components/profile/ManageAdActions";
 import { loadMyAds } from "@/actions/my-ads";
+import type { MyAdsTab } from "@/lib/api/my-ads";
 import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
 
-type Tab = "active" | "expired";
-
 interface TabState {
-  tab: Tab;
+  tab: MyAdsTab;
   items: Post[];
   page: number;
   hasMore: boolean;
   error: string | null;
 }
 
-// Allowances are per bucket (a held group, or a free category cap), so the
-// account totals are sums over the buckets the user actually has.
-function adsSummary(plan: PlanEntitlements): string {
-  const allowance = plan.buckets.reduce((sum, b) => sum + b.limits.ads, 0);
-  return `${plan.usage.ads}/${plan.buckets.length > 0 ? allowance : plan.limits.ads}`;
-}
-
-function renewsSummary(plan: PlanEntitlements): string {
-  const allowance = plan.buckets.reduce((sum, b) => sum + b.limits.renews, 0);
-  return `${plan.usage.renews}/${plan.buckets.length > 0 ? allowance : plan.limits.renews}`;
-}
+const TAB_ORDER: MyAdsTab[] = ["active", "expired", "hidden"];
 
 export default function ManageAds() {
   const t = useTranslations("Me.manageAds");
   const tCommon = useTranslations("Common");
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>("active");
+  const [activeTab, setActiveTab] = useState<MyAdsTab>("active");
   // What the last fetch returned, tagged with the tab it belongs to. A result
   // for another tab counts as "still loading" — derived at render, so the
   // effect never has to reset state synchronously when the tab changes.
   const [loaded, setLoaded] = useState<TabState | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [plan, setPlan] = useState<PlanEntitlements | null>(null);
-  const [counts, setCounts] = useState<Partial<Record<Tab, number>>>({});
+  const [counts, setCounts] = useState<Partial<Record<MyAdsTab, number>>>({});
   /** Bumped after a row action (renew/delete) to reload the current tab. */
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -57,6 +46,22 @@ export default function ManageAds() {
   const items = current?.items ?? null;
   const error = current?.error ?? null;
   const hasMore = current?.hasMore ?? false;
+
+  const hiddenCount = counts.hidden ?? 0;
+  // The Hidden tab only exists when there is something hidden in it — but a
+  // user already standing on it keeps it until they leave.
+  const showHidden = hiddenCount > 0 || activeTab === "hidden";
+  const tabs = showHidden
+    ? TAB_ORDER
+    : TAB_ORDER.filter((tab) => tab !== "hidden");
+
+  /**
+   * Cards read the account allowance: live ads in the pools the user can use
+   * (the free plan's total plus every held group). Restricted ads already
+   * count as live, so they are subtracted here and reported separately — the
+   * card never reads "13/5".
+   */
+  const activeAds = plan ? Math.max(0, plan.usage.ads - plan.usage.hidden) : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -108,9 +113,10 @@ export default function ManageAds() {
   };
 
   /**
-   * Row badge: the Expired chip on that tab, and — on Active — a warning once
-   * the 30-day window is within three days, so the owner sees it coming
-   * before the ad leaves the feed (and gets the matching notification).
+   * Row badge: the Hidden chip on that tab, the Expired chip on its own, and —
+   * on Active — a warning once the 30-day window is within three days, so the
+   * owner sees it coming before the ad leaves the feed (and gets the matching
+   * notification).
    */
   function rowBadge(post: Post) {
     const chip = (label: string) => (
@@ -118,6 +124,7 @@ export default function ManageAds() {
         {label}
       </span>
     );
+    if (activeTab === "hidden") return chip(t("hiddenBadge"));
     if (activeTab === "expired") return chip(t("expired"));
     const days = post.expiresInDays;
     if (days === undefined || days <= 0 || days > 3) return undefined;
@@ -159,43 +166,52 @@ export default function ManageAds() {
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 px-4">
             <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
               {t("totalAds")}
               <p className="text-lg text-foreground">
-                {plan ? adsSummary(plan) : "–"}
+                {plan ? `${activeAds}/${plan.limits.ads}` : "–"}
               </p>
             </div>
             <div className="bg-muted h-20 w-full text-center p-6 rounded-md text-foreground font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
               {t("renews")}
               <p className="text-lg text-foreground">
-                {plan ? renewsSummary(plan) : "–"}
+                {plan ? `${plan.usage.renews}/${plan.limits.renews}` : "–"}
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mx-4">
-            <button
-              onClick={() => setActiveTab("active")}
-              className={`h-10 rounded-md border text-base font-semibold transition-colors cursor-pointer ${
-                activeTab === "active"
-                  ? "bg-background text-foreground border-border shadow-sm"
-                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+          {plan && plan.usage.hidden > 0 ? (
+            <div className="mx-4 mb-4">
+              <button
+                type="button"
+                onClick={() => setActiveTab("hidden")}
+                className="w-full rounded-sm border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-left type-meta text-amber-700 transition-colors hover:bg-amber-500/15 dark:text-amber-400 cursor-pointer"
+              >
+                {t("hiddenNote", { count: plan.usage.hidden })}
+              </button>
+            </div>
+          ) : null}
+          <div className="mx-4">
+            <div
+              className={`grid gap-1 rounded-md bg-muted p-1 ${
+                showHidden ? "grid-cols-3" : "grid-cols-2"
               }`}
             >
-              {t("active")}{" "}
-              <span className="text-[#00a0e9]">({counts.active ?? 0})</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("expired")}
-              className={`h-10 rounded-md border text-base font-semibold transition-colors cursor-pointer ${
-                activeTab === "expired"
-                  ? "bg-background text-foreground border-border shadow-sm"
-                  : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
-              }`}
-            >
-              {t("expired")}{" "}
-              <span className="text-[#00a0e9]">({counts.expired ?? 0})</span>
-            </button>
+              {tabs.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`h-9 rounded-sm text-base font-semibold transition-colors cursor-pointer ${
+                    activeTab === tab
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(tab)}{" "}
+                  <span className="text-[#00a0e9]">({counts[tab] ?? 0})</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -210,6 +226,19 @@ export default function ManageAds() {
             </div>
           ) : items.length > 0 ? (
             <div className="pb-8">
+              {activeTab === "hidden" ? (
+                <div className="mx-4 mb-3 flex flex-col gap-2 rounded-sm border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="type-meta text-muted-foreground">
+                    {t("hiddenNotice")}
+                  </p>
+                  <Link
+                    href="/premium-account"
+                    className="shrink-0 text-sm font-semibold text-[#00a0e9] underline"
+                  >
+                    {t("upgradePlan")}
+                  </Link>
+                </div>
+              ) : null}
               {/* List rows, not a grid (captain, 2026-10-27): a populated tab
                   fills the column; only the empty state is centred. */}
               <div className="space-y-3">
@@ -218,9 +247,11 @@ export default function ManageAds() {
                     key={post.postId}
                     post={post}
                     badge={rowBadge(post)}
+                    linkable={activeTab !== "hidden"}
                     action={
                       <ManageAdActions
                         post={post}
+                        hidden={activeTab === "hidden"}
                         onChanged={() => setReloadKey((key) => key + 1)}
                       />
                     }
@@ -264,7 +295,7 @@ export default function ManageAds() {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm">
-                  {t("noExpired")}
+                  {activeTab === "hidden" ? t("noHidden") : t("noExpired")}
                 </p>
               )}
             </div>

@@ -125,6 +125,35 @@ const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
 const VALUE_SUFFIX: Record<string, string> = { size: "m²" };
 
 /**
+ * The feed query a spec value applies when clicked. The filter bar owns a few
+ * dimensions (year range, condition, tax type, engine, color, transmission),
+ * so those use their shared URL params and show as applied controls; every
+ * other attribute key uses the multi-attribute `attrs` JSON object, which is
+ * exact for every family's own key and needs no slug lookup.
+ *
+ * `value` is the STORED English value (`attributes[key]`), never the
+ * `valueLabels` display text — on `/km` the grid prints Khmer while the feed
+ * still matches the English value the post form wrote.
+ */
+function filterQueryFor(key: string, value: string): Record<string, string> {
+  switch (key) {
+    case "year":
+      // An exact year is a range whose bounds are equal.
+      return { year_min: value, year_max: value };
+    case "taxType":
+      return { tax_type: value };
+    case "engineType":
+      return { engine: value };
+    case "color":
+      return { color: value };
+    case "transmission":
+      return { transmission: value };
+    default:
+      return { attrs: JSON.stringify({ [key]: value }) };
+  }
+}
+
+/**
  * Subcategories whose reference lists Storage before Condition, so Condition
  * moves to after the spec block. Phones and Tablets only (captain, 2026-09-22);
  * the computers family declares `storage` too but keeps Condition where it is
@@ -162,6 +191,18 @@ export default function ListingSpecs({
             categorySlug: cate.slug,
             subcategorySlug: subcate.slug,
           },
+        }
+      : undefined;
+  /** The same page with the value's filter applied. */
+  const browseHrefWith = (query: Record<string, string>): Href | undefined =>
+    cate && subcate
+      ? {
+          pathname: "/category/[categorySlug]/[subcategorySlug]",
+          params: {
+            categorySlug: cate.slug,
+            subcategorySlug: subcate.slug,
+          },
+          query,
         }
       : undefined;
 
@@ -256,7 +297,9 @@ export default function ListingSpecs({
     rows.push({
       label: t("condition"),
       value: tCommon(condition === "used" ? "condition.used" : "condition.new"),
-      href: browseHref,
+      href: browseHrefWith({
+        condition: condition === "used" ? "used" : "new",
+      }),
     });
     conditionInserted = true;
   };
@@ -269,7 +312,8 @@ export default function ListingSpecs({
     rows.push({
       label: t(labelOverrides?.[key] ?? labelKey),
       value: `${displayValue}${VALUE_SUFFIX[key] ?? ""}`,
-      href: browseHref,
+      // The link uses the raw stored value, not the display text above.
+      href: browseHrefWith(filterQueryFor(key, value)),
     });
   }
   pushCondition();

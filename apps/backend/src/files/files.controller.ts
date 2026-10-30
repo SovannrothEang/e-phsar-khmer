@@ -36,6 +36,7 @@ class SignUploadDto {
     'subcategory',
     'brand',
     'model',
+    'product',
     'attribute',
     'advertisement',
   ])
@@ -50,6 +51,7 @@ class SignUploadDto {
     | 'subcategory'
     | 'brand'
     | 'model'
+    | 'product'
     | 'attribute'
     | 'advertisement';
 }

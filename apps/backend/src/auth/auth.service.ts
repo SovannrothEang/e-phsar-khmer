@@ -34,6 +34,7 @@ import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
+import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 
 export interface AuthTokens {
   accessToken: string;
@@ -649,13 +650,18 @@ export class AuthService {
     return publicUser;
   }
 
-  async findById(id: string): Promise<PublicUser> {
+  async findById(
+    id: string,
+  ): Promise<PublicUser & { verifiedAccount: boolean }> {
     const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
-    return this.toPublicUser(user);
+    return {
+      ...this.toPublicUser(user),
+      verifiedAccount: await hasActivePaidSubscription(this.db, id),
+    };
   }
 }

@@ -292,15 +292,21 @@ export default async function SubcategoryPage({
       : undefined;
 
   // Real active listings — every subcategory runs the real feed, narrowed by
-  // the drill-down (brand/type) and the filter bar's URL params.
+  // the drill-down (brand/type) and the filter bar's URL params. The dialog's
+  // `attrs` object carries every schema-declared attribute; a browse-grid
+  // click adds its own key/value on top so both survive a mixed URL.
+  const parsedParams = parseFeedParams(sp);
+  const attrFilters: Record<string, string> = { ...(parsedParams.attrs ?? {}) };
+  if (attrKey && clickedOption?.name) {
+    attrFilters[attrKey] = clickedOption.name;
+  }
   const feedQuery: ListingsFeedParams = {
-    ...parseFeedParams(sp),
+    ...parsedParams,
     subcategorySlug,
     brand: brandName,
     model: modelName,
     bodyType: bodyTypeName,
-    attrKey,
-    attrValue: attrKey ? clickedOption?.name : undefined,
+    attrs: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
   };
   const [feed, banners] = await Promise.all([
     getListingsFeed(feedQuery, locale),

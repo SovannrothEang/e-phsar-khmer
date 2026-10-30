@@ -73,9 +73,11 @@ function PlanSheet({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="px-4 py-4 flex items-start justify-between group hover:bg-muted transition-colors"
+            className="px-4 py-4 flex items-start justify-between"
           >
-            <h3 className="text-sm text-foreground">{row.label}</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              {row.label}
+            </h3>
             <div className="text-sm text-foreground tabular-nums">
               {row.value}
             </div>
@@ -87,6 +89,10 @@ function PlanSheet({
 }
 
 function freeRows(plan: PublicFreePlan): Row[] {
+  // Videos and auto-renewals are plan features the free plan doesn't get
+  // (both 0 until an admin sets them, and "0" reads as "None"). "Other Ads"
+  // is the pool every ad outside a capped category draws from, so it sits
+  // after the caps — those rows are sub-limits inside that pool.
   return [
     { label: "Photos", value: amount(plan.photos) },
     { label: "Videos", value: amount(plan.videos) },
@@ -100,10 +106,8 @@ function freeRows(plan: PublicFreePlan): Row[] {
 function subscriptionRows(subscription: UserSubscription): Row[] {
   return [
     { label: "Photos", value: amount(subscription.photos) },
-    { label: "Videos", value: amount(subscription.videos) },
     { label: "Ads", value: amount(subscription.ads) },
-    { label: "Renews", value: amount(subscription.renews) },
-    { label: "Auto-Renews", value: amount(subscription.autoRenews) },
+    { label: "Renews (30 days)", value: amount(subscription.renews) },
     { label: "Expires", value: formatDate(subscription.expiresAt) },
   ];
 }
@@ -113,7 +117,7 @@ function HistoryCard({ subscription }: { subscription: UserSubscription }) {
     <article className="bg-card border rounded-sm p-3 flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-foreground">
-          {subscription.packageName ?? subscription.planName ?? "Subscription"}
+          {subscription.packageName ?? "Subscription"}
         </p>
         <p className="truncate text-xs text-gray-500">
           {[subscription.groupName, subscription.termName]
@@ -225,9 +229,7 @@ export default function Subscription() {
             {held.map((subscription) => (
               <PlanSheet
                 key={subscription.id}
-                title={
-                  subscription.packageName ?? subscription.planName ?? "Premium"
-                }
+                title={subscription.packageName ?? "Premium"}
                 subtitle={[subscription.groupName, subscription.termName]
                   .filter(Boolean)
                   .join(" · ")}

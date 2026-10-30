@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountCheck } from "@/components/common/VerifiedAccountBadge";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
@@ -37,6 +38,8 @@ export interface ProfileUser {
   following: number;
   follower: number;
   joinDate: string;
+  /** Paid-plan badge (active subscription), derived by the backend. */
+  verifiedAccount?: boolean;
 }
 
 interface ProfileHeaderProps {
@@ -89,9 +92,8 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
     // default section lit instead of dropping the highlight entirely.
     "manage-ads";
 
-  // The profile page currently renders from a mock currentUser; these overrides
-  // reflect an upload immediately. router.refresh() keeps server data in sync
-  // once the page consumes real /users/me data (tracked follow-up).
+  // These overrides reflect an upload immediately; router.refresh() keeps the
+  // server data in sync.
   const displayedAvatar = avatarOverride ?? user.avatar;
   const displayedCover = coverOverride ?? user.cover;
   const handleImageClick = (src: string) => {
@@ -248,7 +250,10 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
               <div className="flex-1">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="">
-                    <h1 className="text-xl font-medium ">{user.name}</h1>
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-xl font-medium">{user.name}</h1>
+                      {user.verifiedAccount && <VerifiedAccountCheck />}
+                    </div>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button

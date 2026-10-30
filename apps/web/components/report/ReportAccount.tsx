@@ -27,7 +27,7 @@ import {
 import { FieldGroup } from "@/components/ui/field";
 import { Images, X, ImagePlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
-import { User } from "@/lib/user";
+import type { User } from "@/lib/user";
 import { signUploadUser } from "@/actions/files";
 import { reportUser } from "@/actions/reports";
 import { REAL_ID, useReportReasons } from "./use-report-reasons";

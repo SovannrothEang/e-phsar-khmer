@@ -18,6 +18,7 @@ export type UploadScope =
   | "subcategory"
   | "brand"
   | "model"
+  | "product"
   | "attribute"
   | "advertisement";
 

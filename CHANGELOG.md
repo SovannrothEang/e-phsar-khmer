@@ -21,6 +21,18 @@ How to use this file:
 
 ### Added
 
+- **Paid "Verified Account" badge + checkout success screen.** `verifiedAccount`
+  is derived from an active paid `user_subscriptions` row (no stored flag, no
+  migration) and is returned additively by `GET /users/by-username/:username`,
+  `/users/me` and `/auth/me`, and as `sellerVerifiedAccount` on feed, detail and
+  trending listing rows. The web renders a white/purple pill on ad cards, a
+  purple check beside the public-profile and `/me` names, and the pill on the
+  ad-detail seller card; the previously unconditional rosette is now
+  conditional. Checkout replaces the activation spinner with an explicit
+  "Payment successful" card carrying **Back to profile** and **My
+  subscriptions**, adds Back to profile to the activated and failure states,
+  and keeps a 15 s status read alive for 30 minutes so a confirmation that
+  lands after the QR expires still updates the page.
 - **Trusted product specs (admin-managed, in-house).** A new `product_specs`
   table (migration `0044_rapid_skaar`; one row per `models` row, grouped
   label/value `spec_groups` JSONB, `is_published`) backs GSMArena-style spec
@@ -42,6 +54,36 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   that model. Admin UI: `/wanderer/dashboard/products` (Attributes → Product
   Specs) with a dynamic group/row editor. No image upload in v1 — the model's
   existing image is used through `DbImage`.
+- **Product Specifications: family-scoped spec pages.** The freeform
+  "Product Specs" surface becomes a top-level admin section —
+  **Product Specifications** → Cars, Motorcycles, Phones, Tablets, Smart
+  Watches (`/wanderer/dashboard/product-specifications/<family>`; the old
+  `/wanderer/dashboard/products` redirects to Cars). `product_specs` gains a
+  `family` enum column (migration `0047_luxuriant_earthquake`, backfilled
+  from each model's family subcategory with a phone fallback). Cars and
+  Motorcycles use the old freeform group/row editor — staff add any section
+  and field, so ICE and BEV specs fit without a schema — while Phones,
+  Tablets and Smart Watches keep fixed templates from
+  `src/products/spec-templates.ts`, rendered from
+  `GET /admin/products/template/:family` (`mode: template | freeform`) with
+  blank fields never rendering. The API also gains `?family=` on the
+  product lists. Create requires the model to be linked to the family's
+  listing subcategory; templated families reject non-template groups
+  (`INVALID_SPEC_SECTION`) except for legacy groups already stored on a row. `productSpec` is now required on `cars-for-sale`,
+  `motorcycles-for-sale`, `phones`, `tablets` and `smart-watches`, and the
+  post-form picker is scoped to the subcategory's family. The listing
+  create/update path also rejects a spec from another family.
+- **Product pages can carry their own image.** `product_specs` gains an
+  `image` column (migration `0048_lucky_harrier`); the admin create/edit
+  dialogs upload through a new staff-only `product` sign scope, and the
+  public product page and picker prefer it, falling back to `models.image`.
+  Product images render contain-fit (no square crop): a wide admin preview
+  and a 384×256 public header panel.
+- **Product spec pages redesigned.** `/product/[brand]/[model]` gets a
+  hero (4:3 contain image, brand eyebrow, 32/40 model name, Trusted-specs
+  badge, family/fuel chips) and two-column spec cards with uppercase
+  section headers. The page uses a scoped `product-type` type scale so its
+  headings stay larger without changing the app-wide 20/28 titles.
 - **Trending listings replace the mock home Top Ads.** `GET /api/v1/listings/trending`
   (`limit` ≤ 20, `windowDays` ≤ 30) ranks live listings by weighted engagement from
   `listing_events` (view 1, chat/call/show_contact 3, apply_job 5 — impressions are
@@ -80,6 +122,43 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Changed
 
+- **"Update this contact to your ads" now carries the location too.** With the switch ticked,
+  `PATCH /users/me` copies the profile's province/district/commune, address and — when the profile
+  has one — map pin onto every non-deleted ad the user owns, alongside the contact name/phones/email
+  it already copied. The settings form had been making Location and Address required for this switch
+  while the backend deliberately skipped them, so ads stayed empty. A profile with no pin leaves each
+  ad's own pin untouched, and an unticked switch still never touches listings. The **post form now
+  prefills Location and Address from the profile too** (same resolved cascade, same saved address),
+  each block still gated on the subcategory's own `field_schema`; the map pin is not prefilled.
+- **Free plan is now one account-wide cap.** `free_plan_settings.other_ads` is the free plan's
+  total live-ad allowance (relabeled "Total Ads"); the `free_plan_ad_limits` rows are sub-limits
+  inside it — at most this many of the pool may sit in one subcategory/category, and a value above
+  the total never binds. A held group keeps its own pool: a Property (1000 ads) subscriber still
+  gets at most 2 cars, because car ads are outside that group. The Manage Ads cards now read
+  active live ads against the summed pools (free total + every held group), a **Hidden** tab lists
+  ads restricted over the allowance with delete/upgrade recovery, restricted ads 404 on their
+  public link, owner deletes reconcile immediately, and a restricted ad whose window lapsed can be
+  renewed. Renewals are pooled the same way (one plan's `renews` is shared by every ad in its
+  pool) and reset on a rolling 30-day window — migration `0046_noisy_wolverine` adds
+  `listing_renewals`, one row per renewal spent, cascading with its listing and user. The allowance
+  is enforced when the ad is created as well as when it is published, so an over-limit post never
+  creates a row; if a publish is refused after all, the web rolls it back. The web has no draft
+  surface. The ad-cap change itself needs no migration.
+- **Subscription catalog collapsed to group → tier → term (migration `0045_collapse_subscription_plans`).**
+  The empty `subscription_plans` level is gone: `subscription_packages` is now one fixed tier per
+  group (the `subscription_tier` enum `bronze|silver|gold`, unique on `(categoryId, tier)`) and
+  carries the limits; `subscription_terms` stay as the purchasable rows, constrained in admin to
+  fixed 3/6/12-month durations (12 stored as months, displayed "1 Year"). The four dashboard pages
+  (Categories / Plans / Packages / Terms) are replaced by three pages under
+  `/wanderer/dashboard/subscription`: **Subscriptions** (groups + coverage), **Tiers** (limits) and
+  **Terms** (prices); Free plan keeps its own page, and the sidebar section is now **Premium**.
+  The migration backfills each package's group and tier from its old plan
+  (failing loudly on unmapped names or duplicate tiers), sets the tier order, normalizes year terms
+  to 12 months, and retires every term outside 3/6/12 months (rows kept; live subscriptions keep
+  their frozen snapshot). The public catalog and `/subscriptions/me` no longer return
+  `planId`/`planName`; customer pricing, checkout and the profile/`/me/subscriptions` views render
+  package + term, checkout now refuses inactive groups, and the unenforced Videos/Auto-Renews rows
+  are no longer shown on customer surfaces.
 - **Admin catalogue tables rebuilt on a shared kit.** Models, Brands, Categories and
   Subcategories drop the raw-UUID ID column (Copy ID now sits in each row's menu), lead
   with a logo/initial + name cell, show category and sub-category chips and one formatted
@@ -141,6 +220,20 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   never overlapped by content — so a long form no longer stretches the dialog past the screen.
   Cancel buttons are the neutral outline (the red/blue fills across the Attributes, Users, Team
   and Feedback dialogs are gone) and primary actions use the theme blue.
+- **Users Subscription rebuilt on the shared admin table.** Subscriber, phone, plan + price/payment,
+  category chip, usage (ads / renews / auto), one subscription period, status and the row menu
+  replace the 15-column table whose Status/Action columns fell off-screen; search and sorting come
+  from the kit and the Grant dialog's Cancel is neutral.
+- **Admin Listings rebuilt on the shared table with category filters.** A thumbnail + title (with
+  the moderation reason beneath), seller, resolved category names, price, soft status and
+  open-report badges, one created date and the row menu (View listing / Remove / Restore / Copy ID)
+  replace the old table with its yellow/red buttons. New **Category** and **Sub-category** filters
+  ride two additive `GET /admin/listings` params (`categorySlug`, `subcategorySlug`); the admin
+  table kit gained a `serverPagination` mode so the footer drives the API page. The status tabs
+  carry counts computed under the current search/category filters, capped at **99+** (the shared
+  `formatCount` also feeds the Users, Team and Users Subscription tab badges). Status and report
+  badges use **solid tints**: Tailwind's alpha colours (e.g. `orange-500/10`) render teal fringe
+  pixels on Chrome's rounded pills — also fixed on the Users Subscription status badges.
 - **Manage Ads: the ad list is split from the controls card and rows gain an
   actions menu.** The header, plan stats and Active/Expired tabs keep their own
   card; the ads (and the loading/empty states) render in a separate section
@@ -241,6 +334,38 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Fixed
 
+- **Listing-detail spec values now actually filter the feed.** Every row in the Description grid used
+  to link to its subcategory page with no query, so clicking Year, Tax Type, Condition, Body Type,
+  Engine or Color landed on the unfiltered feed. Each row now carries the filter: year → an exact
+  `year_min`/`year_max` range, condition/tax type/engine/color/transmission → their shared filter
+  params, and every other attribute key (`bodyType`, `storage`, `jobType`, `bedroom`, `size`, …) →
+  the feed's multi-attribute `attrs` JSON object. Links always carry the stored English value, so
+  `/km` filtering works while the grid stays Khmer. Clear removes the object and the More Filters
+  badge counts it.
+- **More Filters is schema-driven for every subcategory.** The dialog rendered its attribute block
+  only on vehicle subcategories, so a phone page offered no Brand, Model or Storage and a laptop
+  page none of its Storage / Screen Size / RAM / CPU / VGA fields. It now renders one select per
+  `select` field the subcategory's `field_schema` declares (plus Brand/Model and the vehicle-specific
+  controls), AND-ing the generic ones through the new additive `attrs` query param
+  (`GET /listings?attrs={"storage":"128GB","ram":"8GB"}`). Keys are bound as parameters, malformed
+  or oversized input applies nothing, and each parsed filter is unit-tested. No schema change.
+- **The seller card's email row now hides the address until asked.** The full email was always
+  rendered next to a "Show Email Address" button that only logged an analytics event, so the
+  control did nothing. It now mirrors the phone row: `c***@gmail.com` until clicked, then the real
+  address as a `mailto:` link and the reveal control disappears. An expired ad still hides the row
+  entirely.
+- **The car post form was missing the Product Specification picker in an environment whose seed
+  data predated it.** The form is schema-driven, and `subcategories.field_schema` for
+  `cars-for-sale` (plus motorcycles, tablets and smart watches) had been written before
+  `productSpecField` existed, so only `phones` carried the key live. The seed source was already
+  correct; a targeted `field_schema` sync from `categoriesSeed` (by category + slug) applied it.
+  No code change. Production still needs the same targeted `UPDATE` per environment — the seed is
+  its only writer.
+- **Users Subscription tabs are built from the subscription categories, not a hardcoded list.**
+  Category names are free text (e.g. "Auto 8137"), so the old name-matching tabs counted zero and
+  filtered nothing, and any category beyond the original five had no tab at all. The admin view now
+  also returns each row's `subscriptionCategoryId` (additive field); the tabs count and filter by
+  id, so new categories appear automatically, and the strip wraps when it grows.
 - **Editing an attribute with an empty Khmer name no longer 500s.** The admin web action sends
   `nameKm: null` for an empty field, and `AttributesService.update` called `.trim()` on it; update
   now mirrors create's null-safe trim (null clears the Khmer name). The same guard was added to
@@ -311,6 +436,12 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 - The no-op Archive menu item and the unused i18n keys `Chat.inbox.archive`,
   `Chat.thread.emptyTitle`, `Chat.thread.attachingListing` and `Chat.thread.sendingVoice` (all six
   locales).
+- **Web mock data removed.** Deleted `lib/post-ad.ts`, `lib/categories.ts`, `lib/location.ts`,
+  `lib/data.ts`, `lib/users.ts`, `lib/subcategoryGroups.ts`, `lib/brands.ts`,
+  `lib/subcategories.ts`, `components/post/PostForm.tsx`, the five mock display components
+  (`components/ads/{AdsPhoto,ListAd,NormalAd}.tsx`, `components/Card/TabsCard.tsx`,
+  `components/all-ads/AllAdsHeader.tsx`), and the mock `posts`/`users` arrays; feed cards and
+  listing detail are real-data only; `/sell` redirects to `/post`; legacy numeric `-adid-` URLs 404. Client chunks drop ~285 KB raw / ~48 KB gzip.
 
 ### Docs
 

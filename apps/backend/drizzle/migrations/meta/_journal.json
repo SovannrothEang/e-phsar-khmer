@@ -316,6 +316,34 @@
       "when": 1793115011045,
       "tag": "0044_rapid_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1793188491590,
+      "tag": "0045_collapse_subscription_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1793289015038,
+      "tag": "0046_noisy_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793305935216,
+      "tag": "0047_luxuriant_earthquake",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793362907854,
+      "tag": "0048_lucky_harrier",
+      "breakpoints": true
     }
   ]
 }

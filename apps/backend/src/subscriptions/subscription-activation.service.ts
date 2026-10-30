@@ -10,7 +10,6 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import {
   subscriptionPackages,
-  subscriptionPlans,
   subscriptionPurchases,
   subscriptionTerms,
   userSubscriptions,
@@ -338,15 +337,11 @@ export class SubscriptionActivationService {
     if (typeof frozen === 'string') return frozen;
     if (!purchase.termId) return null;
     const [row] = await tx
-      .select({ groupId: subscriptionPlans.categoryId })
+      .select({ groupId: subscriptionPackages.categoryId })
       .from(subscriptionTerms)
       .innerJoin(
         subscriptionPackages,
         eq(subscriptionPackages.id, subscriptionTerms.packageId),
-      )
-      .innerJoin(
-        subscriptionPlans,
-        eq(subscriptionPlans.id, subscriptionPackages.planId),
       )
       .where(eq(subscriptionTerms.id, purchase.termId))
       .limit(1);
@@ -375,13 +370,9 @@ export class SubscriptionActivationService {
           renews: subscriptionPackages.renews,
           autoRenews: subscriptionPackages.autoRenews,
           videos: subscriptionPackages.videos,
-          subscriptionCategoryId: subscriptionPlans.categoryId,
+          subscriptionCategoryId: subscriptionPackages.categoryId,
         })
         .from(subscriptionPackages)
-        .innerJoin(
-          subscriptionPlans,
-          eq(subscriptionPlans.id, subscriptionPackages.planId),
-        )
         .where(eq(subscriptionPackages.id, term.packageId))
         .limit(1);
       if (!pkg) throw new NotFoundException('Subscription package not found');

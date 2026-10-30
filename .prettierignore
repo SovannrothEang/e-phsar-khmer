@@ -11,3 +11,7 @@ CLAUDE.md
 # Local Claude Code harness state (gitignored, never in CI); keeping it out of
 # format:check makes the local gate match CI instead of failing on transcripts.
 .claude/
+
+# Local superpowers agent scratch (gitignored by .superpowers/sdd/.gitignore,
+# never in CI); same reason as .claude/.
+.superpowers/

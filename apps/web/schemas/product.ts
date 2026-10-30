@@ -27,6 +27,11 @@ export const productSpecGroupSchema = z.object({
 
 export const productSchema = z.object({
   modelId: z.string().min(1, "Model is required"),
+  family: z.enum(["car", "motorcycle", "phone", "tablet", "smartwatch"]),
+  image: z
+    .string()
+    .max(500, "Image URL must be at most 500 characters")
+    .optional(),
   specGroups: z
     .array(productSpecGroupSchema)
     .min(1, "Add at least one group")
@@ -34,8 +39,11 @@ export const productSchema = z.object({
   isPublished: z.boolean(),
 });
 
-/** `modelId` is immutable after create — the edit dialog never sends it. */
-export const updateProductSchema = productSchema.omit({ modelId: true });
+/** `modelId` and `family` are immutable after create — the edit dialog never sends them. */
+export const updateProductSchema = productSchema.omit({
+  modelId: true,
+  family: true,
+});
 
 export const deleteProductSchema = z.object({
   productId: z.string().min(1, "Product ID is required"),

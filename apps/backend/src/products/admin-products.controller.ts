@@ -7,12 +7,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateProductDto } from './dto/create-product.dto';
+import { QueryProductsDto } from './dto/query-products.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductsService } from './products.service';
 
@@ -26,8 +28,14 @@ export class AdminProductsController {
 
   @Get()
   @ApiOperation({ summary: 'List product specs (published and draft)' })
-  list() {
-    return this.service.listAdmin();
+  list(@Query() query: QueryProductsDto) {
+    return this.service.listAdmin(query.family);
+  }
+
+  @Get('template/:family')
+  @ApiOperation({ summary: 'Get a family spec template (the admin form)' })
+  template(@Param('family') family: string) {
+    return this.service.getTemplate(family);
   }
 
   @Post()

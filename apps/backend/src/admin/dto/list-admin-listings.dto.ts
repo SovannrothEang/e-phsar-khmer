@@ -33,6 +33,18 @@ export class ListAdminListingsDto {
   @IsUUID()
   userId?: string;
 
+  /** Category slug (the admin Listings category filter). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  categorySlug?: string;
+
+  /** Subcategory slug, scoped by `categorySlug` when both are present. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  subcategorySlug?: string;
+
   @IsOptional()
   @IsInt()
   @Min(1)

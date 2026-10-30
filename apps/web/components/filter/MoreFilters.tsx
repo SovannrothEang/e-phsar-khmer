@@ -27,6 +27,7 @@ import {
   AD_FIELD_PARAM,
   AD_MODEL_PARAM,
   AD_TYPE_PARAM,
+  ATTRS_PARAM,
   COLOR_PARAM,
   CONDITION_OPTIONS,
   CONDITION_PARAM,
@@ -51,6 +52,7 @@ import {
   defaultSortFor,
   hasQueryParam,
   normalizeQuery,
+  parseAttrsParam,
   parseSortParam,
   sortOptionsFor,
   type DateValue,
@@ -105,6 +107,8 @@ function countActiveFilters(params: URLSearchParams): number {
   if (params.get(TAX_TYPE_PARAM)) n++;
   if (params.get(COLOR_PARAM)) n++;
   if (params.get(TRANSMISSION_PARAM)) n++;
+  // One count for the whole attribute object, however many selects are set.
+  if (params.get(ATTRS_PARAM)) n++;
   // The grid drill-down (brand/model/body type) is a filter too — the dialog
   // edits the same params, so the badge must see them (a body-type pick used
   // to leave the badge at zero; captain, 2026-10-27).
@@ -241,6 +245,25 @@ function ToggleField({
   );
 }
 
+// Labels for the schema-driven selects (the keys `getBrowseFilterOptions`
+// returns); a key outside this map falls back to the schema's English label.
+const ATTRIBUTE_LABEL_KEYS = new Set([
+  "jobType",
+  "experience",
+  "bedroom",
+  "bathroom",
+  "facing",
+  "size",
+  "type",
+  "accessory",
+  "screenSize",
+  "storage",
+  "ram",
+  "cpu",
+  "vga",
+  "network",
+]);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
   const t = useTranslations();
@@ -282,6 +305,10 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
   const [engine, setEngine] = useState("");
   const [yearMin, setYearMin] = useState("");
   const [yearMax, setYearMax] = useState("");
+  // Every schema-declared attribute that is not one of the dedicated fields
+  // above (storage, screen size, RAM, CPU, job type, …) — one select each,
+  // AND-ed through the feed's `attrs` JSON param.
+  const [attrs, setAttrs] = useState<Record<string, string>>({});
 
   // ── Option lists (vehicle block only) ────────────────────────────────────
   // Loaded on first open of a subcategory page; the dialog gates every vehicle
@@ -297,7 +324,6 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
   const options = optionsQuery.data ?? null;
   const fields = options?.fields ?? [];
   const hasField = (key: string) => fields.includes(key);
-  const isVehicle = hasField("bodyType") || hasField("vehicleType");
   const brandId = options?.brands.find((b) => b.slug === brand)?.id;
   const modelsQuery = useQuery({
     queryKey: ["browse-filter-models", brandId, subcategorySlug],
@@ -335,6 +361,7 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
     setEngine(searchParams.get(ENGINE_PARAM) ?? "");
     setYearMin(searchParams.get(YEAR_MIN_PARAM) ?? "");
     setYearMax(searchParams.get(YEAR_MAX_PARAM) ?? "");
+    setAttrs(parseAttrsParam(searchParams.get(ATTRS_PARAM)) ?? {});
   }, [open, searchParams]);
 
   // ── Location cascade options ─────────────────────────────────────────────
@@ -386,19 +413,31 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
     set(DELIVERY_PARAM, delivery ? "1" : "");
     set(DISCOUNT_PARAM, discount ? "1" : "");
 
-    // Vehicle fields are written only when the dialog actually renders them —
+    // Fields are written only when the dialog actually renders them —
     // otherwise an untouched dialog would clear a grid drill-down it never
     // showed (the Type grids on non-vehicle pages own `ad_type` too).
-    if (isVehicle) {
-      set(AD_FIELD_PARAM, brand);
-      set(AD_MODEL_PARAM, brand ? model : "");
+    if (hasField("brand")) set(AD_FIELD_PARAM, brand);
+    if (hasField("model")) set(AD_MODEL_PARAM, brand ? model : "");
+    if (hasField("bodyType") || hasField("vehicleType")) {
       set(AD_TYPE_PARAM, bodyType);
-      set(TAX_TYPE_PARAM, taxType);
-      set(COLOR_PARAM, color);
-      set(TRANSMISSION_PARAM, transmission);
-      set(ENGINE_PARAM, engine);
+    }
+    if (hasField("taxType")) set(TAX_TYPE_PARAM, taxType);
+    if (hasField("color")) set(COLOR_PARAM, color);
+    if (hasField("transmission")) set(TRANSMISSION_PARAM, transmission);
+    if (hasField("engineType")) set(ENGINE_PARAM, engine);
+    if (hasField("year")) {
       set(YEAR_MIN_PARAM, yearMin);
       set(YEAR_MAX_PARAM, yearMax);
+    }
+    // The generic object carries every schema select; an emptied select is
+    // dropped so Apply really clears it, and no select leaves no param.
+    const cleanedAttrs = Object.fromEntries(
+      Object.entries(attrs).filter(([, value]) => value.trim() !== ""),
+    );
+    if (Object.keys(cleanedAttrs).length > 0) {
+      params.set(ATTRS_PARAM, JSON.stringify(cleanedAttrs));
+    } else {
+      params.delete(ATTRS_PARAM);
     }
 
     const query = params.toString();
@@ -430,15 +469,16 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
     setEngine("");
     setYearMin("");
     setYearMax("");
+    setAttrs({});
     // Only the filter params — a non-vehicle page's grid drill-down (a Type
-    // pick) stays put. On a vehicle page the Brand/Model/Body Type selects are
-    // part of this dialog, so clearing them is what "Clear" means there.
+    // pick) stays put. On a page whose Brand/Model/Body Type selects this
+    // dialog renders, clearing them is what "Clear" means there.
     const params = new URLSearchParams(searchParams.toString());
     for (const key of FILTER_PARAMS) params.delete(key);
-    if (isVehicle) {
-      for (const key of [AD_FIELD_PARAM, AD_MODEL_PARAM, AD_TYPE_PARAM]) {
-        params.delete(key);
-      }
+    if (hasField("brand")) params.delete(AD_FIELD_PARAM);
+    if (hasField("model")) params.delete(AD_MODEL_PARAM);
+    if (hasField("bodyType") || hasField("vehicleType")) {
+      params.delete(AD_TYPE_PARAM);
     }
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
@@ -564,10 +604,10 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
               }
             />
           </div>
-          {/* Condition — non-vehicle categories keep the plain select here; on
-              vehicles the mock places it in the lower block as segmented
-              buttons (All | Used | New), next to the other vehicle filters. */}
-          {!isVehicle && (
+          {/* Condition — contexts with no subcategory (search/all-ads) keep
+              this plain select; a subcategory's own block renders it as the
+              mock's segmented All | Used | New, next to its other fields. */}
+          {!subcategorySlug && (
             <SelectField
               label={t("Filters.condition.label")}
               value={condition}
@@ -616,131 +656,146 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
             onChange={setDelivery}
           />
 
-          {/* ── Vehicle block — exactly the mock's lower half, every field
-                 gated on the subcategory's own schema ───────────────────── */}
-          {isVehicle && (
-            <>
-              {hasField("brand") && (
+          {/* ── Schema block — every field is gated on the subcategory's own
+                 `field_schema`, for every family: vehicles get Year/Tax/Color/
+                 Transmission/Engine/Body Type, phones get Brand/Model/Storage/
+                 Condition, laptops get Storage/Screen Size/RAM/CPU/VGA, and so
+                 on. The non-dedicated selects are AND-ed through `attrs`. ── */}
+          {hasField("brand") && (
+            <SelectField
+              label={t("Specs.brand")}
+              value={brand}
+              onChange={handleBrandChange}
+              options={(options?.brands ?? []).map((b) => ({
+                value: b.slug,
+                label: b.name,
+              }))}
+              placeholder={t("PostForm.placeholders.chooseBrand")}
+            />
+          )}
+          {hasField("model") && (
+            <SelectField
+              label={t("Specs.model")}
+              value={model}
+              onChange={setModel}
+              options={modelRows.map((m) => ({
+                value: m.slug,
+                label: m.name,
+              }))}
+              disabled={!brand}
+              placeholder={
+                brand
+                  ? t("PostForm.placeholders.chooseModel")
+                  : t("Filters.more.selectBrandFirst")
+              }
+            />
+          )}
+          {hasField("year") && (
+            <div className="space-y-1.5">
+              <span className="type-nav text-foreground">
+                {t("Filters.year.label")}
+              </span>
+              <div className="grid grid-cols-2 gap-4">
                 <SelectField
-                  label={t("Specs.brand")}
-                  value={brand}
-                  onChange={handleBrandChange}
-                  options={(options?.brands ?? []).map((b) => ({
-                    value: b.slug,
-                    label: b.name,
+                  label=""
+                  value={yearMin}
+                  onChange={setYearMin}
+                  options={(options?.years ?? []).map((y) => ({
+                    value: y,
+                    label: y,
                   }))}
-                  placeholder={t("PostForm.placeholders.chooseBrand")}
+                  placeholder={t("Filters.year.min")}
                 />
-              )}
-              {hasField("model") && (
                 <SelectField
-                  label={t("Specs.model")}
-                  value={model}
-                  onChange={setModel}
-                  options={modelRows.map((m) => ({
-                    value: m.slug,
-                    label: m.name,
+                  label=""
+                  value={yearMax}
+                  onChange={setYearMax}
+                  options={(options?.years ?? []).map((y) => ({
+                    value: y,
+                    label: y,
                   }))}
-                  disabled={!brand}
-                  placeholder={
-                    brand
-                      ? t("PostForm.placeholders.chooseModel")
-                      : t("Filters.more.selectBrandFirst")
-                  }
+                  placeholder={t("Filters.year.max")}
                 />
-              )}
-              {hasField("year") && (
-                <div className="space-y-1.5">
-                  <span className="type-nav text-foreground">
-                    {t("Filters.year.label")}
-                  </span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <SelectField
-                      label=""
-                      value={yearMin}
-                      onChange={setYearMin}
-                      options={(options?.years ?? []).map((y) => ({
-                        value: y,
-                        label: y,
-                      }))}
-                      placeholder={t("Filters.year.min")}
-                    />
-                    <SelectField
-                      label=""
-                      value={yearMax}
-                      onChange={setYearMax}
-                      options={(options?.years ?? []).map((y) => ({
-                        value: y,
-                        label: y,
-                      }))}
-                      placeholder={t("Filters.year.max")}
-                    />
-                  </div>
-                </div>
-              )}
-              {hasField("taxType") && (
-                <SegmentedField
-                  label={t("Specs.attributes.taxType")}
-                  value={taxType}
-                  onChange={setTaxType}
-                  options={segmented.taxType}
-                />
-              )}
-              {hasField("condition") && (
-                <SegmentedField
-                  label={t("Filters.condition.label")}
-                  value={condition}
-                  onChange={setCondition}
-                  options={segmented.condition}
-                />
-              )}
-              {hasField("color") && (
-                <SelectField
-                  label={t("Specs.attributes.color")}
-                  value={color}
-                  onChange={setColor}
-                  options={(options?.colors ?? []).map((c) => ({
-                    value: c,
-                    label: c,
-                  }))}
-                  placeholder={t("PostForm.placeholders.chooseColor")}
-                />
-              )}
-              {hasField("transmission") && (
-                <SegmentedField
-                  label={t("Specs.attributes.transmission")}
-                  value={transmission}
-                  onChange={setTransmission}
-                  options={segmented.transmission}
-                />
-              )}
-              {hasField("engineType") && (
-                <SelectField
-                  label={t("Specs.attributes.engineType")}
-                  value={engine}
-                  onChange={setEngine}
-                  options={(options?.engineTypes ?? []).map((name) => ({
-                    value: name,
-                    label: ENGINE_LABEL_KEYS[name]
-                      ? t(`PostForm.options.${ENGINE_LABEL_KEYS[name]}`)
-                      : name,
-                  }))}
-                  placeholder={t("PostForm.placeholders.chooseEngine")}
-                />
-              )}
-              {(hasField("bodyType") || hasField("vehicleType")) && (
-                <SelectField
-                  label={t("Specs.attributes.bodyType")}
-                  value={bodyType}
-                  onChange={setBodyType}
-                  options={(options?.bodyTypes ?? []).map((b) => ({
-                    value: b.slug,
-                    label: b.name,
-                  }))}
-                  placeholder={t("PostForm.placeholders.chooseBodyType")}
-                />
-              )}
-            </>
+              </div>
+            </div>
+          )}
+          {hasField("taxType") && (
+            <SegmentedField
+              label={t("Specs.attributes.taxType")}
+              value={taxType}
+              onChange={setTaxType}
+              options={segmented.taxType}
+            />
+          )}
+          {(options?.selects ?? []).map((select) => (
+            <SelectField
+              key={select.key}
+              label={
+                ATTRIBUTE_LABEL_KEYS.has(select.key)
+                  ? t(`Specs.attributes.${select.key}`)
+                  : select.label
+              }
+              value={attrs[select.key] ?? ""}
+              onChange={(value) =>
+                setAttrs((prev) => ({ ...prev, [select.key]: value }))
+              }
+              options={select.options}
+              placeholder={t("Filters.more.any")}
+            />
+          ))}
+          {hasField("condition") && (
+            <SegmentedField
+              label={t("Filters.condition.label")}
+              value={condition}
+              onChange={setCondition}
+              options={segmented.condition}
+            />
+          )}
+          {hasField("color") && (
+            <SelectField
+              label={t("Specs.attributes.color")}
+              value={color}
+              onChange={setColor}
+              options={(options?.colors ?? []).map((c) => ({
+                value: c,
+                label: c,
+              }))}
+              placeholder={t("PostForm.placeholders.chooseColor")}
+            />
+          )}
+          {hasField("transmission") && (
+            <SegmentedField
+              label={t("Specs.attributes.transmission")}
+              value={transmission}
+              onChange={setTransmission}
+              options={segmented.transmission}
+            />
+          )}
+          {hasField("engineType") && (
+            <SelectField
+              label={t("Specs.attributes.engineType")}
+              value={engine}
+              onChange={setEngine}
+              options={(options?.engineTypes ?? []).map((name) => ({
+                value: name,
+                label: ENGINE_LABEL_KEYS[name]
+                  ? t(`PostForm.options.${ENGINE_LABEL_KEYS[name]}`)
+                  : name,
+              }))}
+              placeholder={t("PostForm.placeholders.chooseEngine")}
+            />
+          )}
+          {(hasField("bodyType") || hasField("vehicleType")) && (
+            <SelectField
+              label={t("Specs.attributes.bodyType")}
+              value={bodyType}
+              onChange={setBodyType}
+              options={(options?.bodyTypes ?? []).map((b) => ({
+                value: b.slug,
+                label: b.name,
+              }))}
+              placeholder={t("PostForm.placeholders.chooseBodyType")}
+            />
           )}
         </div>
         {/* Footer */}

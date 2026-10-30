@@ -26,6 +26,7 @@ import {
   DateCell,
   PrimaryCell,
   RowActions,
+  formatCount,
   type AdminColumn,
 } from "@/components/dashboard/admin-table";
 
@@ -271,13 +272,13 @@ export default function UserPage({
             <TabsTrigger value="premium" className="cursor-pointer">
               Premium
               <Badge className="ml-1.5 bg-blue-500 type-meta text-white">
-                {premiumCount}
+                {formatCount(premiumCount)}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="normal" className="cursor-pointer">
               Normal
               <Badge className="ml-1.5 bg-slate-500 type-meta text-white">
-                {normalCount}
+                {formatCount(normalCount)}
               </Badge>
             </TabsTrigger>
           </TabsList>

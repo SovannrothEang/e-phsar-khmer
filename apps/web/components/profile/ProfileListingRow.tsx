@@ -20,12 +20,15 @@ export function ProfileListingRow({
   post,
   action,
   badge,
+  linkable = true,
 }: {
   post: Post;
   /** Trailing control (like/save toggle); omit for a plain row. */
   action?: ReactNode;
   /** Optional state chip beside the title (Manage Ads' Expired tab). */
   badge?: ReactNode;
+  /** Set false when the ad has no public page (Manage Ads' Hidden tab). */
+  linkable?: boolean;
 }) {
   const t = useTranslations("Common");
   const photo = post.images[0];
@@ -33,11 +36,13 @@ export function ProfileListingRow({
   return (
     <article className="relative flex items-stretch gap-4 rounded-sm border bg-card p-3 shadow-sm">
       {/* Full-row link; the trailing control sits above it. */}
-      <Link
-        // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
-        href={`/${toSlug(post.title)}-adid-${post.postId}`}
-        className="absolute inset-0 z-10"
-      />
+      {linkable ? (
+        <Link
+          // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
+          href={`/${toSlug(post.title)}-adid-${post.postId}`}
+          className="absolute inset-0 z-10"
+        />
+      ) : null}
 
       <div
         className={`relative ${PROFILE_ROW_PHOTO} shrink-0 overflow-hidden rounded-sm bg-muted`}

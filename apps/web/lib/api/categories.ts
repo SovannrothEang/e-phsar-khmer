@@ -64,13 +64,17 @@ async function toSellerView(l: BackendListing): Promise<User> {
     phone: l.contactPhones,
     email: l.contactEmail ?? undefined,
     userlink: username ? `@${username}` : undefined,
+    // The public profile is the authoritative read; the listing's own flag
+    // covers a failed profile fetch (both derive from the same subscription).
+    verifiedAccount:
+      profile?.verifiedAccount ?? l.sellerVerifiedAccount ?? false,
   };
 }
 
 /**
  * Build the template's `RealDetailData` for a real listing — shared by the
  * two detail entry points (`[slug]` root-slug and `post/[slug]`). Returns
- * null when the id is unknown (caller falls back to the mock render).
+ * null when the id is unknown (both callers `notFound()`).
  */
 /** Hardcoded pickers with no `attribute_options` rows to read `nameKm` from. */
 const DETAIL_VALUE_KM: Record<string, Record<string, string>> = {
@@ -264,6 +268,8 @@ export interface BackendListing {
    * rows (they do not join `users`) and null when the owner is gone.
    */
   sellerUsername?: string | null;
+  /** The seller holds an active paid subscription — the badge on cards. */
+  sellerVerifiedAccount?: boolean;
   /**
    * How many users liked this listing — joined on by `GET /listings/:id`,
    * absent from feed rows. Drives the detail page's "N Likes" control.
@@ -440,7 +446,7 @@ export async function getListingsFeed(
   locale: string,
 ): Promise<ListingsFeed | null> {
   const qs = new URLSearchParams();
-  const { attrKey, attrValue, limit, ...rest } = params;
+  const { attrKey, attrValue, attrs, limit, ...rest } = params;
   for (const [key, value] of Object.entries(rest)) {
     if (value === undefined || value === "" || value === false) continue;
     qs.set(key, String(value));
@@ -448,6 +454,9 @@ export async function getListingsFeed(
   if (attrKey && attrValue) {
     qs.set("attrKey", attrKey);
     qs.set("attrValue", attrValue);
+  }
+  if (attrs && Object.keys(attrs).length > 0) {
+    qs.set("attrs", JSON.stringify(attrs));
   }
   qs.set("limit", String(limit ?? 20));
   try {
@@ -591,6 +600,7 @@ export function toCardPost(l: BackendListing): Post {
     // the seller up in mock data by id, which never hit for a real listing, so
     // the control silently did nothing.
     sellerUsername: l.sellerUsername ?? null,
+    sellerVerifiedAccount: l.sellerVerifiedAccount ?? false,
     title: l.title,
     images: l.photos.map((p) => p.url),
     // The listing price is the ORIGINAL; the discount applies on top — the

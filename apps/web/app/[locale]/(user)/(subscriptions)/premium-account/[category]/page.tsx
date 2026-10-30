@@ -40,6 +40,17 @@ function unitLabel(item: SubscriptionCatalogItem): string {
   return UNIT[item.durationUnit][item.durationValue === 1 ? 0 : 1];
 }
 
+/** 12 stored months display as "1 Year" on the compact term tiles. */
+function tileParts(item: SubscriptionCatalogItem): {
+  value: number;
+  unit: string;
+} {
+  if (item.durationUnit === "month" && item.durationValue % 12 === 0) {
+    return { value: item.durationValue / 12, unit: "Year" };
+  }
+  return { value: item.durationValue, unit: unitLabel(item) };
+}
+
 /** "-20%" for a percent discount, "-$5" for an amount; null when none. */
 function discountLabel(item: SubscriptionCatalogItem): string | null {
   const value = Number(item.discount);
@@ -88,8 +99,6 @@ function Benefits({ item }: { item: SubscriptionCatalogItem }) {
     ["Photos", item.photos],
     ["Ads", item.ads],
     ["Renews", item.renews],
-    ["Auto-Renews", item.autoRenews],
-    ["Videos", item.videos],
   ];
   return (
     <ul className="mb-4 grid grid-cols-1 gap-1">
@@ -158,23 +167,26 @@ function TermTiles({
 }) {
   return (
     <div className="flex flex-wrap gap-4">
-      {terms.map((term) => (
-        <button
-          key={term.termId}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPick(term.termId);
-          }}
-          className="relative flex h-20 w-28 flex-col items-center justify-center rounded-sm border bg-card text-foreground transition-colors hover:border-sky-400"
-        >
-          <DiscountBadge item={term} className="absolute right-0 top-0" />
-          <span className="text-2xl font-bold leading-none">
-            {term.durationValue}
-          </span>
-          <span className="mt-1 text-sm">{unitLabel(term)}</span>
-        </button>
-      ))}
+      {terms.map((term) => {
+        const tile = tileParts(term);
+        return (
+          <button
+            key={term.termId}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(term.termId);
+            }}
+            className="relative flex h-20 w-28 flex-col items-center justify-center rounded-sm border bg-card text-foreground transition-colors hover:border-sky-400"
+          >
+            <DiscountBadge item={term} className="absolute right-0 top-0" />
+            <span className="text-2xl font-bold leading-none">
+              {tile.value}
+            </span>
+            <span className="mt-1 text-sm">{tile.unit}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

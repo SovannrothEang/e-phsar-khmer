@@ -4,7 +4,7 @@ import { Globe, MapPin, CircleCheckBig } from "lucide-react";
 import { IconPhone, IconMailFilled } from "@tabler/icons-react";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "@/i18n/routing";
-import { User } from "@/lib/user";
+import type { User } from "@/lib/user";
 
 /** The identity subset the About card renders — the header owns the rest. */
 type AboutUser = Pick<

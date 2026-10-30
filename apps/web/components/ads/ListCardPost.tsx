@@ -1,11 +1,12 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { VerifiedAccountBadge } from "@/components/common/VerifiedAccountBadge";
 import { ConditionLabel } from "@/components/common/ConditionLabel";
 import { ReportPost } from "@/components/report/ReportPost";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import {
   DotIcon,
@@ -198,6 +199,12 @@ export function ListCardPost({ post }: { post: Post }) {
               {post.title}
             </p>
 
+            {post.sellerVerifiedAccount && (
+              <span className="w-fit">
+                <VerifiedAccountBadge />
+              </span>
+            )}
+
             {/* Time · Location */}
             <div className="flex items-center gap-0.5 type-meta text-muted-foreground">
               <span className="shrink-0">
@@ -207,10 +214,12 @@ export function ListCardPost({ post }: { post: Post }) {
                   hour12: locale !== "km",
                 })}
               </span>
-              <DotIcon className="shrink-0 w-3 h-3" />
-              <span className="truncate">
-                {post.location ?? `${post.proId},${post.disId}`}
-              </span>
+              {post.location && (
+                <>
+                  <DotIcon className="shrink-0 w-3 h-3" />
+                  <span className="truncate">{post.location}</span>
+                </>
+              )}
             </div>
 
             {/* Condition · Year · etc */}

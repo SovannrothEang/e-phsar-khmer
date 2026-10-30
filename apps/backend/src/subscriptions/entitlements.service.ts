@@ -4,10 +4,10 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNotNull,
   isNull,
-  ne,
   or,
   sql,
 } from 'drizzle-orm';
@@ -23,6 +23,7 @@ import {
 import {
   freePlanAdLimits,
   freePlanSettings,
+  listingRenewals,
   subscriptionCategories,
   subscriptionCategorySubcategories,
   subscriptionPackages,
@@ -30,13 +31,16 @@ import {
   subscriptionTerms,
   userSubscriptions,
 } from '../db/schema/subscriptions.schema';
-import { toFreePlanSettings } from './entitlements.constants';
+import {
+  RENEW_WINDOW_DAYS,
+  toFreePlanSettings,
+} from './entitlements.constants';
 import type { FreePlanSettings, PlanLimits } from './entitlements.constants';
 import {
   bucketOf,
-  freeLimits,
   groupBucket,
   partitionByAllowance,
+  scopeCapOf,
 } from './allowance';
 import type {
   AdScope,
@@ -45,6 +49,7 @@ import type {
   BucketKey,
   HeldGroup,
   LiveAd,
+  ScopeKey,
 } from './allowance';
 
 export interface Entitlements {
@@ -66,17 +71,21 @@ export interface BucketView {
 }
 
 export interface EntitlementsView extends Entitlements {
-  /** Live ads held, and renewals spent across every ad the user still owns. */
-  usage: { ads: number; renews: number };
+  /**
+   * Live ads held (`active` + `restricted`), the restricted subset (hidden
+   * from the marketplace for exceeding the plan), and renewals spent in the
+   * rolling window.
+   */
+  usage: { ads: number; renews: number; hidden: number };
   /** The bucket `limits`/`usage` describe; null for the account overview. */
   bucket: BucketView | null;
-  /** Every group the user holds, plus every free bucket they have ads in. */
+  /** Every group the user holds, plus the free pool once it holds ads. */
   buckets: BucketView[];
 }
 
 export interface FreePlanView extends FreePlanSettings {
   /** Every free ad cap, named, in catalog order. */
-  caps: { key: BucketKey; name: string; ads: number }[];
+  caps: { key: ScopeKey; name: string; ads: number }[];
 }
 
 const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
@@ -243,19 +252,48 @@ export class EntitlementsService {
       );
   }
 
+  /** Start of the rolling renewal window. */
+  private renewWindowStart(): Date {
+    return new Date(Date.now() - RENEW_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  }
+
   /**
-   * Renewals spent across every ad the user still owns. `renew_count` is
-   * per ad and survives expiry, so a lapsed ad's spent renewals stay spent —
-   * counting only live ads would make the figure drop when an ad expires.
+   * Renewals spent in the window, across every ad. `listing_renewals` keeps
+   * one row per spent renewal and cascades with its listing, so deleting an
+   * ad releases the renewals it held — matching the live-inventory rule.
    */
   private async renewalsUsed(userId: string): Promise<number> {
     const [row] = await this.db
-      .select({
-        total: sql<number>`coalesce(sum(${listings.renewCount}), 0)::int`,
-      })
-      .from(listings)
-      .where(and(eq(listings.userId, userId), ne(listings.status, 'deleted')));
+      .select({ total: sql<number>`count(*)::int` })
+      .from(listingRenewals)
+      .where(
+        and(
+          eq(listingRenewals.userId, userId),
+          gte(listingRenewals.renewedAt, this.renewWindowStart()),
+        ),
+      );
     return row?.total ?? 0;
+  }
+
+  /**
+   * One row per renewal spent in the window, with its ad's scope. Renewals
+   * are a pool — one plan's `renews` is shared by the ads in its pool — so
+   * the check needs each renewal's bucket, not just the ad being renewed.
+   */
+  private renewalRows(userId: string): Promise<AdScope[]> {
+    return this.db
+      .select({
+        categoryId: listings.categoryId,
+        subcategoryId: listings.subcategoryId,
+      })
+      .from(listingRenewals)
+      .innerJoin(listings, eq(listings.id, listingRenewals.listingId))
+      .where(
+        and(
+          eq(listingRenewals.userId, userId),
+          gte(listingRenewals.renewedAt, this.renewWindowStart()),
+        ),
+      );
   }
 
   /** The limits that apply to one ad, given where it is posted. */
@@ -276,8 +314,14 @@ export class EntitlementsService {
   }
 
   /**
-   * The account overview, or — with `scope` — one ad's bucket (what the post
-   * form shows for the subcategory being posted to).
+   * The account overview, or — with `scope` — one ad's allowance (what the
+   * post form shows for the subcategory being posted to).
+   *
+   * The overview is the Manage Ads header: `usage.ads` counts every live ad
+   * and `limits.ads` is the sum of the pools the account can use (the free
+   * total plus every held group), so the number no longer changes meaning
+   * with the ad mix. For one scope, `limits.ads` is the effective cap there:
+   * a group package's pool, else the free total clamped by the scope cap.
    */
   async view(
     userId: string,
@@ -290,6 +334,7 @@ export class EntitlementsService {
       this.renewalsUsed(userId),
     ]);
 
+    const hidden = live.filter((ad) => ad.status === 'restricted').length;
     const used = new Map<BucketKey, number>();
     const buckets = new Map<BucketKey, Bucket>();
     for (const ad of live) {
@@ -304,16 +349,14 @@ export class EntitlementsService {
         if (bucket) buckets.set(key, bucket);
       }
     }
-    const requested = scope ? bucketOf(scope, config, held) : null;
-    if (requested && !buckets.has(requested.key)) {
-      buckets.set(requested.key, requested);
-    }
 
     const names = await this.bucketNames([...buckets.keys()]);
     const toView = (bucket: Bucket): BucketView => ({
       key: bucket.key,
       kind: bucket.kind,
-      name: names.get(bucket.key) ?? 'Other ads',
+      name:
+        names.get(bucket.key) ??
+        (bucket.kind === 'free' ? 'Free plan' : 'Other ads'),
       groupId: bucket.groupId,
       limits: bucket.limits,
       used: used.get(bucket.key) ?? 0,
@@ -326,28 +369,71 @@ export class EntitlementsService {
       .sort(
         (a, b) =>
           Number(b.kind === 'group') - Number(a.kind === 'group') ||
-          Number(a.key === 'other') - Number(b.key === 'other') ||
+          Number(a.key === 'free') - Number(b.key === 'free') ||
           a.name.localeCompare(b.name),
       );
 
     const plan = held.size > 0 ? 'premium' : 'free';
-    if (requested) {
-      const bucket = toView(requested);
+    if (scope) {
+      const pool = bucketOf(scope, config, held);
+      const cap = pool.kind === 'free' ? scopeCapOf(scope, config) : undefined;
+      const bucketUsed = cap
+        ? live.filter((ad) =>
+            cap.key.startsWith('sub:')
+              ? ad.subcategoryId === scope.subcategoryId
+              : ad.categoryId === scope.categoryId,
+          ).length
+        : (used.get(pool.key) ?? 0);
+      const limits = cap
+        ? { ...pool.limits, ads: Math.min(cap.ads, pool.limits.ads) }
+        : pool.limits;
+      const scopeKey = `sub:${scope.subcategoryId}`;
+      const scopeName =
+        pool.kind === 'free'
+          ? ((await this.bucketNames([scopeKey])).get(scopeKey) ??
+            'this category')
+          : null;
+      const bucket: BucketView = {
+        key: pool.key,
+        kind: pool.kind,
+        name:
+          scopeName ??
+          views.find((v) => v.key === pool.key)?.name ??
+          'Free plan',
+        groupId: pool.groupId,
+        limits,
+        used: bucketUsed,
+        expiresAt: pool.groupId
+          ? (held.get(pool.groupId)?.expiresAt ?? null)
+          : null,
+      };
       return {
         plan,
         limits: bucket.limits,
         expiresAt: bucket.expiresAt,
-        usage: { ads: bucket.used, renews: renewsUsed },
+        usage: { ads: bucketUsed, renews: renewsUsed, hidden },
         bucket,
         buckets: views,
       };
     }
-    // Overview: the account-wide free numbers, every live ad counted.
+
+    // Overview: the free plan's total plus every held group's package pool.
+    const groups = [...buckets.values()].filter((b) => b.kind === 'group');
     return {
       plan,
-      limits: freeLimits(config.free, config.free.otherAds),
+      limits: {
+        photos: config.free.photos,
+        ads:
+          config.free.otherAds +
+          groups.reduce((sum, b) => sum + b.limits.ads, 0),
+        renews:
+          config.free.renews +
+          groups.reduce((sum, b) => sum + b.limits.renews, 0),
+        autoRenews: 0,
+        videos: 0,
+      },
       expiresAt: null,
-      usage: { ads: live.length, renews: renewsUsed },
+      usage: { ads: live.length, renews: renewsUsed, hidden },
       bucket: null,
       buckets: views,
     };
@@ -381,18 +467,18 @@ export class EntitlementsService {
             .where(inArray(categories.id, catIds))
         : [],
       this.bucketNames([
-        ...subIds.map((id): BucketKey => `sub:${id}`),
-        ...catIds.map((id): BucketKey => `cat:${id}`),
+        ...subIds.map((id): ScopeKey => `sub:${id}`),
+        ...catIds.map((id): ScopeKey => `cat:${id}`),
       ]),
     ]);
     const caps = [
       ...subOrder.map((row) => ({
-        key: `sub:${row.id}` as BucketKey,
+        key: `sub:${row.id}` as ScopeKey,
         order: [row.cat, 1, row.sub],
         ads: config.subcategoryCaps.get(row.id) ?? 0,
       })),
       ...catOrder.map((row) => ({
-        key: `cat:${row.id}` as BucketKey,
+        key: `cat:${row.id}` as ScopeKey,
         order: [row.cat, 0, 0],
         ads: config.categoryCaps.get(row.id) ?? 0,
       })),
@@ -416,10 +502,8 @@ export class EntitlementsService {
     return row ? { categoryId: row.categoryId, subcategoryId } : null;
   }
 
-  /** Display names: group name, subcategory or category (en), else "Other ads". */
-  private async bucketNames(
-    keys: BucketKey[],
-  ): Promise<Map<BucketKey, string>> {
+  /** Display names: pool, group, subcategory or category (en). */
+  private async bucketNames(keys: string[]): Promise<Map<string, string>> {
     const ids = (prefix: string) =>
       keys
         .filter((k) => k.startsWith(prefix))
@@ -471,7 +555,8 @@ export class EntitlementsService {
             )
         : [],
     ]);
-    const names = new Map<BucketKey, string>();
+    const names = new Map<string, string>();
+    if (keys.includes('free')) names.set('free', 'Free plan');
     for (const g of groups) names.set(`group:${g.id}`, g.name);
     for (const s of subs) names.set(`sub:${s.id}`, s.name ?? s.slug);
     for (const c of cats) names.set(`cat:${c.id}`, c.name);
@@ -500,7 +585,8 @@ export class EntitlementsService {
 
   /**
    * A new ad (or a re-post of one that is no longer counted) needs a free
-   * slot in its bucket. `ad.id` excludes the ad itself from the count.
+   * slot in its pool and, on the free plan, inside its scope cap. `ad.id`
+   * excludes the ad itself from both counts.
    */
   async assertCanHoldAnotherAd(
     userId: string,
@@ -511,31 +597,52 @@ export class EntitlementsService {
       this.liveAds(userId),
     ]);
     const bucket = bucketOf(ad, config, held);
-    const inBucket = live.filter(
-      (other) =>
-        other.id !== ad.id && bucketOf(other, config, held).key === bucket.key,
+    const others = live.filter((other) => other.id !== ad.id);
+    const inPool = others.filter(
+      (other) => bucketOf(other, config, held).key === bucket.key,
     ).length;
-    if (inBucket >= bucket.limits.ads) {
+    if (inPool >= bucket.limits.ads) {
       throw new ForbiddenException({
         code: 'PLAN_LIMIT_ADS',
-        message: `Your plan allows ${bucket.limits.ads} active ads in this category and you have ${inBucket}. Upgrade your subscription or remove an ad to post another.`,
+        message: `Your plan allows ${bucket.limits.ads} live ads and you have ${inPool}. Upgrade your subscription or remove an ad to post another.`,
+      });
+    }
+    const cap = bucket.kind === 'free' ? scopeCapOf(ad, config) : undefined;
+    if (!cap) return;
+    const scopeLimit = Math.min(cap.ads, bucket.limits.ads);
+    const inScope = others.filter((other) =>
+      cap.key.startsWith('sub:')
+        ? other.subcategoryId === ad.subcategoryId
+        : other.categoryId === ad.categoryId,
+    ).length;
+    if (inScope >= scopeLimit) {
+      throw new ForbiddenException({
+        code: 'PLAN_LIMIT_ADS',
+        message: `Your plan allows ${scopeLimit} live ads in this category and you have ${inScope}. Upgrade your subscription or remove an ad to post another.`,
       });
     }
   }
 
-  async assertCanRenew(
-    userId: string,
-    ad: AdScope,
-    renewCount: number,
-  ): Promise<void> {
-    const { limits } = await this.resolve(userId, ad);
-    if (renewCount >= limits.renews) {
+  /**
+   * Renewals are pooled and reset every 30 days: the plan's number is how
+   * many its pool's ads may spend in the window.
+   */
+  async assertCanRenew(userId: string, ad: AdScope): Promise<void> {
+    const [{ config, held }, rows] = await Promise.all([
+      this.context(userId),
+      this.renewalRows(userId),
+    ]);
+    const bucket = bucketOf(ad, config, held);
+    const used = rows.filter(
+      (row) => bucketOf(row, config, held).key === bucket.key,
+    ).length;
+    if (used >= bucket.limits.renews) {
       throw new ForbiddenException({
         code: 'PLAN_LIMIT_RENEWS',
         message:
-          limits.renews === 0
+          bucket.limits.renews === 0
             ? 'Your plan does not include renewals here. Upgrade your subscription to renew this ad.'
-            : `This ad has used all ${limits.renews} renewals your plan includes.`,
+            : `Your plan includes ${bucket.limits.renews} renewals and you have used them all.`,
       });
     }
   }

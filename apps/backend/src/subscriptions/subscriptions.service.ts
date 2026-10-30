@@ -12,7 +12,6 @@ import type { DbClient } from '../db/drizzle.provider';
 import {
   subscriptionCategories,
   subscriptionPackages,
-  subscriptionPlans,
   subscriptionPurchases,
   subscriptionTerms,
   userSubscriptions,
@@ -93,8 +92,6 @@ export class SubscriptionsService {
         groupName: subscriptionCategories.name,
         groupSlug: subscriptionCategories.slug,
         groupDescription: subscriptionCategories.description,
-        planId: subscriptionPlans.id,
-        planName: subscriptionPlans.name,
         packageId: subscriptionPackages.id,
         packageName: subscriptionPackages.name,
         termId: subscriptionTerms.id,
@@ -112,16 +109,9 @@ export class SubscriptionsService {
       })
       .from(subscriptionCategories)
       .innerJoin(
-        subscriptionPlans,
-        and(
-          eq(subscriptionPlans.categoryId, subscriptionCategories.id),
-          eq(subscriptionPlans.isActive, true),
-        ),
-      )
-      .innerJoin(
         subscriptionPackages,
         and(
-          eq(subscriptionPackages.planId, subscriptionPlans.id),
+          eq(subscriptionPackages.categoryId, subscriptionCategories.id),
           eq(subscriptionPackages.isActive, true),
         ),
       )
@@ -135,7 +125,6 @@ export class SubscriptionsService {
       .where(eq(subscriptionCategories.isActive, true))
       .orderBy(
         asc(subscriptionCategories.sortOrder),
-        asc(subscriptionPlans.sortOrder),
         asc(subscriptionPackages.sortOrder),
         asc(subscriptionTerms.sortOrder),
       );
@@ -149,7 +138,6 @@ export class SubscriptionsService {
         termName: subscriptionTerms.name,
         groupId: userSubscriptions.subscriptionCategoryId,
         groupName: subscriptionCategories.name,
-        planName: subscriptionPlans.name,
         packageName: subscriptionPackages.name,
         photos: subscriptionPackages.photos,
         ads: subscriptionPackages.ads,
@@ -172,10 +160,6 @@ export class SubscriptionsService {
       .leftJoin(
         subscriptionPackages,
         eq(subscriptionPackages.id, subscriptionTerms.packageId),
-      )
-      .leftJoin(
-        subscriptionPlans,
-        eq(subscriptionPlans.id, subscriptionPackages.planId),
       )
       .leftJoin(
         subscriptionCategories,
@@ -203,7 +187,6 @@ export class SubscriptionsService {
         termName: snapshotString('termName', row.termName),
         groupId: row.groupId,
         groupName: row.groupName,
-        planName: row.planName,
         packageName: snapshotString('packageName', row.packageName),
         photos: snapshotNumber('photos', row.photos),
         ads: snapshotNumber('ads', row.ads),
@@ -258,7 +241,7 @@ export class SubscriptionsService {
           renews: subscriptionPackages.renews,
           autoRenews: subscriptionPackages.autoRenews,
           videos: subscriptionPackages.videos,
-          subscriptionCategoryId: subscriptionPlans.categoryId,
+          subscriptionCategoryId: subscriptionPackages.categoryId,
         })
         .from(subscriptionTerms)
         .innerJoin(
@@ -266,14 +249,15 @@ export class SubscriptionsService {
           eq(subscriptionPackages.id, subscriptionTerms.packageId),
         )
         .innerJoin(
-          subscriptionPlans,
-          eq(subscriptionPlans.id, subscriptionPackages.planId),
+          subscriptionCategories,
+          eq(subscriptionCategories.id, subscriptionPackages.categoryId),
         )
         .where(
           and(
             eq(subscriptionTerms.id, dto.termId),
             eq(subscriptionTerms.isActive, true),
             eq(subscriptionPackages.isActive, true),
+            eq(subscriptionCategories.isActive, true),
           ),
         )
         .limit(1);

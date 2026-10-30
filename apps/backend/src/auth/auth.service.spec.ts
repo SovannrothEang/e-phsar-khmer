@@ -960,3 +960,24 @@ describe('VerifyOtpDto validation', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 });
+
+describe('AuthService.findById', () => {
+  it('reports verifiedAccount from the active subscription probe', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows = call === 1 ? [makeUser()] : [{ id: 'sub-1' }];
+      return {
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve(rows) }),
+        }),
+      };
+    });
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    const me = await service.findById('user-uuid');
+
+    expect(me.verifiedAccount).toBe(true);
+  });
+});

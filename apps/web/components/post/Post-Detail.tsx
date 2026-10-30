@@ -8,17 +8,6 @@ import type { AdvertisementCard } from "@/lib/api/advertisements";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { IconClockHour4, IconMapPin } from "@tabler/icons-react";
 import ProfileSidebar from "./Profile-Sidebar";
-import {
-  getPostById,
-  getUserById,
-  getProvinceById,
-  getDistrictById,
-  getCategoryById,
-  getSubCategoryById,
-  getBrandById,
-  getModelById,
-} from "@/lib/data";
-import { notFound } from "next/navigation";
 import LoanCalculator from "./LoanCalculator";
 import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
@@ -35,10 +24,9 @@ import { applyDiscount, shortLocation } from "@/lib/utils";
 import { trackEvent } from "@/lib/insights/queue";
 
 /**
- * Real-listing data slotted into this template. The page (RSC) builds this from
+ * Listing data slotted into this template. The page (RSC) builds this from
  * `GET /listings/:id` + the categories list (breadcrumb) + the listing's own
- * contact fields (seller card), so the SAME design renders for real and mock
- * posts.
+ * contact fields (seller card).
  */
 export interface RealDetailData {
   listing: BackendListing;
@@ -135,15 +123,13 @@ function isListingStatus(value: string): value is ListingContext["status"] {
 }
 
 export default function PostDetail({
-  id,
   real,
   viewerId,
   sellerFollowing = false,
   jobApply = null,
   banners = [],
 }: {
-  id: string;
-  real?: RealDetailData;
+  real: RealDetailData;
   /** Signed-in viewer's id, if any — lets the sidebar tell "your ad" apart
    *  from a stranger's and hide seller-contact actions accordingly. */
   viewerId?: string | null;
@@ -156,15 +142,14 @@ export default function PostDetail({
 }) {
   const t = useTranslations();
   const format = useFormatter();
-  const realListingId = real?.listing.id ?? null;
-  const realListingOwnerId = real?.listing.userId ?? null;
+  const realListingId = real.listing.id;
+  const realListingOwnerId = real.listing.userId;
   const viewTrackedFor = useRef<string | null>(null);
 
   // One view per listing per mounted detail page. The ref is keyed by id so
   // Strict Mode cannot double-count and client navigation between listings
   // still records the new one.
   useEffect(() => {
-    if (!realListingId) return;
     if (viewerId && viewerId === realListingOwnerId) return;
     if (viewTrackedFor.current === realListingId) return;
 
@@ -172,20 +157,16 @@ export default function PostDetail({
     trackEvent(realListingId, "view");
   }, [realListingId, realListingOwnerId, viewerId]);
 
-  const isReal = !!real;
-  const post = isReal ? toPostView(real.listing) : getPostById(id);
-  if (!post) return notFound();
-  const user = isReal ? real.seller : getUserById(post.userId);
+  const post = toPostView(real.listing);
+  const user = real.seller;
   if (!user) return null;
-  const province = isReal ? undefined : getProvinceById(post.proId);
-  const district = isReal ? undefined : getDistrictById(post.proId, post.disId);
-  const cate = isReal ? real.cate : getCategoryById(post.cateId);
-  const subcate = isReal ? real.subcate : getSubCategoryById(post.subId);
-  const brand = isReal ? real.brand : getBrandById(post.brandId ?? "");
-  const model = isReal ? real.model : getModelById(post.modelId ?? "");
-  // Only real listings can carry a trusted spec page; the backend nulls it
-  // once the page is unpublished, so the link hides by itself.
-  const product = isReal ? real.product : undefined;
+  const cate = real.cate;
+  const subcate = real.subcate;
+  const brand = real.brand;
+  const model = real.model;
+  // The trusted spec page the listing links to; the backend nulls it once the
+  // page is unpublished, so the link hides by itself.
+  const product = real.product;
 
   const hasBrand = !!brand;
   const hasModel = !!model;
@@ -193,42 +174,28 @@ export default function PostDetail({
   // The one listing family whose header differs: a job moves the like/share
   // pair beside the title and carries the Apply control (captain's mock,
   // 2026-10-16). Every other listing renders exactly as before.
-  const isJobListing = isReal && cate?.slug === "jobs";
+  const isJobListing = cate?.slug === "jobs";
 
   // A lapsed ad keeps its link (shares, old messages) but is no longer a live
   // offer: the API reports it as `expired`, and the page must say so and stop
   // offering contact (captain, 2026-10-27).
-  const isExpired = isReal && real.listing.status === "expired";
+  const isExpired = real.listing.status === "expired";
 
-  // Mock listings have no matching row in the real `listings` table — attaching
-  // their id would only 400 once a message actually tries to send it.
-  const listingContext: ListingContext | null = isReal
-    ? toListingContext(real.listing)
-    : null;
+  const listingContext = toListingContext(real.listing);
 
-  const displayId = isReal
-    ? real.listing.id.slice(0, 8).toUpperCase()
-    : post.postId;
+  const displayId = real.listing.id.slice(0, 8).toUpperCase();
   // Two forms of the same value, in two places: the ID row carries the card's
   // short `district, province`, while the contact block below spells the whole
   // location out with the street address on its own line (see ContactUser).
-  const fullLocation = isReal
-    ? (real.listing.location ?? undefined)
-    : undefined;
-  const addressLine = isReal ? (real.listing.address ?? undefined) : undefined;
-  const locationLine = isReal
-    ? (shortLocation(real.listing.location) ?? "")
-    : [district?.name, province?.name].filter(Boolean).join(", ");
+  const fullLocation = real.listing.location ?? undefined;
+  const addressLine = real.listing.address ?? undefined;
+  const locationLine = shortLocation(real.listing.location) ?? "";
 
   // The pin the seller dropped when posting (numeric columns arrive as strings).
   const lat =
-    isReal && real.listing.latitude != null
-      ? Number(real.listing.latitude)
-      : NaN;
+    real.listing.latitude != null ? Number(real.listing.latitude) : NaN;
   const lng =
-    isReal && real.listing.longitude != null
-      ? Number(real.listing.longitude)
-      : NaN;
+    real.listing.longitude != null ? Number(real.listing.longitude) : NaN;
   const coords =
     Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 
@@ -392,11 +359,12 @@ export default function PostDetail({
                         </span>
                       )}
                     </div>
-                    {jobApply && real && (
+                    {jobApply && (
                       <ApplyJobButton
                         listingId={real.listing.id}
                         listingTitle={real.listing.title}
                         viewerId={viewerId ?? null}
+                        posterId={real.listing.userId}
                         resume={jobApply.resume}
                         appliedApplicationId={jobApply.appliedApplicationId}
                       />
@@ -410,28 +378,24 @@ export default function PostDetail({
                 <h2 className="type-section-title text-foreground mb-4">
                   {t("Post.description")}
                 </h2>
-                {isReal && (
-                  <ListingSpecs
-                    cate={real.cate}
-                    subcate={real.subcate}
-                    brand={real.brand}
-                    model={real.model}
-                    attributes={real.listing.attributes}
-                    valueLabels={real.valueLabels}
-                    condition={real.listing.condition}
-                  />
-                )}
+                <ListingSpecs
+                  cate={real.cate}
+                  subcate={real.subcate}
+                  brand={real.brand}
+                  model={real.model}
+                  attributes={real.listing.attributes}
+                  valueLabels={real.valueLabels}
+                  condition={real.listing.condition}
+                />
                 <p className="whitespace-pre-line type-body">
                   {post.description}
                 </p>
                 <ContactUser
                   user={user}
-                  district={district}
-                  province={province}
                   coords={coords}
-                  locationLine={isReal ? fullLocation : undefined}
+                  locationLine={fullLocation}
                   addressLine={addressLine}
-                  listingId={real?.listing.id}
+                  listingId={real.listing.id}
                   contactDisabled={isExpired}
                 />
                 <div className="border-t border-muted-foreground/20 mt-4" />
@@ -469,7 +433,7 @@ export default function PostDetail({
               <ProfileSidebar
                 userId={post.userId}
                 user={user}
-                listingId={listingContext ? listingContext.id : undefined}
+                listingId={listingContext.id}
                 listing={listingContext}
                 viewerId={viewerId}
                 initialFollowing={sellerFollowing}

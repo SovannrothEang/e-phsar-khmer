@@ -16,6 +16,8 @@ export interface BackendPublicProfile {
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   isVerified: boolean;
+  /** At least one current, unexpired paid subscription. */
+  verifiedAccount: boolean;
   createdAt: string;
   followers: number;
   following: number;
@@ -75,6 +77,7 @@ export function toProfileUser(p: BackendPublicProfile, locale = "en"): User {
     // Same shape the `/me` header produces, including the active locale's month.
     joinDate: `${created.getDate()} ${month} ${created.getFullYear()}`,
     verified: p.isVerified,
+    verifiedAccount: p.verifiedAccount,
   };
 }
 

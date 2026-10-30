@@ -8,8 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EllipsisVertical, BookmarkIcon } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
-import { Post } from "@/lib/posts";
-import { getUserById } from "@/lib/data";
+import type { Post } from "@/lib/posts";
 import { useState } from "react";
 import { toSlug } from "@/lib/utils";
 import { SITE_URL } from "@/lib/site";
@@ -38,11 +37,7 @@ const ICON = "size-[18px] shrink-0";
 export function ThreeDotPost({ post }: { post: Post }) {
   const t = useTranslations();
   const router = useRouter();
-  // The real feed carries the seller's handle; mock posts fall back to the
-  // mock users array. It used to come from that array alone, so on a real
-  // listing the id missed and "View Profile" did nothing at all.
-  const username =
-    post.sellerUsername ?? getUserById(post.userId)?.username ?? null;
+  const username = post.sellerUsername ?? null;
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const reactions = useReactions();

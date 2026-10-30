@@ -10,6 +10,37 @@ export interface ProductSpecGroup {
   rows: ProductSpecItem[];
 }
 
+/** The five template families (mirrors the backend enum). */
+export type ProductSpecFamily =
+  | "car"
+  | "motorcycle"
+  | "phone"
+  | "tablet"
+  | "smartwatch";
+
+/** One labelled input on a family template. */
+export interface ProductSpecTemplateField {
+  key: string;
+  label: string;
+}
+
+/** One ordered section of a family template. */
+export interface ProductSpecTemplateSection {
+  key: string;
+  title: string;
+  fields: ProductSpecTemplateField[];
+}
+
+/** The backend-owned page structure for one family. */
+export interface ProductSpecTemplate {
+  family: ProductSpecFamily;
+  label: string;
+  subcategorySlug: string;
+  /** `template` fills fixed sections; `freeform` lets staff add any rows. */
+  mode: "template" | "freeform";
+  sections: ProductSpecTemplateSection[];
+}
+
 /** Search / post-form picker row. */
 export interface ProductSummary {
   /** The product-spec row id. */
@@ -26,6 +57,9 @@ export interface ProductSummary {
 
 /** Full public spec page. */
 export interface ProductDetail extends ProductSummary {
+  family: ProductSpecFamily;
+  /** The staff-uploaded image (raw); empty when the model image is used. */
+  specImage: string | null;
   specGroups: ProductSpecGroup[];
   isPublished: boolean;
   createdAt: string;

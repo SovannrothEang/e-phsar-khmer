@@ -16,7 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { users } from './users.schema';
-import { discountTypeEnum } from './listings.schema';
+import { discountTypeEnum, listings } from './listings.schema';
 import { categories, subcategories } from './categories.schema';
 
 /** Why a `user_subscriptions` row stopped being current (TS-only column type). */
@@ -26,6 +26,16 @@ export const subscriptionDurationUnitEnum = pgEnum(
   'subscription_duration_unit',
   ['day', 'month', 'year'],
 );
+
+/**
+ * The fixed package tiers a group can sell. The label is global; the limits
+ * (photos/ads/renews/…) live on the (group, tier) package row.
+ */
+export const subscriptionTierEnum = pgEnum('subscription_tier', [
+  'bronze',
+  'silver',
+  'gold',
+]);
 
 export const subscriptionPurchaseStatusEnum = pgEnum(
   'subscription_purchase_status',
@@ -77,39 +87,15 @@ export const subscriptionCategorySubcategories = pgTable(
   ],
 );
 
-export const subscriptionPlans = pgTable(
-  'subscription_plans',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    categoryId: uuid('category_id')
-      .notNull()
-      .references(() => subscriptionCategories.id, { onDelete: 'cascade' }),
-    name: varchar('name', { length: 120 }).notNull(),
-    slug: varchar('slug', { length: 120 }).notNull(),
-    description: text('description'),
-    sortOrder: integer('sort_order').default(0).notNull(),
-    isActive: boolean('is_active').default(true).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdate(() => new Date()),
-  },
-  (t) => [
-    uniqueIndex('subscription_plans_category_slug_uq').on(t.categoryId, t.slug),
-    index('subscription_plans_category_id_idx').on(t.categoryId),
-  ],
-);
-
 export const subscriptionPackages = pgTable(
   'subscription_packages',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    planId: uuid('plan_id')
+    // The group this tier belongs to; deleting the group removes its offers.
+    categoryId: uuid('category_id')
       .notNull()
-      .references(() => subscriptionPlans.id, { onDelete: 'cascade' }),
+      .references(() => subscriptionCategories.id, { onDelete: 'cascade' }),
+    tier: subscriptionTierEnum('tier').notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     photos: integer('photos').default(0).notNull(),
     ads: integer('ads').default(0).notNull(),
@@ -126,7 +112,14 @@ export const subscriptionPackages = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
   },
-  (t) => [index('subscription_packages_plan_id_idx').on(t.planId)],
+  (t) => [
+    index('subscription_packages_category_id_idx').on(t.categoryId),
+    // One package per tier per group: a group sells at most one Bronze.
+    uniqueIndex('subscription_packages_category_tier_uq').on(
+      t.categoryId,
+      t.tier,
+    ),
+  ],
 );
 
 export const subscriptionTerms = pgTable(
@@ -316,12 +309,35 @@ export const subscriptionPurchases = pgTable(
   ],
 );
 
+/**
+ * One row per renewal spent. `listings.renew_count` is the ad's lifetime
+ * count; a plan's renews reset on a rolling window, so the allowance reads
+ * this log instead. Cascades with the listing (a deleted ad's renewals stop
+ * counting, matching the live-inventory model) and with the user.
+ */
+export const listingRenewals = pgTable(
+  'listing_renewals',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    listingId: uuid('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    renewedAt: timestamp('renewed_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [index('listing_renewals_user_window_idx').on(t.userId, t.renewedAt)],
+);
+
 export type SubscriptionCategoryRow =
   typeof subscriptionCategories.$inferSelect;
-export type SubscriptionPlanRow = typeof subscriptionPlans.$inferSelect;
 export type SubscriptionPackageRow = typeof subscriptionPackages.$inferSelect;
 export type SubscriptionTermRow = typeof subscriptionTerms.$inferSelect;
 export type UserSubscriptionRow = typeof userSubscriptions.$inferSelect;
 export type SubscriptionPurchaseRow = typeof subscriptionPurchases.$inferSelect;
 export type FreePlanSettingsRow = typeof freePlanSettings.$inferSelect;
 export type FreePlanAdLimitRow = typeof freePlanAdLimits.$inferSelect;
+export type ListingRenewalRow = typeof listingRenewals.$inferSelect;

@@ -64,6 +64,7 @@ const LABEL_KEYS: Record<string, string> = {
   Brand: "brand",
   Model: "model",
   "Product Spec": "productSpec",
+  "Product Specification": "productSpec",
   Year: "year",
   "Tax Type": "taxType",
   Condition: "condition",
@@ -556,6 +557,21 @@ export default function ListingPostForm({
           Math.min(3, Math.max(1, prefilled.filter((x) => x.trim()).length)),
         );
         setContactEmail(cfg.contact.email ?? "");
+        // Location + Address start from the profile too, but only where the
+        // subcategory's schema declares the block — the same gate that decides
+        // whether it renders at all. Read `cfg.fields`, not `has()`: `config`
+        // state is not set yet inside this callback.
+        const declares = (key: string) => cfg.fields.includes(key);
+        if (declares("location")) {
+          setPlace({
+            province: cfg.location.province,
+            district: cfg.location.district,
+            commune: cfg.location.commune,
+          });
+        }
+        if (declares("address") && cfg.location.address) {
+          setAddress(cfg.location.address);
+        }
       }
       setConfigLoading(false);
     });
@@ -852,8 +868,7 @@ export default function ListingPostForm({
       toast.error(result.error);
       return;
     }
-    if (result.warning) toast.warning(result.warning);
-    else toast.success("Your ad was published");
+    toast.success("Your ad was published");
     router.push({
       pathname: "/post/[slug]",
       params: { slug: result.listingId },
@@ -1178,7 +1193,7 @@ export default function ListingPostForm({
         )}
         {has("productSpec") && (
           <SearchPicker
-            label={labelFor("productSpec", "Product Spec")}
+            label={labelFor("productSpec", "Product Specification")}
             options={config.products.map((p) => ({
               id: p.modelId,
               name: `${p.brandName} ${p.modelName}`,

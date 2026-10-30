@@ -8,7 +8,7 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 import ShareModal from "../share/ShareModel";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import { SITE_URL } from "@/lib/site";
 import { ReportPost } from "../report/ReportPost";

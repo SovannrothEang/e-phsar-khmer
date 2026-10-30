@@ -645,7 +645,7 @@ describe('UsersService updateProfile ads contact sync', () => {
     expect(updateSet?.longitude).toBeNull();
   });
 
-  it('copies the contact trio to the user listings when asked', async () => {
+  it('copies the contact block and location to the user listings when asked', async () => {
     const user = {
       ...fakeUser,
       username: 'sokdara',
@@ -653,6 +653,12 @@ describe('UsersService updateProfile ads contact sync', () => {
       lastName: 'Dara',
       email: 'dara@example.com',
       primaryPhone: '+855111',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
     };
     const sets: Record<string, unknown>[] = [];
     db.update.mockReturnValue({
@@ -679,7 +685,37 @@ describe('UsersService updateProfile ads contact sync', () => {
       contactName: 'Sok Dara',
       contactPhones: ['+855111', '+855222'],
       contactEmail: 'dara@example.com',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
     });
+  });
+
+  it('leaves an ad pin alone when the profile has no pin', async () => {
+    const user = { ...fakeUser, username: 'sokdara', primaryPhone: '+855111' };
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([user]),
+          }),
+        };
+      },
+    });
+    db.select.mockReturnValue(chain([]));
+
+    await service.updateProfile('u1', { updateAdsContact: true });
+
+    // The cascade and address still mirror the profile (here: cleared), but a
+    // pinless account must never wipe the coordinate pair an ad carries.
+    expect(sets[1]).toMatchObject({ provinceId: null, address: null });
+    expect(sets[1]).not.toHaveProperty('latitude');
+    expect(sets[1]).not.toHaveProperty('longitude');
   });
 
   it('falls back to primaryPhone when the account has no phone rows', async () => {
@@ -1750,5 +1786,56 @@ describe('UsersService public profile visibility', () => {
     const { sql } = new PgDialect().sqlToQuery(where as never);
     expect(sql).toContain('"status" = $');
     expect(sql).toContain('"deleted_at" is null');
+  });
+});
+
+describe('UsersService verified account flag', () => {
+  it('marks a public profile with an active paid subscription', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      // 1: the user row, 2-3: follower/following counts, 4: subscription probe.
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([{ id: 'sub-1' }]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(true);
+  });
+
+  it('leaves a public profile without a paid subscription unverified', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(false);
+  });
+
+  it('carries the flag on the signed-in user read', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me.verifiedAccount).toBe(true);
   });
 });

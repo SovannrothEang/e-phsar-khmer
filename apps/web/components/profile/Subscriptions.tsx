@@ -60,13 +60,16 @@ function money(value: string | number): string {
 
 /** "Bronze - 6 Months": the package and the term it was bought for. */
 function packageLine(subscription: UserSubscription): string {
-  const name = subscription.packageName ?? subscription.planName ?? "";
-  return [name, subscription.termName].filter(Boolean).join(" - ") || "—";
+  return (
+    [subscription.packageName, subscription.termName]
+      .filter(Boolean)
+      .join(" - ") || "—"
+  );
 }
 
-/** What the subscription covers: its group, falling back to the plan name. */
+/** What the subscription covers: its group. */
 function serviceLine(subscription: UserSubscription): string {
-  return subscription.groupName ?? subscription.planName ?? "—";
+  return subscription.groupName ?? "—";
 }
 
 function daysLeft(expiresAt: string): number {

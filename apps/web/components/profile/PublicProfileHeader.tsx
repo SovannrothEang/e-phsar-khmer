@@ -7,7 +7,8 @@ import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/common/UserAvatar";
-import { User } from "@/lib/user";
+import { VerifiedAccountCheck } from "@/components/common/VerifiedAccountBadge";
+import type { User } from "@/lib/user";
 import {
   profileTabHref,
   pushProfileTab,
@@ -25,7 +26,6 @@ import {
   Globe,
   Link2,
 } from "lucide-react";
-import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
@@ -134,7 +134,7 @@ export default function PublicProfileHeader({
                   <h1 className="type-page-title text-foreground">
                     {user.name}
                   </h1>
-                  <IconRosetteDiscountCheckFilled className="w-5 h-5 text-blue-500 fill-blue-100 shrink-0" />
+                  {user.verifiedAccount && <VerifiedAccountCheck />}
                 </div>
                 <p className="type-body-sm text-muted-foreground">
                   @{user.username}

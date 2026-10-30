@@ -18,8 +18,6 @@ import { SubscriptionConfigService } from './subscription-config.service';
 import {
   CreateSubCategoryDto,
   UpdateSubCategoryDto,
-  CreateSubPlanDto,
-  UpdateSubPlanDto,
   CreateSubPackageDto,
   UpdateSubPackageDto,
   CreateSubTermDto,
@@ -71,28 +69,10 @@ export class SubscriptionConfigController {
     return this.service.updateFreePlan(dto);
   }
 
-  // Plans
-  @Get('plans')
-  listPlans(@Query('categoryId') categoryId?: string) {
-    return this.service.listPlans(categoryId);
-  }
-  @Post('plans')
-  createPlan(@Body() dto: CreateSubPlanDto) {
-    return this.service.createPlan(dto);
-  }
-  @Patch('plans/:id')
-  updatePlan(@Param('id') id: string, @Body() dto: UpdateSubPlanDto) {
-    return this.service.updatePlan(id, dto);
-  }
-  @Delete('plans/:id')
-  removePlan(@Param('id') id: string) {
-    return this.service.removePlan(id);
-  }
-
-  // Packages
+  // Packages (a group's fixed tiers)
   @Get('packages')
-  listPackages(@Query('planId') planId?: string) {
-    return this.service.listPackages(planId);
+  listPackages(@Query('categoryId') categoryId?: string) {
+    return this.service.listPackages(categoryId);
   }
   @Post('packages')
   createPackage(@Body() dto: CreateSubPackageDto) {

@@ -279,4 +279,17 @@ export class QueryListingsDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(120)
   attrValue?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Multiple attribute filters as a JSON object, e.g. ' +
+      '`{"storage":"128GB","ram":"8GB"}` (the More Filters dialog). Every ' +
+      'entry is AND-ed against `listings.attributes`; keys must be plain ' +
+      'attribute keys and values the display strings the post form wrote. ' +
+      'Malformed input applies nothing.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  attrs?: string;
 }

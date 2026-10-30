@@ -57,16 +57,14 @@ import { useMobilePlatform } from "@/hooks/use-mobile-platform";
 // Waiting for the charge job to hand back the KHQR: up to ~20s.
 const QR_WAIT_MS = 1_000;
 const QR_WAIT_TRIES = 20;
-// Payment status reads only when no push can arrive: socket down, or the
-// code just expired (failures and expiry are not pushed).
-const FALLBACK_REFRESH_MS = 5_000;
-// Kept above the backend's 30 s expiry sweep slack (PaymentReconciler), so
-// the page is still reading when an expired checkout flips to failed.
-const EXPIRY_GRACE_MS = 60_000;
-// Both providers stamp `expiresAt` into the checkout (Bakong: the 5 min KHQR;
-// ABA: `ABA_PAYWAY_LIFETIME_MINUTES`), which drives the countdown and the
-// stop. This is only the fallback for a checkout that arrives without one.
-const NO_EXPIRY_WAIT_MS = 7 * 60_000;
+// A slow read while the result is outstanding. The socket push is the fast
+// path, but a missed push (or a bank confirmation that arrives after the QR
+// expired) must still land — the old page stopped reading 60 s past expiry
+// and could sit on "Waiting" after the money had already moved.
+const SLOW_REFRESH_MS = 15_000;
+// Stop reading eventually on an abandoned tab; long enough for a late
+// confirmation plus plan activation.
+const LATE_READ_WINDOW_MS = 30 * 60_000;
 
 function money(value: string | number): string {
   return Number(value).toLocaleString("en-US", {
@@ -380,46 +378,26 @@ export default function CheckoutPage() {
     if (awaitingResult && isConnected) void refreshPayment();
   }, [awaitingResult, isConnected, refreshPayment]);
 
-  // No socket at all (blocked, misconfigured, reconnects exhausted): a slow
-  // read keeps the page settling on its own.
-  useEffect(() => {
-    if (!awaitingResult || isConnected) return;
-    const timer = setInterval(() => void refreshPayment(), FALLBACK_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [awaitingResult, isConnected, refreshPayment]);
-
-  // Failures and expiry are not pushed, so once the code can no longer be
-  // paid, read for a short grace window to pick up the final status, then
-  // stop. A late `payment.succeeded` push still lands after that. Without an
-  // expiry on the code, the clock starts when waiting starts (this effect
-  // only re-runs if an expiry turns up, or for a new checkout).
-  const qrExpiresAt = getQr(payment?.checkout?.rawResponse)?.expiresAt ?? null;
+  // Keep a slow read alive for as long as the result is outstanding. The
+  // socket remains the fast path; this is the safety net for a missed push
+  // and for a confirmation that lands after the QR expired — the old page
+  // stopped reading 60 s past expiry and could sit on "Waiting" after the
+  // money had already moved.
   useEffect(() => {
     if (!awaitingResult) return;
-    const deadline = qrExpiresAt ?? Date.now() + NO_EXPIRY_WAIT_MS;
-    const graceEnd = deadline + EXPIRY_GRACE_MS;
-    let interval: ReturnType<typeof setInterval> | undefined;
-    const timeout = setTimeout(
-      () => {
-        void refreshPayment();
-        interval = setInterval(() => {
-          if (Date.now() > graceEnd) {
-            clearInterval(interval);
-            setError(
-              "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
-            );
-            return;
-          }
-          void refreshPayment();
-        }, FALLBACK_REFRESH_MS);
-      },
-      Math.max(0, deadline - Date.now()),
-    );
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [awaitingResult, qrExpiresAt, refreshPayment]);
+    const deadline = Date.now() + LATE_READ_WINDOW_MS;
+    const timer = setInterval(() => {
+      if (Date.now() > deadline) {
+        clearInterval(timer);
+        setError(
+          "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
+        );
+        return;
+      }
+      void refreshPayment();
+    }, SLOW_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [awaitingResult, refreshPayment]);
 
   // Only gates the pre-payment step: once a checkout exists, its own status
   // drives the page (activation flips `active` to the new plan anyway).
@@ -588,12 +566,20 @@ export default function CheckoutPage() {
                   Payment confirmed and your {offer.packageName} package is
                   ready to use.
                 </p>
-                <Link
-                  href="/me/subscriptions"
-                  className="mt-5 inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
-                >
-                  View my subscriptions <ArrowRight className="h-4 w-4" />
-                </Link>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
+                  >
+                    Back to profile <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/me/subscriptions"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    View my subscriptions
+                  </Link>
+                </div>
               </div>
             </Card>
           ) : paymentFailed ? (
@@ -607,25 +593,48 @@ export default function CheckoutPage() {
                   The code expired or the payment wasn&apos;t received, so no
                   subscription was activated. Start a new checkout to try again.
                 </p>
-                <button
-                  type="button"
-                  onClick={retryCheckout}
-                  className="mt-5 h-10 rounded-sm bg-[#00a0e9] px-6 text-sm font-medium text-white transition-colors hover:bg-[#008ccb]"
-                >
-                  Try again
-                </button>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={retryCheckout}
+                    className="h-10 rounded-sm bg-[#00a0e9] px-6 text-sm font-medium text-white transition-colors hover:bg-[#008ccb]"
+                  >
+                    Try again
+                  </button>
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Back to profile
+                  </Link>
+                </div>
               </div>
             </Card>
           ) : payment?.status === "succeeded" ? (
             <Card title="Subscription">
               <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                <span className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-emerald-600" />
-                <h3 className="mt-4 text-lg font-medium text-foreground">
-                  Payment received
+                <BadgeCheck className="h-10 w-10 text-emerald-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
+                  Payment successful
                 </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Activating your subscription — this page updates by itself.
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                  Your payment was received. We&apos;re activating your{" "}
+                  {offer.packageName} plan — this page updates by itself.
                 </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
+                  >
+                    Back to profile <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/me/subscriptions"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    My subscriptions
+                  </Link>
+                </div>
               </div>
             </Card>
           ) : (
@@ -654,11 +663,10 @@ export default function CheckoutPage() {
                       Account: {me?.username ?? "—"}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {offer.planName} · {offer.groupName}
+                      {offer.packageName} · {offer.groupName}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Runs for {offer.durationValue} {offer.durationUnit}
-                      {offer.durationValue === 1 ? "" : "s"} after payment
+                      Runs for {offer.termName} after payment
                     </p>
                     <p className="mt-2 text-sm font-medium text-[#00a0e9]">
                       ${money(dueToday)}
@@ -876,8 +884,6 @@ export default function CheckoutPage() {
                     ["Photos per ad", offer.photos],
                     ["Active ads", offer.ads],
                     ["Renewals", offer.renews],
-                    ["Auto-renewals", offer.autoRenews],
-                    ["Videos", offer.videos],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between gap-2">
                       <dt className="text-gray-500">{label}</dt>

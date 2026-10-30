@@ -80,7 +80,7 @@ export default async function PremiumAccountPage() {
                     {mine && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                         <BadgeCheck className="size-3" />
-                        {mine.packageName ?? mine.planName ?? "Active"} ·{" "}
+                        {mine.packageName ?? "Active"} ·{" "}
                         {daysUntil(mine.expiresAt)} days left
                       </span>
                     )}

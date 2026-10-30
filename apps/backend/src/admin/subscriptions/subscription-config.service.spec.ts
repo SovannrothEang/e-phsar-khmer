@@ -101,6 +101,110 @@ describe('SubscriptionConfigService.updateCategoryScope', () => {
   });
 });
 
+describe('SubscriptionConfigService package tiers', () => {
+  function makeInsertDb(result: () => Promise<unknown[]>) {
+    const returning = jest.fn(result);
+    const values = jest.fn(() => ({ returning }));
+    const insert = jest.fn(() => ({ values }));
+    return { db: { insert }, values, returning };
+  }
+
+  it('derives the package name and order from the tier', async () => {
+    const { db, values } = makeInsertDb(() =>
+      Promise.resolve([{ id: 'pkg-1' }]),
+    );
+    const service = new SubscriptionConfigService(
+      db as never,
+      { enqueueConfigReconcile: jest.fn() } as never,
+    );
+
+    await service.createPackage({
+      categoryId: 'category-1',
+      tier: 'silver',
+      ads: 800,
+    });
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        categoryId: 'category-1',
+        tier: 'silver',
+        name: 'Silver',
+        sortOrder: 1,
+        ads: 800,
+      }),
+    );
+  });
+
+  it('maps a duplicate group+tier to a truthful 409', async () => {
+    const { db } = makeInsertDb(() =>
+      Promise.reject(
+        Object.assign(new Error('unique violation'), { code: '23505' }),
+      ),
+    );
+    const service = new SubscriptionConfigService(
+      db as never,
+      { enqueueConfigReconcile: jest.fn() } as never,
+    );
+
+    await expect(
+      service.createPackage({ categoryId: 'category-1', tier: 'silver' }),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: 'This group already has a Silver tier. Edit it instead.',
+    });
+  });
+});
+
+describe('SubscriptionConfigService term durations', () => {
+  it('writes a 12-month term as 1 Year / month / last', async () => {
+    const returning = jest.fn().mockResolvedValue([{ id: 'term-1' }]);
+    const values = jest.fn(() => ({ returning }));
+    const insert = jest.fn(() => ({ values }));
+    const select = jest.fn(() => query([]));
+    const service = new SubscriptionConfigService(
+      { select, insert } as never,
+      { enqueueConfigReconcile: jest.fn() } as never,
+    );
+
+    await service.createTerm({
+      packageId: 'package-1',
+      durationMonths: 12,
+      price: 100,
+    });
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: '1 Year',
+        durationValue: 12,
+        durationUnit: 'month',
+        sortOrder: 2,
+      }),
+    );
+  });
+
+  it('refuses to reactivate a retired 1-month term', async () => {
+    const select = jest.fn(() =>
+      query([
+        {
+          id: 'term-1',
+          packageId: 'package-1',
+          durationValue: 1,
+          durationUnit: 'month',
+          isActive: false,
+        },
+      ]),
+    );
+    const service = new SubscriptionConfigService(
+      { select } as never,
+      { enqueueConfigReconcile: jest.fn() } as never,
+    );
+
+    await expect(
+      service.updateTerm('term-1', { isActive: true }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
 describe('SubscriptionConfigService.updateFreePlan', () => {
   it.each([
     ['both fields', { categoryId: 'category-1', subcategoryId, ads: 2 }],

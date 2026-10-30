@@ -1,12 +1,12 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { VerifiedAccountBadge } from "@/components/common/VerifiedAccountBadge";
 import { ConditionLabel } from "@/components/common/ConditionLabel";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
-import { getProvinceById, getDistrictById } from "@/lib/data";
 import { DotIcon, ImageIcon, TruckIcon, HeartIcon, Play } from "lucide-react";
 import {
   Card,
@@ -33,9 +33,6 @@ export function GridCardPost({ post }: { post: Post }) {
       <ImageIcon className="h-8 w-8 text-zinc-400" aria-hidden />
     </div>
   );
-
-  const province = getProvinceById(post.proId);
-  const district = getDistrictById(post.proId, post.disId);
 
   // `oldPrice` only exists alongside a real price, but a "Negotiable" listing
   // has none — guard it rather than letting the subtraction see null.
@@ -70,18 +67,26 @@ export function GridCardPost({ post }: { post: Post }) {
         ) : (
           emptyPhoto
         )}
-        {post.oldPrice && (
-          <div className="absolute top-2 left-2 z-30 flex flex-col items-start gap-1">
-            {/* % OFF */}
-            <span className="bg-red-600 text-white type-discount px-2 py-0.5 rounded">
-              -{discountPercent}%
-            </span>
-            {/* $ OFF */}
-            <span className="bg-black/70 text-white type-discount px-2 py-0.5 rounded">
-              {t("ListingCard.amountOff", {
-                amount: discountAmount.toLocaleString(),
-              })}
-            </span>
+        {(post.sellerVerifiedAccount || post.oldPrice) && (
+          <div className="pointer-events-none absolute top-2 left-2 z-30 flex flex-col items-start gap-1">
+            {/* Paid-plan badge. Stacked above the discounts rather than
+                centred: the Khmer label is ~1.7x the English one and would
+                collide with the discount badges on a 260px card. */}
+            {post.sellerVerifiedAccount && <VerifiedAccountBadge />}
+            {post.oldPrice && (
+              <>
+                {/* % OFF */}
+                <span className="bg-red-600 text-white type-discount px-2 py-0.5 rounded">
+                  -{discountPercent}%
+                </span>
+                {/* $ OFF */}
+                <span className="bg-black/70 text-white type-discount px-2 py-0.5 rounded">
+                  {t("ListingCard.amountOff", {
+                    amount: discountAmount.toLocaleString(),
+                  })}
+                </span>
+              </>
+            )}
           </div>
         )}
         <div className="absolute top-2 right-2 z-30">
@@ -126,11 +131,12 @@ export function GridCardPost({ post }: { post: Post }) {
                 hour12: locale !== "km",
               })}
             </span>
-            <DotIcon className="scale-120" />
-            <span className="truncate">
-              {post.location ??
-                [district?.name, province?.name].filter(Boolean).join(", ")}
-            </span>
+            {post.location && (
+              <>
+                <DotIcon className="scale-120" />
+                <span className="truncate">{post.location}</span>
+              </>
+            )}
           </div>
           <div className="type-meta text-muted-foreground">
             <ConditionLabel value={post.condition} />

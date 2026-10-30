@@ -6,20 +6,33 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
-import { brands, models } from '../db/schema/brands.schema';
+import {
+  brands,
+  modelSubcategoryLinks,
+  models,
+} from '../db/schema/brands.schema';
+import { subcategories } from '../db/schema/categories.schema';
 import { productSpecs } from '../db/schema/products.schema';
 import type {
   NewProductSpec,
+  ProductSpecFamily,
   ProductSpecGroup,
 } from '../db/schema/products.schema';
 import { likeTerm } from '../utils/like-term';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { QueryProductsDto } from './dto/query-products.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
+import {
+  getFamilyForSubcategorySlug,
+  getProductSpecTemplate,
+  groupSignature,
+  isTemplateGroup,
+} from './spec-templates';
+import type { ProductSpecTemplate } from './spec-templates';
 
 /** Mirrors the listing keyword search's cap — enough words, bounded work. */
 const MAX_SEARCH_TOKENS = 5;
@@ -42,6 +55,9 @@ export interface PublicProductSummary extends ProductRef {
 
 /** Full public spec page. */
 export interface PublicProduct extends PublicProductSummary {
+  family: ProductSpecFamily;
+  /** The staff-uploaded image (raw); empty when the model image is used. */
+  specImage: string | null;
   specGroups: ProductSpecGroup[];
   isPublished: boolean;
   createdAt: Date;
@@ -54,12 +70,15 @@ export type AdminProduct = PublicProduct;
 const detailFields = {
   id: productSpecs.id,
   modelId: productSpecs.modelId,
+  family: productSpecs.family,
   brandId: brands.id,
   brandSlug: brands.slug,
   brandName: brands.name,
   modelSlug: models.slug,
   modelName: models.name,
-  image: models.image,
+  // The product page's own image wins; the model image is the fallback.
+  image: sql<string | null>`coalesce(${productSpecs.image}, ${models.image})`,
+  specImage: productSpecs.image,
   specGroups: productSpecs.specGroups,
   isPublished: productSpecs.isPublished,
   createdAt: productSpecs.createdAt,
@@ -88,6 +107,9 @@ export class ProductsService {
     query: QueryProductsDto = {},
   ): Promise<PublicProductSummary[]> {
     const conditions = this.visibility();
+    if (query.family) {
+      conditions.push(eq(productSpecs.family, query.family));
+    }
     const q = query.q?.trim();
     if (q) {
       const tokens = q.split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
@@ -113,7 +135,9 @@ export class ProductsService {
         brandName: brands.name,
         modelSlug: models.slug,
         modelName: models.name,
-        image: models.image,
+        image: sql<
+          string | null
+        >`coalesce(${productSpecs.image}, ${models.image})`,
       })
       .from(productSpecs)
       .innerJoin(models, eq(models.id, productSpecs.modelId))
@@ -144,23 +168,30 @@ export class ProductsService {
     return row;
   }
 
-  async listAdmin(): Promise<AdminProduct[]> {
+  async listAdmin(family?: ProductSpecFamily): Promise<AdminProduct[]> {
     return this.db
       .select(detailFields)
       .from(productSpecs)
       .innerJoin(models, eq(models.id, productSpecs.modelId))
       .innerJoin(brands, eq(brands.id, models.brandId))
+      .where(family ? eq(productSpecs.family, family) : undefined)
       .orderBy(asc(brands.name), asc(models.sortOrder), asc(models.name));
   }
 
   async createAdmin(dto: CreateProductDto): Promise<AdminProduct> {
+    const template = getProductSpecTemplate(dto.family);
     const specGroups = this.normalizeGroups(dto.specGroups);
+    this.assertTemplateGroups(template, specGroups, []);
+    await this.assertModelInFamily(dto.modelId, template);
+
     let id: string;
     try {
       const [row] = await this.db
         .insert(productSpecs)
         .values({
           modelId: dto.modelId,
+          family: dto.family,
+          image: dto.image?.trim() || null,
           specGroups,
           isPublished: dto.isPublished ?? true,
         })
@@ -173,18 +204,31 @@ export class ProductsService {
   }
 
   async updateAdmin(id: string, dto: UpdateProductDto): Promise<AdminProduct> {
-    const patch: Partial<NewProductSpec> = {};
-    if (dto.specGroups !== undefined) {
-      patch.specGroups = this.normalizeGroups(dto.specGroups);
-    }
-    if (dto.isPublished !== undefined) patch.isPublished = dto.isPublished;
-
     const [existing] = await this.db
-      .select({ id: productSpecs.id })
+      .select({
+        id: productSpecs.id,
+        family: productSpecs.family,
+        specGroups: productSpecs.specGroups,
+      })
       .from(productSpecs)
       .where(eq(productSpecs.id, id))
       .limit(1);
     if (!existing) throw new NotFoundException('Product spec not found');
+
+    const patch: Partial<NewProductSpec> = {};
+    if (dto.specGroups !== undefined) {
+      const specGroups = this.normalizeGroups(dto.specGroups);
+      this.assertTemplateGroups(
+        getProductSpecTemplate(existing.family),
+        specGroups,
+        existing.specGroups,
+      );
+      patch.specGroups = specGroups;
+    }
+    if (dto.image !== undefined) {
+      patch.image = dto.image.trim() || null;
+    }
+    if (dto.isPublished !== undefined) patch.isPublished = dto.isPublished;
 
     if (Object.keys(patch).length > 0) {
       await this.db
@@ -193,6 +237,11 @@ export class ProductsService {
         .where(eq(productSpecs.id, id));
     }
     return this.getAdminOne(id);
+  }
+
+  /** The family template the admin form renders (static, code-owned). */
+  getTemplate(family: string): ProductSpecTemplate {
+    return getProductSpecTemplate(family as ProductSpecFamily);
   }
 
   async removeAdmin(id: string): Promise<{ id: string }> {
@@ -209,9 +258,12 @@ export class ProductsService {
    * can actually open. Called before the write; see the TOCTOU note in the
    * plan (a publish flip in between hides the link, never corrupts the row).
    */
-  async assertPublishedModel(modelId: string): Promise<void> {
+  async assertPublishedModel(
+    modelId: string,
+    subcategoryId?: string,
+  ): Promise<void> {
     const [row] = await this.db
-      .select({ id: productSpecs.id })
+      .select({ id: productSpecs.id, family: productSpecs.family })
       .from(productSpecs)
       .innerJoin(models, eq(models.id, productSpecs.modelId))
       .innerJoin(brands, eq(brands.id, models.brandId))
@@ -220,6 +272,21 @@ export class ProductsService {
     if (!row) {
       throw new BadRequestException(
         'productModelId must reference a published product spec',
+      );
+    }
+    if (!subcategoryId) return;
+
+    const [subcategory] = await this.db
+      .select({ slug: subcategories.slug })
+      .from(subcategories)
+      .where(eq(subcategories.id, subcategoryId))
+      .limit(1);
+    if (!subcategory) return;
+
+    const family = getFamilyForSubcategorySlug(subcategory.slug);
+    if (family && row.family !== family) {
+      throw new BadRequestException(
+        'productModelId must reference a spec page from the same family as the listing subcategory',
       );
     }
   }
@@ -272,6 +339,61 @@ export class ProductsService {
       );
     }
     return normalized;
+  }
+
+  /**
+   * New groups must be template sections. An update may also keep groups
+   * already stored on the row (grandfathered legacy content), matched by the
+   * exact title + label signature so a legacy section can never be silently
+   * rewritten into a template one.
+   */
+  private assertTemplateGroups(
+    template: ProductSpecTemplate,
+    groups: ProductSpecGroup[],
+    legacy: ProductSpecGroup[],
+  ): void {
+    // Freeform families (Cars, Motorcycles) accept any group/row.
+    if (template.mode === 'freeform') return;
+
+    const legacySignatures = new Set(legacy.map(groupSignature));
+    const templateTitles = new Set<string>();
+    for (const group of groups) {
+      if (isTemplateGroup(template.family, group)) {
+        if (templateTitles.has(group.title)) {
+          throw new BadRequestException('INVALID_SPEC_SECTION');
+        }
+        templateTitles.add(group.title);
+        continue;
+      }
+      if (legacySignatures.has(groupSignature(group))) continue;
+      throw new BadRequestException('INVALID_SPEC_SECTION');
+    }
+  }
+
+  /** The model must belong to the family's listing subcategory. */
+  private async assertModelInFamily(
+    modelId: string,
+    template: ProductSpecTemplate,
+  ): Promise<void> {
+    const [link] = await this.db
+      .select({ modelId: modelSubcategoryLinks.modelId })
+      .from(modelSubcategoryLinks)
+      .innerJoin(
+        subcategories,
+        eq(subcategories.id, modelSubcategoryLinks.subcategoryId),
+      )
+      .where(
+        and(
+          eq(modelSubcategoryLinks.modelId, modelId),
+          eq(subcategories.slug, template.subcategorySlug),
+        ),
+      )
+      .limit(1);
+    if (!link) {
+      throw new BadRequestException(
+        `Model is not linked to the ${template.label} category`,
+      );
+    }
   }
 
   /** Drizzle surfaces the pg error code; map the two we can act on. */

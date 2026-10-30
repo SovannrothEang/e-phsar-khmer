@@ -24,10 +24,13 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
 import { ReactionsService } from '../reactions/reactions.service';
 import { EntitlementsService } from '../subscriptions/entitlements.service';
+import { activePaidSubscriptionExistsSql } from '../subscriptions/verified-account.util';
+import { parseAttributeFilters } from './attribute-filters';
 import { ProductsService } from '../products/products.service';
 import type { ProductRef } from '../products/products.service';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
+import { listingRenewals } from '../db/schema/subscriptions.schema';
 import { listingEvents } from '../db/schema/insights.schema';
 import { listingLikes, listingSaves } from '../db/schema/reactions.schema';
 import type {
@@ -79,6 +82,12 @@ export interface ListingWithPhotos extends ListingRow {
    */
   sellerUsername?: string | null;
   /**
+   * Whether the seller holds an active paid subscription — the card/profile
+   * "Verified Account" badge. Present on the public feed, the detail read and
+   * the trending strip; derived by an EXISTS subquery, never stored.
+   */
+  sellerVerifiedAccount?: boolean;
+  /**
    * How many users liked this listing — resolved by `findById` only (same
    * reasoning as `sellerUsername`), so the detail page's "N Likes" control
    * starts truthful. Counted on read; there is no counter column to drift.
@@ -122,9 +131,12 @@ interface ResolvedFilters {
 function effectiveStatus(
   listing: Pick<ListingRow, 'status' | 'expiresAt'>,
 ): ListingRow['status'] {
-  return listing.status === 'active' &&
-    listing.expiresAt !== null &&
-    listing.expiresAt.getTime() <= Date.now()
+  const lapsed =
+    listing.expiresAt !== null && listing.expiresAt.getTime() <= Date.now();
+  // A lapsed restricted ad is no longer "hidden over the limit": it is an
+  // expired ad the owner can renew once they have a free slot.
+  return lapsed &&
+    (listing.status === 'active' || listing.status === 'restricted')
     ? 'expired'
     : listing.status;
 }
@@ -178,11 +190,19 @@ export class ListingsService {
       .limit(1);
     if (!sub) throw new NotFoundException('Subcategory not found');
 
+    // The web has no draft surface, so a create that cannot be published is
+    // an invisible row. Check the allowance here too: an over-limit post never
+    // creates anything, even for a client that skips the publish step.
+    await this.entitlements.assertCanHoldAnotherAd(userId, dto);
+
     // Trusted spec link: only a published page is a legal target. The read
     // happens before the transactional write (see the TOCTOU note in the
     // products service); the column is nullable for pre-existing ads.
     if (dto.productModelId) {
-      await this.products.assertPublishedModel(dto.productModelId);
+      await this.products.assertPublishedModel(
+        dto.productModelId,
+        dto.subcategoryId,
+      );
     }
 
     const values: NewListing = {
@@ -306,7 +326,10 @@ export class ListingsService {
     if (dto.attributes !== undefined) updates.attributes = dto.attributes;
     if (dto.productModelId !== undefined) {
       if (dto.productModelId) {
-        await this.products.assertPublishedModel(dto.productModelId);
+        await this.products.assertPublishedModel(
+          dto.productModelId,
+          existing.subcategoryId,
+        );
       }
       updates.productModelId = dto.productModelId ?? null;
     }
@@ -390,7 +413,11 @@ export class ListingsService {
     // links to profiles that do not exist. Left join: a soft-deleted owner
     // must not make their listing unreadable.
     const [row] = await this.db
-      .select({ listing: listings, sellerUsername: users.username })
+      .select({
+        listing: listings,
+        sellerUsername: users.username,
+        sellerVerifiedAccount: activePaidSubscriptionExistsSql(listings.userId),
+      })
       .from(listings)
       .leftJoin(users, eq(users.id, listings.userId))
       .where(eq(listings.id, id))
@@ -413,6 +440,7 @@ export class ListingsService {
       ...row.listing,
       photos,
       sellerUsername: row.sellerUsername ?? null,
+      sellerVerifiedAccount: row.sellerVerifiedAccount ?? false,
       likeCount,
       product,
     };
@@ -475,6 +503,9 @@ export class ListingsService {
             ...getTableColumns(listings),
             sortKey: sortKeyExpr(ordering),
             sellerUsername: users.username,
+            sellerVerifiedAccount: activePaidSubscriptionExistsSql(
+              listings.userId,
+            ),
           })
           .from(listings)
           .leftJoin(users, eq(users.id, listings.userId))
@@ -617,6 +648,7 @@ export class ListingsService {
       .select({
         ...getTableColumns(listings),
         sellerUsername: users.username,
+        sellerVerifiedAccount: activePaidSubscriptionExistsSql(listings.userId),
         score: trendScore,
       })
       .from(listings)
@@ -647,6 +679,9 @@ export class ListingsService {
         .select({
           ...getTableColumns(listings),
           sellerUsername: users.username,
+          sellerVerifiedAccount: activePaidSubscriptionExistsSql(
+            listings.userId,
+          ),
         })
         .from(listings)
         .leftJoin(users, eq(users.id, listings.userId))
@@ -695,11 +730,18 @@ export class ListingsService {
         or(
           eq(listings.status, 'expired'),
           and(
-            eq(listings.status, 'active'),
+            inArray(listings.status, ['active', 'restricted']),
             isNotNull(listings.expiresAt),
             sql`${listings.expiresAt} <= now()`,
           ),
         )!,
+      );
+    } else if (query.status === 'restricted') {
+      // Hidden-by-plan list: only rows still inside their window. A lapsed
+      // restricted ad reads as expired (and is renewable) instead.
+      conditions.push(
+        eq(listings.status, 'restricted'),
+        or(isNull(listings.expiresAt), sql`${listings.expiresAt} > now()`)!,
       );
     } else if (query.status) {
       conditions.push(
@@ -774,15 +816,19 @@ export class ListingsService {
       });
     }
 
-    if (existing.status === 'restricted') {
+    const now = new Date();
+    const lapsed =
+      existing.expiresAt !== null &&
+      existing.expiresAt.getTime() <= now.getTime();
+    // A restricted ad whose 30-day window is still open cannot be re-published
+    // into a full plan; once it lapses it is a renewal like any expired ad.
+    if (existing.status === 'restricted' && !lapsed) {
       throw new ForbiddenException({
         code: 'PLAN_RESTRICTED',
         message:
           'This ad is hidden because it is over your plan’s limit. Renew or upgrade your subscription to show it again.',
       });
     }
-
-    const now = new Date();
     if (existing.publishedAt === null) {
       // A brand-new ad: needs a free slot, and its photos must fit the plan.
       await this.entitlements.assertPhotos(
@@ -794,11 +840,7 @@ export class ListingsService {
     } else {
       // Re-publishing an ad that already went live is a renewal. An ad that
       // lapsed (or was deleted) is no longer counted, so it also needs a slot.
-      await this.entitlements.assertCanRenew(
-        userId,
-        existing,
-        existing.renewCount,
-      );
+      await this.entitlements.assertCanRenew(userId, existing);
       const stillLive =
         existing.status === 'active' &&
         (existing.expiresAt === null || existing.expiresAt > now);
@@ -809,20 +851,27 @@ export class ListingsService {
 
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    const [updated] = await this.db
-      .update(listings)
-      .set({
-        status: 'active',
-        publishedAt: existing.publishedAt ?? now,
-        expiresAt,
-        renewCount:
-          existing.publishedAt === null
-            ? existing.renewCount
-            : existing.renewCount + 1,
-        updatedAt: now,
-      })
-      .where(eq(listings.id, id))
-      .returning();
+    // A renewal is an extra publish of an ad that already went live; the
+    // extension and the window's spend log commit together, so the plan can
+    // never count a renewal the ad did not get (or miss one it did).
+    const isRenewal = existing.publishedAt !== null;
+    const updated = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(listings)
+        .set({
+          status: 'active',
+          publishedAt: existing.publishedAt ?? now,
+          expiresAt,
+          renewCount: isRenewal ? existing.renewCount + 1 : existing.renewCount,
+          updatedAt: now,
+        })
+        .where(eq(listings.id, id))
+        .returning();
+      if (isRenewal) {
+        await tx.insert(listingRenewals).values({ listingId: id, userId });
+      }
+      return row;
+    });
 
     // The count check above is not atomic with the write; settling here keeps
     // two parallel publishes from leaving the user over their allowance.
@@ -973,6 +1022,12 @@ export class ListingsService {
         eq(sql`${listings.attributes}->>${query.attrKey}`, query.attrValue),
       );
     }
+    // Multi-attribute filter from the More Filters dialog: one JSON object,
+    // one AND'ed condition per entry. Each key is bound (`->>$n`), never
+    // interpolated; malformed or oversized input applies nothing.
+    for (const [key, value] of parseAttributeFilters(query.attrs)) {
+      out.push(eq(sql`${listings.attributes}->>${key}`, value));
+    }
 
     // Model year lives in the JSONB as the display string ("2021"); anything
     // that is not four digits never matches a year bound instead of erroring.
@@ -1098,6 +1153,11 @@ export class ListingsService {
       .where(eq(listingPhotos.listingId, id))
       .orderBy(listingPhotos.sort);
 
+    // A removed ad frees a plan slot: settle the allowance now instead of
+    // waiting for the ten-minute sweep, so the owner can post right away and
+    // a restricted ad they made room for comes back immediately.
+    await this.entitlements.reconcileListingsSafely(userId);
+
     return { ...updated, photos };
   }
 
@@ -1110,9 +1170,14 @@ export class ListingsService {
     const listing = await this.findById(id);
     if (listing.moderatedAt) throw new NotFoundException('Listing not found');
     // The public detail must not serve what the marketplace already hides:
-    // a never-published draft, or an ad its owner withdrew. (Moderated rows
-    // are `deleted` too, and are rejected just above with their own comment.)
-    if (listing.status === 'draft' || listing.status === 'deleted') {
+    // a never-published draft, an ad its owner withdrew, or one hidden for
+    // exceeding its plan's allowance. (Moderated rows are `deleted` too, and
+    // are rejected just above with their own comment.)
+    if (
+      listing.status === 'draft' ||
+      listing.status === 'deleted' ||
+      listing.status === 'restricted'
+    ) {
       throw new NotFoundException('Listing not found');
     }
     // A lapsed ad keeps its link (shares, old messages, search history) but

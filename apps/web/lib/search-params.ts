@@ -27,6 +27,10 @@ export const ENGINE_PARAM = "engine";
 export const TAX_TYPE_PARAM = "tax_type";
 export const COLOR_PARAM = "color";
 export const TRANSMISSION_PARAM = "transmission";
+/** The multi-attribute filter — a JSON object of `{ attributeKey: value }`.
+ *  The More Filters dialog writes every schema-declared select here, and a
+ *  detail spec link writes a one-entry object, so one vocabulary serves both. */
+export const ATTRS_PARAM = "attrs";
 
 /** The browse grids' own drill-down params (brand/model/type), NOT filter-bar
  *  params: they live on the same URLs and the More Filters dialog edits them,
@@ -54,6 +58,7 @@ export const FILTER_PARAMS = [
   TAX_TYPE_PARAM,
   COLOR_PARAM,
   TRANSMISSION_PARAM,
+  ATTRS_PARAM,
 ] as const;
 
 export const MAX_QUERY_LENGTH = 100;
@@ -168,6 +173,8 @@ export interface FeedQuery {
   taxType?: string;
   color?: string;
   transmission?: string;
+  /** Multi-attribute filter (detail spec links + More Filters selects). */
+  attrs?: Record<string, string>;
   sort?: BackendSort;
 }
 
@@ -184,6 +191,42 @@ function reader(raw: RawParams) {
 }
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const ATTR_KEY_RE = /^[A-Za-z][A-Za-z0-9]{0,39}$/;
+const MAX_ATTR_FILTERS = 12;
+
+/**
+ * Parse the `attrs` JSON param, mirroring the backend's validation. Exported
+ * because the More Filters dialog seeds its schema selects from the URL.
+ * Malformed/oversized input returns undefined — the feed then applies no
+ * attribute filter, the same "applies nothing" rule as a half `attrKey`.
+ */
+export function parseAttrsParam(
+  raw: string | null | undefined,
+): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return undefined;
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (entries.length === 0 || entries.length > MAX_ATTR_FILTERS) {
+    return undefined;
+  }
+  const out: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    if (!ATTR_KEY_RE.test(key)) continue;
+    if (typeof value !== "string" && typeof value !== "number") continue;
+    const text = String(value).trim();
+    if (!text || text.length > 120) continue;
+    out[key] = text;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 const slug = (v: string | undefined) =>
   v && v.length <= 100 && SLUG_RE.test(v) ? v : undefined;
 
@@ -276,6 +319,12 @@ export function parseFeedParams(
   if (transmission && transmission.length <= 120) {
     out.transmission = transmission;
   }
+
+  // Multi-attribute filter (the detail specs grid and the More Filters
+  // selects): a JSON object of { attributeKey: value }. Malformed input
+  // applies nothing, matching the backend.
+  const attrs = parseAttrsParam(get(ATTRS_PARAM));
+  if (attrs) out.attrs = attrs;
 
   const sort = SORT_OPTIONS.find(
     (o) => o.value === parseSortParam(get(SORT_PARAM), !!out.q),

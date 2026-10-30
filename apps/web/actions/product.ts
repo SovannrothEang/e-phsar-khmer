@@ -6,7 +6,22 @@ import {
   productSchema,
   updateProductSchema,
 } from "@/schemas/product";
+import type { ProductSpecFamily, ProductSpecTemplate } from "@/types/product";
 import z from "zod";
+
+/** The family template the admin form renders; null when unreachable. */
+export async function getProductTemplate(
+  family: ProductSpecFamily,
+): Promise<ProductSpecTemplate | null> {
+  try {
+    const { data } = await serverFetch<ProductSpecTemplate>(
+      `/admin/products/template/${family}`,
+    );
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 export async function createProduct(unsafeData: z.infer<typeof productSchema>) {
   const parsed = productSchema.safeParse(unsafeData);
@@ -17,6 +32,8 @@ export async function createProduct(unsafeData: z.infer<typeof productSchema>) {
       method: "POST",
       body: JSON.stringify({
         modelId: parsed.data.modelId,
+        family: parsed.data.family,
+        image: parsed.data.image,
         specGroups: parsed.data.specGroups,
         isPublished: parsed.data.isPublished,
       }),
@@ -41,6 +58,7 @@ export async function updateProduct(
       method: "PATCH",
       body: JSON.stringify({
         specGroups: parsed.data.specGroups,
+        image: parsed.data.image,
         isPublished: parsed.data.isPublished,
       }),
     });

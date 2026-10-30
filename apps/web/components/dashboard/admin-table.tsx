@@ -66,6 +66,12 @@ const ALIGN: Record<"left" | "center" | "right", string> = {
 
 const PAGE_SIZES = [10, 20, 50, 100];
 
+/** Tab/badge counts stay readable: anything past 99 renders as "99+". */
+export function formatCount(count: number | undefined): string {
+  if (count === undefined) return "…";
+  return count > 99 ? "99+" : String(count);
+}
+
 export function AdminTable<T>({
   columns,
   rows,
@@ -76,6 +82,7 @@ export function AdminTable<T>({
   pageSize,
   initialSort,
   resetKey,
+  serverPagination,
 }: {
   columns: AdminColumn<T>[];
   rows: T[];
@@ -88,6 +95,18 @@ export function AdminTable<T>({
   initialSort?: SortState;
   /** Page one is restored whenever this changes (search/filter input). */
   resetKey?: string | number;
+  /**
+   * Server-side paging: the rows prop is already one page, so the table renders
+   * them whole and the footer drives the caller's page state instead of slicing.
+   */
+  serverPagination?: {
+    page: number;
+    totalPages: number;
+    total: number;
+    onPageChange: (page: number) => void;
+    /** Noun after the total, e.g. "listings". */
+    totalLabel?: string;
+  };
 }) {
   const [sort, setSort] = useState<SortState | null>(initialSort ?? null);
   // The page is keyed to the current filter: when the key no longer matches,
@@ -138,7 +157,7 @@ export function AdminTable<T>({
     });
   }, [rows, sort, columns]);
 
-  const paginated = pageSize !== undefined;
+  const paginated = pageSize !== undefined && !serverPagination;
   const totalPages = paginated
     ? Math.max(1, Math.ceil(sorted.length / size))
     : 1;
@@ -238,7 +257,67 @@ export function AdminTable<T>({
           )}
         </TableBody>
       </Table>
-      {paginated ? (
+      {serverPagination ? (
+        <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="type-body-sm text-muted-foreground">
+            {serverPagination.total} {serverPagination.totalLabel ?? "rows"}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="type-body-sm text-muted-foreground">
+              Page {serverPagination.page} of{" "}
+              {Math.max(1, serverPagination.totalPages)}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() => serverPagination.onPageChange(1)}
+                disabled={serverPagination.page <= 1}
+                aria-label="First page"
+              >
+                <ChevronsLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() =>
+                  serverPagination.onPageChange(serverPagination.page - 1)
+                }
+                disabled={serverPagination.page <= 1}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() =>
+                  serverPagination.onPageChange(serverPagination.page + 1)
+                }
+                disabled={serverPagination.page >= serverPagination.totalPages}
+                aria-label="Next page"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-8"
+                onClick={() =>
+                  serverPagination.onPageChange(serverPagination.totalPages)
+                }
+                disabled={serverPagination.page >= serverPagination.totalPages}
+                aria-label="Last page"
+              >
+                <ChevronsRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : paginated ? (
         <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 type-body-sm text-muted-foreground">
             <span>Rows per page</span>

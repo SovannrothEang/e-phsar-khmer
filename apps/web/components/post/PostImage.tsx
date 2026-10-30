@@ -9,7 +9,7 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 
 const MAX_THUMBS = 7;
 

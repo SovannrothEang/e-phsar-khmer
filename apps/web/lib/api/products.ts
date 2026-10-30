@@ -1,6 +1,10 @@
 import "server-only";
 import { API_URL } from "@/lib/api/client";
-import type { ProductDetail, ProductSummary } from "@/types/product";
+import type {
+  ProductDetail,
+  ProductSpecFamily,
+  ProductSummary,
+} from "@/types/product";
 
 interface Envelope<T> {
   success: boolean;
@@ -9,17 +13,20 @@ interface Envelope<T> {
 
 /**
  * Published product specs. Used by the public search page (top matches) and by
- * the phones post form, which loads the whole published catalogue to power the
- * "Product Spec" picker and pasted-link resolution. Fail-soft: the caller
- * renders without the section rather than taking the page down.
+ * the listing post form, which loads the published catalogue for its family to
+ * power the "Product Specification" picker and pasted-link resolution.
+ * Fail-soft: the caller renders without the section rather than taking the
+ * page down.
  */
 export async function getProducts(
   q?: string,
   limit = 10,
+  family?: ProductSpecFamily,
 ): Promise<ProductSummary[]> {
   const qs = new URLSearchParams();
   if (q && q.trim()) qs.set("q", q.trim());
   qs.set("limit", String(limit));
+  if (family) qs.set("family", family);
   try {
     const res = await fetch(`${API_URL}/products?${qs.toString()}`, {
       cache: "no-store",

@@ -23,6 +23,7 @@ export const STAFF_SCOPES = [
   'subcategory',
   'brand',
   'model',
+  'product',
   'attribute',
   'advertisement',
 ] as const;

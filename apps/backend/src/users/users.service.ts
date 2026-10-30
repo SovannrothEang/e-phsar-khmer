@@ -44,6 +44,7 @@ import type { ListFollowsDto } from './dto/list-follows.dto';
 import type { PaginatedResponse } from '../common/types/api-response.types';
 import { isBlockedEitherWay } from '../chat/blocks.util';
 import { NotificationsService } from '../notifications/notifications.service';
+import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 import type { PublicUser } from '../auth/auth.service';
 
 /** Matches AuthService/AdminService — bcrypt cost is a property of the data, not the caller. */
@@ -84,6 +85,8 @@ export interface PublicProfile {
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   isVerified: boolean;
+  /** At least one current, unexpired paid subscription — the "Verified Account" badge. */
+  verifiedAccount: boolean;
   createdAt: Date;
   followers: number;
   following: number;
@@ -99,14 +102,19 @@ export class UsersService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async findById(id: string): Promise<PublicUser> {
+  async findById(
+    id: string,
+  ): Promise<PublicUser & { verifiedAccount: boolean }> {
     const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
-    return this.toPublicUser(user);
+    return {
+      ...this.toPublicUser(user),
+      verifiedAccount: await hasActivePaidSubscription(this.db, id),
+    };
   }
 
   async findByUsernameOrPhone(identifier: string): Promise<UserRow | null> {
@@ -239,10 +247,12 @@ export class UsersService {
   }
 
   /**
-   * "Update this contact to your ads": copy the profile's contact trio onto
-   * every non-deleted listing the user owns. Only the contact fields move —
-   * address and coordinates stay listing-specific, because rewriting every
-   * ad's location from a profile edit would be a far larger footprint.
+   * "Update this contact to your ads": copy the profile's contact block and
+   * location onto every non-deleted listing the user owns. Ticking the box is
+   * the user saying "make my ads match my profile", and the settings form
+   * requires phone, location and address while it is ticked. The map pin only
+   * travels when the profile has one — an account that never dropped a pin
+   * must not wipe the pin an individual ad already carries.
    */
   private async copyContactToAds(tx: DbExecutor, user: UserRow): Promise<void> {
     const phoneRows = await tx
@@ -267,12 +277,23 @@ export class UsersService {
       user.username ||
       null;
 
+    // A pin on the profile overwrites the ad's; no pin leaves the ad's alone.
+    const pin =
+      user.latitude !== null && user.longitude !== null
+        ? { latitude: user.latitude, longitude: user.longitude }
+        : {};
+
     await tx
       .update(listings)
       .set({
         contactName,
         contactPhones: phones,
         contactEmail: user.email,
+        provinceId: user.provinceId,
+        districtId: user.districtId,
+        communeId: user.communeId,
+        address: user.address,
+        ...pin,
         updatedAt: new Date(),
       })
       .where(and(eq(listings.userId, user.id), ne(listings.status, 'deleted')));
@@ -875,6 +896,7 @@ export class UsersService {
       profilePhotoUrl: user.profilePhotoUrl,
       coverPhotoUrl: user.coverPhotoUrl,
       isVerified: Boolean(user.phoneVerifiedAt || user.emailVerifiedAt),
+      verifiedAccount: await hasActivePaidSubscription(this.db, user.id),
       createdAt: user.createdAt,
       ...counts,
     };

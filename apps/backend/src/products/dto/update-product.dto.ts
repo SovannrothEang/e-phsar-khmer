@@ -5,6 +5,8 @@ import {
   IsArray,
   IsBoolean,
   IsOptional,
+  IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { ProductSpecGroupDto } from './product-spec-group.dto';
@@ -22,6 +24,12 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => ProductSpecGroupDto)
   specGroups?: ProductSpecGroupDto[];
+
+  /** Empty string clears the image and re-falls back to the model image. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  image?: string;
 
   @IsOptional()
   @IsBoolean()

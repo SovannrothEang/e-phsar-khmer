@@ -166,8 +166,8 @@ const REAL_FORM_SUBCATEGORIES = [
   // rename or divergence to resolve. The family declares **no price**: these
   // listings publish with a NULL price and read "Negotiable" on the cards and
   // the detail page, exactly like the three Home & Land forms that declare
-  // none. `lib/post-ad.ts`'s Services mock carries a `company_name` payload
-  // field, but that is the mock's generic boilerplate — 146 occurrences
+  // none. The deleted `lib/post-ad.ts` mock carried a `company_name` payload
+  // field, but that was the mock's generic boilerplate — 146 occurrences
   // against 145 mock subcategory entries, i.e. one per subcategory of every
   // category, Jobs and Cars included — never Services design intent.
   "accounting-services",
@@ -217,9 +217,10 @@ const REAL_FORM_SUBCATEGORIES = [
   // Also note the type lists are admin-managed data, not seed literals —
   // spec-detail-eight spells the men's/kids options "Men's Accessories" and
   // "Baby & Kids Clothing" while the `types` set (and the design mock data in
-  // `lib/post-ad.ts`) say "Men Accessories"/"Kid Clothing". The design mock
-  // agrees with the ticked rows, so the rows stand and the spec-detail wording
-  // loses — the same mock-wins rule as apartment-for-rent's dropped `facing`.
+  // the since-deleted `lib/post-ad.ts`) say "Men Accessories"/"Kid Clothing".
+  // The design mock agrees with the ticked rows, so the rows stand and the
+  // spec-detail wording loses — the same mock-wins rule as apartment-for-rent's
+  // dropped `facing`.
   "womens-fashion",
   "mens-fashion",
   "baby-and-kids",
@@ -244,7 +245,8 @@ const REAL_FORM_SUBCATEGORIES = [
   //
   // Where Type DOES render, its options come from the admin-managed `types`
   // rows ticked for that subcategory, not from the schema's inline `options`:
-  // the rows (and the design mock data in `lib/post-ad.ts`) read "Dining Table"
+  // the rows (and the design mock data in the since-deleted `lib/post-ad.ts`)
+  // read "Dining Table"
   // / "Kids Desks" / "Kids Chairs&Seats" while spec-detail-nine.md spells them
   // "Dining Tables" / "Kid's Desks" / "Kid's Chair & Seats". The rows agree
   // with the design, so the rows stand and the spec wording loses — the same
@@ -279,7 +281,8 @@ const REAL_FORM_SUBCATEGORIES = [
   // rows ticked for it (11: the spec's 10 + the shared `other`), not from the
   // schema's inline `options` — and the two disagree on one name: the row reads
   // **"Traditional-instruments"** where spec-detail-ten.md writes "Traditional
-  // Instruments". The rows agree with the design mock (`lib/post-ad.ts:6108`),
+  // Instruments". The rows agree with the design mock (formerly
+  // `lib/post-ad.ts:6108`, deleted in the 2026-10-30 mock-data cleanup),
   // so the rows stand and the spec wording loses — the same mock-wins rule as
   // apartment-for-rent's dropped `facing` and the Fashion & Beauty / Furniture
   // type lists. Its Condition row was already in

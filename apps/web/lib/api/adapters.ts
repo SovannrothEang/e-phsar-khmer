@@ -40,6 +40,8 @@ export interface BackendUser {
   updatedAt: string;
   /** Present on the admin users list (derived from active subscriptions). */
   accountType?: "Premium" | "Normal";
+  /** Present on `/auth/me` and `/users/me` — the paid-plan badge. */
+  verifiedAccount?: boolean;
 }
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;

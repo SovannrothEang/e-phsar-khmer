@@ -2,12 +2,30 @@ import {
   boolean,
   index,
   jsonb,
+  pgEnum,
   pgTable,
   timestamp,
   uniqueIndex,
   uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 import { models } from './brands.schema';
+
+/** The five product families that own a spec page (2026-10-30). */
+export const PRODUCT_SPEC_FAMILIES = [
+  'car',
+  'motorcycle',
+  'phone',
+  'tablet',
+  'smartwatch',
+] as const;
+
+export type ProductSpecFamily = (typeof PRODUCT_SPEC_FAMILIES)[number];
+
+export const productSpecFamilyEnum = pgEnum(
+  'product_spec_family',
+  PRODUCT_SPEC_FAMILIES,
+);
 
 /**
  * One label/value row inside a spec group ("Size" → "6.1\"").
@@ -39,6 +57,11 @@ export const productSpecs = pgTable(
     modelId: uuid('model_id')
       .notNull()
       .references(() => models.id, { onDelete: 'cascade' }),
+    // Which family template the page was built from; pinned at create.
+    family: productSpecFamilyEnum('family').notNull(),
+    // Staff-uploaded product image (Storage public URL). Null falls back to
+    // the model's own image.
+    image: varchar('image', { length: 500 }),
     specGroups: jsonb('spec_groups')
       .$type<ProductSpecGroup[]>()
       .default([])

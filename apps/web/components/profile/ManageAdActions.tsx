@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  CircleArrowUp,
   EllipsisVertical,
   Eye,
   Loader2,
@@ -45,9 +46,12 @@ const ITEM =
  */
 export function ManageAdActions({
   post,
+  hidden = false,
   onChanged,
 }: {
   post: Post;
+  /** A hidden ad has no public page and cannot be renewed until a slot frees. */
+  hidden?: boolean;
   /** Called after a successful renew/delete so the list reloads. */
   onChanged: () => void;
 }) {
@@ -96,36 +100,47 @@ export function ManageAdActions({
           className="w-48"
           onClick={(event) => event.stopPropagation()}
         >
-          <DropdownMenuItem asChild className="p-0">
-            <Link
-              // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
-              href={href}
-              className={ITEM}
-            >
-              <Eye size={16} />
-              {t("view")}
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className={ITEM}
-            onSelect={(event) => {
-              event.preventDefault();
-              setConfirm("renew");
-            }}
-          >
-            <RefreshCw size={16} />
-            {t("renew")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className={ITEM}
-            onSelect={(event) => {
-              event.preventDefault();
-              setShareOpen(true);
-            }}
-          >
-            <Share2 size={16} />
-            {t("share")}
-          </DropdownMenuItem>
+          {hidden ? (
+            <DropdownMenuItem asChild className="p-0">
+              <Link href="/premium-account" className={ITEM}>
+                <CircleArrowUp size={16} />
+                {t("upgradePlan")}
+              </Link>
+            </DropdownMenuItem>
+          ) : (
+            <>
+              <DropdownMenuItem asChild className="p-0">
+                <Link
+                  // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
+                  href={href}
+                  className={ITEM}
+                >
+                  <Eye size={16} />
+                  {t("view")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={ITEM}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setConfirm("renew");
+                }}
+              >
+                <RefreshCw size={16} />
+                {t("renew")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={ITEM}
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setShareOpen(true);
+                }}
+              >
+                <Share2 size={16} />
+                {t("share")}
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem
             className={`${ITEM} text-destructive focus:text-destructive`}
             onSelect={(event) => {

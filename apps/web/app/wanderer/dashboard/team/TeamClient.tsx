@@ -48,6 +48,7 @@ import {
   DateCell,
   PrimaryCell,
   RowActions,
+  formatCount,
   type AdminColumn,
 } from "@/components/dashboard/admin-table";
 type AddUserFormData = z.infer<typeof usersSchema>;
@@ -805,13 +806,13 @@ export default function TeamPage({
             <TabsTrigger value="online" className="cursor-pointer">
               Online
               <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
-                {onlineCount}
+                {formatCount(onlineCount)}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="offline" className="cursor-pointer">
               Offline
               <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
-                {offlineCount}
+                {formatCount(offlineCount)}
               </Badge>
             </TabsTrigger>
           </TabsList>

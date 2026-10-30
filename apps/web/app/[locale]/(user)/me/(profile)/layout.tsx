@@ -33,6 +33,7 @@ function toProfileUser(
     following: counts?.following ?? 0,
     follower: counts?.followers ?? 0,
     joinDate,
+    verifiedAccount: me.verifiedAccount ?? false,
   };
 }
 

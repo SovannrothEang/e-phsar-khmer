@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountBadge } from "@/components/common/VerifiedAccountBadge";
 import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { getUserById } from "@/lib/data";
 import { type User } from "@/lib/user";
 import {
   IconBuilding,
@@ -20,16 +20,29 @@ import type { ListingContext } from "@/types/chat";
 import { trackEvent } from "@/lib/insights/queue";
 import { maskPhone } from "@/lib/phone";
 
+/**
+ * The email counterpart of `maskPhone`: the local part is reduced to its
+ * first character, the domain stays readable so the visitor can tell which
+ * mailbox they are asking for. A very short local part is fully masked.
+ */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  return `${local.length > 2 ? local[0] : "*"}***@${domain}`;
+}
+
 export default function ProfileSidebar({
   userId,
-  user: userProp,
+  user,
   listingId,
   listing,
   viewerId,
   initialFollowing = false,
 }: {
   userId: string;
-  user?: User;
+  user: User;
   listingId?: string;
   /** Preview card for the ad, stashed for the chat page — see ContactSellerButton. */
   listing?: ListingContext | null;
@@ -42,10 +55,11 @@ export default function ProfileSidebar({
   const t = useTranslations("Post");
   const format = useFormatter();
   // Same "Show Phone Number" gate as the description block: the numbers stay
-  // masked until the visitor asks for them.
+  // masked until the visitor asks for them. The email follows the same rule —
+  // the "Show Email Address" control used to only log the event, leaving the
+  // address already readable above it.
   const [phoneRevealed, setPhoneRevealed] = useState(false);
-  const user = userProp ?? getUserById(userId);
-  if (!user) return null;
+  const [emailRevealed, setEmailRevealed] = useState(false);
   const isOwnAd = !!viewerId && viewerId === userId;
   // An expired ad keeps its seller card (identity, follow) but offers no way
   // to contact anyone: the offer is no longer live (captain, 2026-10-27).
@@ -109,8 +123,11 @@ export default function ProfileSidebar({
           imgClassName="bg-card"
         />
       </div>
-      <div className="text-card">
-        <h2 className="type-card-heading">{user?.name}</h2>
+      <div className="text-card min-w-0">
+        <h2 className="type-card-heading flex min-w-0 items-center gap-1.5">
+          <span className="truncate">{user?.name}</span>
+          {user?.verifiedAccount && <VerifiedAccountBadge />}
+        </h2>
         {/* No handle, no row — the same rule the company, phone and email
             rows below already follow. */}
         {user?.username && (
@@ -141,12 +158,14 @@ export default function ProfileSidebar({
                 pathname: "/[username]",
                 params: { username: user.username },
               }}
-              className="flex items-center gap-3  cursor-pointer"
+              className="flex min-w-0 flex-1 items-center gap-3  cursor-pointer"
             >
               {identity}
             </Link>
           ) : (
-            <div className="flex items-center gap-3">{identity}</div>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              {identity}
+            </div>
           )}
 
           {/* Nothing sits here on your own ad — the "Your Ad" badge that used
@@ -254,18 +273,30 @@ export default function ProfileSidebar({
                 <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
                   <IconMail size={18} className="text-muted-foreground" />
                 </div>
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">{user.email}</p>
+                {emailRevealed ? (
+                  <a
+                    href={`mailto:${user.email}`}
+                    className="font-medium text-foreground hover:underline break-all"
+                  >
+                    {user.email}
+                  </a>
+                ) : (
                   <button
                     type="button"
                     onClick={() => {
+                      setEmailRevealed(true);
                       if (listingId) trackEvent(listingId, "show_contact");
                     }}
-                    className="text-[#00a0e9] type-body-sm italic hover:underline cursor-pointer"
+                    className="-m-1 flex cursor-pointer flex-col items-start gap-1 rounded-md p-1 text-left transition-colors hover:bg-muted"
                   >
-                    {t("showEmail")}
+                    <span className="font-medium text-foreground break-all">
+                      {maskEmail(user.email)}
+                    </span>
+                    <span className="text-[#00a0e9] type-body-sm italic">
+                      {t("showEmail")}
+                    </span>
                   </button>
-                </div>
+                )}
               </div>
               <div className="border-t border-muted-foreground/30" />
             </>
