@@ -35,11 +35,13 @@ import {
 import { chatKeys, isUnauthenticated, unwrap } from "@/lib/chat/queries";
 import { readListingPreview } from "@/lib/chat/listing-handoff";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
+import { useTabAttending } from "@/hooks/use-tab-attention";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { ConversationList } from "@/components/chat/conversation-list";
 import { MessageThread } from "@/components/chat/message-thread";
 import { E2eBackupPanel } from "@/components/chat/e2e-backup-panel";
+import { E2eBootstrapNotice } from "@/components/chat/e2e-bootstrap-notice";
 import type {
   ConversationWithUser,
   InboxItem,
@@ -173,10 +175,14 @@ export function ChatWorkspace({
   });
 
   // Warm E2E bootstrap as soon as the viewer is known so key registration
-  // races ahead of the first send (fail-closed on send if still pending).
-  const e2eEngine = useE2eEngine(
-    viewer.isSuccess ? (viewer.data?.id ?? null) : null,
-  );
+  // races ahead of the first send (fail-closed on send if still pending). The
+  // backup panel reads the same engine through E2eBackupProvider.
+  //
+  // The passcode re-prompt itself now lives in `MessageThread`: it re-opens
+  // whenever a thread with unavailable messages loads (not once per browser
+  // session — that one-shot version used to live here), because only the
+  // thread knows whether the conversation it is showing actually has any.
+  useE2eEngine(viewer.isSuccess ? (viewer.data?.id ?? null) : null);
 
   // ── Inbox ─────────────────────────────────────────────────────────────────
   // The nav badge's own socket subscription keeps the shared connection alive
@@ -191,6 +197,9 @@ export function ChatWorkspace({
     },
   });
 
+  // Idle counts as "no socket": the socket closes when the tab is abandoned,
+  // and the fallback interval must not take over from a tab nobody is using.
+  const attending = useTabAttending();
   const inbox = useInfiniteQuery({
     queryKey: chatKeys.inbox(),
     enabled: viewer.isSuccess,
@@ -200,7 +209,8 @@ export function ChatWorkspace({
     getNextPageParam: (last) => last.meta.nextCursor,
     // Realtime push (see the subscription above) replaces the poll once the
     // socket is up; the interval stays as the fallback while it isn't.
-    refetchInterval: realtimeConnected ? false : CHAT_POLL.inboxMs,
+    refetchInterval:
+      realtimeConnected || !attending ? false : CHAT_POLL.inboxMs,
     refetchIntervalInBackground: false,
   });
 
@@ -532,7 +542,8 @@ export function ChatWorkspace({
           threadOpen ? "flex" : "hidden md:flex",
         )}
       >
-        <E2eBackupPanel engine={e2eEngine} />
+        <E2eBootstrapNotice />
+        <E2eBackupPanel />
         {!threadOpen && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
             <div className="flex size-20 items-center justify-center rounded-full bg-muted">

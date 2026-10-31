@@ -213,7 +213,7 @@ function TextInput({
           }
           className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
-          } ${trailing ? "pr-11" : "pr-3"}`}
+          } ${trailing ? "pr-14" : "pr-3"}`}
         />
         {trailing && (
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -1548,7 +1548,7 @@ export default function ListingPostForm({
                         type="button"
                         onClick={() => removePhoneRow(i)}
                         aria-label={`${t("removePhone")} ${i + 1}`}
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
                       >
                         <Minus className="h-4 w-4" strokeWidth={3} />
                       </button>

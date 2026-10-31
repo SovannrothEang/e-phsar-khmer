@@ -6,6 +6,7 @@ import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { FaCamera } from "react-icons/fa";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
+import { MobileNavSheet } from "./MobileNavSheet";
 import { SessionCacheGuard } from "./SessionCacheGuard";
 import { BrandWordmark } from "./BrandWordmark";
 import LocalSelector from "../LocalSelector";
@@ -32,7 +33,7 @@ export function NavBar({ user }: { user: User | null }) {
       <SessionCacheGuard identity={user?.username ?? null} />
       <div className="mx-auto max-w-7xl  py-2.5">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
             <Link href={`/`} className="flex items-center gap-2">
               <BrandWordmark className="text-3xl font-bold" />
             </Link>
@@ -43,14 +44,16 @@ export function NavBar({ user }: { user: User | null }) {
           </div>
           {/* SearchBar reads the URL (useSearchParams), which needs a
               Suspense boundary so static pages can still prerender. */}
-          <Suspense fallback={<div className="flex-1 max-w-lg h-[42px]" />}>
-            <SearchBar />
-          </Suspense>
+          <div className="hidden lg:block flex-1 max-w-lg">
+            <Suspense fallback={<div className="flex-1 max-w-lg h-[42px]" />}>
+              <SearchBar />
+            </Suspense>
+          </div>
           <div
             className={
               isLoggedIn
-                ? "flex items-center gap-4 flex-shrink-0 ml-2"
-                : "flex items-center gap-4 flex-shrink-0 ml-2"
+                ? "hidden lg:flex items-center gap-4 flex-shrink-0 ml-2"
+                : "hidden lg:flex items-center gap-4 flex-shrink-0 ml-2"
             }
           >
             {isLoggedIn ? (
@@ -84,6 +87,17 @@ export function NavBar({ user }: { user: User | null }) {
                 </Button>
               </div>
             )}
+          </div>
+          {/* Compact nav (<lg): logo + a single sheet trigger holding
+              search/locale/theme/account — see MobileNavSheet. */}
+          <div className="flex lg:hidden items-center justify-between w-full">
+            <Link href={`/`} className="flex items-center gap-2">
+              <div className="text-3xl font-bold whitespace-nowrap tracking-tight">
+                <span className="text-foreground">PSA</span>
+                <span className="text-[#00a0e9]">KHMER</span>
+              </div>
+            </Link>
+            <MobileNavSheet user={user} />
           </div>
         </div>
       </div>

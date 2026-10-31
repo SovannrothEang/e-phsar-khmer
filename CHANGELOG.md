@@ -171,6 +171,145 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Changed
 
+- **Bakong payments are polled on demand by one poller, not by a self-rescheduling chain** (`Plans.md`, "Bakong
+  demand-driven polling"). Issuing a checkout now emits a local `payment.issued` event that arms
+  `PaymentReconciler`: it checks every 5 s for the first minute, every 15 s while the checkout stays pending, and
+  falls back to the 60 s safety sweep when nothing is open. The outbox → BullMQ → Bakong → outbox chain is retired,
+  so a KHQR left open no longer writes up to ~25 outbox rows and Redis jobs (≈75 before back-off). An unpaid
+  checkout is now abandoned at its own expiry plus 30 s (Bakong's `charge()` now stamps `expires_at`, as ABA's
+  does) instead of after a flat 15 minutes; the provider is still asked first, so a payer at the deadline settles.
+  Attempts we gave up on (`POLL_EXPIRED`) are re-asked about every 5 minutes inside the existing 24 h grace instead
+  of on every tick. Fixed: the reconciler read candidates oldest-first with one shared limit of 100, so with many
+  abandoned checkouts the payer actually waiting could be skipped; pending and recoverable attempts are now read
+  newest-first with separate caps. `GET /payments/:id` also nudges an open Bakong checkout along (at most one
+  Bakong call per attempt per 5 s, after the ownership check; the response still comes from the database).
+  `BAKONG_POLL_INTERVAL_MS` and `ChargeResult.poll` are removed (an old value in `.env` is ignored). Rows and
+  delayed jobs written before the switch are drained by a no-op handler, not retried to failure.
+- **Older messages are one notice, and tabs off `/chats` keep the backup complete** (`Plans.md`, "Keep E2E, stop the
+  wall"; design in `docs/e2e-encryption.md` section 9c). A run of messages sent before this device joined is now a
+  single notice with a count instead of one identical note per bubble, with text that depends on whether the backup
+  is locked with a passcode, ready, or locked without one. Opening such a thread on a locked device re-opens the
+  passcode dialog each time; "Not now" silences it for the browser session. The leader tab also uploads pending
+  plaintext when the tab is hidden. Together with the catch-up decrypt (a tab on any page caches what it
+  receives), the backup now holds messages that were received but never displayed. Not browser-verified: the
+  "ready" and "locked, no passcode" notice states and the flush itself.
+
+- **A chat partner is never "not set up yet"** (`Plans.md`, "Signal-model key availability"; design in
+  `docs/e2e-encryption.md` section 9b). (1) The browser registers its E2E device as part of signing in
+  (password and OTP login, OTP registration), not when a layout happens to render. (2) A user who went quiet
+  is still reachable: when none of a user's devices was seen within 30 days, their 2 most recently seen
+  non-revoked devices stay targets (`loadTargetDevices`, the one helper behind the devices list, the bundle
+  fetch and the send-path set check). (3) A message to someone with no device at all is **held** in the
+  sender's browser ("Waiting for <name> to join secure chat"), retried by a loop that only runs while
+  something is held, sent at most once, and shown as "not sent" after 14 days; the first one sends a
+  content-free in-app nudge (`POST /chats/e2e/nudge/:userId`, 24 h per sender and recipient). (4) A visible
+  tab re-runs the device heartbeat every ~6 h, asks for persistent storage, and shows a notice when the
+  browser repeatedly cannot create keys. The "Ask them to open Messages once" error is gone in all six
+  locales. Nothing is ever sent in the clear. Known gaps: no Telegram nudge (no messaging channel exists);
+  a message to a stale device is readable only if that person returns on the same browser; the
+  release-on-registration path is unit-tested but was not exercised against a real registering account.
+
+- **Chat "share location" opens a map picker.** The Location tile opens a dialog with a map; "Use current
+  location" is the only thing that asks the browser for GPS (inline messages for denied, timeout,
+  unavailable and unsupported). `LocationMapCanvas` gained an optional `flyTo` prop.
+
+- **Hidden tabs no longer poll the backend** (Vercel usage investigation; plan in `Plans.md`). The backend runs
+  as a container that scales to zero within about a minute, and a hidden tab's throttled timer fired the E2E
+  backup sync and approvals poll once a minute, which is just slow enough that **every call cold-started the
+  whole backend (~6 s to boot, 8 boots in an 8-minute sample from one parked tab)**. `hooks/use-e2e-backup.ts`
+  now runs them through `lib/polling/visible-poller.ts`: no timer or request while the tab is hidden, an
+  immediate catch-up on return (only if the last run is older than the interval), and the account-level
+  sync runs in one visible tab per browser (Web Locks; browsers without it keep every tab polling). The 20 s
+  approvals poll stays per tab and is deliberately **not** slowed, because a poll slower than the ~30–60 s
+  warm window would boot the backend on every call. The 10 s "waiting for another device" poll is gated too.
+  Added `pnpm --filter web test` (Node's built-in `node:test`, no new dependency) and
+  `allowImportingTsExtensions` in `apps/web/tsconfig.json` so the test can import its `.ts` module.
+
+- **Backup and approvals are pushed over the WebSocket instead of polled** (`Plans.md`, "Push instead of poll").
+  `E2eBackupService` now publishes `e2e.history_requested`, `e2e.history_resolved` and `e2e.backup_updated` as
+  `notification` frames to the user's own tabs, after the write commits, with ids only (best-effort; a failed
+  publish never fails the request; an idempotent repeat of a history request publishes nothing). The web hook
+  (`lib/e2e/push-events.ts`) maps each to an ordinary read and ignores its own device's events. While the socket is
+  up the polls drop to a 5-minute safety net (1 minute while waiting for another device to approve); with no socket
+  they keep today's 20 s / 60 s / 10 s, and every (re)connect catches up because a missed frame is not replayed.
+  A push only nudges the one leader tab's sync, so tabs still never pull in parallel. **Backend and web must
+  deploy together**: a new web build against an old backend simply keeps its 5-minute poll and would be slow to
+  notice an approval.
+- **An abandoned visible tab behaves like a hidden one.** After 30 minutes without pointer, key, scroll or touch input
+  (`lib/polling/attention.ts`, `ATTENTION_IDLE_MS`) the socket closes and every poller stops — the E2E ones through
+  `visible-poller.ts`, and the chat fallbacks (inbox, unread badge, thread delta, checkout) through the new
+  `use-tab-attention.ts`, because "socket down" alone would otherwise re-enable them in a tab nobody is looking at.
+  The first input, or the tab being shown again, reopens everything and the reconnect refreshes inbox and unread. A
+  message that arrives meanwhile appears on that first input, not before.
+
+### Removed
+
+- **New-device approval is gone; the backup passcode is the only restore path.** A device that cannot read older
+  history can now only unlock the account's backup key with the passcode. Removed end to end: the
+  `history-requests` API (`create` / `mine` / `pending` / `approve` / `decline` / `consume`), the
+  device-to-device key envelope and its Double Ratchet handling, the `e2e.history_requested` /
+  `e2e.history_resolved` push events, the approval dialog and "Ask my other device" UI, and the
+  `chat.e2e_history_requests` table (migration `0041_brainy_plazm`). The only realtime hint left is
+  `e2e.backup_updated` (another device uploaded segments), which still drives a sync.
+
+### Changed
+
+- **A backup passcode is required before the backup is usable elsewhere.** It was optional (a dismissible nudge);
+  without approval, a backup with no passcode is a dead end — a new device has no way in. A device that holds the
+  key and has no passcode now gets a forced, non-dismissible "Set a backup passcode" dialog. Accounts that already
+  have a backup without a passcode keep working on the devices that hold the key; setting one there makes the
+  history restorable on a new device. The locked-device copy now explains the passcode-only path (and what to do
+  when no passcode was ever set) instead of offering approval. A locked device now asks for the passcode when the
+  user first opens a conversation (once per browser session); the per-message "Restore chat history" link was
+  removed, and the undecryptable-message note now points at the backup passcode instead of another device.
+
+### Known issues
+
+- **Bakong polling has not run against a live Bakong or a booted app.** The new poller, the throttled read and the
+  legacy drain are covered by unit tests with mocked database and provider (backend `jest`, 64 suites / 860
+  tests), `nest build` and `eslint`; the `payment.issued` wiring (an `EventEmitter2` injected into
+  `PaymentProcessor`) and the `expires_at` stamp in Bakong's `charge()` are not unit-testable here (`effect` is
+  ESM-only under Jest). Batching many MD5s into one call (`check_transaction_by_md5_list`) is **not** built: NBC's
+  published guide does not document it and no source gives a schema. Also unverified: a third-party note of a daily
+  request limit on the Bakong Open API — if real it caps how many checkouts can be polled, so confirm it on the
+  Bakong developer portal before real traffic. A serverless instance still only polls while it is alive: a QR paid
+  while nobody is on the checkout page waits for the next request or boot (`Plans.md` Task 2.1).
+- The cause of the high Vercel usage is inferred from a 50-row log sample and the code: per-project and
+  30-day numbers need the paid Observability Plus add-on, and billing was not readable. Re-measure after
+  this ships (`Plans.md`, Task 0.1 / 4.1). The `APP_ROLE` worker split (Task 2.1) and the hosting decision
+  (Task 3.1) are still open. The push work is covered by unit tests but has **not been exercised in a browser or in
+  production** (`Plans.md` P0.1 / P2.2 / P3.1): confirm the socket connects, then deploy backend and web together.
+
+## 2026-10-24 — Encrypted-only chat, history restore, idle background work
+
+### Changed
+
+- **Background work no longer runs when there is nothing to do** (Vercel resource audit; plan in `Plans.md`).
+  The outbox worker used to claim from `outbox_events` every 2 s forever; it now asks the database when the
+  next row is due (`OutboxService.msUntilNextDue`), sleeps until then, and re-arms after every drain that
+  handled events. `OUTBOX_POLL_INTERVAL_MS` is now the **longest** idle sleep (default 2000 → 30000), which
+  only bounds the latency of a lost wakeup or a producer in another process — lower it for an API-only /
+  separate-drainer topology. A failed peek falls back to a plain claim.
+- **Bakong poll chain backs off.** Rounds are the base interval (4 s) for five rounds, then 2×, then 4×
+  (cap 30 s), and the last round lands just after the QR expires. One abandoned checkout writes ~25
+  outbox rows instead of ~75. Payloads gained optional `round` / `delayMs`; older queued payloads still work.
+- **`PaymentReconciler` relaxes when idle.** With no unresolved attempt and nothing to activate or expire it
+  ticks every `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (new, default 60 s) instead of every 15 s; any activity
+  returns it to `PAYMENT_RECONCILE_INTERVAL_MS`. The boot tick is still immediate.
+- **No housekeeping at boot.** The outbox retention sweep and the account purge no longer run the moment the
+  process starts; the first run waits a jittered 1–2 minutes, so a restart loop is not a query loop.
+- **Checkout fallback polling** (socket down only) backs off 5 s → 15 s and pauses while the tab is hidden.
+- Outbox worker logs a one-line stats summary (due-time checks, drains, events) every 10 minutes.
+- **Backup API is device-scoped.** `POST /chats/e2e/backup` and
+  `GET /chats/e2e/backup/segments` now require an active `deviceId`;
+  `POST /chats/e2e/history-requests/:id/consume` only succeeds for the requesting device and
+  returns `404 E2E_REQUEST_NOT_FOUND` / `409 E2E_REQUEST_NOT_PENDING` instead of a silent
+  `{ ok: true }`. Init, segment upload and segment list are throttled (10 / 30 / 60 per
+  minute).
+- **v2 send device-set check is race-free.** The active-set read is repeated inside the
+  message insert transaction under per-user Postgres advisory locks shared with
+  `registerDevice`, so a device registering mid-send surfaces as `409 E2E_DEVICES_MISMATCH`
+  and is retried by the client instead of silently missing an envelope.
 - **"Update this contact to your ads" now carries the location too.** With the switch ticked,
   `PATCH /users/me` copies the profile's province/district/commune, address and — when the profile
   has one — map pin onto every non-deleted ad the user owns, alongside the contact name/phones/email
@@ -341,12 +480,24 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 - **Chat thread redesign.** The workspace stays inside the normal app shell (the `(chat)`
   layout still mounts `NavBar`) and takes the viewport minus the navbar, as a dark two-pane
   panel. The thread pane gains quick replies above the composer and a compact pending-listing
-  row with immediate send. The inbox column keeps its previous design ("Inbox" title, chevron
+  row with immediate send. Quick replies are an empty-thread onboarding row: they are shown
+  while a conversation has no messages, and dismissing them with the X is remembered per
+  conversation in `localStorage` (`chat:quick-replies-dismissed:<scope>`), so every new chat
+  introduces them again. The inbox column keeps its previous design ("Inbox" title, chevron
   collapse, 300/340px default width). Only its portaled menu and delete dialog pick up the
   panel's dark scope.
 
 ### Added
 
+- **App-wide encrypted-history restore.** `E2eBackupProvider` now mounts in the `(user)` and
+  `(chat)` layouts and owns the single backup instance (status, uploads, pulls, the
+  approval prompt and the restore dialogs), so history backs up and restores even when the
+  chat page is closed. A locked (new) device automatically asks the account's other devices
+  for the backup key once per session, and an incoming request is approved from any page.
+- **Actionable "not on this device" bubble.** A message this device cannot decrypt now
+  offers `Chat.message.restoreHistory` ("Restore chat history"), opening the passcode or
+  other-device restore flow instead of ending at a dead-end note. Newly decrypted plaintext
+  is uploaded to the backup promptly via the `E2E_PLAINTEXT_CACHED` window event.
 - **Encrypted rich content** (`lib/e2e/chat-content.ts`, marker `khmer24-chat-content` v1):
   shared locations and listing-only messages are sealed inside the ciphertext. New
   `location-card.tsx` (OSM link, no map tiles).
@@ -388,6 +539,23 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   is now one full-width card after another, per the captain's 2026-10-31 layout call. Multi-value
   cells (4G bands, SIM, camera Modules, …) separate each value with the same divider the spec rows
   use, scoped to the value column and spaced so it never touches the text.
+- **Backup-key creation race.** Two first devices creating the account backup at the same
+  time could leave the loser holding a key that would never open the account backup.
+  Creation now runs under a cross-tab Web Lock, re-reads the status inside it, and clears
+  any stored key that fails the server `keyCheck` instead of using it.
+- **An approval can no longer be stranded.** After a device approves a new device, the
+  backup key is validated and saved before the one-shot ratchet step is committed and
+  before the request is consumed; a pull that fails after that is retried by the ordinary
+  pull cycle.
+- **Backup pulls are no longer silently lossy.** An unreadable segment stops the cursor
+  instead of advancing past it, and pulls no longer depend on uploads succeeding.
+- A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
+  first inbound message created it. `chat-workspace.tsx` now reconciles the cached
+  `GET /chats/with/:userId` lookup against the inbox.
+- **The web project failed to build on Vercel (`NEXT_NO_VERSION`).** `.vercelignore` excluded `apps/web`, but
+  that file is read by every project built from this repo, including the web project (Root Directory =
+  `apps/web`), which then had no `package.json`. The exclusion is gone; the backend image build only uploads
+  more (~257 MB instead of ~10 MB).
 - **Listing-detail spec values now actually filter the feed.** Every row in the Description grid used
   to link to its subcategory page with no query, so clicking Year, Tax Type, Condition, Body Type,
   Engine or Color landed on the unfiltered feed. Each row now carries the filter: year → an exact
@@ -503,6 +671,9 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   (read-only, no code changes).
 - `CHANGELOG.md` introduced. `tasks/todo.md` was reset to open items only, and its history
   rolled up here.
+- `ARCHITECTURE.md` added and `CLAUDE.md` slimmed down; the plans under `tasks/` were checked against the code
+  and the finished ones deleted (shipped outcome lives here, text in git). `Plans.md` gained the backend
+  background-work audit plan.
 
 ### Known issues
 
@@ -510,6 +681,12 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   re-checked against the stored object size.
 - A v2 envelope's `wrappedKey`/`header` is stored verbatim, with nothing binding it to the device
   key it claims to target. No safety-number / key-substitution protection yet.
+- Backup restoration remains ciphertext-only and device-gated, but there is still no segment
+  retention/size quota beyond the route throttles, no device-list/revocation management, and
+  a participant still receives every device envelope of a v2 message (device ids/count are
+  visible; wrapped keys stay unreadable). A revoked device keeps the backup key and can read
+  messages already addressed to it; any authenticated stranger can list a user's active
+  device ids and claim one-time prekeys. These are tracked as follow-ups, not fixed here.
 
 ## 2026-10-23 — Security audit, moderation, reports, feedback
 

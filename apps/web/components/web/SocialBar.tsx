@@ -54,12 +54,12 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
     t("myAccount");
   const handle = user.username ? `@${user.username}` : "";
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Notifications */}
       <Button
         variant={"ghost"}
         onClick={() => router.push("/notifications")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconBellFilled className="scale-150 " />
         <NotificationUnreadBadge />
@@ -68,7 +68,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       <Button
         variant={"ghost"}
         onClick={() => router.push("/chats")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconMessageFilled className="scale-150" />
         <ChatUnreadBadge />
@@ -76,11 +76,11 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       {/* User Dropdown */}
       <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
         <DropdownMenuTrigger className="outline-none ml-2">
-          <div className="relative h-10 w-10 cursor-pointer">
+          <div className="relative h-11 w-11 cursor-pointer">
             <UserAvatar
               src={user.profilePhotoUrl}
               name={displayName}
-              className="h-10 w-10 border border-muted-foreground/50 text-sm"
+              className="h-11 w-11 border border-muted-foreground/50 text-sm"
             />
             {/* Dropdown affordance: small chevron badge on the avatar corner */}
             <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-card border border-muted-foreground/30 shadow-sm">

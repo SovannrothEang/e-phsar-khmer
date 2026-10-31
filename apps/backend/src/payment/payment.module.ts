@@ -15,6 +15,7 @@ import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
 import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
 import { PaymentReconciler } from './reconciler/payment-reconciler.service';
+import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconciler.service';
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
@@ -26,9 +27,9 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         // Replaces (not merges with) the root BullModule defaultJobOptions,
-        // so the retention has to be repeated here — this queue is the one
-        // that fills Redis fastest (a poll job every few seconds per open
-        // Bakong checkout).
+        // so the retention has to be repeated here — this queue used to be the
+        // one that filled Redis fastest (a poll job every few seconds per open
+        // Bakong checkout, before the reconciler became the one poller).
         defaultJobOptions: {
           ...JOB_RETENTION,
           attempts: configService.get<number>('payment.jobAttempts') ?? 3,
@@ -62,17 +63,20 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
       ],
     },
     PaymentEffectRunner,
-    // Publish the three outbox event types this module produces to BullMQ —
-    // register themselves with OutboxRegistry from onModuleInit.
+    // Publish the outbox event types this module produces to BullMQ — register
+    // themselves with OutboxRegistry from onModuleInit. The poll handler is a
+    // legacy drain for rows written before the poll chain was retired.
     PaymentAttemptOutboxHandler,
     PaymentEventOutboxHandler,
     PaymentPollOutboxHandler,
-    // Consumes all three BullMQ job kinds — the first @Processor in this repo.
+    // Consumes the BullMQ job kinds — the first @Processor in this repo.
     PaymentProcessor,
-    // The guarantee behind the poll chain: settles any unresolved attempt
-    // straight from Postgres, so a payment made while the app was down (or the
-    // chain broke) still activates. See reconciler/payment-reconciler.service.ts.
+    // The one poller for a provider with no webhook, armed by payment.issued:
+    // settles any unresolved attempt straight from Postgres, so a payment made
+    // while the app was down still activates. See reconciler/payment-reconciler.service.ts.
     PaymentReconciler,
+    // Lets a payer's own GET /payments/:id nudge a settle along (throttled).
+    PaymentOnDemandReconciler,
     // Consumes the business-level payment.succeeded event — notifies the
     // customer directly, no BullMQ hop (see its own doc comment).
     PaymentSettledOutboxHandler,

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getChatWsTicket } from "@/actions/chat";
+import { getAttention } from "@/lib/polling/attention";
 import type { ChatMessage } from "@/types/chat";
 
 const WS_RECONNECT_BASE_MS = 1_000;
@@ -129,6 +130,9 @@ class ChatSocket {
   private attempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Closed because nobody used the visible tab for a long time (see attention.ts). */
+  private idleClosed = false;
+  private stopAttention: (() => void) | null = null;
   /** Bumped per connect/teardown so an in-flight ticket fetch can tell it's stale. */
   private generation = 0;
   private connecting = false;
@@ -169,7 +173,7 @@ class ChatSocket {
   }
 
   private ensureConnected() {
-    if (this.connecting || isTabHidden()) return;
+    if (this.connecting || isTabHidden() || this.idleClosed) return;
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
@@ -246,13 +250,14 @@ class ChatSocket {
     this.attempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if (this.refCount > 0 && !isTabHidden()) void this.connect();
+      if (this.refCount > 0 && !isTabHidden() && !this.idleClosed)
+        void this.connect();
     }, delay);
   }
 
   /** Network back / tab refocused: retry now with a fresh backoff budget. */
   private readonly wake = () => {
-    if (this.refCount === 0 || isTabHidden()) return;
+    if (this.refCount === 0 || isTabHidden() || this.idleClosed) return;
     this.attempt = 0;
     this.ensureConnected();
   };
@@ -278,11 +283,21 @@ class ChatSocket {
   private addWakeListeners() {
     window.addEventListener("online", this.wake);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
+    // An abandoned visible tab is treated like a hidden one: the socket closes,
+    // and the first input reopens it (the reconnect refreshes inbox and unread).
+    this.stopAttention = getAttention().onChange((idle) => {
+      this.idleClosed = idle;
+      if (idle) this.disconnect();
+      else this.wake();
+    });
   }
 
   private removeWakeListeners() {
     window.removeEventListener("online", this.wake);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.stopAttention?.();
+    this.stopAttention = null;
+    this.idleClosed = false;
     this.clearHiddenTimer();
   }
 

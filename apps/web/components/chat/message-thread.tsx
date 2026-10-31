@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Download,
   ImageOff,
+  KeyRound,
   Loader2,
   MessageSquareOff,
   MoreVertical,
@@ -48,6 +49,12 @@ import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ImageGroup } from "@/components/chat/image-group";
 import { groupImageMessages } from "@/lib/chat/group-images";
+import type { MessageNode } from "@/lib/chat/group-images";
+import { groupUnavailable } from "@/lib/chat/group-unavailable";
+import {
+  E2E_RESTORE_SNOOZE_KEY,
+  useE2eBackupContext,
+} from "@/components/chat/e2e-backup-provider";
 import type {
   ChatUserSummary,
   ListingContext,
@@ -71,6 +78,39 @@ const QUICK_REPLIES = [
   "negotiable",
   "notNegotiable",
 ] as const;
+
+/**
+ * Dismissal memory for the quick-replies row, scoped to one conversation.
+ * The row is an empty-thread onboarding aid (see `showQuickReplies`), so the
+ * flag only has to survive reloads of a still-empty chat. A brand-new
+ * conversation has no stored key — that is what re-introduces the row for
+ * every new chat without ever sharing a dismissal across chats.
+ */
+const QUICK_REPLIES_DISMISSED_KEY = "chat:quick-replies-dismissed";
+
+function readQuickRepliesDismissed(scope: string): boolean {
+  try {
+    return (
+      localStorage.getItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`) === "1"
+    );
+  } catch {
+    return false; // private mode / quota
+  }
+}
+
+function dismissQuickReplies(scope: string): void {
+  try {
+    localStorage.setItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`, "1");
+  } catch {
+    // Private mode / quota — hidden for this mount only.
+  }
+}
+
+/** One day-bucket's renderable rows: an image group, a single bubble, or a
+ * collapsed run of unavailable messages (finding H-5). */
+type ThreadNode =
+  | MessageNode
+  | { kind: "unavailable-notice"; key: string; count: number };
 
 /**
  * Turn a decrypted plaintext into what the bubble renders: attachment JSON
@@ -126,9 +166,16 @@ export function MessageThread({
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [listingSent, setListingSent] = useState(false);
   const [listingDismissed, setListingDismissed] = useState(false);
-  // Per-thread preference only: ChatWorkspace keys this component by peer +
-  // conversation, so a thread switch remounts it and the row comes back.
-  const [quickRepliesHidden, setQuickRepliesHidden] = useState(false);
+  // Per-conversation dismissal memory for the quick-replies row. `peer.id` is
+  // the scope until the first send creates the conversation (`conversationId`
+  // null) — the same logical chat, and still one flag.
+  const quickRepliesScope = conversationId
+    ? `conversation:${conversationId}`
+    : `peer:${peer.id}`;
+  const [quickRepliesDismissedNow, setQuickRepliesDismissedNow] =
+    useState(false);
+  const quickRepliesDismissed =
+    quickRepliesDismissedNow || readQuickRepliesDismissed(quickRepliesScope);
   const listingPending =
     Boolean(listingId) && !listingSent && !listingDismissed;
 
@@ -218,6 +265,7 @@ export function MessageThread({
     loadOlder,
     send,
     retry,
+    cancelHeldSend,
     isSending,
     markActivity,
   } = thread;
@@ -230,12 +278,21 @@ export function MessageThread({
   const showListingAttachment =
     listingPending && !messages.some((m) => m.listingId === listingId);
 
+  // Quick replies are an empty-thread onboarding aid: introduced in every new
+  // chat, retired as soon as a message exists (from either side), and hidden
+  // once the user dismisses them — a dismissal stored per conversation, so a
+  // new chat always gets the introduction again. `!isLoading` keeps the row
+  // from flashing while a thread's first page is still in flight.
+  const showQuickReplies =
+    canMessage && !isLoading && messages.length === 0 && !quickRepliesDismissed;
+
   // ── E2E decrypt ──────────────────────────────────────────────────────────
   // Own optimistic echoes already carry plaintext; only server rows need
   // resolving. A still-bootstrapping or failed engine yields a null map —
   // we render a neutral placeholder, never the raw ciphertext.
   const e2eEngine = useE2eEngine(viewerId);
   const decrypted = useDecryptedMessages(messages, e2eEngine);
+  const backup = useE2eBackupContext();
 
   useEffect(() => {
     if (!e2eEngine) return;
@@ -272,6 +329,29 @@ export function MessageThread({
     return () => clearTimeout(timer);
   }, [revealed]);
 
+  // Re-prompt for the passcode whenever a thread with unavailable messages
+  // opens on a locked, passcoded device — not once per browser session. The
+  // EnterPasscodeDialog's "Not now" button snoozes this for the rest of the
+  // session (sessionStorage); reloading (or opening another such thread in a
+  // new session) asks again.
+  const hasUnavailable = useMemo(
+    () => messages.some((m) => decrypted.get(m.id)?.status === "unavailable"),
+    [messages, decrypted],
+  );
+  const backupKind = backup?.state?.kind ?? null;
+  const backupHasPasscode =
+    backup?.state?.kind === "locked" && backup.state.hasPasscode;
+  useEffect(() => {
+    if (!backup || !revealed || !hasUnavailable) return;
+    if (backupKind !== "locked" || !backupHasPasscode) return;
+    try {
+      if (sessionStorage.getItem(E2E_RESTORE_SNOOZE_KEY) === "1") return;
+    } catch {
+      // Private mode — prompting anyway is harmless.
+    }
+    backup.setDialog("enter");
+  }, [backup, revealed, hasUnavailable, backupKind, backupHasPasscode]);
+
   const displayMessages = useMemo<ThreadMessage[]>(() => {
     // Ordinary plaintext threads need no post-processing. Optimistic echoes
     // are always inspected: a location / listing-only send stores its
@@ -293,7 +373,10 @@ export function MessageThread({
       if (outcome?.status === "ok")
         out.push(withDecryptedContent(m, outcome.plaintext));
       else if (outcome?.status === "unavailable")
-        out.push({ ...m, body: t("message.notOnThisDevice") });
+        // Never ciphertext, and never its own bubble: a run of these is
+        // collapsed into one notice row below (`groupUnavailable`), whose
+        // text is state-aware instead of the old one-note-per-bubble copy.
+        out.push({ ...m, unavailable: true });
       else if (outcome?.status === "failed")
         out.push({ ...m, body: t("message.decryptFailed") });
       // Still decrypting. With a live engine, hold the row back — a new
@@ -348,12 +431,14 @@ export function MessageThread({
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
       if (pendingListingId) setListingSent(true);
-      // Location and voice must be forwarded here: the composer clears its
-      // staged state on send, so a dropped field is a silently lost message.
+      // Location, voice and the ad picked from the composer's "+" menu must be
+      // forwarded here: the composer clears its staged state on send, so a
+      // dropped field is a silently lost message. An explicitly picked ad wins
+      // over the deep-linked listing card.
       send({
         body: draft.body,
         draftKeys: draft.draftKeys,
-        listingId: pendingListingId,
+        listingId: draft.listingId ?? pendingListingId,
         location: draft.location,
         voice: draft.voice,
       });
@@ -390,11 +475,37 @@ export function MessageThread({
       if (last && last.day === day) last.items.push(message);
       else dayBuckets.push({ day, items: [message] });
     }
-    // Then group consecutive image messages within each day.
-    return dayBuckets.map((bucket) => ({
-      day: bucket.day,
-      nodes: groupImageMessages(bucket.items),
-    }));
+    // Then, within each day: collapse runs of unavailable messages into one
+    // notice node first (a readable message splits a run in two — see
+    // `groupUnavailable`), then group consecutive image messages among what
+    // is left readable.
+    return dayBuckets.map((bucket) => {
+      const unavailability = groupUnavailable(
+        bucket.items,
+        (m) => m.unavailable === true,
+      );
+      const nodes: ThreadNode[] = [];
+      let readable: ThreadMessage[] = [];
+      const flushReadable = () => {
+        if (readable.length === 0) return;
+        nodes.push(...groupImageMessages(readable));
+        readable = [];
+      };
+      for (const node of unavailability) {
+        if (node.kind === "unavailable-run") {
+          flushReadable();
+          nodes.push({
+            kind: "unavailable-notice",
+            key: node.messages[0].id,
+            count: node.count,
+          });
+        } else {
+          readable.push(node.message);
+        }
+      }
+      flushReadable();
+      return { day: bucket.day, nodes };
+    });
   }, [displayMessages]);
 
   // A 404 on a conversation route means "not a participant" — the backend
@@ -552,7 +663,12 @@ export function MessageThread({
                   </span>
                 </div>
                 {group.nodes.map((node) =>
-                  node.kind === "image-group" ? (
+                  node.kind === "unavailable-notice" ? (
+                    <UnavailableNotice
+                      key={`notice-${node.key}`}
+                      count={node.count}
+                    />
+                  ) : node.kind === "image-group" ? (
                     <ImageGroup
                       key={`group-${node.messages[0].id}`}
                       messages={node.messages}
@@ -568,6 +684,7 @@ export function MessageThread({
                       peerName={peerName}
                       peerAvatarUrl={peer.profilePhotoUrl}
                       onRetry={retry}
+                      onCancelHeld={cancelHeldSend}
                       onOpenImage={setLightbox}
                     />
                   ),
@@ -627,9 +744,10 @@ export function MessageThread({
       )}
 
       {/* Quick replies: one tap sends the pill's text (plus the pending
-          listing, if one is still armed). Hidden per thread, restored on
-          the next mount — i.e. on a thread change. */}
-      {canMessage && !quickRepliesHidden && (
+          listing, if one is still armed). See `showQuickReplies` — the row
+          only exists in a message-less thread and a dismissal is persisted
+          per conversation. */}
+      {showQuickReplies && (
         <div className="shrink-0 border-t border-border bg-card px-3 pt-2 sm:px-4">
           <div className="flex items-center gap-1.5 pb-2">
             <div
@@ -653,7 +771,10 @@ export function MessageThread({
             </div>
             <button
               type="button"
-              onClick={() => setQuickRepliesHidden(true)}
+              onClick={() => {
+                dismissQuickReplies(quickRepliesScope);
+                setQuickRepliesDismissedNow(true);
+              }}
               aria-label={t("thread.quickReplies.hide")}
               className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
@@ -740,6 +861,42 @@ function ThreadNotice({
           {backLabel}
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * One notice row for a whole run of unavailable messages (finding H-5):
+ * state-aware text instead of the old identical note on every bubble, with
+ * the passcode button inline only when there is a passcode to enter.
+ */
+function UnavailableNotice({ count }: { count: number }) {
+  const t = useTranslations("Chat.message");
+  const tBackup = useTranslations("Chat.backup");
+  const backup = useE2eBackupContext();
+  const locked = backup?.state?.kind === "locked" ? backup.state : null;
+  const textKey = !locked
+    ? "unavailableReady"
+    : locked.hasPasscode
+      ? "unavailableLockedWithPasscode"
+      : "unavailableLockedNoPasscode";
+
+  return (
+    <div className="flex justify-center">
+      <div className="flex max-w-[85%] flex-col items-center gap-1.5 rounded-xl bg-muted/70 px-3 py-2 text-center text-[11px] text-muted-foreground sm:max-w-[70%]">
+        <p>{t(textKey, { count })}</p>
+        {locked?.hasPasscode && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => backup?.setDialog("enter")}
+          >
+            <KeyRound className="size-3" />
+            {tBackup("enterPasscode")}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -166,7 +166,7 @@ export function GridCardPost({ post }: { post: Post }) {
               reactions.toggleLike(listingId);
             }}
             disabled={reactions.isPending(listingId)}
-            className="group/heart h-9 w-9 z-30  rounded-full bg-card hover:bg-gray-500 flex items-center justify-center cursor-pointer"
+            className="group/heart h-11 w-11 shrink-0 z-30 rounded-full bg-card hover:bg-gray-500 flex items-center justify-center cursor-pointer"
           >
             <HeartIcon
               className={`h-6 w-6 transition ${

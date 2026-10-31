@@ -20,7 +20,17 @@ import {
   getDraftPreviewUrl,
   removeDraftImage,
 } from "@/lib/chat-draft-images";
+import { nudgeRecipient } from "@/actions/e2e-nudge";
+import { isPending } from "@/lib/e2e/held-sends";
 import { getE2eEngine } from "@/lib/e2e/engine-provider";
+import {
+  cancelHeld,
+  holdSend,
+  listHeld,
+  releaseHeld,
+  subscribeHeldSends,
+} from "@/lib/e2e/held-sends-runtime";
+import type { HeldPayload } from "@/lib/e2e/held-sends-runtime";
 import { sendE2eText } from "@/lib/e2e/send-encrypt";
 import type { E2eSendOutcome } from "@/lib/e2e/send-encrypt";
 import { E2E_ATTACHMENTS_ENABLED } from "@/lib/e2e/config";
@@ -131,6 +141,8 @@ export interface ChatThread {
   loadOlder: () => void;
   send: (draft: SendDraft) => void;
   retry: (message: ThreadMessage) => void;
+  /** Cancel a send held for a recipient with no E2E device yet. */
+  cancelHeldSend: (message: ThreadMessage) => void;
   isSending: boolean;
   markActivity: () => void;
   wsConnected: boolean;
@@ -176,6 +188,9 @@ export function useChatThread({
 
   const [local, setLocal] = useState<ThreadMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
+  // Sends held for a recipient with no E2E device yet, as bubbles.
+  const [heldEchoes, setHeldEchoes] = useState<ThreadMessage[]>([]);
+  const heldIdsRef = useRef<Set<string>>(new Set());
 
   // ── WebSocket ────────────────────────────────────────────────────────────
   const wsEnabled = enabled && conversationId !== null;
@@ -341,8 +356,8 @@ export function useChatThread({
         local.filter((m) => !serverIds.has(m.id)).map((m) => [m.id, m]),
       ).values(),
     ];
-    return [...serverMessages, ...extras];
-  }, [serverMessages, local]);
+    return [...serverMessages, ...extras, ...heldEchoes];
+  }, [serverMessages, local, heldEchoes]);
 
   const peerLastReadAt =
     delta.data?.peerLastReadAt ??
@@ -396,6 +411,113 @@ export function useChatThread({
     );
   }, []);
 
+  // ── Held sends (recipient has no E2E device yet) ─────────────────────────
+  // Rebuild the held bubbles from the IndexedDB store. When a row that was
+  // held is gone (sent by this or another tab, or cancelled) the thread
+  // refetches so the delivered message shows up in its place.
+  const refreshHeld = useCallback(async () => {
+    if (!viewerId || !recipientId) {
+      setHeldEchoes([]);
+      return;
+    }
+    const items = await listHeld(viewerId, recipientId);
+    const echoes: ThreadMessage[] = [];
+    for (const item of items) {
+      const tempId = `held-${item.clientMessageId}`;
+      let echo: ThreadMessage | null = null;
+      if (item.payload.kind === "text") {
+        echo = {
+          id: tempId,
+          tempId,
+          clientMessageId: item.clientMessageId,
+          conversationId: item.payload.conversationId ?? "",
+          senderId: viewerId,
+          body: item.payload.plaintext,
+          listingId: item.payload.listingId ?? null,
+          imageUrl: null,
+          imagePath: null,
+          groupId: null,
+          readAt: null,
+          createdAt: item.createdAt,
+          isE2e: false,
+          e2eHeader: null,
+        };
+      } else {
+        const entry = await getOutbox(item.clientMessageId).catch(() => null);
+        if (entry) echo = outboxEcho(entry, tempId, viewerId, false);
+      }
+      if (!echo) continue;
+      echoes.push({
+        ...echo,
+        id: tempId,
+        tempId,
+        createdAt: item.createdAt,
+        pending: false,
+        failed: false,
+        held: item.state === "expired" ? "expired" : "held",
+      });
+    }
+    const nowIds = new Set(echoes.map((e) => e.clientMessageId as string));
+    const gone = [...heldIdsRef.current].some((id) => !nowIds.has(id));
+    heldIdsRef.current = nowIds;
+    setHeldEchoes(echoes);
+    if (gone) {
+      refetchDeltaRef.current?.();
+      onMutated?.();
+    }
+  }, [viewerId, recipientId, onMutated]);
+
+  useEffect(() => {
+    let active = true;
+    // A different recipient starts from an empty baseline, so its first load
+    // is not mistaken for "a held send disappeared".
+    heldIdsRef.current = new Set();
+    const run = () => {
+      if (active) void refreshHeld();
+    };
+    queueMicrotask(run);
+    const unsubscribe = subscribeHeldSends(run);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [refreshHeld]);
+
+  // Opening the thread is one of the moments a held send is retried (the
+  // recipient may have signed in since). A no-op when nothing is held.
+  useEffect(() => {
+    if (viewerId && recipientId) void releaseHeld(viewerId, recipientId);
+  }, [viewerId, recipientId]);
+
+  /**
+   * Park a send the recipient cannot receive yet. The first held message for
+   * a recipient also sends one content-free nudge (rate-limited server-side)
+   * so they know someone wants to talk and sign in.
+   */
+  const holdOutbound = useCallback(
+    async (
+      clientMessageId: string,
+      payload: HeldPayload,
+      listingId?: string,
+    ) => {
+      if (!viewerId || !recipientId) return;
+      const first = !(await listHeld(viewerId, recipientId)).some((i) =>
+        isPending(i.state),
+      );
+      await holdSend(viewerId, { clientMessageId, recipientId, payload });
+      if (first) void nudgeRecipient(recipientId, listingId);
+    },
+    [viewerId, recipientId],
+  );
+
+  const cancelHeldSend = useCallback(
+    (message: ThreadMessage) => {
+      if (viewerId && message.clientMessageId)
+        void cancelHeld(viewerId, message.clientMessageId);
+    },
+    [viewerId],
+  );
+
   const reportE2eFailure = useCallback(
     (
       outcome: Exclude<E2eSendOutcome | AttachmentSendOutcome, { ok: true }>,
@@ -431,6 +553,17 @@ export function useChatThread({
       });
       setIsSending(false);
       if (!outcome.ok) {
+        if (outcome.reason === "no-recipient-keys") {
+          // The recipient has no E2E device yet: keep the entry (it stays in
+          // the attachment outbox) and wait, instead of failing.
+          setLocal((prev) => prev.filter((m) => m.tempId !== tempId));
+          await holdOutbound(
+            entry.clientMessageId,
+            { kind: "outbox" },
+            entry.listingId,
+          );
+          return null;
+        }
         markFailed(tempId);
         reportE2eFailure(outcome);
         return null;
@@ -454,6 +587,7 @@ export function useChatThread({
       viewerId,
       conversationId,
       markFailed,
+      holdOutbound,
       reportE2eFailure,
       onConversationCreated,
       onMutated,
@@ -572,14 +706,28 @@ export function useChatThread({
       setIsSending(false);
 
       if (!outcome.ok) {
+        if (outcome.reason === "no-recipient-keys") {
+          // No E2E device on the other side yet. Hold the sealed body here and
+          // send it the moment one registers; nothing leaves in the clear.
+          setLocal((prev) => prev.filter((m) => m.tempId !== tempId));
+          await holdOutbound(
+            clientMessageId,
+            {
+              kind: "text",
+              plaintext,
+              listingId: draft.listingId,
+              conversationId,
+            },
+            draft.listingId,
+          );
+          return;
+        }
         setLocal((prev) =>
           prev.map((m) =>
             m.tempId === tempId ? { ...m, pending: false, failed: true } : m,
           ),
         );
-        if (outcome.reason === "no-recipient-keys") {
-          onSendError?.("E2E_NO_KEYS", 404);
-        } else if (outcome.reason === "send-failed") {
+        if (outcome.reason === "send-failed") {
           onSendError?.(outcome.message, outcome.status);
         } else {
           onSendError?.("E2E_UNAVAILABLE", 0);
@@ -612,6 +760,7 @@ export function useChatThread({
       onMutated,
       onSendError,
       dispatchOutbox,
+      holdOutbound,
       markFailed,
     ],
   );
@@ -714,6 +863,7 @@ export function useChatThread({
     loadOlder: () => void history.fetchNextPage(),
     send,
     retry,
+    cancelHeldSend,
     isSending,
     markActivity,
     wsConnected,
