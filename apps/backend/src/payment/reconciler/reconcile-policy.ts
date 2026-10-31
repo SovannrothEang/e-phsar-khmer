@@ -29,19 +29,74 @@ export function isReconcilable(attempt: ReconcilableAttempt): boolean {
   );
 }
 
-export interface DueOptions {
-  /** Attempts younger than this are checked on every tick. */
-  fastWindowMs: number;
-  /** Older ones only on every Nth tick, so the long grace tail stays cheap. */
-  slowEveryTicks: number;
+export interface AbandonCheck {
+  createdAt: Date;
+  /** The checkout's own deadline (`payment_transactions.expires_at`), if one was recorded. */
+  expiresAt: Date | null;
+  now: number;
+  /** Slack past `expiresAt`, so a payer at the deadline still settles. */
+  graceMs: number;
+  /** Backstop on age, for a checkout with no recorded expiry. */
+  abandonAfterMs: number;
 }
 
-/** Whether an attempt of this age is due for a check on this tick. */
-export function isDueThisTick(
-  ageMs: number,
-  tick: number,
-  options: DueOptions,
-): boolean {
-  if (ageMs < options.fastWindowMs) return true;
-  return tick % options.slowEveryTicks === 0;
+/**
+ * Whether a still-unpaid `pending` attempt should stop being polled as a live
+ * checkout. The provider has already been asked and said "not paid" by the
+ * time this is judged, so it never fails a paid attempt on the clock.
+ *
+ * Ends at the checkout's own expiry rather than a flat age: a KHQR lives five
+ * minutes, and polling it for fifteen would triple the provider calls spent on
+ * every abandoned checkout.
+ */
+export function isPendingAbandoned(check: AbandonCheck): boolean {
+  if (check.now - check.createdAt.getTime() >= check.abandonAfterMs) {
+    return true;
+  }
+  return (
+    check.expiresAt !== null &&
+    check.now >= check.expiresAt.getTime() + check.graceMs
+  );
+}
+
+export interface TickState {
+  /** Still-`pending` attempts in view this pass. */
+  pending: number;
+  /** Age of the newest one; `null` when none are pending. */
+  newestPendingAgeMs: number | null;
+  /** The pass settled, activated, abandoned or errored on something. */
+  didWork: boolean;
+}
+
+export interface TickDelayOptions {
+  /** Interval while a payer has only just been issued a checkout. */
+  fastIntervalMs: number;
+  /** How long after issue the fast interval applies. */
+  fastWindowMs: number;
+  /** Interval while any checkout is still pending. */
+  baseIntervalMs: number;
+  /** Safety-sweep interval with nothing pending. */
+  idleIntervalMs: number;
+}
+
+/**
+ * How long to sleep before the next reconcile pass.
+ *
+ * Demand-driven: the tight interval exists only while a payer is likely still
+ * scanning; with nothing pending the loop falls back to a slow safety sweep
+ * (which also covers a checkout issued on another instance). Issuing a payment
+ * re-arms it at once via `PaymentReconciler.arm()`.
+ */
+export function nextTickDelayMs(
+  state: TickState,
+  options: TickDelayOptions,
+): number {
+  if (state.pending > 0) {
+    const age = state.newestPendingAgeMs ?? Number.POSITIVE_INFINITY;
+    return age < options.fastWindowMs
+      ? options.fastIntervalMs
+      : options.baseIntervalMs;
+  }
+  if (state.didWork) return options.baseIntervalMs;
+  return Math.max(options.idleIntervalMs, options.baseIntervalMs);
 }

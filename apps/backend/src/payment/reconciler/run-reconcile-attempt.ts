@@ -27,7 +27,11 @@ export interface ReconcileAttemptDeps {
  */
 export async function runReconcileAttempt(
   deps: ReconcileAttemptDeps,
-  input: { paymentAttemptId: string; abandonPendingAfterMs: number },
+  input: {
+    paymentAttemptId: string;
+    abandonPendingAfterMs: number;
+    expiryGraceMs: number;
+  },
 ): Promise<ReconcileAttemptResult> {
   const layer = Layer.mergeAll(
     DbClientTag.layer(deps.db),

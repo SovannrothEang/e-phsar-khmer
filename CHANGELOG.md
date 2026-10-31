@@ -21,6 +21,20 @@ How to use this file:
 
 ### Changed
 
+- **Bakong payments are polled on demand by one poller, not by a self-rescheduling chain** (`Plans.md`, "Bakong
+  demand-driven polling"). Issuing a checkout now emits a local `payment.issued` event that arms
+  `PaymentReconciler`: it checks every 5 s for the first minute, every 15 s while the checkout stays pending, and
+  falls back to the 60 s safety sweep when nothing is open. The outbox → BullMQ → Bakong → outbox chain is retired,
+  so a KHQR left open no longer writes up to ~25 outbox rows and Redis jobs (≈75 before back-off). An unpaid
+  checkout is now abandoned at its own expiry plus 30 s (Bakong's `charge()` now stamps `expires_at`, as ABA's
+  does) instead of after a flat 15 minutes; the provider is still asked first, so a payer at the deadline settles.
+  Attempts we gave up on (`POLL_EXPIRED`) are re-asked about every 5 minutes inside the existing 24 h grace instead
+  of on every tick. Fixed: the reconciler read candidates oldest-first with one shared limit of 100, so with many
+  abandoned checkouts the payer actually waiting could be skipped; pending and recoverable attempts are now read
+  newest-first with separate caps. `GET /payments/:id` also nudges an open Bakong checkout along (at most one
+  Bakong call per attempt per 5 s, after the ownership check; the response still comes from the database).
+  `BAKONG_POLL_INTERVAL_MS` and `ChargeResult.poll` are removed (an old value in `.env` is ignored). Rows and
+  delayed jobs written before the switch are drained by a no-op handler, not retried to failure.
 - **Older messages are one notice, and tabs off `/chats` keep the backup complete** (`Plans.md`, "Keep E2E, stop the
   wall"; design in `docs/e2e-encryption.md` section 9c). A run of messages sent before this device joined is now a
   single notice with a count instead of one identical note per bubble, with text that depends on whether the backup
@@ -101,6 +115,15 @@ How to use this file:
 
 ### Known issues
 
+- **Bakong polling has not run against a live Bakong or a booted app.** The new poller, the throttled read and the
+  legacy drain are covered by unit tests with mocked database and provider (backend `jest`, 64 suites / 860
+  tests), `nest build` and `eslint`; the `payment.issued` wiring (an `EventEmitter2` injected into
+  `PaymentProcessor`) and the `expires_at` stamp in Bakong's `charge()` are not unit-testable here (`effect` is
+  ESM-only under Jest). Batching many MD5s into one call (`check_transaction_by_md5_list`) is **not** built: NBC's
+  published guide does not document it and no source gives a schema. Also unverified: a third-party note of a daily
+  request limit on the Bakong Open API — if real it caps how many checkouts can be polled, so confirm it on the
+  Bakong developer portal before real traffic. A serverless instance still only polls while it is alive: a QR paid
+  while nobody is on the checkout page waits for the next request or boot (`Plans.md` Task 2.1).
 - The cause of the high Vercel usage is inferred from a 50-row log sample and the code: per-project and
   30-day numbers need the paid Observability Plus add-on, and billing was not readable. Re-measure after
   this ships (`Plans.md`, Task 0.1 / 4.1). The `APP_ROLE` worker split (Task 2.1) and the hosting decision

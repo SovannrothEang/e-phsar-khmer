@@ -176,12 +176,6 @@ const envSchema = z.object({
   // expired — bakong-khqr requires an expirationTimestamp for any KHQR that
   // carries an amount (a "dynamic" QR), so this always applies here.
   BAKONG_QR_EXPIRY_SECONDS: z.coerce.number().default(300),
-  // Bakong delivers no webhooks — this is the delay between poll-attempt
-  // jobs re-checking check_transaction_by_md5 (see
-  // src/payment/providers/bakong/README.md). Short enough that a payer
-  // sees their payment confirmed quickly, long enough not to hammer
-  // Bakong's API for the several minutes a KHQR stays valid.
-  BAKONG_POLL_INTERVAL_MS: z.coerce.number().default(4000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

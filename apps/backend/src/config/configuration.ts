@@ -97,7 +97,6 @@ export default () => {
       merchantCity: env.BAKONG_MERCHANT_CITY,
       acquiringBank: env.BAKONG_ACQUIRING_BANK,
       qrExpirySeconds: env.BAKONG_QR_EXPIRY_SECONDS,
-      pollIntervalMs: env.BAKONG_POLL_INTERVAL_MS,
     },
   };
 };

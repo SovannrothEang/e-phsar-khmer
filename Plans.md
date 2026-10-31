@@ -23,6 +23,49 @@ _harness_version: "4.3.3"
 
 <!-- Add tasks with cc:todo or pm:requested here. -->
 
+### Plan: Bakong demand-driven polling — poll only while a payment is open (2026-10-31)
+
+**Purpose**: Bakong has no webhook or push, so something must ask. Make that asking happen only while a payment is open (armed by issue, idle when none), with one poller and batched calls, instead of a BullMQ chain plus a 15 s reconciler that both ask per attempt. Settlement durability is out of scope: the owner tested that a paid QR settles after a page refresh.
+
+**Spec delta**: no root `spec.md`. Record in `payment/providers/bakong/README.md` and `ARCHITECTURE.md`: "Polling is demand-driven: armed when a payment is issued (first `payment.attempt.poll_requested`), idle with zero open attempts. Settlement is server-driven and independent of any client; the UI only reads state."
+**team_validation_mode**: `manual-pass` (no sub-agents).
+**Not observed**: whether `check_transaction_by_md5_list` exists in NBC's official docs (only third-party SDKs mention it, max 50 per call); whether Bakong rejects payment of an expired dynamic KHQR; whether `DATABASE_URL` is a pooler (secret, not read). `not_observed != absent`.
+**Rejected**: Postgres LISTEN/NOTIFY. It needs a long-lived session connection (impossible on serverless), NOTIFY is lossy so a table sweep is still required, and Bakong never notifies us. The outbox plus `wakeupAfterCommit()` is already the in-process event. Revisit only with an always-on worker on a direct connection.
+**Known gap on serverless**: no live instance means no poller. A paid QR waits until a request boots one. Task 2.1 decides the wake-up.
+
+| Task | 内容 | DoD | Depends | Status |
+| ---- | ---- | --- | ------- | ------ |
+| 0.2 | [lane:gate] [tdd:required] Fix candidate selection in `PaymentReconciler`: `ORDER BY createdAt ASC LIMIT 100` (`payment-reconciler.service.ts:219`) starves the newest pending attempt when more than 100 candidates exist. Check pending attempts newest-first and cap the recoverable-failed tail | Spec fails first, then passes: with 150 candidates the newest pending attempt is checked in one tick. `pnpm --filter backend test` and `lint` green | - | `cc:done` |
+| 0.3 | [lane:fast] [tdd:skip:read-only] Confirm `payment.reconcileProviders` includes `bakong` by default (`config/configuration.ts`, no env values read) | One-line note under this plan | - | `cc:done` (`PAYMENT_RECONCILE_PROVIDERS` defaults to `'bakong'`, `config.validation.ts`) |
+| 1.1 | [lane:gate] [tdd:required] Demand-driven single poller: armed by `wakeupAfterCommit` on issue, next-due timer (soonest check across open attempts), disarmed when none are open; retire the BullMQ `poll-attempt` self-rescheduling chain (outbox row, Redis job and extra Bakong call per round) | Specs: no timer fires with zero open attempts; issuing a payment arms it; a paid QR still settles once; an expired QR stops being polled. No new `poll_requested` row after the change. Tests and lint green | 0.2, 0.3 | `cc:done` (see run log: idle = 60 s safety sweep, not zero timers) |
+| 1.2 | [lane:gate] [tdd:required] Batch check: one `check_transaction_by_md5_list` call (≤50 md5) per pass, falling back to single `check_transaction_by_md5` on error. Verify the endpoint and response shape against NBC's official docs first | Specs cover chunking at 50, per-md5 result mapping and fallback. Docs link or `unknown` recorded. Live call stays `blocked` until the owner supplies credentials | 1.1 | `blocked` (endpoint undocumented by NBC, no schema; needs a live sample) |
+| 1.3 | [lane:gate] **Optional decision**: shorten `latePaymentGraceMs` (24 h) to QR expiry plus a short margin so abandoned QRs stop being polled. Needs a check that Bakong rejects expired dynamic KHQR; until then `unknown` | Decision and evidence recorded in the Bakong README. If adopted, a spec proves an attempt past the margin is no longer a candidate | 1.1 | `blocked` (owner decision) |
+| 2.1 | [lane:gate] **Decision, needs the owner**: what wakes the poller when nobody is on the checkout page? (a) external pinger every 1–5 min hitting the task 2.2 endpoint (free; detection can lag by the interval; recommended now), (b) small always-on worker with `APP_ROLE=worker` (seconds; about $5/month; the only setup where LISTEN/NOTIFY becomes viable) | Choice recorded in `payment/providers/bakong/README.md` and `ARCHITECTURE.md` with the cost trade-off | 1.1 | `blocked` (owner decision) |
+| 2.2 | [lane:gate] [tdd:required] `POST /internal/payments/reconcile`: secret header with constant-time compare, runs one `runOnce` pass, returns the `ReconcileSummary`. Skipped if 2.1 picks (b) | Specs: missing or wrong secret is rejected; correct secret returns a summary; no secret value is logged | 2.1 | `blocked` |
+| 2.3 | [lane:gate] [tdd:required] Throttled on-demand check from the payment status read (`GET /payments/:id`): at most one Bakong call per attempt per 5 s, through the same settle path. The page still only reads the result | Spec: 10 reads inside 5 s cause one provider call; a paid attempt is settled by the read and returned as `succeeded` | 1.1 | `cc:done` |
+| 4.1 | [lane:release] Update `payment/README.md` and `providers/bakong/README.md` (the reconciler and the new loop are undocumented or stale), run `harness-review`, add a `CHANGELOG.md` `Unreleased` entry | Review verdict APPROVE; READMEs describe the demand-driven loop; changelog names the removed poll chain and any new env | 1.1–2.3 | `cc:WIP` docs and changelog done; independent `harness-review` not run |
+
+#### Run log (2026-10-31, `/harness-work all`)
+
+- **Done and verified**: 0.2, 0.3, 1.1, 2.3. Backend `jest`: 64 suites / 860 tests green (was 62 / 797 on 2026-10-24). `eslint` is clean on `src/payment`, `src/outbox`, `src/config`, `src/common`. `nest build` succeeds. 0.2 and 1.1 were written test-first (red run seen before the change).
+- **Shipped beyond the table**: (a) Bakong's `charge()` now returns a top-level `expiresAt`. Before this, `payment_transactions.expires_at` was never stamped for Bakong (only ABA did), so the new expiry-based abandonment would have silently fallen back to the 15-minute age backstop and polled an unpaid QR three times longer than the old chain. (b) `ChargeResult.poll`, `BAKONG_POLL_INTERVAL_MS` and `pollPaymentAttempt` / `enqueuePaymentAttemptPoll` / `poll-schedule` are removed. (c) `PaymentPollOutboxHandler` and the `poll-attempt` job branch stay as no-op drains: an unregistered outbox event type is retried and then marked `failed`, so deleting the handler would have failed every `poll_requested` row queued at deploy.
+- **Differs from the plan as written**: 1.1's DoD said "no timer fires with zero open attempts". What shipped is a 60 s safety sweep when nothing is pending, because a checkout issued on another instance (or a lost local event) is only found by a sweep. `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` is the lever. The late-payment tail (24 h grace) is re-asked every 5 minutes instead of every tick; 1.3 (shortening the grace) is still undecided.
+- **1.2 not built, on purpose**: NBC's published Open API guide (v1.0.2) lists the single-MD5 and hash checks; `check_transaction_by_md5_list` appears only in third-party SDKs and none gives a schema (the sources disagree on the response shape). A wrong per-MD5 mapping could mark an unpaid attempt paid and post the ledger. Unblocks with a real response (needs `BAKONG_API_KEY`, listed under 事前確認) or NBC's confirmation. I could not read the official PDF locally (encoded fonts), so this rests on search results, not the PDF text.
+- **Not verified**: the app was not booted (no Postgres or Redis here), so the `EventEmitter2` injection into `PaymentProcessor`, the `@OnEvent` registration and the `expires_at` stamp in Bakong's `charge()` are checked by compile and reading only (the processor and provider import `effect`, ESM-only under Jest). No live Bakong call has been made. Nothing was deployed.
+- **New risk found, unconfirmed**: one third-party source says the Bakong Open API portal states a limit of 100 requests per day. If real, it caps polling regardless of cadence and the 5 s / 15 s schedule would need to change. Confirm on the developer portal before real traffic.
+- **Still open**: 2.1 (what wakes the poller when nobody is on the page: external pinger or always-on worker) gates 2.2. On serverless, a QR paid while no instance is alive waits for the next request or boot. 4.1's independent review has not run; the self-review above is the only one.
+
+**Classification**: Required: 0.2, 1.1, 2.1, 2.2 (unless 2.1 = b). Recommended: 0.3, 1.2, 2.3, 4.1. Optional: 1.3. Reject: LISTEN/NOTIFY.
+
+#### 事前確認
+
+- 事項: external-send — one live Bakong `check_transaction_by_md5_list` call, which needs `BAKONG_API_KEY` (secret-read)
+  理由: Task 1.2 verifies the batch response shape
+  scope: Phase 1 / Task 1.2
+- 事項: external-send — create the external schedule and set the internal-endpoint secret as a Vercel env var
+  理由: Tasks 2.1/2.2 wake-up trigger
+  scope: Phase 2 / Task 2.2
+
 ### Plan: Backend background-work audit — stop the Vercel resource burn (2026-10-24)
 
 **Purpose**: the backend runs as a container on Vercel (`Dockerfile.vercel`) and never idles, because several in-process loops run for as long as the container lives. Cut idle and per-payment background work without losing payments or retries.
