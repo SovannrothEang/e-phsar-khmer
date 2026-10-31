@@ -56,11 +56,28 @@ import type {
 } from "@/types/product";
 import { cn } from "@/lib/utils";
 
-type SpecValues = Record<string, string>;
+/**
+ * One field's values, in order. A template field can carry several rows with
+ * the same label (a phone's 4G bands differ per regional model), so the draft
+ * holds a list per section+field rather than one string.
+ */
+type SpecValues = Record<string, string[]>;
 type GroupValues = { values: SpecValues; legacy: ProductSpecGroup[] };
 
 const valueKey = (sectionKey: string, fieldKey: string) =>
   `${sectionKey}:${fieldKey}`;
+
+/** Replace one value of a draft field. */
+function setValueAt(
+  values: SpecValues,
+  key: string,
+  index: number,
+  value: string,
+): SpecValues {
+  const next = [...(values[key] ?? [])];
+  next[index] = value;
+  return { ...values, [key]: next };
+}
 
 /** Split a stored page into template values + preserved legacy groups. */
 function splitProduct(
@@ -84,7 +101,10 @@ function splitProduct(
     const byLabel = new Map(section.fields.map((f) => [f.label, f.key]));
     for (const row of group.rows) {
       const key = byLabel.get(row.label);
-      if (key) values[valueKey(section.key, key)] = row.value;
+      if (key) {
+        const draftKey = valueKey(section.key, key);
+        values[draftKey] = [...(values[draftKey] ?? []), row.value];
+      }
     }
   }
   return { values, legacy };
@@ -98,12 +118,14 @@ function composeGroups(
 ): ProductSpecGroup[] {
   const groups: ProductSpecGroup[] = [];
   for (const section of template.sections) {
-    const rows = section.fields
-      .map((field) => ({
-        label: field.label,
-        value: (values[valueKey(section.key, field.key)] ?? "").trim(),
-      }))
-      .filter((row) => row.value.length > 0);
+    // One row per value, in field order: a multi-value field (4G bands per
+    // regional model) emits each line back as its own row.
+    const rows = section.fields.flatMap((field) =>
+      (values[valueKey(section.key, field.key)] ?? [])
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+        .map((value) => ({ label: field.label, value })),
+    );
     if (rows.length > 0) groups.push({ title: section.title, rows });
   }
   return [...groups, ...legacy];
@@ -131,19 +153,84 @@ function TemplateFields({
           <div className="grid gap-3 sm:grid-cols-2">
             {section.fields.map((field) => {
               const key = valueKey(section.key, field.key);
+              const list = values[key] ?? [];
+              const shown = list.length > 0 ? list : [""];
+
+              if (!field.multi) {
+                return (
+                  <label key={field.key} className="grid gap-1">
+                    <span className="type-meta text-muted-foreground">
+                      {field.label}
+                    </span>
+                    <Input
+                      value={shown[0]}
+                      maxLength={500}
+                      onChange={(event) =>
+                        onChange(
+                          list.length > 0
+                            ? setValueAt(values, key, 0, event.target.value)
+                            : { ...values, [key]: [event.target.value] },
+                        )
+                      }
+                    />
+                  </label>
+                );
+              }
+
+              // A multi-value field (network bands): one input per value, a
+              // remove control once there are two, and an add control below.
               return (
-                <label key={field.key} className="grid gap-1">
+                <div key={field.key} className="grid gap-1 sm:col-span-2">
                   <span className="type-meta text-muted-foreground">
                     {field.label}
                   </span>
-                  <Input
-                    value={values[key] ?? ""}
-                    maxLength={500}
-                    onChange={(event) =>
-                      onChange({ ...values, [key]: event.target.value })
+                  {shown.map((value, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={value}
+                        maxLength={500}
+                        aria-label={`${field.label} ${index + 1}`}
+                        onChange={(event) =>
+                          onChange(
+                            list.length > 0
+                              ? setValueAt(
+                                  values,
+                                  key,
+                                  index,
+                                  event.target.value,
+                                )
+                              : { ...values, [key]: [event.target.value] },
+                          )
+                        }
+                      />
+                      {shown.length > 1 && (
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="outline"
+                          aria-label={`Remove ${field.label} ${index + 1}`}
+                          onClick={() =>
+                            onChange({
+                              ...values,
+                              [key]: shown.filter((_, i) => i !== index),
+                            })
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange({ ...values, [key]: [...shown, ""] })
                     }
-                  />
-                </label>
+                    className="w-fit cursor-pointer type-meta text-[#00a0e9] hover:underline"
+                  >
+                    + Add value
+                  </button>
+                </div>
               );
             })}
           </div>

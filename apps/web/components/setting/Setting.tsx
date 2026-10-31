@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { AccountIdentity } from "./AccountIdentity";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
+import { LinkedAccountsRows } from "./LinkedAccountsRows";
 import { SignOutDialog } from "./SignOutDialog";
 import { formatPhoneLocal } from "@/lib/phone";
 import type { SettingsUser } from "@/lib/auth/current-user";
@@ -77,29 +78,7 @@ export default function Settings({ me }: { me?: SettingsUser | null }) {
               </p>
             </Link>
             <Separator />
-            {/* Connecting an identity needs a provider-linking flow the
-                backend does not have yet, so these rows state the option and
-                stop — no chevron, nothing to click. */}
-            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
-              <p className="px-1">Facebook</p>
-              <p className="flex items-center opacity-50 gap-1 capitalize">
-                Add
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
-              <p className="px-1">Google</p>
-              <p className="flex items-center opacity-50 gap-1 capitalize">
-                Add
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between p-3 bg-card rounded-none border border-transparent">
-              <p className="px-1">Telegram</p>
-              <p className="flex items-center opacity-50 capitalize gap-1">
-                Add
-              </p>
-            </div>
+            <LinkedAccountsRows me={me} />
             <Separator />
             <Link
               href={{ pathname: "/settings/passkeys" }}

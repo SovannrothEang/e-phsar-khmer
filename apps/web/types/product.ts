@@ -22,6 +22,8 @@ export type ProductSpecFamily =
 export interface ProductSpecTemplateField {
   key: string;
   label: string;
+  /** Multiple values per field (a phone's band lists differ per model). */
+  multi?: boolean;
 }
 
 /** One ordered section of a family template. */

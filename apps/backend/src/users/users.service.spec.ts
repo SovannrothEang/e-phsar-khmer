@@ -1838,4 +1838,42 @@ describe('UsersService verified account flag', () => {
 
     expect(me.verifiedAccount).toBe(true);
   });
+
+  it('omits linked providers unless the caller opts in', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me).not.toHaveProperty('authProviders');
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns the linked providers in a stable order when requested', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1
+          ? [fakeUser]
+          : call === 2
+            ? [{ id: 'sub-1' }]
+            : [{ provider: 'telegram' }, { provider: 'google' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1', true);
+
+    expect(me.authProviders).toEqual(['google', 'telegram']);
+    expect(db.select).toHaveBeenCalledTimes(3);
+  });
 });

@@ -6,7 +6,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, count, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+} from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import {
   buildUsernameBase,
@@ -104,16 +113,49 @@ export class UsersService {
 
   async findById(
     id: string,
-  ): Promise<PublicUser & { verifiedAccount: boolean }> {
+    includeAuthProviders = false,
+  ): Promise<
+    PublicUser & {
+      verifiedAccount: boolean;
+      authProviders?: ('google' | 'facebook' | 'telegram')[];
+    }
+  > {
     const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
-    return {
+
+    const result = {
       ...this.toPublicUser(user),
       verifiedAccount: await hasActivePaidSubscription(this.db, id),
+    };
+    if (!includeAuthProviders) return result;
+
+    // Opt-in on purpose: the (user) layout reads /users/me on every page, and
+    // only the settings surface needs the linked-provider list.
+    const rows = await this.db
+      .select({ provider: userAuthProviders.provider })
+      .from(userAuthProviders)
+      .where(
+        and(
+          eq(userAuthProviders.userId, id),
+          inArray(userAuthProviders.provider, [
+            'google',
+            'facebook',
+            'telegram',
+          ]),
+          isNotNull(userAuthProviders.providerAccountId),
+        ),
+      );
+
+    const order = ['google', 'facebook', 'telegram'] as const;
+    return {
+      ...result,
+      authProviders: order.filter((provider) =>
+        rows.some((row) => row.provider === provider),
+      ),
     };
   }
 

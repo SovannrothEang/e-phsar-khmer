@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -26,6 +27,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
+import { LinkSocialProviderDto } from './dto/link-social-provider.dto';
 
 // Per-route limits on top of the global 100/min. Every route here is @Public,
 // so the throttler keys on IP: these bound password guessing (login,
@@ -93,12 +95,18 @@ export class AuthController {
   @Get('social/:provider/url')
   @Public()
   @ApiOperation({ summary: 'Get OAuth redirect URL for social provider' })
-  socialUrl(@Param('provider') provider: 'google' | 'facebook') {
-    return this.authService.getSocialAuthUrl(provider);
+  socialUrl(
+    @Param('provider') provider: string,
+    @Query('redirectTo') redirectTo?: string,
+  ) {
+    return this.authService.getSocialAuthUrl(provider, redirectTo);
   }
 
   @Post('social/callback')
-  @Throttle(CREDENTIAL_LIMIT)
+  // No per-route bucket on purpose: the web exchanges the Supabase token from
+  // a Next server action, so every user arrives from the same Next/Vercel
+  // egress IP and CREDENTIAL_LIMIT would cap all logins together. The
+  // Supabase access token is the gate; the global limiter still applies.
   @Public()
   @ApiOperation({ summary: 'Handle social OAuth callback' })
   socialCallback(
@@ -106,6 +114,29 @@ export class AuthController {
     @ClientDevice() device: ClientDeviceInfo | null,
   ) {
     return this.authService.handleSocialCallback(dto, device);
+  }
+
+  @Post('social/link')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Link a social provider to the current account' })
+  linkSocial(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: LinkSocialProviderDto,
+  ) {
+    return this.authService.linkSocialProvider(user.id, dto);
+  }
+
+  @Delete('social/:provider')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Unlink a social provider from the current account',
+  })
+  unlinkSocial(
+    @CurrentUser() user: RequestUser,
+    @Param('provider') provider: string,
+  ) {
+    return this.authService.unlinkSocialProvider(user.id, provider);
   }
 
   @Post('telegram')

@@ -420,6 +420,36 @@ describe('ProductsService families', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
+  it('accepts repeated labels for a multi-value template field on create', async () => {
+    const db = makeDb();
+    const service = makeService(db);
+    const values = jest.fn(() => ({
+      returning: jest.fn().mockResolvedValue([{ id: 'spec-1' }]),
+    }));
+    db.insert.mockReturnValue({ values });
+    db.select
+      .mockReturnValueOnce(selectChain([{ modelId: 'm1' }]).chain)
+      .mockReturnValueOnce(
+        selectChain([{ ...detailRow, family: 'phone', specGroups: [] }]).chain,
+      );
+
+    const specGroups = [
+      {
+        title: 'Network',
+        rows: [
+          { label: '4G bands', value: '1, 2, 3, 4 - A3296' },
+          { label: '4G bands', value: '1, 2, 3, 4, 5 - A3084' },
+        ],
+      },
+    ];
+
+    await service.createAdmin({ modelId: 'm1', family: 'phone', specGroups });
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ family: 'phone', specGroups }),
+    );
+  });
+
   it('accepts arbitrary groups for a freeform family on create', async () => {
     const db = makeDb();
     const service = makeService(db);

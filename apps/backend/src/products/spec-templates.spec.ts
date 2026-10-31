@@ -59,7 +59,58 @@ it('accepts a filled subset of a template section and rejects foreign groups', (
       title: 'Display',
       rows: [{ label: 'Size' }, { label: 'Size' }],
     }),
-  ).toBe(false);
+    // A label may repeat: one template field carries several values (the
+    // network band lists differ per regional model).
+  ).toBe(true);
+});
+
+it('marks the network band fields as multi-value', () => {
+  const network = PRODUCT_SPEC_TEMPLATES.phone.sections.find(
+    (section) => section.title === 'Network',
+  );
+  expect(
+    network?.fields.filter((field) => field.multi).map((field) => field.label),
+  ).toEqual(['2G bands', '3G bands', '4G bands', '5G bands']);
+});
+
+it('marks every stacked reference cell as multi-value', () => {
+  const multi = (title: string) =>
+    PRODUCT_SPEC_TEMPLATES.phone.sections
+      .find((section) => section.title === title)
+      ?.fields.filter((field) => field.multi)
+      .map((field) => field.label);
+
+  expect(multi('Body')).toEqual(['Build', 'SIM']);
+  expect(multi('Memory')).toEqual(['Internal']);
+  expect(multi('Main Camera')).toEqual(['Modules']);
+  expect(multi('Selfie Camera')).toEqual(['Modules']);
+  expect(multi('Features')).toEqual(['Sensors']);
+  expect(multi('Battery')).toEqual(['Charging']);
+});
+
+it('uses the reference Misc fields — SAR, not a price', () => {
+  const misc = PRODUCT_SPEC_TEMPLATES.phone.sections.find(
+    (section) => section.title === 'Misc',
+  );
+  expect(misc?.fields.map((field) => field.label)).toEqual([
+    'Colors',
+    'Models',
+    'SAR',
+    'SAR EU',
+  ]);
+});
+
+it('gives the Body block the reference fields, including the IP rating', () => {
+  const body = PRODUCT_SPEC_TEMPLATES.phone.sections.find(
+    (section) => section.title === 'Body',
+  );
+  expect(body?.fields.map((field) => field.label)).toEqual([
+    'Dimensions',
+    'Weight',
+    'Build',
+    'SIM',
+    'IP rating',
+  ]);
 });
 
 it('resolves families from subcategory slugs and rejects unknown ones', () => {

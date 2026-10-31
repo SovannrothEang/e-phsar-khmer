@@ -55,8 +55,16 @@ export class UsersController {
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
-  getMe(@CurrentUser() user: RequestUser) {
-    return this.usersService.findById(user.id);
+  getMe(
+    @CurrentUser() user: RequestUser,
+    @Query('includeAuthProviders') includeAuthProviders?: string,
+  ) {
+    // Express can hand back an array for a repeated query key — only a
+    // literal "1"/"true" opts in.
+    const include =
+      typeof includeAuthProviders === 'string' &&
+      (includeAuthProviders === '1' || includeAuthProviders === 'true');
+    return this.usersService.findById(user.id, include);
   }
 
   @Patch('me')

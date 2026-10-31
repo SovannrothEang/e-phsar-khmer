@@ -53,8 +53,10 @@ export function familyForSubcategory(slug: string): ProductSpecFamily | null {
 
 /**
  * True when a stored group is a filled subset of one template section: the
- * title matches, every label belongs to that section, and no label repeats.
- * Anything else is legacy content the edit dialog keeps in Additional details.
+ * title matches and every label belongs to that section. A label may repeat —
+ * a template field can carry several values (a phone's per-model band lists),
+ * and the public page folds them under one label. Anything else is legacy
+ * content the edit dialog keeps in Additional details.
  */
 export function matchTemplateGroup(
   template: ProductSpecTemplate,
@@ -65,8 +67,6 @@ export function matchTemplateGroup(
     (candidate) => candidate.title === group.title,
   );
   if (!section) return false;
-  const labels = group.rows.map((row) => row.label);
-  if (new Set(labels).size !== labels.length) return false;
   const allowed = new Set(section.fields.map((field) => field.label));
-  return labels.every((label) => allowed.has(label));
+  return group.rows.every((row) => allowed.has(row.label));
 }

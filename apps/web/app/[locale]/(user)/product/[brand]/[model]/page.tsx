@@ -28,6 +28,24 @@ function fuelTypeOf(
   return null;
 }
 
+/**
+ * Fold consecutive rows sharing a label into one entry. A multi-value field
+ * (a phone's 4G bands per regional model) is stored as several rows with the
+ * same label; the page shows the label once and each value on its own line.
+ */
+function foldRows(rows: { label: string; value: string }[]): {
+  label: string;
+  values: string[];
+}[] {
+  const out: { label: string; values: string[] }[] = [];
+  for (const row of rows) {
+    const last = out[out.length - 1];
+    if (last && last.label === row.label) last.values.push(row.value);
+    else out.push({ label: row.label, values: [row.value] });
+  }
+  return out;
+}
+
 type ProductPageParams = Promise<{ brand: string; model: string }>;
 
 export async function generateMetadata({
@@ -136,7 +154,10 @@ export default async function ProductPage({
           <h2 className="type-section-title text-foreground">
             {t("specifications")}
           </h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2 md:items-start">
+          {/* One section per row, full width (captain, 2026-10-31): stacked
+              cards read as one continuous spec sheet, not a two-column
+              comparison of unrelated sections. */}
+          <div className="mt-5 space-y-4">
             {product.specGroups.map((group, groupIndex) => (
               <div
                 key={`${group.title}-${groupIndex}`}
@@ -150,7 +171,7 @@ export default async function ProductPage({
                   {group.title}
                 </h3>
                 <dl className="mt-2 divide-y divide-border">
-                  {group.rows.map((row, rowIndex) => (
+                  {foldRows(group.rows).map((row, rowIndex) => (
                     <div
                       key={`${row.label}-${rowIndex}`}
                       className="grid grid-cols-[minmax(120px,40%)_1fr] gap-4 py-2.5"
@@ -158,7 +179,19 @@ export default async function ProductPage({
                       <dt className="type-body-sm text-muted-foreground">
                         {row.label}
                       </dt>
-                      <dd className="type-body text-foreground">{row.value}</dd>
+                      <dd className="type-body flex flex-col divide-y divide-border text-foreground">
+                        {row.values.map((value, valueIndex) => (
+                          // The divider matches the row separators and spans
+                          // the value column only (the `dd`), with breathing
+                          // room above and below instead of touching the text.
+                          <span
+                            key={valueIndex}
+                            className="block py-2 first:pt-0 last:pb-0"
+                          >
+                            {value}
+                          </span>
+                        ))}
+                      </dd>
                     </div>
                   ))}
                 </dl>

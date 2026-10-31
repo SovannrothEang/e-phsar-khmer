@@ -21,6 +21,55 @@ How to use this file:
 
 ### Added
 
+- **Linked social accounts on `/settings`.** The Facebook / Google / Telegram rows now read
+  `Add` or `Linked` from the account's real provider links and carry the `>` chevron.
+  `GET /users/me?includeAuthProviders=1` returns the linked providers (additive and opt-in, so
+  the `(user)` layout pays no extra query); the settings hub and rail share a new
+  `LinkedAccountsRows`. Google/Facebook can be connected with the OAuth popup plus a per-flow
+  nonce (`social_link_pending`, echoed in the `/auth/link/{provider}/{nonce}` path), and a
+  linked row opens a confirmation dialog calling the new JWT-protected
+  `DELETE /auth/social/:provider`. `POST /auth/social/link` attaches an identity to the
+  signed-in account (no tokens minted; 409 when the provider is already attached elsewhere).
+  Removal is guarded by `409 LAST_LOGIN_METHOD` when no phone, username + password or other
+  provider remains. Telegram is display/remove only until its Login Widget ships. Verified:
+  backend 78 suites / 1082 tests, build + eslint; web eslint + `tsc --noEmit` + `next build`;
+  live curl of the status/link/unlink endpoints and a headless Chromium walk of the settings
+  rows (Add + chevrons, popup disable/re-enable, foreign-nonce rejection).
+
+- **Web social login wired end to end (Google & Facebook; user + admin).** The backend
+  endpoints existed but no client called them and every social button was inert.
+  `GET /auth/social/:provider/url` now accepts a `redirectTo` (origin-checked against
+  `FRONTEND_ORIGINS`, failing closed in production), and `POST /auth/social/callback`
+  accepts an additive `mode: 'user' | 'admin'` — admin mode signs in an existing staff
+  account only and never creates one, and every failure answers the same 401. Social
+  identities link on `user_auth_providers.providerAccountId` (the Supabase user id) before
+  email, and a login is rejected unless Supabase reports a confirmed email and the token's
+  identity matches the claimed provider (closes audit M1). The web adds
+  `actions/social.ts`, a shared fragment-reading `SocialCallback`, the
+  `/[locale]/auth/callback/[provider]` and `/wanderer/auth/callback/[provider]` routes, and
+  wires the Google/Facebook buttons. A click opens the provider in an `about:blank` popup;
+  every action button (Login, Telegram, Apple, Google, Facebook) disables while the form
+  fields stay editable (the clicked social button shows a spinner), and closing the popup
+  re-enables the buttons without a reload. The callback completes in the opener and closes
+  the popup, falling back to the full-page flow when popups are blocked. A host-only
+  `social_oauth_pending` cookie binds the callback to the browser that started it.
+  Telegram/Apple remain inert. Setup: `docs/social-oauth-setup.md` (Supabase Redirect URLs and
+  `FRONTEND_ORIGINS` are required in production). Verified: backend 78 suites / 1067 tests,
+  build + eslint; web eslint + `tsc --noEmit` + `next build`; headless Chromium checks of both
+  start buttons, the popup open/disabled/re-enable cycle, the fragment strip, the CSRF guard
+  and both error paths.
+
+- **Multi-value product-spec fields (phones/tablets).** A template field can now hold several
+  rows under one label — a phone's 2G/3G/4G/5G band lists differ per regional model (A3296,
+  A3084, …), and the same stacked shape appears in Build, SIM, Internal, the two camera Modules
+  lists, Sensors and Charging. The admin editor exposes **+ Add value** with a remove control per
+  extra row on those fields; the validator accepts repeated labels inside a template section
+  (unknown labels and duplicate section titles are still rejected), and the public page shows the
+  label once with each value on its own line. The phone/tablet Misc template now follows the
+  reference — Colors / Models / SAR / SAR EU, with no Price field (an already-stored Price row is
+  kept as Additional details) — and Body gains an explicit **IP rating** field for the reference's
+  unlabelled IP68 note. Each row keeps the existing 500-character value cap; no migration —
+  the `spec_groups` row array already supported it.
 - **Paid "Verified Account" badge + checkout success screen.** `verifiedAccount`
   is derived from an active paid `user_subscriptions` row (no stored flag, no
   migration) and is returned additively by `GET /users/by-username/:username`,
@@ -334,6 +383,11 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Fixed
 
+- **Product spec sections now stack full width.** The public product page laid the sections out in
+  a two-column grid, so unrelated blocks (Network beside Launch) read as a comparison; each section
+  is now one full-width card after another, per the captain's 2026-10-31 layout call. Multi-value
+  cells (4G bands, SIM, camera Modules, …) separate each value with the same divider the spec rows
+  use, scoped to the value column and spaced so it never touches the text.
 - **Listing-detail spec values now actually filter the feed.** Every row in the Description grid used
   to link to its subcategory page with no query, so clicking Year, Tax Type, Condition, Body Type,
   Engine or Color landed on the unfiltered feed. Each row now carries the filter: year → an exact

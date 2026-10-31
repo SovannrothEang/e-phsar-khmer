@@ -5,6 +5,13 @@ import type { ProductSpecFamily } from '../db/schema/products.schema';
 export interface ProductSpecTemplateField {
   key: string;
   label: string;
+  /**
+   * A field whose real-world value varies per regional model/variant (the
+   * network band lists): the editor lets staff add one row per value, and the
+   * public page shows them under the label on separate lines. The row model
+   * already carried repeated labels; this only exposes the UI affordance.
+   */
+  multi?: boolean;
 }
 
 /** A named, ordered section ("Display", "Engine & Transmission", …). */
@@ -43,10 +50,10 @@ const deviceSections: ProductSpecTemplateSection[] = [
     title: 'Network',
     fields: [
       { key: 'technology', label: 'Technology' },
-      { key: 'bands2g', label: '2G bands' },
-      { key: 'bands3g', label: '3G bands' },
-      { key: 'bands4g', label: '4G bands' },
-      { key: 'bands5g', label: '5G bands' },
+      { key: 'bands2g', label: '2G bands', multi: true },
+      { key: 'bands3g', label: '3G bands', multi: true },
+      { key: 'bands4g', label: '4G bands', multi: true },
+      { key: 'bands5g', label: '5G bands', multi: true },
       { key: 'speed', label: 'Speed' },
     ],
   },
@@ -64,8 +71,13 @@ const deviceSections: ProductSpecTemplateSection[] = [
     fields: [
       { key: 'dimensions', label: 'Dimensions' },
       { key: 'weight', label: 'Weight' },
-      { key: 'build', label: 'Build' },
-      { key: 'sim', label: 'SIM' },
+      // Materials and the IP rating are stacked in the reference cell.
+      { key: 'build', label: 'Build', multi: true },
+      // One row per SIM combination/region in the reference cell.
+      { key: 'sim', label: 'SIM', multi: true },
+      // The reference's unlabelled "IP68 dust tight and water resistant …"
+      // line at the end of the Body block gets its own field here.
+      { key: 'ipRating', label: 'IP rating' },
     ],
   },
   {
@@ -93,14 +105,16 @@ const deviceSections: ProductSpecTemplateSection[] = [
     title: 'Memory',
     fields: [
       { key: 'cardSlot', label: 'Card slot' },
-      { key: 'internal', label: 'Internal' },
+      // Storage/RAM configurations plus the storage technology line.
+      { key: 'internal', label: 'Internal', multi: true },
     ],
   },
   {
     key: 'main-camera',
     title: 'Main Camera',
     fields: [
-      { key: 'mainCameraModules', label: 'Modules' },
+      // One row per lens/sensor; features and video stay single cells.
+      { key: 'mainCameraModules', label: 'Modules', multi: true },
       { key: 'mainCameraFeatures', label: 'Features' },
       { key: 'mainCameraVideo', label: 'Video' },
     ],
@@ -109,7 +123,7 @@ const deviceSections: ProductSpecTemplateSection[] = [
     key: 'selfie-camera',
     title: 'Selfie Camera',
     fields: [
-      { key: 'selfieCameraModules', label: 'Modules' },
+      { key: 'selfieCameraModules', label: 'Modules', multi: true },
       { key: 'selfieCameraFeatures', label: 'Features' },
       { key: 'selfieCameraVideo', label: 'Video' },
     ],
@@ -137,23 +151,27 @@ const deviceSections: ProductSpecTemplateSection[] = [
   {
     key: 'features',
     title: 'Features',
-    fields: [{ key: 'sensors', label: 'Sensors' }],
+    // The sensor list is stacked (main sensors, UWB, satellite features).
+    fields: [{ key: 'sensors', label: 'Sensors', multi: true }],
   },
   {
     key: 'battery',
     title: 'Battery',
     fields: [
       { key: 'batteryType', label: 'Type' },
-      { key: 'charging', label: 'Charging' },
+      // Wired, wireless and reverse charging each take a line.
+      { key: 'charging', label: 'Charging', multi: true },
     ],
   },
   {
     key: 'misc',
     title: 'Misc',
+    // The reference's Misc block carries SAR figures, not a price.
     fields: [
       { key: 'colors', label: 'Colors' },
       { key: 'models', label: 'Models' },
-      { key: 'price', label: 'Price' },
+      { key: 'sar', label: 'SAR' },
+      { key: 'sarEu', label: 'SAR EU' },
     ],
   },
 ];
@@ -266,10 +284,11 @@ export function isTemplateGroup(
     (candidate) => candidate.title === group.title,
   );
   if (!section) return false;
-  const labels = group.rows.map((row) => row.label);
-  if (new Set(labels).size !== labels.length) return false;
+  // A label may repeat: one template field can carry several values (a phone's
+  // 4G bands differ per regional model), and `rows` is already an ordered
+  // array, so the public page can show them under one label.
   const allowed = new Set(section.fields.map((field) => field.label));
-  return labels.every((label) => allowed.has(label));
+  return group.rows.every((row) => allowed.has(row.label));
 }
 
 /** Order-sensitive identity used to grandfather stored legacy groups. */

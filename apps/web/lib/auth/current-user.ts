@@ -38,7 +38,9 @@ export const getSettingsUser = cache(async (): Promise<SettingsUser | null> => {
   if (!accessToken && !refreshToken) return null;
 
   try {
-    const { data } = await userServerFetch<BackendUser>("/users/me");
+    const { data } = await userServerFetch<BackendUser>(
+      "/users/me?includeAuthProviders=1",
+    );
     return data;
   } catch {
     return null;
