@@ -62,8 +62,8 @@ function toCreatePaymentError(
  * steps used to be separate use-cases (`createPayment`, `createPaymentAttempt`,
  * `enqueuePaymentAttempt`) — folded in here because none of the three had a
  * second caller; splitting them only added indirection, not reuse. Compare
- * `enqueuePaymentAttemptPoll` or `checkPayment`, which stay separate because
- * several different composed flows actually call them.
+ * `checkPayment`, which stays separate because several different composed
+ * flows actually call it.
  *
  * Must run inside `runInTransaction` (see `PaymentEffectRunner.runDurably`)
  * — all three inserts have to commit atomically.

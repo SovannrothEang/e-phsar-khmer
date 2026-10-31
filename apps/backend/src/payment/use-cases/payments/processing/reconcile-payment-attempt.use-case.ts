@@ -2,7 +2,10 @@ import { Effect } from 'effect';
 import { DbClientTag, runInTransaction } from '../../../../db/db.provider';
 import type { OutboxService } from '../../../../outbox/outbox.service';
 import { PaymentGatewayRegistryTag } from '../../../providers/payment-gateway-registry.provider';
-import { isReconcilable } from '../../../reconciler/reconcile-policy';
+import {
+  isPendingAbandoned,
+  isReconcilable,
+} from '../../../reconciler/reconcile-policy';
 import { PaymentGatewayCallError, PaymentPersistenceError } from '../errors';
 import type { PaymentProcessingError } from '../errors';
 import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
@@ -23,13 +26,18 @@ export type ReconcilePaymentAttemptOutcome =
 export interface ReconcilePaymentAttemptInput {
   paymentAttemptId: string;
   /**
-   * A `pending` attempt older than this that the provider still reports
-   * unpaid is failed `POLL_EXPIRED` — the backstop for an attempt whose poll
-   * chain died, which would otherwise sit `pending` forever. It stays in the
-   * reconciler's late-payment window afterwards, so a payment that lands
-   * later still settles.
+   * Age backstop: a `pending` attempt older than this that the provider still
+   * reports unpaid is failed `POLL_EXPIRED`, for a checkout that recorded no
+   * expiry of its own. It stays in the reconciler's late-payment window
+   * afterwards, so a payment that lands later still settles.
    */
   abandonPendingAfterMs: number;
+  /**
+   * Slack past the checkout's own expiry (`payment_transactions.expires_at`)
+   * before an unpaid attempt is failed. The normal end of a polled checkout:
+   * a KHQR lives five minutes, so it is not polled for the whole backstop.
+   */
+  expiryGraceMs: number;
 }
 
 /**
@@ -84,10 +92,15 @@ export const reconcilePaymentAttempt = Effect.fn('reconcilePaymentAttempt')(
     });
 
     if (result.status === 'pending') {
-      const ageMs = Date.now() - attempt.createdAt.getTime();
       if (
         attempt.status === 'pending' &&
-        ageMs >= input.abandonPendingAfterMs
+        isPendingAbandoned({
+          createdAt: attempt.createdAt,
+          expiresAt: transaction.expiresAt,
+          now: Date.now(),
+          graceMs: input.expiryGraceMs,
+          abandonAfterMs: input.abandonPendingAfterMs,
+        })
       ) {
         yield* runInTransaction(
           failPaymentAttempt({

@@ -49,7 +49,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
         <DropdownMenuTrigger asChild>
           <Button
             onClick={(e) => e.stopPropagation()}
-            className="bg-card w-7 h-7  hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer"
+            className="bg-card h-11 w-11 shrink-0 hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer"
           >
             <EllipsisVertical size={14} />
           </Button>

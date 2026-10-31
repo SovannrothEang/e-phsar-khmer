@@ -161,9 +161,9 @@ export default function SearchBar() {
             <Button
               type="button"
               variant="ghost"
-              className="relative flex items-center rounded-l-xs rounded-r-none bg-card text-foreground hover:bg-muted/60 h-full px-4 focus:ring-0 whitespace-nowrap type-nav w-[170px] justify-between transition-colors duration-75 cursor-pointer"
+              className="relative flex items-center rounded-l-xs rounded-r-none bg-card text-foreground hover:bg-muted/60 h-full px-4 focus:ring-0 whitespace-nowrap type-nav w-[120px] sm:w-[170px] justify-between transition-colors duration-75 cursor-pointer"
             >
-              <span className="absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center">
+              <span className="absolute left-1/2 -translate-x-1/2 truncate max-w-[70px] sm:max-w-[115px] text-center">
                 {scopeLabel}
               </span>
               <IconChevronDown className="ml-auto scale-80 text-card-foreground" />

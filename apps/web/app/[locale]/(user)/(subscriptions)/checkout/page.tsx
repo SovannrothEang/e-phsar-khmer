@@ -52,19 +52,23 @@ import {
 } from "@/lib/subscription-pricing";
 import { KhqrCard } from "@/components/payment/KhqrCard";
 import { useNotificationEvents } from "@/hooks/use-chat-ws";
+import { isTabAttending } from "@/hooks/use-tab-attention";
 import { useMobilePlatform } from "@/hooks/use-mobile-platform";
 
 // Waiting for the charge job to hand back the KHQR: up to ~20s.
 const QR_WAIT_MS = 1_000;
 const QR_WAIT_TRIES = 20;
-// A slow read while the result is outstanding. The socket push is the fast
-// path, but a missed push (or a bank confirmation that arrives after the QR
-// expired) must still land — the old page stopped reading 60 s past expiry
-// and could sit on "Waiting" after the money had already moved.
-const SLOW_REFRESH_MS = 15_000;
-// Stop reading eventually on an abandoned tab; long enough for a late
-// confirmation plus plan activation.
-const LATE_READ_WINDOW_MS = 30 * 60_000;
+// Payment status reads only when no push can arrive: socket down, or the
+// code just expired (failures and expiry are not pushed).
+const FALLBACK_REFRESH_MS = 5_000;
+const FALLBACK_MAX_REFRESH_MS = 15_000;
+// Kept above the backend's 30 s expiry sweep slack (PaymentReconciler), so
+// the page is still reading when an expired checkout flips to failed.
+const EXPIRY_GRACE_MS = 60_000;
+// Both providers stamp `expiresAt` into the checkout (Bakong: the 5 min KHQR;
+// ABA: `ABA_PAYWAY_LIFETIME_MINUTES`), which drives the countdown and the
+// stop. This is only the fallback for a checkout that arrives without one.
+const NO_EXPIRY_WAIT_MS = 7 * 60_000;
 
 function money(value: string | number): string {
   return Number(value).toLocaleString("en-US", {
@@ -378,26 +382,70 @@ export default function CheckoutPage() {
     if (awaitingResult && isConnected) void refreshPayment();
   }, [awaitingResult, isConnected, refreshPayment]);
 
-  // Keep a slow read alive for as long as the result is outstanding. The
-  // socket remains the fast path; this is the safety net for a missed push
-  // and for a confirmation that lands after the QR expired — the old page
-  // stopped reading 60 s past expiry and could sit on "Waiting" after the
-  // money had already moved.
+  // No socket at all (blocked, misconfigured, reconnects exhausted): a slow
+  // read keeps the page settling on its own.
+  // Backs off (5s, 10s, 15s, then steady) and reads nothing while the tab is
+  // hidden; coming back to the tab reads once at once and restarts the pace.
+  useEffect(() => {
+    if (!awaitingResult || isConnected) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = FALLBACK_REFRESH_MS;
+    const run = () => {
+      // "Attending" also covers an abandoned-but-visible tab: the socket closes
+      // when the tab goes idle, and without this the fallback would then poll a
+      // parked checkout page every few seconds.
+      if (isTabAttending()) {
+        void refreshPayment();
+        delay = Math.min(delay + FALLBACK_REFRESH_MS, FALLBACK_MAX_REFRESH_MS);
+      }
+      timer = setTimeout(run, delay);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      delay = FALLBACK_REFRESH_MS;
+      run();
+    };
+    timer = setTimeout(run, delay);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [awaitingResult, isConnected, refreshPayment]);
+
+  // Failures and expiry are not pushed, so once the code can no longer be
+  // paid, read for a short grace window to pick up the final status, then
+  // stop. A late `payment.succeeded` push still lands after that. Without an
+  // expiry on the code, the clock starts when waiting starts (this effect
+  // only re-runs if an expiry turns up, or for a new checkout).
+  const qrExpiresAt = getQr(payment?.checkout?.rawResponse)?.expiresAt ?? null;
   useEffect(() => {
     if (!awaitingResult) return;
-    const deadline = Date.now() + LATE_READ_WINDOW_MS;
-    const timer = setInterval(() => {
-      if (Date.now() > deadline) {
-        clearInterval(timer);
-        setError(
-          "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
-        );
-        return;
-      }
-      void refreshPayment();
-    }, SLOW_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [awaitingResult, refreshPayment]);
+    const deadline = qrExpiresAt ?? Date.now() + NO_EXPIRY_WAIT_MS;
+    const graceEnd = deadline + EXPIRY_GRACE_MS;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(
+      () => {
+        void refreshPayment();
+        interval = setInterval(() => {
+          if (Date.now() > graceEnd) {
+            clearInterval(interval);
+            setError(
+              "We're still waiting for confirmation. If you already paid, check My subscriptions in a moment.",
+            );
+            return;
+          }
+          void refreshPayment();
+        }, FALLBACK_REFRESH_MS);
+      },
+      Math.max(0, deadline - Date.now()),
+    );
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [awaitingResult, qrExpiresAt, refreshPayment]);
 
   // Only gates the pre-payment step: once a checkout exists, its own status
   // drives the page (activation flips `active` to the new plan anyway).

@@ -47,7 +47,7 @@ export default async function HomePage() {
             <CategoryGrid />
             <TrendingAds />
             <h2 className="type-section-title">{t("latestads")}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <GridCardSell />
               {feedPosts.map((post) => (
                 <GridCardPost key={post.postId} post={post} />
@@ -58,7 +58,7 @@ export default async function HomePage() {
         <div className="flex justify-center">
           <Link
             href="/all-ads"
-            className="w-5xl max-w-5xl px-6 py-2 bg-[#00a7e1] hover:bg-[#0095ca] type-nav text-white text-center rounded transition-colors"
+            className="max-w-5xl px-6 py-2.5 bg-[#00a7e1] hover:bg-[#0095ca] type-nav text-white text-center rounded transition-colors"
           >
             {t("viewall")}
           </Link>

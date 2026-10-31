@@ -533,14 +533,22 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
     ({ service, pubsub } = makeService(db));
   });
 
+  /** A non-revoked device row as loadTargetDevices reads it. */
+  const device = (id: string, userId: string, fresh = true, seenDay = 25) => ({
+    id,
+    userId,
+    lastSeenAt: new Date(Date.UTC(2026, 9, seenDay)),
+    fresh,
+  });
+
   /** Active devices: u1 = [d-me, d-me2], u2 = [d-peer]. */
-  function selectsWithDevices(
-    devices = [
-      { id: 'd-me', userId: 'u1' },
-      { id: 'd-me2', userId: 'u1' },
-      { id: 'd-peer', userId: 'u2' },
-    ],
-  ) {
+  const activeDevices = [
+    device('d-me', 'u1'),
+    device('d-me2', 'u1'),
+    device('d-peer', 'u2'),
+  ];
+
+  function selectsWithDevices(devices = activeDevices) {
     let callCount = 0;
     db.select.mockImplementation(() => {
       callCount++;
@@ -548,6 +556,23 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       if (callCount === 2) return limitQuery([]); // no block
       return whereQuery(devices); // active devices of both users
     });
+  }
+
+  /**
+   * The v2 insert transaction. A send takes the per-user device advisory locks
+   * and re-reads the active set inside it, so the tx mock needs `execute` for
+   * the locks and a `select` reporting what the locked re-read sees.
+   */
+  function mockSendTx(devices = activeDevices) {
+    const tx = {
+      execute: jest.fn(() => Promise.resolve([])),
+      select: jest.fn(() => whereQuery(devices)),
+      insert: jest.fn(),
+    };
+    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
+      cb(tx),
+    );
+    return tx;
   }
 
   function send(envelopes: ReturnType<typeof env>[], senderDeviceId = 'd-me') {
@@ -604,15 +629,83 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
   });
 
   it('rejects a sending device that is not active with 403', async () => {
-    selectsWithDevices([{ id: 'd-peer', userId: 'u2' }]);
+    selectsWithDevices([device('d-peer', 'u2')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(ForbiddenException);
   });
 
   it('returns 404 E2E_NO_RECIPIENT_DEVICES when the peer has no active device', async () => {
-    selectsWithDevices([{ id: 'd-me', userId: 'u1' }]);
+    selectsWithDevices([device('d-me', 'u1')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(NotFoundException);
+  });
+
+  describe('recipient whose every device is stale', () => {
+    // u2 went quiet past DEVICE_STALE_DAYS on three browsers. The fallback
+    // keeps their two most recently seen devices targetable instead of
+    // answering E2E_NO_RECIPIENT_DEVICES.
+    const quietPeer = [
+      device('d-me', 'u1'),
+      device('p-old', 'u2', false, 1),
+      device('p-new', 'u2', false, 9),
+      device('p-mid', 'u2', false, 5),
+    ];
+
+    function mockConversationUpsert() {
+      db.insert.mockImplementation(() => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            returning: () => Promise.resolve([conversation]),
+          }),
+        }),
+      }));
+    }
+
+    it('accepts envelopes for exactly the newest two devices', async () => {
+      selectsWithDevices(quietPeer);
+      mockConversationUpsert();
+      const tx = mockSendTx(quietPeer);
+      let txInsert = 0;
+      tx.insert.mockImplementation(() => ({
+        values: (v: unknown) => ({
+          returning: () =>
+            Promise.resolve(
+              ++txInsert === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : (v as Record<string, unknown>[]),
+            ),
+        }),
+      }));
+
+      const result = await send([env('p-new'), env('p-mid')]);
+
+      expect(result.message.envelopes).toHaveLength(2);
+    });
+
+    it('rejects an envelope for a stale device outside the fallback', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new'), env('p-mid'), env('p-old')]).catch(
+        (e: unknown) => e,
+      );
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [], stale: ['p-old'] },
+      });
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a send missing one of the fallback devices', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new')]).catch((e: unknown) => e);
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [{ userId: 'u2', deviceId: 'p-mid' }], stale: [] },
+      });
+    });
   });
 
   it('stores message + envelopes in one transaction and pushes to both users', async () => {
@@ -630,28 +723,24 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       },
     }));
     const txInserts: unknown[] = [];
-    const tx = {
-      insert: jest.fn(() => ({
-        values: (v: unknown) => {
-          txInserts.push(v);
-          return {
-            returning: () =>
-              Promise.resolve(
-                txInserts.length === 1
-                  ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
-                  : (v as Record<string, unknown>[]).map((e) => ({
-                      recipientDeviceId: e.recipientDeviceId,
-                      header: e.header,
-                      wrappedKey: e.wrappedKey,
-                    })),
-              ),
-          };
-        },
-      })),
-    };
-    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
-      cb(tx),
-    );
+    const tx = mockSendTx();
+    tx.insert.mockImplementation(() => ({
+      values: (v: unknown) => {
+        txInserts.push(v);
+        return {
+          returning: () =>
+            Promise.resolve(
+              txInserts.length === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : (v as Record<string, unknown>[]).map((e) => ({
+                    recipientDeviceId: e.recipientDeviceId,
+                    header: e.header,
+                    wrappedKey: e.wrappedKey,
+                  })),
+            ),
+        };
+      },
+    }));
 
     const result = await send([env('d-peer'), env('d-me2')]);
 
@@ -673,6 +762,36 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       .filter((e) => e.type === 'message')
       .map((e) => e.targetUserId);
     expect(targets.sort()).toEqual(['u1', 'u2']);
+  });
+
+  it('rejects 409 and writes nothing when a device registers between the outer check and the insert', async () => {
+    // The fast-fail read passes: the envelopes cover the outer active set.
+    selectsWithDevices();
+    // The locked re-read inside the transaction sees the device registered
+    // after that read. Inserting now would hand every recipient a message the
+    // new device has no envelope for — reject instead.
+    const tx = mockSendTx([...activeDevices, device('d-new', 'u2')]);
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([conversation]),
+        }),
+      }),
+    }));
+
+    const err = await send([env('d-peer'), env('d-me2')]).catch(
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      code: 'E2E_DEVICES_MISMATCH',
+      details: { missing: [{ userId: 'u2', deviceId: 'd-new' }], stale: [] },
+    });
+    expect(tx.execute).toHaveBeenCalledTimes(1);
+    expect(tx.insert).not.toHaveBeenCalled();
+    // The only insert is the conversation upsert; no message row is written.
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -712,6 +831,13 @@ describe('ChatService.sendMessage — attachments', () => {
   function mockTx() {
     let n = 0;
     const tx = {
+      execute: jest.fn(() => Promise.resolve([])),
+      select: jest.fn(() =>
+        whereQuery([
+          { id: 'd-me', userId: 'u1' },
+          { id: 'd-peer', userId: 'u2' },
+        ]),
+      ),
       insert: jest.fn(() => ({
         values: () => ({
           returning: () =>

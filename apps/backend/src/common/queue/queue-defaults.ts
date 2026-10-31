@@ -3,9 +3,9 @@ import type { DefaultJobOptions } from 'bullmq';
 /**
  * How long BullMQ keeps finished jobs in Redis. Without this every job ever
  * run stays there forever (~1 KB each): the two housekeeping schedulers alone
- * leak ~170 KB/day, and one Bakong checkout left open writes up to 75 poll
- * jobs (`BAKONG_QR_EXPIRY_SECONDS / BAKONG_POLL_INTERVAL_MS`) — which is what
- * filled the free 30 MB Redis Cloud database.
+ * leak ~170 KB/day, and one Bakong checkout left open used to write up to 75
+ * poll jobs (the since-retired BullMQ poll chain) — which is what filled the
+ * free 30 MB Redis Cloud database.
  *
  * Postgres is the record (`payment_attempts`, `outbox_events`, the tables the
  * jobs act on), so a finished job is only worth keeping for debugging. Failed

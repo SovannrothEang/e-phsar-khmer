@@ -20,7 +20,7 @@ export default async function AllAdsCategories() {
 
   return (
     <div>
-      <ul className="bg-muted text-center grid grid-cols-6 gap-2">
+      <ul className="bg-muted text-center grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
         {categories.map((category) => (
           <li key={category.slug}>
             <Link
