@@ -20,7 +20,7 @@ export default function Settings({ me }: { me?: SettingsUser | null }) {
     <div className="min-h-screen bg-muted pb-30 pt-2">
       <div className="max-w-6xl mx-auto px-4 ">
         <main className="max-w-4xl mx-auto px-4">
-          <h1 className="text-2xl font-medium text-foreground mb-4 mt-2">
+          <h1 className="type-page-title text-foreground mb-4 mt-2">
             Settings
           </h1>
 

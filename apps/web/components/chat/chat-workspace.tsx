@@ -546,7 +546,7 @@ export function ChatWorkspace({
         <E2eBackupPanel />
         {!threadOpen && (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-            <div className="flex size-20 items-center justify-center rounded-full bg-white/5">
+            <div className="flex size-20 items-center justify-center rounded-full bg-muted">
               <MessagesSquare className="size-8 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">
@@ -604,12 +604,13 @@ export function ChatWorkspace({
 
 function Panel({ children }: { children: React.ReactNode }) {
   return (
-    // The `dark` class scopes the dark token set to chat only, so the rest of
-    // the site keeps the visitor's theme. Portaled menus/dialogs mount outside
-    // this subtree and re-apply the scope themselves.
+    // Chat follows the visitor's theme like the rest of the site: the panel is
+    // a card surface and the token-driven children below pick up whichever
+    // token set next-themes' `dark` class on <html> selects. Portaled
+    // menus/dialogs inherit that same html-level scope.
     // Height is the viewport minus the 3.5rem site navbar and this page's 1rem
     // top padding — the workspace sits inside the normal app shell.
-    <div className="dark flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] overflow-hidden rounded-lg border border-white/10 bg-[#1b1b1b] text-foreground">
+    <div className="flex h-[calc(100dvh-3.5rem-1rem)] min-h-[480px] overflow-hidden rounded-lg border border-border bg-card text-foreground">
       {children}
     </div>
   );

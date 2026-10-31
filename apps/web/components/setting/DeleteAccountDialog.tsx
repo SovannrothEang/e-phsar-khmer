@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ export function DeleteAccountDialog({
   username: string;
   trigger: ReactNode;
 }) {
+  const t = useTranslations("Settings.deleteAccount");
+  const tCommon = useTranslations("Common");
   const [step, setStep] = useState<"confirm" | "password">("confirm");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,14 +44,12 @@ export function DeleteAccountDialog({
 
     const result = await deleteMyAccount(password);
     if (!result.success) {
-      toast.error(result.error ?? "Could not delete the account");
+      toast.error(result.error ?? t("failed"));
       setBusy(false);
       return;
     }
 
-    toast.success(
-      "Account deactivated — sign in again within 90 days to get it back.",
-    );
+    toast.success(t("deactivated"));
     // Clears the session cookies; the account can no longer authenticate.
     await userLogout();
   }
@@ -67,20 +68,19 @@ export function DeleteAccountDialog({
 
       <DialogContent className="sm:max-w-[550px] rounded-md p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-foreground">
-            {username ? `${username}: ` : ""}Delete Account?
+          <DialogTitle>
+            {username ? `${username}: ` : ""}
+            {t("title")}
           </DialogTitle>
-          <DialogDescription className="mt-4 text-[15px] leading-relaxed text-foreground/90">
-            Your account will be deactivated and won&apos;t be visible to the
-            public. During deactivation, you can reactivate your account
-            anytime. After 90 days, your data will be deleted permanently.
+          <DialogDescription className="mt-4 type-body-sm text-foreground/90">
+            {t("description")}
           </DialogDescription>
         </DialogHeader>
 
         {step === "password" && (
           <Field className="mt-2">
             <FieldLabel htmlFor="delete-account-password">
-              Confirm with your password
+              {t("confirmPassword")}
             </FieldLabel>
             <Input
               id="delete-account-password"
@@ -98,7 +98,7 @@ export function DeleteAccountDialog({
               variant="ghost"
               className="bg-[#eeeeee] hover:bg-gray-200 text-black px-6 rounded-sm font-medium cursor-pointer"
             >
-              Cancel
+              {tCommon("cancel")}
             </Button>
           </DialogClose>
 
@@ -108,7 +108,7 @@ export function DeleteAccountDialog({
               onClick={() => setStep("password")}
               className="bg-[#e3281b] hover:bg-red-700 text-white px-8 rounded-sm font-medium cursor-pointer"
             >
-              Next
+              {t("next")}
             </Button>
           ) : (
             <Button
@@ -117,7 +117,7 @@ export function DeleteAccountDialog({
               disabled={busy || password.length === 0}
               className="bg-[#e3281b] hover:bg-red-700 text-white px-8 rounded-sm font-medium cursor-pointer"
             >
-              {busy ? "Deleting…" : "Delete"}
+              {busy ? t("deleting") : t("delete")}
             </Button>
           )}
         </DialogFooter>

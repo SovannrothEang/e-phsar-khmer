@@ -6,6 +6,7 @@ import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilt
 import SortFilter from "@/components/filter/SortFilter";
 import PriceFilter from "@/components/filter/PriceFilter";
 import MoreFilters from "@/components/filter/MoreFilters";
+import { useTranslations } from "next-intl";
 
 interface JobsCategoryLayoutProps {
   category: {
@@ -18,13 +19,13 @@ interface JobsCategoryLayoutProps {
 export default function JobsCategoryLayout({
   category,
 }: JobsCategoryLayoutProps) {
+  const t = useTranslations();
   return (
     <>
       {/* HEADER */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
-        <h1 className="font-semibold text-lg md:text-lg">
-          {category.name}{" "}
-          <span className="font-semibold text-lg">in Cambodia</span>
+        <h1 className="type-page-title">
+          {t("Common.inCambodia", { name: category.name })}
         </h1>
       </div>
 
@@ -35,7 +36,7 @@ export default function JobsCategoryLayout({
         <div className="flex items-center gap-2 flex-wrap">
           <LocationSelectorFilter />
           <SortFilter />
-          <PriceFilter label="Salary" />
+          <PriceFilter label={t("Filters.price.salary")} />
           <MoreFilters />
         </div>
         <TabsList className="h-9 shrink-0">

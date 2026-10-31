@@ -40,7 +40,11 @@ export class ChatController {
   })
   issueWsTicket(@CurrentUser() user: RequestUser) {
     const ticket = this.jwt.sign(
-      { sub: user.id, typ: WS_TICKET_TYP },
+      {
+        sub: user.id,
+        typ: WS_TICKET_TYP,
+        ...(user.sessionId ? { sid: user.sessionId } : {}),
+      },
       { expiresIn: WS_TICKET_TTL_SECONDS },
     );
     return { ticket, expiresIn: WS_TICKET_TTL_SECONDS };

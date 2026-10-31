@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, CircleAlert, RefreshCw } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { getMySubscriptions, getPublicFreePlan } from "@/actions/subscriptions";
 import type { PublicFreePlan, UserSubscription } from "@/types/subscription";
 import { activeSubscriptions } from "@/lib/subscription-pricing";
@@ -42,7 +43,10 @@ const amount = (value: number) => (value > 0 ? String(value) : "None");
 
 type Row = { label: string; value: string };
 
-/** One plan as a sheet: a centred title over label / value rows. */
+/**
+ * One plan as the card the old Membership page used: a centred title over
+ * label / value rows split by hairlines.
+ */
 function PlanSheet({
   title,
   subtitle,
@@ -55,30 +59,40 @@ function PlanSheet({
   return (
     <section
       aria-label={`${title} plan`}
-      className="overflow-hidden rounded-md bg-card ring-1 ring-border"
+      className="bg-card border rounded-sm overflow-hidden"
     >
-      <header className="px-6 pt-8 pb-4 text-center">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+      <div className="px-4 py-4">
+        <h2 className="text-lg text-center font-medium text-foreground">
+          {title}
+        </h2>
         {subtitle && (
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+          <p className="mt-1 text-center text-xs text-gray-500">{subtitle}</p>
         )}
-      </header>
-      <dl>
+      </div>
+      <div className="divide-y divide-muted">
         {rows.map((row) => (
           <div
             key={row.label}
-            className="flex items-center justify-between gap-4 border-b border-border px-6 py-5 last:border-b-0"
+            className="px-4 py-4 flex items-start justify-between"
           >
-            <dt className="text-foreground">{row.label}</dt>
-            <dd className="tabular-nums text-foreground">{row.value}</dd>
+            <h3 className="text-sm font-semibold text-foreground">
+              {row.label}
+            </h3>
+            <div className="text-sm text-foreground tabular-nums">
+              {row.value}
+            </div>
           </div>
         ))}
-      </dl>
+      </div>
     </section>
   );
 }
 
 function freeRows(plan: PublicFreePlan): Row[] {
+  // Videos and auto-renewals are plan features the free plan doesn't get
+  // (both 0 until an admin sets them, and "0" reads as "None"). "Other Ads"
+  // is the pool every ad outside a capped category draws from, so it sits
+  // after the caps — those rows are sub-limits inside that pool.
   return [
     { label: "Photos", value: amount(plan.photos) },
     { label: "Videos", value: amount(plan.videos) },
@@ -92,22 +106,20 @@ function freeRows(plan: PublicFreePlan): Row[] {
 function subscriptionRows(subscription: UserSubscription): Row[] {
   return [
     { label: "Photos", value: amount(subscription.photos) },
-    { label: "Videos", value: amount(subscription.videos) },
     { label: "Ads", value: amount(subscription.ads) },
-    { label: "Renews", value: amount(subscription.renews) },
-    { label: "Auto-Renews", value: amount(subscription.autoRenews) },
+    { label: "Renews (30 days)", value: amount(subscription.renews) },
     { label: "Expires", value: formatDate(subscription.expiresAt) },
   ];
 }
 
 function HistoryCard({ subscription }: { subscription: UserSubscription }) {
   return (
-    <article className="flex items-center justify-between gap-3 rounded-md bg-card p-4 ring-1 ring-border">
+    <article className="bg-card border rounded-sm p-3 flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <p className="truncate font-medium text-foreground">
-          {subscription.packageName ?? subscription.planName ?? "Subscription"}
+        <p className="truncate text-sm font-medium text-foreground">
+          {subscription.packageName ?? "Subscription"}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="truncate text-xs text-gray-500">
           {[subscription.groupName, subscription.termName]
             .filter(Boolean)
             .join(" · ")}{" "}
@@ -115,12 +127,12 @@ function HistoryCard({ subscription }: { subscription: UserSubscription }) {
           {formatDate(subscription.expiresAt)}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="text-sm font-semibold tabular-nums text-foreground">
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-sm font-medium tabular-nums text-foreground">
           ${money(subscription.priceUsd)}
         </span>
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[subscription.status]}`}
+          className={`rounded-sm px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[subscription.status]}`}
         >
           {STATUS_LABEL[subscription.status]}
         </span>
@@ -181,37 +193,43 @@ export default function Subscription() {
   }, [subscriptions, held]);
 
   return (
-    <div className="min-w-full bg-background pb-12 pt-6">
-      <main className="mx-auto max-w-5xl space-y-6 px-4">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-          Membership
-        </h1>
+    <div className="min-h-screen bg-muted pb-12">
+      <div className="mx-auto max-w-7xl px-4 pt-4">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership" },
+          ]}
+        />
+      </div>
+
+      <main className="mx-auto mt-4 max-w-4xl px-4">
+        <h1 className="type-page-title text-foreground mb-4">Membership</h1>
 
         {loading ? (
-          <div className="h-[34rem] animate-pulse rounded-md bg-card ring-1 ring-border" />
+          <div className="h-[420px] animate-pulse rounded-sm border bg-card" />
         ) : error ? (
           <div
             role="alert"
-            className="rounded-md bg-card p-10 text-center ring-1 ring-border"
+            className="rounded-sm border bg-card p-8 text-center"
           >
-            <CircleAlert className="mx-auto size-7 text-amber-600" />
-            <p className="mt-3 text-sm text-muted-foreground">{error}</p>
+            <CircleAlert className="mx-auto h-8 w-8 text-amber-600" />
+            <p className="mt-3 text-sm text-gray-500">{error}</p>
             <Button
               variant="outline"
               onClick={() => void load()}
-              className="mt-4 h-10 rounded-md"
+              className="mt-4 h-9 rounded-sm"
             >
-              <RefreshCw className="mr-2 size-4" /> Try again
+              <RefreshCw className="mr-2 h-4 w-4" /> Try again
             </Button>
           </div>
         ) : (
-          <>
+          <div className="space-y-3">
             {held.map((subscription) => (
               <PlanSheet
                 key={subscription.id}
-                title={
-                  subscription.packageName ?? subscription.planName ?? "Premium"
-                }
+                title={subscription.packageName ?? "Premium"}
                 subtitle={[subscription.groupName, subscription.termName]
                   .filter(Boolean)
                   .join(" · ")}
@@ -231,31 +249,33 @@ export default function Subscription() {
               />
             )}
 
-            <Link
-              href="/premium-account"
-              className="flex items-center justify-between gap-4 rounded-md bg-card px-6 py-6 ring-1 ring-border transition-colors hover:ring-[#00a0e9]/60"
-            >
-              <span>
-                <span className="block text-xl font-semibold text-foreground">
-                  Need More?
-                </span>
-                <span className="mt-3 block text-foreground">
-                  Upgrade to the right plan that better suits your business.
-                </span>
-              </span>
-              <ChevronRight className="size-5 shrink-0 text-[#00a0e9]" />
+            <Link href="/premium-account" className="group block">
+              <div className="flex items-center justify-between overflow-hidden rounded-sm border bg-card">
+                <div className="space-y-1">
+                  <p className="px-4 pt-3 text-lg font-semibold">Need More?</p>
+                  <span className="block px-4 pb-3 text-sm">
+                    Upgrade to the right plan that better suits your business.
+                  </span>
+                </div>
+                <div className="mr-3 flex items-center justify-center">
+                  <ChevronRight
+                    size={20}
+                    className="text-[#00a0e9] transition-transform group-hover:translate-x-2"
+                  />
+                </div>
+              </div>
             </Link>
 
             <Link
               href="/premium-account"
-              className="flex h-14 items-center justify-center rounded-md bg-[#00a0e9] text-lg font-semibold text-white transition-colors hover:bg-[#008ccb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a0e9] focus-visible:ring-offset-2"
+              className="mt-4 flex h-9 w-full items-center justify-center rounded-sm bg-[#00a0e9] font-medium text-white transition-colors hover:bg-[#00a0e9]/80"
             >
-              Upgrade Account
+              Upgrade Now
             </Link>
 
             {history.length > 0 && (
-              <section aria-label="Past plans" className="pt-4">
-                <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
+              <section aria-label="Past plans" className="pt-2">
+                <h2 className="mb-2 text-sm font-medium text-gray-500">
                   History
                 </h2>
                 <div className="space-y-2">
@@ -268,7 +288,7 @@ export default function Subscription() {
                 </div>
               </section>
             )}
-          </>
+          </div>
         )}
       </main>
     </div>

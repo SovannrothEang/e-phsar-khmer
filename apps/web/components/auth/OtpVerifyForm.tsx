@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/input-otp";
 import { useRouter } from "@/i18n/routing";
 import { requestOtp, verifyOtp } from "@/actions/otp";
+import { getDeviceIdentity } from "@/lib/device";
 import { formatPhoneLocal } from "@/lib/phone";
 import {
   clearOtpRegistration,
@@ -29,6 +30,14 @@ import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
+
+/**
+ * Survives a remount of this page — the verify server action sets session
+ * cookies, which can refresh the route and give the component a fresh
+ * `doneRef`. A full reload resets it, which is exactly when the registration
+ * guard should run again.
+ */
+let verifiedPhone: string | null = null;
 
 export function OtpVerifyForm({ phone }: { phone: string }) {
   const router = useRouter();
@@ -47,14 +56,19 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
   }, [cooldown]);
 
   // Verify needs the password handoff — without it (lost sessionStorage, new
-  // tab) restart at the login form instead of dead-ending here.
+  // tab) restart at the login form instead of dead-ending here. A successful
+  // verify clears the handoff and may keep this page mounted (the new-device
+  // dialog), so the done guard stops a re-run from bouncing the user to
+  // /login after they have just logged in.
   useEffect(() => {
+    if (doneRef.current || verifiedPhone === phone) return;
     if (!readOtpRegistration(phone)) router.replace("/login");
   }, [phone, router]);
 
   // Back-target depends on which flow stored the handoff.
   const goBack = useCallback(() => {
     const registration = readOtpRegistration(phone);
+    verifiedPhone = null;
     clearOtpRegistration();
     router.push(registration?.mode === "register" ? "/register" : "/login");
   }, [phone, router]);
@@ -72,9 +86,16 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
       setVerifying(true);
       try {
         const registration = readOtpRegistration(phone);
-        const res = await verifyOtp(phone, token, registration ?? undefined);
+        const device = getDeviceIdentity();
+        const res = await verifyOtp(
+          phone,
+          token,
+          registration ?? undefined,
+          device ?? undefined,
+        );
         if (res.success) {
           doneRef.current = true;
+          verifiedPhone = phone;
           clearOtpRegistration();
           // Covers both OTP login and registration: the new account gets its
           // E2E device before any other page renders.
@@ -199,7 +220,7 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           >
             {verifying ? "Verifying…" : "Verify"}
           </Button>
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="type-body-sm text-muted-foreground text-center">
             Wrong number?{" "}
             <button
               type="button"

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "next-intl";
 import {
   IconSunHigh,
   IconMoonFilled,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeSwitcher() {
+  const t = useTranslations("Theme");
   const { theme, setTheme } = useTheme();
 
   const [mounted, setMounted] = React.useState(false);
@@ -49,7 +51,7 @@ export function ThemeSwitcher() {
           {theme === "system" && (
             <IconDeviceDesktop stroke={2} className="h-[1.1rem] w-[1.1rem]" />
           )}
-          <span className="sr-only">Toggle theme</span>
+          <span className="sr-only">{t("toggle")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -62,7 +64,7 @@ export function ThemeSwitcher() {
           className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
         >
           <IconSunHigh className="h-6 w-6" />
-          <span>Light</span>
+          <span>{t("light")}</span>
 
           {theme === "light" && (
             <div className="ml-auto h-2 w-2 rounded-full bg-[#00a0e9]" />
@@ -74,7 +76,7 @@ export function ThemeSwitcher() {
           className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
         >
           <IconMoonFilled className="h-6 w-6" />
-          <span>Dark</span>
+          <span>{t("dark")}</span>
 
           {theme === "dark" && (
             <div className="ml-auto h-2 w-2 rounded-full bg-[#00a0e9]" />
@@ -85,7 +87,7 @@ export function ThemeSwitcher() {
           className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
         >
           <IconDeviceDesktop className="h-6 w-6" />
-          <span>System</span>
+          <span>{t("system")}</span>
 
           {theme === "system" && (
             <div className="ml-auto h-2 w-2 rounded-full bg-[#00a0e9]" />

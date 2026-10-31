@@ -14,6 +14,7 @@ export interface UserReportView {
   reporterName: string;
   targetUserId: string;
   targetName: string;
+  targetUsername: string | null;
   reasonText: string | null;
   description: string | null;
   imagePaths: string[];
@@ -21,6 +22,7 @@ export interface UserReportView {
   imageUrls: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
+  reviewerName: string | null;
   createdAt: string;
 }
 
@@ -30,6 +32,7 @@ interface BackendUserReport {
   targetUserId: string;
   reporterName: string;
   targetName: string;
+  targetUsername: string | null;
   reasonText: string | null;
   description: string | null;
   imagePaths: string[];
@@ -37,6 +40,7 @@ interface BackendUserReport {
   imageUrls: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
+  reviewerName: string | null;
   createdAt: string;
 }
 
@@ -46,10 +50,14 @@ export interface ListingReportView {
   reporterName: string;
   listingId: string;
   listingTitle: string | null;
+  listingOwnerName: string | null;
+  listingOwnerUsername: string | null;
   reasonText: string | null;
   description: string | null;
+  imagePaths: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
+  reviewerName: string | null;
   createdAt: string;
 }
 
@@ -59,10 +67,14 @@ interface BackendListingReport {
   listingId: string;
   reporterName: string;
   listingTitle: string | null;
+  listingOwnerName: string | null;
+  listingOwnerUsername: string | null;
   reasonText: string | null;
   description: string | null;
+  imagePaths: string[];
   status: "pending" | "approved" | "rejected";
   reviewedById: string | null;
+  reviewerName: string | null;
   createdAt: string;
 }
 
@@ -79,11 +91,7 @@ export async function getUserReports(): Promise<UserReportView[]> {
   const { data } = await serverFetch<BackendUserReport[]>(
     "/admin/reports/users",
   );
-  return data.map((r) => ({
-    ...r,
-    reporterName: r.reporterName,
-    targetName: r.targetName,
-  }));
+  return data;
 }
 
 export async function updateUserReportStatus(

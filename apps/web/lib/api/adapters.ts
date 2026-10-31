@@ -14,14 +14,25 @@ export interface BackendUser {
   status: "active" | "suspended" | "deleted";
   preferredLanguage: string;
   isBusiness: boolean;
+  /** Settings → Privacy lookup visibility. `true` = Public, `false` = Only Me. */
+  discoverableByGender: boolean;
+  discoverableByDateOfBirth: boolean;
+  discoverableByPhone: boolean;
+  discoverableByEmail: boolean;
+  discoverableByLocation: boolean;
   /** Profile fields `GET /users/me` returns (PublicUser) — the settings form needs them. */
   gender: "male" | "female" | null;
+  /** ISO date (`YYYY-MM-DD`); the settings day picker's value. */
+  dateOfBirth: string | null;
   yearOfBirth: number | null;
   company: string | null;
   address: string | null;
   provinceId: string | null;
   districtId: string | null;
   communeId: string | null;
+  /** Drizzle `numeric` columns serialise as strings. */
+  latitude: string | null;
+  longitude: string | null;
   phoneVerifiedAt: string | null;
   emailVerifiedAt: string | null;
   lastSeenAt: string | null;
@@ -29,6 +40,8 @@ export interface BackendUser {
   updatedAt: string;
   /** Present on the admin users list (derived from active subscriptions). */
   accountType?: "Premium" | "Normal";
+  /** Present on `/auth/me` and `/users/me` — the paid-plan badge. */
+  verifiedAccount?: boolean;
 }
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000;

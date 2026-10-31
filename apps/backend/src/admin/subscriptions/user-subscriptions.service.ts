@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -11,7 +12,6 @@ import { users } from '../../db/schema/users.schema';
 import {
   subscriptionCategories,
   subscriptionPackages,
-  subscriptionPlans,
   subscriptionTerms,
   userSubscriptions,
 } from '../../db/schema/subscriptions.schema';
@@ -31,11 +31,14 @@ export interface UserSubscriptionView {
   name: string;
   email: string | null;
   phone: string | null;
+  /** The subscription category row this plan belongs to (the tab key). */
+  subscriptionCategoryId: string | null;
   group: string | null;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
-  plan: string | null;
+  /** The purchased duration (e.g. "6 Months"). */
+  term: string | null;
   price: string;
   paymentMethod: string | null;
   subscribedAt: Date;
@@ -67,6 +70,7 @@ export class UserSubscriptionsService {
         username: users.username,
         email: users.email,
         phone: users.primaryPhone,
+        subscriptionCategoryId: userSubscriptions.subscriptionCategoryId,
         group: subscriptionCategories.name,
         ads: subscriptionPackages.ads,
         renews: subscriptionPackages.renews,
@@ -90,10 +94,6 @@ export class UserSubscriptionsService {
         eq(subscriptionPackages.id, subscriptionTerms.packageId),
       )
       .leftJoin(
-        subscriptionPlans,
-        eq(subscriptionPlans.id, subscriptionPackages.planId),
-      )
-      .leftJoin(
         subscriptionCategories,
         eq(subscriptionCategories.id, userSubscriptions.subscriptionCategoryId),
       )
@@ -111,11 +111,12 @@ export class UserSubscriptionsService {
         'Unknown',
       email: r.email,
       phone: r.phone,
+      subscriptionCategoryId: r.subscriptionCategoryId,
       group: r.group,
       totalAds: r.ads ?? 0,
       totalRenew: r.renews ?? 0,
       autoRenew: r.autoRenews ?? 0,
-      plan: r.termName,
+      term: r.termName,
       price: r.price,
       paymentMethod: r.paymentMethod,
       subscribedAt: r.subscribedAt,
@@ -133,6 +134,11 @@ export class UserSubscriptionsService {
       .where(eq(subscriptionTerms.id, dto.termId))
       .limit(1);
     if (!term) throw new NotFoundException('Term not found');
+    if (!term.isActive) {
+      throw new BadRequestException(
+        'This term is retired. Pick an active 3, 6 or 12-month term.',
+      );
+    }
 
     const [user] = await this.db
       .select({ id: users.id })

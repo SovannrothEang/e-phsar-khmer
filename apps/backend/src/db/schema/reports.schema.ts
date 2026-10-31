@@ -101,6 +101,7 @@ export const listingReports = pgTable(
       onDelete: 'set null',
     }),
     description: text('description'),
+    imagePaths: jsonb('image_paths').$type<string[]>().default([]).notNull(),
     status: reportStatusEnum('status').default('pending').notNull(),
     reviewedById: uuid('reviewed_by_id').references(() => users.id, {
       onDelete: 'set null',
@@ -122,6 +123,40 @@ export const listingReports = pgTable(
   ],
 );
 
+/**
+ * Phone numbers banned by moderation.
+ *
+ * Keyed on the number itself, not a user row: the ban must outlive the account
+ * (including the 90-day hard purge) so the same number can never be used to
+ * register again. Every FK is SET NULL — deleting the user, the report or the
+ * reviewing admin must never lift a ban.
+ */
+export const bannedPhones = pgTable(
+  'banned_phones',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    phone: varchar('phone', { length: 32 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    reportId: uuid('report_id').references(() => userReports.id, {
+      onDelete: 'set null',
+    }),
+    bannedById: uuid('banned_by_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('banned_phones_phone_uq').on(t.phone),
+    index('banned_phones_user_id_idx').on(t.userId),
+    index('banned_phones_report_id_idx').on(t.reportId),
+  ],
+);
+
 export type ReportReasonRow = typeof reportReasons.$inferSelect;
 export type UserReportRow = typeof userReports.$inferSelect;
 export type ListingReportRow = typeof listingReports.$inferSelect;
+export type BannedPhoneRow = typeof bannedPhones.$inferSelect;

@@ -1,41 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
+import { AdminPage } from "@/components/dashboard/admin-page";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  AdminFilter,
+  AdminSearch,
+  AdminTable,
+  EntityChip,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Filter,
-  MoreVertical,
-  Search,
-  Trash2,
-  Plus,
-  Pencil,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -43,952 +21,543 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
-import {
-  SubscriptionCategory,
-  SubscriptionTermDiscountType,
-  SubscriptionTermDurationUnit,
-  SubscriptionTermOption,
-} from "@/types/subscription";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import {
+  createSubTerm,
+  deleteSubTerm,
   getSubCategories,
-  getSubPlans,
   getSubPackages,
   getSubTerms,
-  createSubTerm,
   updateSubTerm,
-  deleteSubTerm,
-  type SubCategory,
+  type SubPackage,
   type SubTerm,
 } from "@/actions/admin-subscriptions";
+import {
+  TERM_MONTHS,
+  TIERS,
+  TIER_LABEL,
+  discountLabel,
+  finalPrice,
+  termLabel,
+  type Tier,
+} from "@/lib/subscription-admin";
 
-type TermRow = SubscriptionTermOption & {
-  subscriptionCateId: string;
-  categoryName: string;
-  subscriptionPlanId: string;
-  planName: string;
-  SubscriptionPackageId: string;
-  packageName: string;
+type Row = SubTerm & { groupName: string };
+
+type TermForm = {
+  id?: string;
+  categoryId: string;
+  packageId: string;
+  /** Null on a retired legacy duration (1 month); the picker is hidden. */
+  durationMonths: 3 | 6 | 12 | null;
+  legacyLabel: string | null;
+  price: string;
+  discount: string;
+  discountType: "percent" | "amount";
+  isActive: boolean;
 };
 
-function formatDate(date: Date) {
-  return new Date(date).toLocaleDateString();
-}
-
-function formatPrice(amount: number) {
-  return `$${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
-
-function calcFinalPrice(
-  price: number,
-  discount: number,
-  type: SubscriptionTermDiscountType,
-): number {
-  if (discount <= 0 || price <= 0) return price;
-  if (type === "percent") {
-    const pct = Math.min(100, Math.max(0, discount));
-    return Math.max(0, price * (1 - pct / 100));
-  }
-  return Math.max(0, price - discount);
-}
-
-function formatDiscountDisplay(
-  discount: number,
-  type: SubscriptionTermDiscountType,
-): string {
-  if (discount <= 0) return "—";
-  return type === "percent" ? `${discount}%` : formatPrice(discount);
-}
-
-function normalizeDiscountType(
-  type: SubscriptionTermDiscountType | undefined,
-): SubscriptionTermDiscountType {
-  return type === "percent" ? "percent" : "amount";
-}
-
-function formatDuration(value: number, unit: SubscriptionTermDurationUnit) {
-  const unitLabel =
-    unit === "day" ? "Day" : unit === "month" ? "Month" : "Year";
-  const plural = value === 1 ? "" : "s";
-  return `${value} ${unitLabel}${plural}`;
-}
-
-function toVerbose(c: SubCategory): SubscriptionCategory {
+function emptyTerm(categoryId: string): TermForm {
   return {
-    subscriptionCateId: c.id,
-    subscriptioncatename: c.name,
-    subscriptioncateslug: c.slug,
-    desc: c.description ?? "",
-    subscriptionplans: [],
-    createdAt: new Date(c.createdAt),
-    updatedAt: new Date(c.updatedAt),
+    categoryId,
+    packageId: "",
+    durationMonths: 3,
+    legacyLabel: null,
+    price: "0",
+    discount: "0",
+    discountType: "percent",
+    isActive: true,
   };
 }
 
-function toTermRow(
-  t: SubTerm,
-  ctx: {
-    categoryId: string;
-    categoryName: string;
-    planId: string;
-    planName: string;
-    packageName: string;
-  },
-): TermRow {
-  return {
-    SubscriptionTermId: t.id,
-    subscriptiontermname: t.name,
-    subscriptiontermdurationvalue: t.durationValue,
-    subscriptiontermdurationunit: t.durationUnit,
-    subscriptiontermprice: Number(t.price),
-    subscriptiontermdiscount: Number(t.discount),
-    subscriptiontermdiscounttype: t.discountType,
-    createdAt: new Date(t.createdAt),
-    updatedAt: new Date(t.updatedAt),
-    subscriptionCateId: ctx.categoryId,
-    categoryName: ctx.categoryName,
-    subscriptionPlanId: ctx.planId,
-    planName: ctx.planName,
-    SubscriptionPackageId: t.packageId,
-    packageName: ctx.packageName,
-  };
-}
-
-const emptyForm = {
-  categoryId: "",
-  planId: "",
-  packageId: "",
-  durationValue: "",
-  durationUnit: "month" as SubscriptionTermDurationUnit,
-  name: "",
-  price: "",
-  discount: "",
-  discountType: "amount" as SubscriptionTermDiscountType,
-};
-
-export default function SubscriptionTermPage() {
+export default function TermsPage() {
   const queryClient = useQueryClient();
-  const { data: subscriptionCategories = [] } = useQuery({
+  const [search, setSearch] = useState("");
+  const [groupFilter, setGroupFilter] = useState("all");
+  const [tierFilter, setTierFilter] = useState("all");
+  const [form, setForm] = useState<TermForm | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const categories = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: async () => (await getSubCategories()).map(toVerbose),
+    queryFn: getSubCategories,
   });
-  const { data: rawPlans = [] } = useQuery({
-    queryKey: ["admin", "sub", "plans"],
-    queryFn: () => getSubPlans(),
-  });
-  const { data: rawPackages = [] } = useQuery({
+  const packages = useQuery({
     queryKey: ["admin", "sub", "packages"],
     queryFn: () => getSubPackages(),
   });
-  const { data: rawTerms = [] } = useQuery({
+  const terms = useQuery({
     queryKey: ["admin", "sub", "terms"],
     queryFn: () => getSubTerms(),
   });
-  const refresh = () =>
+
+  const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["admin", "sub", "terms"] });
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [durationFilter, setDurationFilter] = useState("__all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedTerm, setSelectedTerm] = useState<TermRow | null>(null);
-  const [formData, setFormData] = useState(emptyForm);
-
-  const allTerms = useMemo(() => {
-    const catName = new Map(
-      subscriptionCategories.map((c) => [
-        c.subscriptionCateId,
-        c.subscriptioncatename,
-      ]),
-    );
-    const planInfo = new Map(
-      rawPlans.map((p) => [p.id, { name: p.name, categoryId: p.categoryId }]),
-    );
-    const pkgInfo = new Map(
-      rawPackages.map((p) => [p.id, { name: p.name, planId: p.planId }]),
-    );
-    return rawTerms.map((t) => {
-      const pkg = pkgInfo.get(t.packageId);
-      const plan = pkg ? planInfo.get(pkg.planId) : undefined;
-      const categoryId = plan?.categoryId ?? "";
-      return toTermRow(t, {
-        categoryId,
-        categoryName: catName.get(categoryId) ?? "—",
-        planId: pkg?.planId ?? "",
-        planName: plan?.name ?? "—",
-        packageName: pkg?.name ?? "—",
-      });
-    });
-  }, [rawTerms, rawPackages, rawPlans, subscriptionCategories]);
-
-  const plansForCategory = useMemo(
-    () =>
-      rawPlans
-        .filter((p) => p.categoryId === formData.categoryId)
-        .map((p) => ({
-          subscriptionPlanId: p.id,
-          subscriptionplanname: p.name,
-        })),
-    [rawPlans, formData.categoryId],
-  );
-
-  const packagesForPlan = useMemo(
-    () =>
-      rawPackages
-        .filter((p) => p.planId === formData.planId)
-        .map((p) => ({
-          SubscriptionPackageId: p.id,
-          subscriptionPackagename: p.name,
-        })),
-    [rawPackages, formData.planId],
-  );
-
-  const durationOptions = Array.from(
-    new Map(
-      allTerms.map((term) => {
-        const value = term.subscriptiontermdurationvalue;
-        const unit = term.subscriptiontermdurationunit;
-        return [
-          `${value}:${unit}`,
-          { value, unit, label: formatDuration(value, unit) },
-        ];
-      }),
-    ).values(),
-  ).sort((a, b) => {
-    const unitOrder: Record<SubscriptionTermDurationUnit, number> = {
-      day: 0,
-      month: 1,
-      year: 2,
-    };
-    return unitOrder[a.unit] - unitOrder[b.unit] || a.value - b.value;
-  });
-
-  const filteredTerms = allTerms.filter((term) => {
-    const q = searchQuery.toLowerCase();
-
-    const matchesSearch =
-      term.SubscriptionTermId.toLowerCase().includes(q) ||
-      term.subscriptiontermname.toLowerCase().includes(q) ||
-      String(term.subscriptiontermprice).includes(q) ||
-      String(term.subscriptiontermdiscount).includes(q) ||
-      term.categoryName.toLowerCase().includes(q) ||
-      term.planName.toLowerCase().includes(q) ||
-      term.packageName.toLowerCase().includes(q) ||
-      term.subscriptionCateId.toLowerCase().includes(q) ||
-      term.subscriptionPlanId.toLowerCase().includes(q) ||
-      term.SubscriptionPackageId.toLowerCase().includes(q) ||
-      formatDate(term.createdAt).toLowerCase().includes(q) ||
-      formatDate(term.updatedAt).toLowerCase().includes(q);
-
-    const matchesFilter =
-      durationFilter === "__all" ||
-      `${term.subscriptiontermdurationvalue}:${term.subscriptiontermdurationunit}` ===
-        durationFilter;
-
-    return matchesSearch && matchesFilter;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredTerms.length / rowsPerPage));
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedTerms = filteredTerms.slice(
-    startIndex,
-    startIndex + rowsPerPage,
-  );
-
-  const resetForm = () => setFormData(emptyForm);
-
-  const termBody = () => {
-    const durationValue = Number(formData.durationValue) || 1;
-    const durationUnit = formData.durationUnit || "month";
-    return {
-      name: formData.name.trim() || formatDuration(durationValue, durationUnit),
-      durationValue,
-      durationUnit,
-      price: Number(formData.price) || 0,
-      discount: Number(formData.discount) || 0,
-      discountType: formData.discountType,
-    };
   };
 
-  const handleAdd = async () => {
-    if (!formData.categoryId || !formData.planId || !formData.packageId) return;
-    const res = await createSubTerm({
-      packageId: formData.packageId,
-      ...termBody(),
-    });
-    if (res.success) {
-      refresh();
-      resetForm();
-      setIsAddDialogOpen(false);
-      toast.success("Term created");
-    } else {
+  const groupById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const group of categories.data ?? []) map.set(group.id, group.name);
+    return map;
+  }, [categories.data]);
+  const packageById = useMemo(() => {
+    const map = new Map<string, SubPackage>();
+    for (const pkg of packages.data ?? []) map.set(pkg.id, pkg);
+    return map;
+  }, [packages.data]);
+
+  const rows = useMemo<Row[]>(() => {
+    const q = search.trim().toLowerCase();
+    return (terms.data ?? [])
+      .map((term) => {
+        const pkg = packageById.get(term.packageId);
+        return {
+          ...term,
+          groupName: pkg ? (groupById.get(pkg.categoryId) ?? "—") : "—",
+        };
+      })
+      .filter((term) => {
+        const pkg = packageById.get(term.packageId);
+        if (groupFilter !== "all" && pkg?.categoryId !== groupFilter)
+          return false;
+        if (tierFilter !== "all" && pkg?.tier !== tierFilter) return false;
+        if (!q) return true;
+        const label = termLabel(term.durationValue);
+        return `${term.groupName} ${pkg ? TIER_LABEL[pkg.tier] : ""} ${label}`
+          .toLowerCase()
+          .includes(q);
+      })
+      .sort(
+        (a, b) =>
+          a.groupName.localeCompare(b.groupName) ||
+          (packageById.get(a.packageId)?.sortOrder ?? 0) -
+            (packageById.get(b.packageId)?.sortOrder ?? 0) ||
+          a.sortOrder - b.sortOrder,
+      );
+  }, [terms.data, packageById, groupById, search, groupFilter, tierFilter]);
+
+  async function saveTerm(termForm: TermForm) {
+    const body = {
+      durationMonths: termForm.durationMonths ?? undefined,
+      price: Number(termForm.price) || 0,
+      discount: Number(termForm.discount) || 0,
+      discountType: termForm.discountType,
+      isActive: termForm.isActive,
+    };
+    setSaving(true);
+    const res = termForm.id
+      ? await updateSubTerm(termForm.id, body)
+      : await createSubTerm({ ...body, packageId: termForm.packageId });
+    setSaving(false);
+    if (!res.success) {
       toast.error(res.error);
-    }
-  };
-
-  const handleUpdate = async () => {
-    if (
-      !selectedTerm ||
-      !formData.categoryId ||
-      !formData.planId ||
-      !formData.packageId
-    )
       return;
-    const res = await updateSubTerm(selectedTerm.SubscriptionTermId, {
-      packageId: formData.packageId,
-      ...termBody(),
-    });
-    if (res.success) {
-      refresh();
-      resetForm();
-      setSelectedTerm(null);
-      setIsEditDialogOpen(false);
-      toast.success("Term updated");
-    } else {
-      toast.error(res.error);
     }
-  };
+    toast.success(termForm.id ? "Term updated" : "Term created");
+    setForm(null);
+    refresh();
+  }
 
-  const openEditDialog = (term: TermRow) => {
-    setSelectedTerm(term);
-    setFormData({
-      categoryId: term.subscriptionCateId,
-      planId: term.subscriptionPlanId,
-      packageId: term.SubscriptionPackageId,
-      durationValue: String(term.subscriptiontermdurationvalue),
-      durationUnit: term.subscriptiontermdurationunit,
-      name: term.subscriptiontermname,
-      price: String(term.subscriptiontermprice),
-      discount: String(term.subscriptiontermdiscount),
-      discountType: normalizeDiscountType(term.subscriptiontermdiscounttype),
-    });
-    setIsEditDialogOpen(true);
-  };
-
-  const openDeleteDialog = (term: TermRow) => {
-    setSelectedTerm(term);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleDelete = async () => {
-    if (!selectedTerm) return;
-    const res = await deleteSubTerm(selectedTerm.SubscriptionTermId);
-    if (res.success) {
-      refresh();
-      toast.success("Term deleted");
-    } else {
-      toast.error(res.error);
+  async function removeTerm(term: Row) {
+    if (!window.confirm(`Delete the ${termLabel(term.durationValue)} term?`)) {
+      return;
     }
-    setIsDeleteDialogOpen(false);
-    setSelectedTerm(null);
-  };
+    const res = await deleteSubTerm(term.id);
+    if (!res.success) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Term deleted");
+    refresh();
+  }
 
-  const formPrice = Number(formData.price) || 0;
-  const formDiscount = Number(formData.discount) || 0;
-  const formFinalPrice = calcFinalPrice(
-    formPrice,
-    formDiscount,
-    formData.discountType,
-  );
+  function editTerm(term: SubTerm) {
+    const pkg = packageById.get(term.packageId);
+    const conforming =
+      term.durationUnit === "month" &&
+      (TERM_MONTHS as readonly number[]).includes(term.durationValue);
+    setForm({
+      id: term.id,
+      categoryId: pkg?.categoryId ?? "",
+      packageId: term.packageId,
+      durationMonths: conforming ? (term.durationValue as 3 | 6 | 12) : null,
+      legacyLabel: conforming
+        ? null
+        : `${term.durationValue} ${term.durationUnit}`,
+      price: term.price,
+      discount: term.discount,
+      discountType: term.discountType,
+      isActive: term.isActive,
+    });
+  }
 
-  const termFormFields = (idPrefix: string) => (
-    <div className="grid gap-4 py-4">
-      <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-category`}>Category</Label>
-        <Select
-          value={formData.categoryId}
-          onValueChange={(value) =>
-            setFormData({
-              ...formData,
-              categoryId: value,
-              planId: "",
-              packageId: "",
-            })
-          }
-        >
-          <SelectTrigger id={`${idPrefix}-category`}>
-            <SelectValue placeholder="Select a category" />
-          </SelectTrigger>
-          <SelectContent>
-            {subscriptionCategories.map((category) => (
-              <SelectItem
-                key={category.subscriptionCateId}
-                value={category.subscriptionCateId}
-              >
-                {category.subscriptioncatename}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-plan`}>Plan</Label>
-        <Select
-          value={formData.planId}
-          onValueChange={(value) =>
-            setFormData({ ...formData, planId: value, packageId: "" })
-          }
-          disabled={!formData.categoryId}
-        >
-          <SelectTrigger id={`${idPrefix}-plan`}>
-            <SelectValue placeholder="Select a plan" />
-          </SelectTrigger>
-          <SelectContent>
-            {plansForCategory.map((plan) => (
-              <SelectItem
-                key={plan.subscriptionPlanId}
-                value={plan.subscriptionPlanId}
-              >
-                {plan.subscriptionplanname}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-package`}>Package</Label>
-        <Select
-          value={formData.packageId}
-          onValueChange={(value) =>
-            setFormData({ ...formData, packageId: value })
-          }
-          disabled={!formData.planId}
-        >
-          <SelectTrigger id={`${idPrefix}-package`}>
-            <SelectValue placeholder="Select a package" />
-          </SelectTrigger>
-          <SelectContent>
-            {packagesForPlan.map((pkg) => (
-              <SelectItem
-                key={pkg.SubscriptionPackageId}
-                value={pkg.SubscriptionPackageId}
-              >
-                {pkg.subscriptionPackagename}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`${idPrefix}-duration-value`}>Duration</Label>
-          <Input
-            id={`${idPrefix}-duration-value`}
-            type="number"
-            min={1}
-            step={1}
-            placeholder="e.g. 6"
-            value={formData.durationValue}
-            onChange={(e) =>
-              setFormData({ ...formData, durationValue: e.target.value })
-            }
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`${idPrefix}-duration-unit`}>Duration unit</Label>
-          <Select
-            value={formData.durationUnit}
-            onValueChange={(value: SubscriptionTermDurationUnit) =>
-              setFormData({ ...formData, durationUnit: value })
-            }
-          >
-            <SelectTrigger id={`${idPrefix}-duration-unit`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">Days</SelectItem>
-              <SelectItem value="month">Months</SelectItem>
-              <SelectItem value="year">Years</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-name`}>Term name (optional)</Label>
-        <Input
-          id={`${idPrefix}-name`}
-          placeholder={formatDuration(
-            Number(formData.durationValue) || 1,
-            formData.durationUnit,
+  const tierOf = (packageId: string): Tier | null =>
+    packageById.get(packageId)?.tier ?? null;
+
+  const columns: AdminColumn<Row>[] = [
+    {
+      key: "term",
+      header: "Term",
+      sortValue: (row) => row.durationValue,
+      cell: (row) => (
+        <div className="min-w-0">
+          <div className="font-medium leading-tight">
+            {termLabel(row.durationValue)}
+          </div>
+          {!(
+            row.durationUnit === "month" &&
+            (TERM_MONTHS as readonly number[]).includes(row.durationValue)
+          ) && (
+            <div className="type-meta text-orange-600">Retired duration</div>
           )}
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        />
-        <p className="text-xs text-muted-foreground">
-          Leave blank to use the duration as the term name.
-        </p>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-price`}>Price ($)</Label>
-        <Input
-          id={`${idPrefix}-price`}
-          type="number"
-          min={0}
-          step="0.01"
-          placeholder="e.g. 100"
-          value={formData.price}
-          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`${idPrefix}-discount-type`}>Discount type</Label>
-          <Select
-            value={formData.discountType}
-            onValueChange={(value: SubscriptionTermDiscountType) =>
-              setFormData({
-                ...formData,
-                discountType: value,
-              })
-            }
-          >
-            <SelectTrigger id={`${idPrefix}-discount-type`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="amount">$ (fixed amount)</SelectItem>
-              <SelectItem value="percent">% (percentage)</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`${idPrefix}-discount`}>
-            Discount {formData.discountType === "percent" ? "(%)" : "($)"}
-          </Label>
-          <Input
-            id={`${idPrefix}-discount`}
-            type="number"
-            min={0}
-            max={formData.discountType === "percent" ? 100 : undefined}
-            step={formData.discountType === "percent" ? 1 : "0.01"}
-            placeholder={
-              formData.discountType === "percent" ? "e.g. 10" : "e.g. 20"
-            }
-            value={formData.discount}
-            onChange={(e) =>
-              setFormData({ ...formData, discount: e.target.value })
-            }
-          />
-        </div>
-      </div>
-      {formPrice > 0 && (
-        <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span className="text-muted-foreground">Final price: </span>
-          <span className="font-semibold">{formatPrice(formFinalPrice)}</span>
-          {formDiscount > 0 && (
-            <span className="text-muted-foreground">
-              {" "}
-              ({formatPrice(formPrice)} −{" "}
-              {formatDiscountDisplay(formDiscount, formData.discountType)})
+      ),
+    },
+    {
+      key: "group",
+      header: "Subscription",
+      sortValue: (row) => row.groupName,
+      cell: (row) => <EntityChip tone="category">{row.groupName}</EntityChip>,
+    },
+    {
+      key: "tier",
+      header: "Tier",
+      sortValue: (row) => TIER_LABEL[tierOf(row.packageId) ?? "bronze"],
+      cell: (row) => {
+        const tier = tierOf(row.packageId);
+        return tier ? (
+          <Badge className="bg-[#00a0e9]/10 text-[#00a0e9]">
+            {TIER_LABEL[tier]}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      key: "price",
+      header: "Price",
+      align: "right",
+      sortValue: (row) => finalPrice(row.price, row.discount, row.discountType),
+      cell: (row) => {
+        const price = finalPrice(row.price, row.discount, row.discountType);
+        const original = Number(row.price);
+        return (
+          <span className="tabular-nums">
+            {price < original && (
+              <span className="mr-2 text-xs text-muted-foreground line-through">
+                ${original.toLocaleString("en-US")}
+              </span>
+            )}
+            <span className="font-medium">
+              ${price.toLocaleString("en-US")}
             </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
+          </span>
+        );
+      },
+    },
+    {
+      key: "discount",
+      header: "Discount",
+      sortValue: (row) => Number(row.discount),
+      cell: (row) => {
+        const label = discountLabel(row.discount, row.discountType);
+        return label ? (
+          <Badge className="bg-red-100 text-red-500">{label}</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortValue: (row) => (row.isActive ? 1 : 0),
+      cell: (row) =>
+        row.isActive ? (
+          <Badge className="border-emerald-500 bg-emerald-50 text-emerald-700">
+            Active
+          </Badge>
+        ) : (
+          <Badge variant="outline">Retired</Badge>
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      cell: (row) => (
+        <RowActions
+          id={row.id}
+          actions={[
+            { label: "Edit", onSelect: () => editTerm(row) },
+            {
+              label: "Delete",
+              tone: "danger",
+              onSelect: () => void removeTerm(row),
+            },
+          ]}
+        />
+      ),
+    },
+  ];
 
-  const getDurationBadge = (
-    value: number,
-    unit: SubscriptionTermDurationUnit,
-  ) => <Badge variant="outline">{formatDuration(value, unit)}</Badge>;
-
-  const getPackageBadge = (name: string) => (
-    <Badge variant="outline">{name}</Badge>
-  );
-
-  const durationValue = Number(formData.durationValue);
-  const isFormValid =
-    formData.categoryId.length > 0 &&
-    formData.planId.length > 0 &&
-    formData.packageId.length > 0 &&
-    Number.isInteger(durationValue) &&
-    durationValue > 0 &&
-    formData.price.trim().length > 0;
+  const groupOptions = (categories.data ?? []).map((group) => ({
+    value: group.id,
+    label: group.name,
+  }));
+  const tierOptions = TIERS.map((tier) => ({
+    value: tier,
+    label: TIER_LABEL[tier],
+  }));
+  const packagesForCategory = (categoryId: string) =>
+    (packages.data ?? [])
+      .filter((pkg) => pkg.categoryId === categoryId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
-    <main className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
-            Subscription Terms
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage pricing and discounts for each package duration
-          </p>
-        </div>
-
-        <Dialog
-          open={isAddDialogOpen}
-          onOpenChange={(open) => {
-            setIsAddDialogOpen(open);
-            if (!open) resetForm();
-          }}
+    <AdminPage
+      title="Terms"
+      description="The purchasable prices: one row per tier and fixed 3, 6 or 12-month duration. Prices are snapshotted onto the purchase at checkout."
+      action={
+        <Button
+          className="h-9 rounded-sm bg-[#00a0e9] text-white hover:bg-[#008ccb]"
+          onClick={() => setForm(emptyTerm(categories.data?.[0]?.id ?? ""))}
+          disabled={(packages.data ?? []).length === 0}
         >
-          <DialogTrigger asChild>
-            <Button className="bg-sky-500 text-white rounded-sm cursor-pointer">
-              <Plus className="mr-2 size-4" />
-              Add Term
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="text-sky-500">
-                Add subscription term
-              </DialogTitle>
-              <DialogDescription>
-                Create a new billing term under a category, plan, and package.
-              </DialogDescription>
-            </DialogHeader>
-            {termFormFields("add")}
-            <DialogFooter>
-              <Button
-                className="h-9 bg-red-500 text-white rounded-sm  hover:bg-red-600 hover:text-white cursor-pointer"
-                onClick={() => setIsAddDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
-                onClick={handleAdd}
-                disabled={!isFormValid}
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search terms..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="pl-9"
+          <Plus className="mr-1.5 h-4 w-4" /> New term
+        </Button>
+      }
+      toolbar={
+        <>
+          <AdminSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search subscription, tier or term..."
           />
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Filter className="size-4" />
-              Filter
-              {durationFilter !== "__all" && (
-                <span className="text-muted-foreground">
-                  {durationOptions.find(
-                    (option) =>
-                      `${option.value}:${option.unit}` === durationFilter,
-                  )?.label ?? "Selected"}
-                </span>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuRadioGroup
-              value={durationFilter}
-              onValueChange={(value) => {
-                setDurationFilter(value);
-                setCurrentPage(1);
-              }}
-            >
-              <DropdownMenuRadioItem value="__all">
-                All terms ({allTerms.length})
-              </DropdownMenuRadioItem>
-              {durationOptions.map((option) => (
-                <DropdownMenuRadioItem
-                  key={`${option.value}:${option.unit}`}
-                  value={`${option.value}:${option.unit}`}
-                >
-                  {`${option.label} (${allTerms.filter((term) => term.subscriptiontermdurationvalue === option.value && term.subscriptiontermdurationunit === option.unit).length})`}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="border rounded-lg overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-center">ID</TableHead>
-              <TableHead className="text-center">Term</TableHead>
-              <TableHead className="text-center">Price</TableHead>
-              <TableHead className="text-center">Discount</TableHead>
-              <TableHead className="text-center">Final price</TableHead>
-              <TableHead className="text-center">Category</TableHead>
-              <TableHead className="text-center">Plan</TableHead>
-              <TableHead className="text-center">Package</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="w-[70px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedTerms.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={11}
-                  className="text-center py-10 text-muted-foreground"
-                >
-                  No subscription terms found
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedTerms.map((term) => (
-                <TableRow
-                  key={`${term.subscriptionCateId}-${term.subscriptionPlanId}-${term.SubscriptionPackageId}-${term.SubscriptionTermId}`}
-                >
-                  <TableCell className="text-center">
-                    {term.SubscriptionTermId}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {getDurationBadge(
-                      term.subscriptiontermdurationvalue,
-                      term.subscriptiontermdurationunit,
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center font-medium">
-                    {formatPrice(term.subscriptiontermprice)}
-                  </TableCell>
-                  <TableCell className="text-center text-muted-foreground">
-                    {formatDiscountDisplay(
-                      term.subscriptiontermdiscount,
-                      normalizeDiscountType(term.subscriptiontermdiscounttype),
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center font-medium text-emerald-700">
-                    {formatPrice(
-                      calcFinalPrice(
-                        term.subscriptiontermprice,
-                        term.subscriptiontermdiscount,
-                        normalizeDiscountType(
-                          term.subscriptiontermdiscounttype,
-                        ),
-                      ),
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {term.categoryName}
-                  </TableCell>
-                  <TableCell className="text-center">{term.planName}</TableCell>
-                  <TableCell className="text-center">
-                    {getPackageBadge(term.packageName)}
-                  </TableCell>
-                  <TableCell>{formatDate(term.createdAt)}</TableCell>
-                  <TableCell>{formatDate(term.updatedAt)}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="rounded-full cursor-pointer"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="center">
-                        <DropdownMenuItem
-                          className="text-yellow-500 cursor-pointer"
-                          onClick={() => openEditDialog(term)}
-                        >
-                          <Pencil className="mr-2 size-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive cursor-pointer"
-                          onClick={() => openDeleteDialog(term)}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Rows per page
-            <Select
-              value={rowsPerPage.toString()}
-              onValueChange={(value) => {
-                setRowsPerPage(Number(value));
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-8 w-[70px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronsLeft className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronsRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+          <AdminFilter
+            value={groupFilter}
+            onChange={setGroupFilter}
+            allLabel="All subscriptions"
+            options={groupOptions}
+          />
+          <AdminFilter
+            value={tierFilter}
+            onChange={setTierFilter}
+            allLabel="All tiers"
+            options={tierOptions}
+          />
+        </>
+      }
+    >
+      <AdminTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.id}
+        isLoading={
+          categories.isLoading || packages.isLoading || terms.isLoading
+        }
+        emptyTitle={terms.isError ? "Couldn't load terms" : "No terms yet"}
+        emptyHint={
+          terms.isError
+            ? "Refresh the page to try again."
+            : "Add a price to a tier; only 3, 6 and 12 months can be sold."
+        }
+        pageSize={20}
+        resetKey={`${search}|${groupFilter}|${tierFilter}`}
+        initialSort={{ key: "group", dir: "asc" }}
+      />
 
       <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) {
-            resetForm();
-            setSelectedTerm(null);
-          }
-        }}
+        open={form !== null}
+        onOpenChange={(open) => !open && setForm(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-sky-500">
-              Edit subscription term
-            </DialogTitle>
+            <DialogTitle>{form?.id ? "Edit term" : "New term"}</DialogTitle>
             <DialogDescription>
-              Update term pricing or move it to another package.
+              One price per tier and duration. Retired durations can be edited
+              but not reactivated.
             </DialogDescription>
           </DialogHeader>
-          {termFormFields("edit")}
-          <DialogFooter>
-            <Button
-              className="h-9 bg-red-500 text-white rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
-              onClick={() => setIsEditDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
-              onClick={handleUpdate}
-              disabled={!isFormValid}
-            >
-              Save changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {form && (
+            <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label>Subscription</Label>
+                  {form.id ? (
+                    <p className="rounded-sm border bg-muted/40 px-3 py-2 text-sm">
+                      {groupById.get(form.categoryId) ?? "—"}
+                    </p>
+                  ) : (
+                    <Select
+                      value={form.categoryId}
+                      onValueChange={(value) =>
+                        setForm({
+                          ...form,
+                          categoryId: value,
+                          packageId: "",
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(categories.data ?? []).map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+                <div className="grid gap-1.5">
+                  <Label>Tier</Label>
+                  {form.id ? (
+                    <p className="rounded-sm border bg-muted/40 px-3 py-2 text-sm">
+                      {tierOf(form.packageId)
+                        ? TIER_LABEL[tierOf(form.packageId) as Tier]
+                        : "—"}
+                    </p>
+                  ) : (
+                    <Select
+                      value={form.packageId}
+                      onValueChange={(value) =>
+                        setForm({ ...form, packageId: value })
+                      }
+                      disabled={!form.categoryId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {packagesForCategory(form.categoryId).map((pkg) => (
+                          <SelectItem key={pkg.id} value={pkg.id}>
+                            {TIER_LABEL[pkg.tier]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete subscription term</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;
-              <span className="font-semibold text-red-500">
-                {selectedTerm?.subscriptiontermname}
-              </span>
-              &quot; (
-              {selectedTerm &&
-                formatPrice(
-                  calcFinalPrice(
-                    selectedTerm.subscriptiontermprice,
-                    selectedTerm.subscriptiontermdiscount,
-                    normalizeDiscountType(
-                      selectedTerm.subscriptiontermdiscounttype,
-                    ),
-                  ),
-                )}
-              ) from{" "}
-              <span className="font-semibold text-red-500">
-                {selectedTerm?.categoryName}
-              </span>{" "}
-              /{" "}
-              <span className="font-semibold text-red-500">
-                {selectedTerm?.planName}
-              </span>{" "}
-              /{" "}
-              <span className="font-semibold text-red-500">
-                {selectedTerm?.packageName}
-              </span>
-              ? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
+              {form.durationMonths ? (
+                <div className="grid gap-1.5">
+                  <Label>Duration</Label>
+                  <Select
+                    value={String(form.durationMonths)}
+                    onValueChange={(value) =>
+                      setForm({
+                        ...form,
+                        durationMonths: Number(value) as 3 | 6 | 12,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TERM_MONTHS.map((months) => (
+                        <SelectItem key={months} value={String(months)}>
+                          {termLabel(months)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <p className="rounded-sm bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  Retired duration: {form.legacyLabel}. It can stay active for
+                  existing holders only.
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="term-price">Price ($)</Label>
+                  <Input
+                    id="term-price"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.price}
+                    onChange={(e) =>
+                      setForm({ ...form, price: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="term-discount">Discount</Label>
+                  <Input
+                    id="term-discount"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.discount}
+                    onChange={(e) =>
+                      setForm({ ...form, discount: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Discount type</Label>
+                <Select
+                  value={form.discountType}
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      discountType: value as "percent" | "amount",
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percent">Percent</SelectItem>
+                    <SelectItem value="amount">Amount ($)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch
+                  className="data-checked:bg-[#00a0e9]"
+                  checked={form.isActive}
+                  disabled={form.durationMonths === null}
+                  onCheckedChange={(checked) =>
+                    setForm({ ...form, isActive: checked })
+                  }
+                />
+                Active
+              </label>
+            </div>
+          )}
           <DialogFooter>
             <Button
-              className="h-9 bg-red-500 text-white rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
-              onClick={() => setIsDeleteDialogOpen(false)}
+              className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600"
+              disabled={saving || (!form?.id && !form?.packageId)}
+              onClick={() => form && void saveTerm(form)}
             >
-              Cancel
-            </Button>
-            <Button
-              className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
-              onClick={handleDelete}
-            >
-              Delete
+              {saving ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </AdminPage>
   );
 }

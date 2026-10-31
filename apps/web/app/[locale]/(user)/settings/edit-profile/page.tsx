@@ -1,13 +1,18 @@
 import EditProfile from "@/components/setting/Edit-Profile";
 import { getSettingsUser } from "@/lib/auth/current-user";
 import { getProvinces, resolvePlaceSelection } from "@/lib/api/categories";
+import { listMyPhones } from "@/actions/settings";
+import { getTranslations } from "next-intl/server";
 
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Edit Profile - Psakhmer",
-  description: "Edit Profile - Psakhmer",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("Settings.metadata");
+  return {
+    title: t("editProfile"),
+    description: t("editProfile"),
+  };
+}
 
 export default async function EditProfilePage() {
   const me = await getSettingsUser();
@@ -22,6 +27,16 @@ export default async function EditProfilePage() {
     me.districtId,
     me.communeId,
   );
+  // Secondary contact numbers; the primary row falls back to `me.primaryPhone`
+  // when the account has no phone rows at all.
+  const phones = await listMyPhones();
 
-  return <EditProfile me={me} provinces={provinces} savedPlace={savedPlace} />;
+  return (
+    <EditProfile
+      me={me}
+      provinces={provinces}
+      savedPlace={savedPlace}
+      phones={phones}
+    />
+  );
 }

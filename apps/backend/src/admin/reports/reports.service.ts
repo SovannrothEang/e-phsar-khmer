@@ -7,13 +7,15 @@ import {
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
-import { users } from '../../db/schema/users.schema';
+import { users, userPhones } from '../../db/schema/users.schema';
 import { listings } from '../../db/schema/listings.schema';
 import {
+  bannedPhones,
   reportReasons,
   userReports,
   listingReports,
 } from '../../db/schema/reports.schema';
+import { normalizePhoneE164 } from '../../reports/phone-ban.util';
 import type {
   ReportReasonRow,
   UserReportRow,
@@ -175,6 +177,44 @@ export class ReportsService {
           .update(users)
           .set({ status: 'suspended', updatedAt: new Date() })
           .where(eq(users.id, report.targetUserId));
+
+        // The ban is keyed on the number, not the account: it must outlive
+        // the 90-day hard purge so the same numbers can never register again.
+        const [target] = await tx
+          .select({ primaryPhone: users.primaryPhone })
+          .from(users)
+          .where(eq(users.id, report.targetUserId))
+          .limit(1);
+        const extraPhones = await tx
+          .select({ phone: userPhones.phone })
+          .from(userPhones)
+          .where(eq(userPhones.userId, report.targetUserId));
+
+        const phones = [
+          ...new Set(
+            [target?.primaryPhone, ...extraPhones.map((p) => p.phone)]
+              .filter(
+                (phone): phone is string =>
+                  typeof phone === 'string' && phone.length > 0,
+              )
+              .map(normalizePhoneE164),
+          ),
+        ];
+        if (phones.length > 0) {
+          await tx
+            .insert(bannedPhones)
+            .values(
+              phones.map((phone) => ({
+                phone,
+                userId: report.targetUserId,
+                reportId: report.id,
+                bannedById: reviewer.id,
+              })),
+            )
+            // A number already banned by an earlier report stays banned.
+            .onConflictDoNothing({ target: bannedPhones.phone });
+        }
+
         // Every other open report against this account is settled by the
         // same decision.
         await tx

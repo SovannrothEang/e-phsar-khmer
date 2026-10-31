@@ -16,6 +16,8 @@ export type CurrentUser = {
   firstName: string | null;
   lastName: string | null;
   profilePhotoUrl: string | null;
+  /** The account's primary number — the checkout contact block shows it. */
+  primaryPhone: string | null;
 };
 
 /**
@@ -35,6 +37,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       firstName: res.data.firstName,
       lastName: res.data.lastName,
       profilePhotoUrl: res.data.profilePhotoUrl,
+      primaryPhone: res.data.primaryPhone ?? null,
     };
   } catch {
     /* no valid session — chip stays hidden */
@@ -59,6 +62,7 @@ export async function getUserProfile(): Promise<CurrentUser | null> {
       firstName: res.data.firstName,
       lastName: res.data.lastName,
       profilePhotoUrl: res.data.profilePhotoUrl,
+      primaryPhone: res.data.primaryPhone ?? null,
     };
   } catch {
     return null;

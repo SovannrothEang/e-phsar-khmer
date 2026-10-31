@@ -5,6 +5,7 @@ import { serverFetch } from "@/lib/api/client";
 export interface AdminSubcategory {
   subId: string;
   name: string;
+  nameKm: string;
   slug: string;
   subIcon: string;
   categoryId: string;
@@ -19,6 +20,7 @@ interface BackendSubcategory {
   categoryId: string;
   slug: string;
   name: string;
+  nameKm: string | null;
   icon: string | null;
   isActive: boolean;
   sortOrder: number;
@@ -40,6 +42,7 @@ export async function getAdminSubcategories(): Promise<AdminSubcategory[]> {
   return data.map((s) => ({
     subId: s.id,
     name: s.name,
+    nameKm: s.nameKm ?? "",
     slug: s.slug,
     subIcon: iconToSrc(s.icon),
     categoryId: s.categoryId,

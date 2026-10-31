@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { FieldGroup } from "@/components/ui/field";
 import { toast } from "@/components/ui/sonner";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { reportListing } from "@/actions/reports";
 import { REAL_ID, useReportReasons } from "./use-report-reasons";
 

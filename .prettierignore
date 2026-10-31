@@ -1,0 +1,17 @@
+# CLAUDE.md is prose documentation read by every agent session, and prettier's
+# markdown printer damages it rather than formatting it:
+#   * it strips the spaces around an inline-code span that sits between two
+#     code terms -- "`a` adds `b`" becomes "`a`adds`b`"
+#   * it escapes "__" inside identifiers, so the documented
+#     drizzle.__drizzle_migrations becomes drizzle.\_\_drizzle_migrations
+# Keeping it out of `pnpm format` / `format:check` is deliberate; the file is
+# hand-maintained.
+CLAUDE.md
+
+# Local Claude Code harness state (gitignored, never in CI); keeping it out of
+# format:check makes the local gate match CI instead of failing on transcripts.
+.claude/
+
+# Local superpowers agent scratch (gitignored by .superpowers/sdd/.gitignore,
+# never in CI); same reason as .claude/.
+.superpowers/

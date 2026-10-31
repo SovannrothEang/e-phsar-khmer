@@ -1,1 +1,0 @@
-DROP TABLE "chat"."e2e_history_requests" CASCADE;

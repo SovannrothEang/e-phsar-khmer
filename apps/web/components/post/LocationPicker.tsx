@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { placeDisplayName } from "@/lib/places";
 import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import {
   Popover,
@@ -24,9 +26,9 @@ export const EMPTY_PLACE: PlaceSelection = {
 };
 
 /** "Phnom Penh, Boeng Keng Kang, Olympic" — largest to smallest. */
-export function placeLabel(place: PlaceSelection): string {
+export function placeLabel(place: PlaceSelection, locale = "en"): string {
   return [place.province, place.district, place.commune]
-    .map((level) => level?.name)
+    .map((level) => (level ? placeDisplayName(level, locale) : undefined))
     .filter(Boolean)
     .join(", ");
 }
@@ -46,12 +48,17 @@ export default function LocationPicker({
   value,
   onChange,
   required,
+  error,
 }: {
   provinces: BackendPlace[];
   value: PlaceSelection;
   onChange: (place: PlaceSelection) => void;
   required?: boolean;
+  /** Inline validation message; also marks the trigger as invalid. */
+  error?: string;
 }) {
+  const t = useTranslations("Common");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [level, setLevel] = useState<Level>("province");
   const [districts, setDistricts] = useState<BackendPlace[]>([]);
@@ -134,12 +141,20 @@ export default function LocationPicker({
       : level === "district"
         ? value.district
         : value.commune;
-  const label = placeLabel(value);
-  const crumbs = [value.province?.name, value.district?.name].filter(Boolean);
+  const label = placeLabel(value, locale);
+  const crumbs = [value.province, value.district]
+    .filter((p): p is BackendPlace => p !== null)
+    .map((p) => placeDisplayName(p, locale));
+  const displayRows = [...rows].sort((a, b) =>
+    placeDisplayName(a, locale).localeCompare(
+      placeDisplayName(b, locale),
+      locale,
+    ),
+  );
 
   return (
     <div>
-      <FieldLabel label="Location" required={required} />
+      <FieldLabel label={t("location")} required={required} />
       <Popover
         open={open}
         onOpenChange={(next) => {
@@ -150,10 +165,14 @@ export default function LocationPicker({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            className={`flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-left type-nav text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+              error
+                ? "border-destructive ring-3 ring-destructive/20"
+                : "border-gray-200"
+            }`}
           >
             <span className={label ? "" : "text-gray-400"}>
-              {label || "Choose Location"}
+              {label || t("chooseLocation")}
             </span>
             <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
           </button>
@@ -167,7 +186,7 @@ export default function LocationPicker({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close"
+                aria-label={t("close")}
                 className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
               >
                 <X className="h-4 w-4" />
@@ -178,14 +197,14 @@ export default function LocationPicker({
                 onClick={() =>
                   setLevel(level === "commune" ? "district" : "province")
                 }
-                aria-label="Back"
+                aria-label={t("back")}
                 className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-muted/70"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
             )}
-            <span className="truncate px-2 text-[15px]">
-              {crumbs.length > 0 ? crumbs.join(" › ") : "Choose Location"}
+            <span className="truncate px-2 type-body-sm">
+              {crumbs.length > 0 ? crumbs.join(" › ") : t("chooseLocation")}
             </span>
             <button
               type="button"
@@ -193,32 +212,34 @@ export default function LocationPicker({
                 onChange(EMPTY_PLACE);
                 setLevel("province");
               }}
-              className="shrink-0 cursor-pointer rounded-full bg-muted px-3 py-1 text-[13px] text-muted-foreground hover:bg-muted/70"
+              className="shrink-0 cursor-pointer rounded-full bg-muted px-3 py-1 type-meta text-muted-foreground hover:bg-muted/70"
             >
-              Clear
+              {t("clear")}
             </button>
           </div>
 
           <div className="max-h-80 overflow-y-auto py-1">
             {loading && rows.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted-foreground">
-                Loading…
+              <p className="px-4 py-3 type-body-sm text-muted-foreground">
+                {t("loading")}
               </p>
             ) : rows.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted-foreground">
-                Nothing here
+              <p className="px-4 py-3 type-body-sm text-muted-foreground">
+                {t("nothingHere")}
               </p>
             ) : (
-              rows.map((row) => (
+              displayRows.map((row) => (
                 <button
                   key={row.id}
                   type="button"
                   onClick={() => pick(row)}
-                  className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left text-[15px] hover:bg-muted ${
+                  className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left type-body-sm hover:bg-muted ${
                     selected?.id === row.id ? "bg-muted" : ""
                   }`}
                 >
-                  <span className="truncate">{row.name}</span>
+                  <span className="truncate">
+                    {placeDisplayName(row, locale)}
+                  </span>
                   {selected?.id === row.id ? (
                     <Check className="h-4 w-4 shrink-0 text-[#00a0e9]" />
                   ) : (
@@ -230,6 +251,7 @@ export default function LocationPicker({
           </div>
         </PopoverContent>
       </Popover>
+      {error && <p className="mt-1.5 type-body-sm text-destructive">{error}</p>}
     </div>
   );
 }

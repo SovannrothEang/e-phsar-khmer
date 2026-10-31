@@ -79,6 +79,18 @@ const conditionField: FieldDef = {
   options: ['Used', 'New'],
 };
 
+/**
+ * Trusted product spec (2026-10-30): the five family forms must link one of the
+ * admin-entered spec pages. Required in the form only — the create DTO keeps
+ * `productModelId` optional like every other per-form rule.
+ */
+const productSpecField: FieldDef = {
+  key: 'productSpec',
+  label: { en: 'Product Specification' },
+  type: 'product',
+  required: true,
+};
+
 const vehicleMakeModelYearFields: FieldDef[] = [
   { key: 'brand', label: { en: 'Brand' }, type: 'select', required: false },
   { key: 'model', label: { en: 'Model' }, type: 'select', required: false },
@@ -265,12 +277,12 @@ const smartWatchBrandModelFields: FieldDef[] = [
 export const categoriesSeed: CategorySeed[] = [
   {
     slug: 'cars-and-vehicles',
-    name: { en: 'Cars and Vehicles' },
+    name: { en: 'Cars and Vehicles', km: 'រថយន្ត និង យានយន្ត' },
     sortOrder: 1,
     subcategories: [
       {
         slug: 'cars-for-sale',
-        name: { en: 'Cars For Sale' },
+        name: { en: 'Cars For Sale', km: 'រថយន្តសម្រាប់លក់' },
         sortOrder: 1,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -281,6 +293,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...vehicleMakeModelYearFields,
+          productSpecField,
           taxTypeField,
           conditionField,
           {
@@ -361,7 +374,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'bicycles',
-        name: { en: 'Bicycles' },
+        name: { en: 'Bicycles', km: 'កង់' },
         sortOrder: 2,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -431,7 +444,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'motorcycles-for-sale',
-        name: { en: 'Motorcycles For Sale' },
+        name: { en: 'Motorcycles For Sale', km: 'ម៉ូតូសម្រាប់លក់' },
         sortOrder: 3,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -442,6 +455,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...vehicleMakeModelYearFields,
+          productSpecField,
           taxTypeField,
           conditionField,
           {
@@ -503,7 +517,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'vehicles-for-rent',
-        name: { en: 'Vehicles For Rent' },
+        name: { en: 'Vehicles For Rent', km: 'យានជំនិះសម្រាប់ជួល' },
         sortOrder: 4,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -597,7 +611,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'maintenance-and-repair',
-        name: { en: 'Maintenance & Repair' },
+        name: { en: 'Maintenance & Repair', km: 'ថែទាំ និង ជួលជុល' },
         sortOrder: 5,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -654,7 +668,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'lorries-vans-and-tractors',
-        name: { en: 'Lorries, Vans & Tractors' },
+        name: { en: 'Lorries, Vans & Tractors', km: 'ឡានដឹកទំនិញ & ត្រាក់ទ័រ' },
         sortOrder: 6,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -745,7 +759,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'financing-and-insurance',
-        name: { en: 'Financing & Insurance' },
+        name: { en: 'Financing & Insurance', km: 'ហិរញ្ញវត្ថុ & ធានារ៉ាប់រង' },
         sortOrder: 7,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -802,7 +816,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'tuk-tuk-and-remork',
-        name: { en: 'Tuk Tuk & Remork' },
+        name: { en: 'Tuk Tuk & Remork', km: 'តុកតុក & រ៉ឺម៉ក' },
         sortOrder: 8,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -871,7 +885,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'parts-and-accessories',
-        name: { en: 'Parts & Accessories' },
+        name: { en: 'Parts & Accessories', km: 'គ្រឿងបន្លាស់ & សំភារះ' },
         sortOrder: 9,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -954,7 +968,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'vehicles-others',
-        name: { en: 'Others' },
+        name: { en: 'Others', km: 'ផ្សេងទៀត' },
         sortOrder: 10,
         fieldSchema: [
           ...commonListingFields.filter((f) => f.key === 'photos'),
@@ -1013,12 +1027,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'phones-and-tablets',
-    name: { en: 'Phones & Tablets' },
+    name: { en: 'Phones & Tablets', km: 'ទូរស័ព្ទ & ថេប្លេត' },
     sortOrder: 2,
     subcategories: [
       {
         slug: 'phones',
-        name: { en: 'Phones' },
+        name: { en: 'Phones', km: 'ទូរស័ព្ទ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -1035,6 +1049,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...phoneBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',
@@ -1095,7 +1110,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'tablets',
-        name: { en: 'Tablets' },
+        name: { en: 'Tablets', km: 'ថេប្លេត' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -1112,6 +1127,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...tabletBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',
@@ -1172,7 +1188,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'smart-watches',
-        name: { en: 'Smart Watches' },
+        name: { en: 'Smart Watches', km: 'នាឡិកាឆ្លាតវៃ' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -1189,6 +1205,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...smartWatchBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',
@@ -1249,7 +1266,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'phone-accessories',
-        name: { en: 'Phone Accessories' },
+        name: { en: 'Phone Accessories', km: 'គ្រឿងបន្លាស់ទូរស័ព្ទ' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -1343,7 +1360,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'phone-numbers',
-        name: { en: 'Phone Numbers' },
+        name: { en: 'Phone Numbers', km: 'លេខទូរសព្ទ' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -1427,12 +1444,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'computers-and-accessories',
-    name: { en: 'Computers & Accessories' },
+    name: { en: 'Computers & Accessories', km: 'កុំព្យូទ័រ & គ្រឿងបន្លាស់' },
     sortOrder: 3,
     subcategories: [
       {
         slug: 'laptops',
-        name: { en: 'Laptops' },
+        name: { en: 'Laptops', km: 'កុំព្យូទ័រយួរដៃ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -1519,7 +1536,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'desktops',
-        name: { en: 'Desktops' },
+        name: { en: 'Desktops', km: 'កុំព្យូទ័រលើតុ' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -1605,7 +1622,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'all-in-one',
-        name: { en: 'All-in-One' },
+        name: { en: 'All-in-One', km: 'All-in-One' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -1692,7 +1709,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'monitors',
-        name: { en: 'Monitors' },
+        name: { en: 'Monitors', km: 'ម៉ូនីទ័រ' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -1775,7 +1792,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'printers-and-scanners',
-        name: { en: 'Printers & Scanners' },
+        name: {
+          en: 'Printers & Scanners',
+          km: 'ម៉ាស៊ីនបោះពុម្ព & ម៉ាស៊ីនស្កេន',
+        },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -1857,7 +1877,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'computers-parts-and-accessories',
-        name: { en: 'Parts & Accessories' },
+        name: { en: 'Parts & Accessories', km: 'គ្រឿងបន្លាស់ & សំភារះ' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -1958,7 +1978,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'softwares',
-        name: { en: 'Softwares' },
+        name: { en: 'Softwares', km: 'កម្មវិធី' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -2035,12 +2055,15 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'electronics-and-appliances',
-    name: { en: 'Electronics & Appliances' },
+    name: {
+      en: 'Electronics & Appliances',
+      km: 'អេឡិចត្រូនិច និង គ្រឿងប្រើប្រាស់',
+    },
     sortOrder: 4,
     subcategories: [
       {
         slug: 'washing-machines-and-dryers',
-        name: { en: 'Washing Machines & Dryers' },
+        name: { en: 'Washing Machines & Dryers', km: 'ម៉ាស៊ីនបោកគក់ & សម្ងួត' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -2116,7 +2139,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'fridges-and-freezers',
-        name: { en: 'Fridges & Freezers' },
+        name: { en: 'Fridges & Freezers', km: 'ទូរទឹកកក និង ទូក្លាសេ' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -2192,7 +2215,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'air-conditioning-and-heating',
-        name: { en: 'Air Conditioning & Heating' },
+        name: {
+          en: 'Air Conditioning & Heating',
+          km: 'ម៉ាស៊ីនត្រជាក់ និង កំដៅ',
+        },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -2268,7 +2294,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'tools',
-        name: { en: 'Tools' },
+        name: { en: 'Tools', km: 'ឧបករណ៍' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -2344,7 +2370,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'machinery',
-        name: { en: 'Machinery' },
+        name: { en: 'Machinery', km: 'គ្រឿងម៉ាស៊ីន' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -2423,7 +2449,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'consumer-electronics',
-        name: { en: 'Consumer Electronics' },
+        name: { en: 'Consumer Electronics', km: 'គ្រឿងអេឡិចត្រូនិក' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -2499,7 +2525,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'security-cameras',
-        name: { en: 'Security Cameras' },
+        name: { en: 'Security Cameras', km: 'កាមេរ៉ាសុវត្ថិភាព' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -2576,7 +2602,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'lighting',
-        name: { en: 'Lighting' },
+        name: { en: 'Lighting', km: 'អំពូល' },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -2653,7 +2679,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cameras-and-camcorders',
-        name: { en: 'Cameras & Camcorders' },
+        name: { en: 'Cameras & Camcorders', km: 'កាមេរ៉ា & ម៉ាស៊ីនថត' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -2745,7 +2771,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'tvs-videos-and-audio',
-        name: { en: 'TVs, Videos & Audio' },
+        name: { en: 'TVs, Videos & Audio', km: 'ទូរទស្សន៍ វីដេអូ & សំឡេង' },
         sortOrder: 10,
         fieldSchema: [
           {
@@ -2835,7 +2861,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'home-appliances',
-        name: { en: 'Home Appliances' },
+        name: { en: 'Home Appliances', km: 'ឧបករណ៍ប្រើប្រាស់ក្នុងផ្ទះ' },
         sortOrder: 11,
         fieldSchema: [
           {
@@ -2911,7 +2937,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'video-games-consoles-toys',
-        name: { en: 'Video games, consoles, toys' },
+        name: {
+          en: 'Video games, consoles, toys',
+          km: 'វីដេអូហ្គេម & ប្រដាប់ប្រដាក្មេងលេង',
+        },
         sortOrder: 12,
         fieldSchema: [
           {
@@ -2989,12 +3018,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'home-and-land',
-    name: { en: 'Home & Land' },
+    name: { en: 'Home & Land', km: 'ផ្ទះ & ដី' },
     sortOrder: 5,
     subcategories: [
       {
         slug: 'house-for-sale',
-        name: { en: 'House For Sale' },
+        name: { en: 'House For Sale', km: 'ផ្ទះលក់' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -3100,7 +3129,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'house-for-rent',
-        name: { en: 'House For Rent' },
+        name: { en: 'House For Rent', km: 'ផ្ទះជួល' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -3206,7 +3235,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'condo-for-sale',
-        name: { en: 'Condo For Sale' },
+        name: { en: 'Condo For Sale', km: 'ខុនដូសម្រាប់លក់' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -3275,7 +3304,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'apartment-for-rent',
-        name: { en: 'Apartment For Rent' },
+        name: { en: 'Apartment For Rent', km: 'អាផាតមិនសំរាប់ជួល' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -3363,7 +3392,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'land-for-sale',
-        name: { en: 'Land For Sale' },
+        name: { en: 'Land For Sale', km: 'ដីលក់' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -3432,7 +3461,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'land-for-rent',
-        name: { en: 'Land For Rent' },
+        name: { en: 'Land For Rent', km: 'ដីសម្រាប់ជួល' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -3501,7 +3530,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'commercial-properties-for-sale',
-        name: { en: 'Commercial Properties For Sale' },
+        name: {
+          en: 'Commercial Properties For Sale',
+          km: 'អចលនទ្រព្យពាណិជ្ជកម្មសម្រាប់លក់',
+        },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -3585,7 +3617,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'commercial-properties-for-rent',
-        name: { en: 'Commercial Properties For Rent' },
+        name: {
+          en: 'Commercial Properties For Rent',
+          km: 'អចលនទ្រព្យពាណិជ្ជកម្មសម្រាប់ជួល',
+        },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -3669,7 +3704,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'room-for-rent',
-        name: { en: 'Room For Rent' },
+        name: { en: 'Room For Rent', km: 'បន្ទប់ជួល' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -3738,7 +3773,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'properties-wanted',
-        name: { en: 'Properties Wanted' },
+        name: { en: 'Properties Wanted', km: 'ត្រូវការអចលនទ្រព្យ' },
         sortOrder: 10,
         fieldSchema: [
           {
@@ -3795,7 +3830,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'agent-services',
-        name: { en: 'Agent Services' },
+        name: { en: 'Agent Services', km: 'សេវាកម្មភ្នាក់ងារ' },
         sortOrder: 11,
         fieldSchema: [
           {
@@ -3852,7 +3887,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'home-and-land-others',
-        name: { en: 'Others' },
+        name: { en: 'Others', km: 'ផ្សេងទៀត' },
         sortOrder: 12,
         fieldSchema: [
           {
@@ -3911,12 +3946,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'jobs',
-    name: { en: 'Jobs' },
+    name: { en: 'Jobs', km: 'ការងារ' },
     sortOrder: 6,
     subcategories: [
       {
         slug: 'accounting-jobs',
-        name: { en: 'Accounting' },
+        name: { en: 'Accounting', km: 'គណនេយ្យ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -4019,7 +4054,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'administration',
-        name: { en: 'Administration' },
+        name: { en: 'Administration', km: 'រដ្ឋបាល' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -4122,7 +4157,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'architecture-engineering',
-        name: { en: 'Architecture/Engineering' },
+        name: { en: 'Architecture/Engineering', km: 'ស្ថាបត្យកម្ម/វិស្វកម្ម' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -4225,7 +4260,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'assistant-secretary',
-        name: { en: 'Assistant/Secretary' },
+        name: { en: 'Assistant/Secretary', km: 'ជំនួយការ/លេខាធិការ' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -4328,7 +4363,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'audit-taxation',
-        name: { en: 'Audit/Taxation' },
+        name: { en: 'Audit/Taxation', km: 'សវនកម្ម/ពន្ធដារ' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -4431,7 +4466,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'banking-insurance',
-        name: { en: 'Banking/Insurance' },
+        name: { en: 'Banking/Insurance', km: 'ធនាគារ/ធានារ៉ាប់រង' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -4534,7 +4569,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cashier-receptionist',
-        name: { en: 'Cashier/Receptionist' },
+        name: { en: 'Cashier/Receptionist', km: 'អ្នកគិតលុយ/អ្នកទទួលភ្ញៀវ' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -4637,7 +4672,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'catering-restaurant',
-        name: { en: 'Catering/Restaurant' },
+        name: { en: 'Catering/Restaurant', km: 'អាហារដ្ឋាន/ភោជនីយដ្ឋាន' },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -4740,7 +4775,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cleaner-maid',
-        name: { en: 'Cleaner/Maid' },
+        name: { en: 'Cleaner/Maid', km: 'អ្នកសម្អាត/កូនឈ្នួល' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -4843,7 +4878,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'consultancy',
-        name: { en: 'Consultancy' },
+        name: { en: 'Consultancy', km: 'ប្រឹក្សាយោបល់' },
         sortOrder: 10,
         fieldSchema: [
           {
@@ -4946,7 +4981,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'customer-service',
-        name: { en: 'Customer Service' },
+        name: { en: 'Customer Service', km: 'សេវាកម្មអតិថិជន' },
         sortOrder: 11,
         fieldSchema: [
           {
@@ -5049,7 +5084,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'design',
-        name: { en: 'Design' },
+        name: { en: 'Design', km: 'រចនា' },
         sortOrder: 12,
         fieldSchema: [
           {
@@ -5152,7 +5187,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'education-training',
-        name: { en: 'Education/Training' },
+        name: { en: 'Education/Training', km: 'ការអប់រំ/បណ្តុះបណ្តាល' },
         sortOrder: 13,
         fieldSchema: [
           {
@@ -5255,7 +5290,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'finance',
-        name: { en: 'Finance' },
+        name: { en: 'Finance', km: 'ហិរញ្ញវត្ថុ' },
         sortOrder: 14,
         fieldSchema: [
           {
@@ -5358,7 +5393,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'freight-shipping-delivery-warehouse',
-        name: { en: 'Freight/Shipping/Delivery/Warehouse' },
+        name: {
+          en: 'Freight/Shipping/Delivery/Warehouse',
+          km: 'ដឹកទំនិញ/ដឹកជញ្ជូន/ចែកចាយ/ឃ្លាំង',
+        },
         sortOrder: 15,
         fieldSchema: [
           {
@@ -5461,7 +5499,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'hotel-hospitality',
-        name: { en: 'Hotel/Hospitality' },
+        name: { en: 'Hotel/Hospitality', km: 'សណ្ឋាគារ / មន្ទីរពេទ្យ' },
         sortOrder: 16,
         fieldSchema: [
           {
@@ -5564,7 +5602,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'human-resources',
-        name: { en: 'Human Resources' },
+        name: { en: 'Human Resources', km: 'ធនធានមនុស្ស' },
         sortOrder: 17,
         fieldSchema: [
           {
@@ -5667,7 +5705,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'information-technology',
-        name: { en: 'Information Technology' },
+        name: { en: 'Information Technology', km: 'ពត៌មានវិទ្យា' },
         sortOrder: 18,
         fieldSchema: [
           {
@@ -5770,7 +5808,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'lawyer-legal-services',
-        name: { en: 'Lawyer/Legal Services' },
+        name: { en: 'Lawyer/Legal Services', km: 'មេធាវី/សេវាច្បាប់' },
         sortOrder: 19,
         fieldSchema: [
           {
@@ -5873,7 +5911,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'management',
-        name: { en: 'Management' },
+        name: { en: 'Management', km: 'ការគ្រប់គ្រង' },
         sortOrder: 20,
         fieldSchema: [
           {
@@ -5976,7 +6014,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'manufacturing',
-        name: { en: 'Manufacturing' },
+        name: { en: 'Manufacturing', km: 'ការផលិត' },
         sortOrder: 21,
         fieldSchema: [
           {
@@ -6079,7 +6117,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'marketing',
-        name: { en: 'Marketing' },
+        name: { en: 'Marketing', km: 'ទីផ្សារ' },
         sortOrder: 22,
         fieldSchema: [
           {
@@ -6182,7 +6220,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'media-advertising',
-        name: { en: 'Media/Advertising' },
+        name: {
+          en: 'Media/Advertising',
+          km: 'ប្រព័ន្ធផ្សព្វផ្សាយ/ការផ្សាយពាណិជ្ជកម្ម',
+        },
         sortOrder: 23,
         fieldSchema: [
           {
@@ -6285,7 +6326,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'medical-health-nursing',
-        name: { en: 'Medical/Health/Nursing' },
+        name: {
+          en: 'Medical/Health/Nursing',
+          km: 'វេជ្ជសាស្ត្រ/សុខភាព/គិលានុបដ្ឋាយិកា',
+        },
         sortOrder: 24,
         fieldSchema: [
           {
@@ -6388,7 +6432,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'merchandising-purchasing',
-        name: { en: 'Merchandising/Purchasing' },
+        name: { en: 'Merchandising/Purchasing', km: 'ការទិញ/លក់ទំនិញ' },
         sortOrder: 25,
         fieldSchema: [
           {
@@ -6491,7 +6535,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'operations',
-        name: { en: 'Operations' },
+        name: { en: 'Operations', km: 'ប្រតិបត្តិការ' },
         sortOrder: 26,
         fieldSchema: [
           {
@@ -6594,7 +6638,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'project-management',
-        name: { en: 'Project Management' },
+        name: { en: 'Project Management', km: 'ការគ្រប់គ្រងគម្រោង' },
         sortOrder: 27,
         fieldSchema: [
           {
@@ -6697,7 +6741,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'quality-control',
-        name: { en: 'Quality Control' },
+        name: { en: 'Quality Control', km: 'ការត្រួតពិនិត្យគុណភាព' },
         sortOrder: 28,
         fieldSchema: [
           {
@@ -6800,7 +6844,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'resort-casino',
-        name: { en: 'Resort/Casino' },
+        name: { en: 'Resort/Casino', km: 'Resort/Casino' },
         sortOrder: 29,
         fieldSchema: [
           {
@@ -6903,7 +6947,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'sales',
-        name: { en: 'Sales' },
+        name: { en: 'Sales', km: 'ការលក់' },
         sortOrder: 30,
         fieldSchema: [
           {
@@ -7006,7 +7050,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'security-driver',
-        name: { en: 'Security/Driver' },
+        name: { en: 'Security/Driver', km: 'សន្តិសុខ/អ្នកបើកបរ' },
         sortOrder: 31,
         fieldSchema: [
           {
@@ -7109,7 +7153,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'technicians',
-        name: { en: 'Technicians' },
+        name: { en: 'Technicians', km: 'អ្នកបច្ចេកទេស' },
         sortOrder: 32,
         fieldSchema: [
           {
@@ -7212,7 +7256,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'telecommunications',
-        name: { en: 'Telecommunications' },
+        name: { en: 'Telecommunications', km: 'ទូរគមនាគមន៍' },
         sortOrder: 33,
         fieldSchema: [
           {
@@ -7315,7 +7359,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'translations-interpretation',
-        name: { en: 'Translations/Interpretation' },
+        name: { en: 'Translations/Interpretation', km: 'ការបកប្រែ/ការបកស្រាយ' },
         sortOrder: 34,
         fieldSchema: [
           {
@@ -7418,7 +7462,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'travel-agents-ticket-sales',
-        name: { en: 'Travel Agents/Ticket Sales' },
+        name: {
+          en: 'Travel Agents/Ticket Sales',
+          km: 'ភ្នាក់ងារទេសចរណ៍/លក់សំបុត្រ',
+        },
         sortOrder: 35,
         fieldSchema: [
           {
@@ -7521,7 +7568,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'jobs-others',
-        name: { en: 'Others' },
+        name: { en: 'Others', km: 'ផ្សេងទៀត' },
         sortOrder: 36,
         fieldSchema: [
           {
@@ -7626,12 +7673,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'services',
-    name: { en: 'Services' },
+    name: { en: 'Services', km: 'សេវាកម្ម' },
     sortOrder: 7,
     subcategories: [
       {
         slug: 'accounting-services',
-        name: { en: 'Accounting' },
+        name: { en: 'Accounting', km: 'គណនេយ្យ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -7688,7 +7735,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'financial-services',
-        name: { en: 'Financial Services' },
+        name: { en: 'Financial Services', km: 'សេវាហិរញ្ញវត្ថុ' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -7745,7 +7792,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'travel-and-tourism',
-        name: { en: 'Travel & Tourism' },
+        name: { en: 'Travel & Tourism', km: 'ការធ្វើដំណើរ និងទេសចរណ៍' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -7802,7 +7849,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'automotive-services',
-        name: { en: 'Automotive' },
+        name: { en: 'Automotive', km: 'រថយន្ត' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -7859,7 +7906,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'advertising-and-media',
-        name: { en: 'Advertising & Media' },
+        name: {
+          en: 'Advertising & Media',
+          km: 'ការផ្សាយពាណិជ្ជកម្ម & ប្រព័ន្ធផ្សព្វផ្សាយ',
+        },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -7916,7 +7966,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'bridal-services',
-        name: { en: 'Bridal Services' },
+        name: { en: 'Bridal Services', km: 'សំអាងការ' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -7973,7 +8023,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cleaning-and-maid-services',
-        name: { en: 'Cleaning & Maid Services' },
+        name: { en: 'Cleaning & Maid Services', km: 'សេវាសំអាត & មេផ្ទះ' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -8030,7 +8080,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'construction-arch-and-interiors',
-        name: { en: 'Construction, Arch. & Interiors' },
+        name: {
+          en: 'Construction, Arch. & Interiors',
+          km: 'សំណង់ ស្ថាបត្យកម្ម និងផ្នែកខាងក្នុង',
+        },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -8087,7 +8140,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'education-training-services',
-        name: { en: 'Education/Training' },
+        name: { en: 'Education/Training', km: 'ការអប់រំ & បណ្តុះបណ្តាល' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -8144,7 +8197,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'engineering-services',
-        name: { en: 'Engineering' },
+        name: { en: 'Engineering', km: 'សេវាកម្មវិស្វកម្ម' },
         sortOrder: 10,
         fieldSchema: [
           {
@@ -8201,7 +8254,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'insurance-services',
-        name: { en: 'Insurance' },
+        name: { en: 'Insurance', km: 'ធានារ៉ាប់រង' },
         sortOrder: 11,
         fieldSchema: [
           {
@@ -8258,7 +8311,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'massage-and-spa',
-        name: { en: 'Massage & Spa' },
+        name: { en: 'Massage & Spa', km: 'ម៉ាស្សា & ស្ប៉ា' },
         sortOrder: 12,
         fieldSchema: [
           {
@@ -8315,7 +8368,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'hospitality-travel-and-tourism',
-        name: { en: 'Hospitality, Travel & Tourism' },
+        name: {
+          en: 'Hospitality, Travel & Tourism',
+          km: 'បដិសណ្ឋារកិច្ច និង ទេសចរ',
+        },
         sortOrder: 13,
         fieldSchema: [
           {
@@ -8372,7 +8428,10 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'health-medical-and-pharma',
-        name: { en: 'Health, Medical & Pharma' },
+        name: {
+          en: 'Health, Medical & Pharma',
+          km: 'សុខភាព វេជ្ជសាស្ត្រ & ឱសថ',
+        },
         sortOrder: 14,
         fieldSchema: [
           {
@@ -8429,7 +8488,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'it-and-telecom',
-        name: { en: 'IT & Telecom' },
+        name: { en: 'IT & Telecom', km: 'អាយធី & ទូរគមនាគមន៍' },
         sortOrder: 15,
         fieldSchema: [
           {
@@ -8486,7 +8545,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'interior-design-and-renovation',
-        name: { en: 'Interior Design & Renovation' },
+        name: { en: 'Interior Design & Renovation', km: 'រចនា និង កែលម្អ' },
         sortOrder: 16,
         fieldSchema: [
           {
@@ -8543,7 +8602,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'legal-services',
-        name: { en: 'Legal' },
+        name: { en: 'Legal', km: 'សេវាច្បាប់' },
         sortOrder: 17,
         fieldSchema: [
           {
@@ -8600,7 +8659,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'movers-and-logistics',
-        name: { en: 'Movers & Logistics' },
+        name: { en: 'Movers & Logistics', km: 'សេវាកម្មដឹកជញ្ជូន' },
         sortOrder: 18,
         fieldSchema: [
           {
@@ -8657,7 +8716,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'plumbing-and-electrical',
-        name: { en: 'Plumbing & Electrical' },
+        name: { en: 'Plumbing & Electrical', km: 'បំពង់ទឹក & អគ្គិសនី' },
         sortOrder: 19,
         fieldSchema: [
           {
@@ -8714,7 +8773,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'property-and-real-estate',
-        name: { en: 'Property & Real Estate' },
+        name: { en: 'Property & Real Estate', km: 'សេវាកម្មអចលនទ្រព្យ' },
         sortOrder: 20,
         fieldSchema: [
           {
@@ -8771,7 +8830,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'science-services',
-        name: { en: 'Science' },
+        name: { en: 'Science', km: 'វិទ្យាសាស្ត្រ' },
         sortOrder: 21,
         fieldSchema: [
           {
@@ -8828,7 +8887,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'supply-chain-and-logistics',
-        name: { en: 'Supply Chain & Logistics' },
+        name: { en: 'Supply Chain & Logistics', km: 'ផ្គត់ផ្គង់ & ដឹកជញ្ជូន' },
         sortOrder: 22,
         fieldSchema: [
           {
@@ -8885,7 +8944,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'printing-and-publishing',
-        name: { en: 'Printing & Publishing' },
+        name: { en: 'Printing & Publishing', km: 'បោះពុម្ពផ្សាយ' },
         sortOrder: 23,
         fieldSchema: [
           {
@@ -8942,7 +9001,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'other-services',
-        name: { en: 'Other Services' },
+        name: { en: 'Other Services', km: 'សេវាកម្មផ្សេងទៀត' },
         sortOrder: 24,
         fieldSchema: [
           {
@@ -9001,12 +9060,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'fashion-and-beauty',
-    name: { en: 'Fashion & Beauty' },
+    name: { en: 'Fashion & Beauty', km: 'សំលៀកបំពាក់ & សម្រស់' },
     sortOrder: 8,
     subcategories: [
       {
         slug: 'womens-fashion',
-        name: { en: "Women's Fashion" },
+        name: { en: "Women's Fashion", km: 'សម្លៀកបំពាក់ស្ត្រី' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -9095,7 +9154,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'mens-fashion',
-        name: { en: "Men's Fashion" },
+        name: { en: "Men's Fashion", km: 'សម្លៀកបំពាក់បុរស' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -9184,7 +9243,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'baby-and-kids',
-        name: { en: 'Baby & Kids' },
+        name: { en: 'Baby & Kids', km: 'ទារក & កុមារ' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -9272,7 +9331,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'travel-and-luggage',
-        name: { en: 'Travel & Luggage' },
+        name: { en: 'Travel & Luggage', km: 'ការធ្វើដំណើរ និង វ៉ាលី' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -9354,7 +9413,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'fashion-accessories',
-        name: { en: 'Fashion Accessories' },
+        name: { en: 'Fashion Accessories', km: 'គ្រឿង Fashion' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -9457,7 +9516,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'beauty-and-healthcare-products',
-        name: { en: 'Beauty & Healthcare Products' },
+        name: { en: 'Beauty & Healthcare Products', km: 'សម្ផស្ស & សុខភាព' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -9534,12 +9593,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'furniture-and-decor',
-    name: { en: 'Furniture & Decor' },
+    name: { en: 'Furniture & Decor', km: 'គ្រឿងសង្ហារិម & ការតុបតែង' },
     sortOrder: 9,
     subcategories: [
       {
         slug: 'table-and-desks',
-        name: { en: 'Table & Desks' },
+        name: { en: 'Table & Desks', km: 'តុ & តុការិយាល័យ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -9629,7 +9688,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'chairs-and-sofas',
-        name: { en: 'Chairs & Sofas' },
+        name: { en: 'Chairs & Sofas', km: 'កៅអី & សាឡុង' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -9723,7 +9782,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'wardrobe-and-cabinets',
-        name: { en: 'Wardrobe & Cabinets' },
+        name: { en: 'Wardrobe & Cabinets', km: 'ទូខោអាវ & ទូ' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -9798,7 +9857,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'shelves-and-drawers',
-        name: { en: 'Shelves & Drawers' },
+        name: { en: 'Shelves & Drawers', km: 'ធ្នើរ & ថត' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -9873,7 +9932,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'beds-and-mattresses',
-        name: { en: 'Beds & Mattresses' },
+        name: { en: 'Beds & Mattresses', km: 'គ្រែ & ពូក' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -9948,7 +10007,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'curtains-and-carpets',
-        name: { en: 'Curtains & Carpets' },
+        name: { en: 'Curtains & Carpets', km: 'វាំងនន & កំរាលព្រំ' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -10023,7 +10082,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'other-furniture',
-        name: { en: 'Other Furniture' },
+        name: { en: 'Other Furniture', km: 'គ្រឿងសង្ហារិមផ្សេងទៀត' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -10098,7 +10157,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'kitchenware',
-        name: { en: 'Kitchenware' },
+        name: { en: 'Kitchenware', km: 'សម្ភារៈផ្ទះបាយ' },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -10173,7 +10232,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'household-items',
-        name: { en: 'Household Items' },
+        name: { en: 'Household Items', km: 'របស់របរប្រើប្រាស់ក្នុងផ្ទះ' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -10248,7 +10307,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'handicrafts-paintings',
-        name: { en: 'Handicrafts-Paintings' },
+        name: { en: 'Handicrafts-Paintings', km: 'សិប្បកម្ម - គំនូរ' },
         sortOrder: 10,
         fieldSchema: [
           {
@@ -10325,12 +10384,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'books-sports-and-hobbies',
-    name: { en: 'Books & Sports & Hobbies' },
+    name: { en: 'Books & Sports & Hobbies', km: 'សៀវភៅ កីឡា & ចំណូលចិត្ត' },
     sortOrder: 10,
     subcategories: [
       {
         slug: 'musical-instruments',
-        name: { en: 'Musical Instruments' },
+        name: { en: 'Musical Instruments', km: 'ឧបករណ៍ភ្លេង' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -10425,7 +10484,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'fishing',
-        name: { en: 'Fishing' },
+        name: { en: 'Fishing', km: 'ការនេសាទត្រី' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -10500,7 +10559,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'hike-and-camping',
-        name: { en: 'Hike & Camping' },
+        name: { en: 'Hike & Camping', km: 'ឡើងភ្នំ និង បោះជំរុំ' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -10575,7 +10634,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cds-dvds-vhs',
-        name: { en: 'CDs, DVDs, VHS' },
+        name: { en: 'CDs, DVDs, VHS', km: 'CDS, DVDS, VHS' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -10650,7 +10709,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'books',
-        name: { en: 'Books' },
+        name: { en: 'Books', km: 'សៀវភៅ' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -10725,7 +10784,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'sports-equipment',
-        name: { en: 'Sports Equipment' },
+        name: { en: 'Sports Equipment', km: 'ឧបករណ៍កីឡា' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -10800,7 +10859,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'hobbies-others',
-        name: { en: 'Others' },
+        name: { en: 'Others', km: 'ផ្សេងទៀត' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -10877,12 +10936,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'pets',
-    name: { en: 'Pets' },
+    name: { en: 'Pets', km: 'សត្វចិញ្ចឹម' },
     sortOrder: 11,
     subcategories: [
       {
         slug: 'dogs',
-        name: { en: 'Dogs' },
+        name: { en: 'Dogs', km: 'ឆ្កែ' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -10957,7 +11016,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'cats',
-        name: { en: 'Cats' },
+        name: { en: 'Cats', km: 'ឆ្មា' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -11032,7 +11091,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'birds',
-        name: { en: 'Birds' },
+        name: { en: 'Birds', km: 'បក្សី' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -11107,7 +11166,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'fish',
-        name: { en: 'Fish' },
+        name: { en: 'Fish', km: 'ត្រី' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -11182,7 +11241,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'pet-food',
-        name: { en: 'Pet Food' },
+        name: { en: 'Pet Food', km: 'ចំណីសត្វ' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -11257,7 +11316,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'pet-accessories',
-        name: { en: 'Pet Accessories' },
+        name: { en: 'Pet Accessories', km: 'គ្រឿងសម្ភារៈសត្វចិញ្ចឹម' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -11332,7 +11391,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'other-pets',
-        name: { en: 'Other pets' },
+        name: { en: 'Other pets', km: 'សត្វចិញ្ចឹមផ្សេងទៀត' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -11409,12 +11468,12 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'foods',
-    name: { en: 'Foods' },
+    name: { en: 'Foods', km: 'អាហារ' },
     sortOrder: 12,
     subcategories: [
       {
         slug: 'meat',
-        name: { en: 'Meat' },
+        name: { en: 'Meat', km: 'សាច់' },
         sortOrder: 1,
         fieldSchema: [
           {
@@ -11489,7 +11548,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'seafood',
-        name: { en: 'Seafood' },
+        name: { en: 'Seafood', km: 'អាហារសមុទ្រ' },
         sortOrder: 2,
         fieldSchema: [
           {
@@ -11564,7 +11623,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'fruits',
-        name: { en: 'Fruits' },
+        name: { en: 'Fruits', km: 'ផ្លែឈើ' },
         sortOrder: 3,
         fieldSchema: [
           {
@@ -11639,7 +11698,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'vegetables',
-        name: { en: 'Vegetables' },
+        name: { en: 'Vegetables', km: 'បន្លែ' },
         sortOrder: 4,
         fieldSchema: [
           {
@@ -11714,7 +11773,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'beverages',
-        name: { en: 'Beverages' },
+        name: { en: 'Beverages', km: 'ភេសជ្ជៈ' },
         sortOrder: 5,
         fieldSchema: [
           {
@@ -11789,7 +11848,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'grocery',
-        name: { en: 'Grocery' },
+        name: { en: 'Grocery', km: 'គ្រឿងទេស' },
         sortOrder: 6,
         fieldSchema: [
           {
@@ -11864,7 +11923,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'bread-and-bakery',
-        name: { en: 'Bread & Bakery' },
+        name: { en: 'Bread & Bakery', km: 'នំបុ័ង & នំខេក' },
         sortOrder: 7,
         fieldSchema: [
           {
@@ -11939,7 +11998,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'beer-and-wine',
-        name: { en: 'Beer & Wine' },
+        name: { en: 'Beer & Wine', km: 'ស្រាបៀរ & ស្រា' },
         sortOrder: 8,
         fieldSchema: [
           {
@@ -12014,7 +12073,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'rice-and-cereal',
-        name: { en: 'Rice & Cereal' },
+        name: { en: 'Rice & Cereal', km: 'អង្ករ & ធញ្ញជាតិ' },
         sortOrder: 9,
         fieldSchema: [
           {
@@ -12089,7 +12148,7 @@ export const categoriesSeed: CategorySeed[] = [
       },
       {
         slug: 'other-foods',
-        name: { en: 'Other Foods' },
+        name: { en: 'Other Foods', km: 'អាហារផ្សេងទៀត' },
         sortOrder: 10,
         fieldSchema: [
           {

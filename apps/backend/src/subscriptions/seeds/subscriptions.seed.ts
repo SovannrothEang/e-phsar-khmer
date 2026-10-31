@@ -7,7 +7,6 @@ import {
   subscriptionCategories,
   subscriptionCategorySubcategories,
   subscriptionPackages,
-  subscriptionPlans,
   subscriptionTerms,
 } from '../../db/schema/subscriptions.schema';
 import {
@@ -15,18 +14,24 @@ import {
   DEFAULT_FREE_PLAN,
 } from '../entitlements.constants';
 
+type Tier = 'bronze' | 'silver' | 'gold';
+
+const TIER_LABEL: Record<Tier, string> = {
+  bronze: 'Bronze',
+  silver: 'Silver',
+  gold: 'Gold',
+};
+
 interface TermSeed {
   name: string;
-  durationValue: number;
-  durationUnit: 'month' | 'year';
+  durationMonths: number;
   price: number;
   /** Percent off `price`. */
   discount?: number;
 }
 
-interface PlanSeed {
-  name: string;
-  slug: string;
+interface TierSeed {
+  tier: Tier;
   photos: number;
   ads: number;
   renews: number;
@@ -41,27 +46,24 @@ interface GroupSeed {
   description: string;
   /** Listing categories whose every subcategory the group covers. */
   categorySlugs: string[];
-  plans: PlanSeed[];
+  tiers: TierSeed[];
 }
 
 const year = (price: number, discount?: number): TermSeed => ({
   name: '1 Year',
-  durationValue: 1,
-  durationUnit: 'year',
+  durationMonths: 12,
   price,
   discount,
 });
 const months = (n: number, price: number, discount?: number): TermSeed => ({
-  name: `${n} Month${n === 1 ? '' : 's'}`,
-  durationValue: n,
-  durationUnit: 'month',
+  name: `${n} Months`,
+  durationMonths: n,
   price,
   discount,
 });
 
 const bronze200 = {
-  name: 'Bronze',
-  slug: 'bronze',
+  tier: 'bronze' as const,
   photos: 24,
   ads: 200,
   renews: 20,
@@ -69,8 +71,7 @@ const bronze200 = {
   videos: 20,
 };
 const bronze30 = {
-  name: 'Bronze',
-  slug: 'bronze',
+  tier: 'bronze' as const,
   photos: 24,
   ads: 30,
   renews: 10,
@@ -103,7 +104,7 @@ const GROUPS: GroupSeed[] = [
       'furniture-and-decor',
       'fashion-and-beauty',
     ],
-    plans: [{ ...bronze200, terms: [year(100, 20), months(6, 60)] }],
+    tiers: [{ ...bronze200, terms: [months(6, 60), year(100, 20)] }],
   },
   {
     name: 'Property',
@@ -111,30 +112,28 @@ const GROUPS: GroupSeed[] = [
     description:
       'Up to 1000 ads, 75 renews & 75 auto-renews in house, land, condo, apartment & rental.',
     categorySlugs: ['home-and-land'],
-    plans: [
+    tiers: [
       {
         ...bronze200,
-        terms: [months(6, 180, 5), year(360, 15), months(3, 90)],
+        terms: [months(3, 90), months(6, 180, 5), year(360, 15)],
       },
       {
-        name: 'Silver',
-        slug: 'silver',
+        tier: 'silver',
         photos: 24,
         ads: 800,
         renews: 50,
         autoRenews: 50,
         videos: 50,
-        terms: [months(6, 420, 5), year(840, 15), months(3, 210)],
+        terms: [months(3, 210), months(6, 420, 5), year(840, 15)],
       },
       {
-        name: 'Gold',
-        slug: 'gold',
+        tier: 'gold',
         photos: 24,
         ads: 1000,
         renews: 75,
         autoRenews: 75,
         videos: 75,
-        terms: [months(6, 900, 5), year(1800, 15), months(3, 450)],
+        terms: [months(3, 450), months(6, 900, 5), year(1800, 15)],
       },
     ],
   },
@@ -144,10 +143,10 @@ const GROUPS: GroupSeed[] = [
     description:
       'Up to 30 ads, 10 renews & 20 auto-renews in cars, motorcycles, bicycles & rentals.',
     categorySlugs: ['cars-and-vehicles'],
-    plans: [
+    tiers: [
       {
         ...bronze30,
-        terms: [year(100, 20), months(1, 10), months(3, 30), months(6, 60)],
+        terms: [months(3, 30), months(6, 60), year(100, 20)],
       },
     ],
   },
@@ -156,21 +155,21 @@ const GROUPS: GroupSeed[] = [
     slug: 'service',
     description: 'Up to 30 ads, 10 renews & 20 auto-renews in services.',
     categorySlugs: ['services'],
-    plans: [{ ...bronze30, terms: [year(100), months(6, 60)] }],
+    tiers: [{ ...bronze30, terms: [months(6, 60), year(100)] }],
   },
   {
     name: 'Food',
     slug: 'food',
     description: 'Up to 200 ads, 20 renews & 20 auto-renews in foods.',
     categorySlugs: ['foods'],
-    plans: [{ ...bronze200, terms: [year(100, 20), months(6, 60)] }],
+    tiers: [{ ...bronze200, terms: [months(6, 60), year(100, 20)] }],
   },
 ];
 
 /**
  * Insert-only, like the attributes seed: admin edits always survive a re-run.
  * The free plan row and caps are inserted only if missing; a group that
- * already exists (by slug) is skipped whole — its scope, plans and prices
+ * already exists (by slug) is skipped whole — its scope, tiers and prices
  * belong to the admin from then on.
  */
 export async function seedSubscriptions(db: DbClient): Promise<void> {
@@ -221,7 +220,7 @@ export async function seedSubscriptions(db: DbClient): Promise<void> {
   let created = 0;
   for (const [i, group] of GROUPS.entries()) {
     // One transaction per group, so a failed run never leaves a group that
-    // exists (and is therefore skipped next time) without its plans.
+    // exists (and is therefore skipped next time) without its tiers.
     const isNew = await db.transaction((tx) =>
       seedGroup(tx, group, i, subRows, catBySlug),
     );
@@ -249,7 +248,7 @@ export async function seedSubscriptions(db: DbClient): Promise<void> {
   );
 }
 
-/** Creates one group with its scope, plans, packages and terms. False if it already existed. */
+/** Creates one group with its scope, tiers and terms. False if it already existed. */
 async function seedGroup(
   db: DbExecutor,
   group: GroupSeed,
@@ -288,34 +287,27 @@ async function seedGroup(
       .onConflictDoNothing();
   }
 
-  for (const [p, plan] of group.plans.entries()) {
-    const [planRow] = await db
-      .insert(subscriptionPlans)
-      .values({
-        categoryId: row.id,
-        name: plan.name,
-        slug: plan.slug,
-        sortOrder: p,
-      })
-      .returning({ id: subscriptionPlans.id });
+  for (const [p, tier] of group.tiers.entries()) {
     const [pkg] = await db
       .insert(subscriptionPackages)
       .values({
-        planId: planRow.id,
-        name: plan.name,
-        photos: plan.photos,
-        ads: plan.ads,
-        renews: plan.renews,
-        autoRenews: plan.autoRenews,
-        videos: plan.videos,
+        categoryId: row.id,
+        tier: tier.tier,
+        name: TIER_LABEL[tier.tier],
+        photos: tier.photos,
+        ads: tier.ads,
+        renews: tier.renews,
+        autoRenews: tier.autoRenews,
+        videos: tier.videos,
+        sortOrder: p,
       })
       .returning({ id: subscriptionPackages.id });
     await db.insert(subscriptionTerms).values(
-      plan.terms.map((term, t) => ({
+      tier.terms.map((term, t) => ({
         packageId: pkg.id,
         name: term.name,
-        durationValue: term.durationValue,
-        durationUnit: term.durationUnit,
+        durationValue: term.durationMonths,
+        durationUnit: 'month' as const,
         price: term.price.toFixed(2),
         discount: (term.discount ?? 0).toFixed(2),
         discountType: 'percent' as const,

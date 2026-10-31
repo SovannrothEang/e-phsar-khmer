@@ -30,12 +30,13 @@ interface Setup {
     ads: number;
   }[];
   held?: unknown[];
+  /** The 5th select: live ads, or renewal rows (same field names differ). */
   live?: unknown[];
 }
 
 /**
  * Selects are issued in a fixed order: free settings, group scopes, free caps,
- * held subscriptions, then (when the call needs them) live ads.
+ * held subscriptions, then the call's own rows (live ads or renewal rows).
  */
 function makeService(setup: Setup, withLive = false) {
   const select = jest.fn();
@@ -54,11 +55,19 @@ function makeService(setup: Setup, withLive = false) {
   const set = jest.fn(() => ({ where }));
   const update = jest.fn(() => ({ set }));
   const service = new EntitlementsService({ select, update } as never);
-  return { service, update, set, where, returning };
+  return { service, update, set, where, returning, select };
+}
+
+/** Explicit select batches, for `view()` whose read order is longer. */
+function makeServiceWith(batches: unknown[][]) {
+  const select = jest.fn();
+  for (const rows of batches) select.mockReturnValueOnce(query(rows));
+  return new EntitlementsService({ select } as never);
 }
 
 const future = new Date(Date.now() + 10 * 24 * 3600 * 1000);
 const cars = { categoryId: 'vehicles', subcategoryId: 'cars' };
+const dogs = { categoryId: 'pets', subcategoryId: 'dogs' };
 const scopes = [{ subcategoryId: 'cars', groupId: 'auto' }];
 const caps = [{ categoryId: null, subcategoryId: 'cars', ads: 2 }];
 const autoSub = {
@@ -71,12 +80,16 @@ const autoSub = {
   autoRenews: 0,
   videos: 2,
 };
+const settings = [
+  { photos: 8, renews: 5, autoRenews: 0, videos: 0, otherAds: 5 },
+];
 
 describe('EntitlementsService.resolve', () => {
   it('gives the free plan defaults when nothing is configured or held', async () => {
     const { service } = makeService({});
     const result = await service.resolve('u1', cars);
     expect(result.plan).toBe('free');
+    expect(result.bucket.key).toBe('free');
     expect(result.limits).toEqual({
       photos: DEFAULT_FREE_PLAN.photos,
       ads: DEFAULT_FREE_PLAN.otherAds,
@@ -86,16 +99,17 @@ describe('EntitlementsService.resolve', () => {
     });
   });
 
-  it('reads the free plan from its settings row and caps', async () => {
+  it('keeps a capped category inside the same free pool', async () => {
     const { service } = makeService({
       settings: [
         { photos: 3, renews: 1, autoRenews: 0, videos: 0, otherAds: 9 },
       ],
       caps,
     });
-    const { limits } = await service.resolve('u1', cars);
-    expect(limits.ads).toBe(2);
-    expect(limits.photos).toBe(3);
+    const result = await service.resolve('u1', cars);
+    expect(result.bucket.key).toBe('free');
+    expect(result.limits.ads).toBe(9);
+    expect(result.limits.photos).toBe(3);
   });
 
   it("applies a held group's frozen snapshot to ads in its scope", async () => {
@@ -109,11 +123,8 @@ describe('EntitlementsService.resolve', () => {
 
   it('keeps ads outside the held group on the free plan', async () => {
     const { service } = makeService({ scopes, caps, held: [autoSub] });
-    const result = await service.resolve('u1', {
-      categoryId: 'pets',
-      subcategoryId: 'dogs',
-    });
-    expect(result.bucket.key).toBe('other');
+    const result = await service.resolve('u1', dogs);
+    expect(result.bucket.key).toBe('free');
     expect(result.limits.ads).toBe(DEFAULT_FREE_PLAN.otherAds);
     expect(result.expiresAt).toBeNull();
   });
@@ -134,16 +145,35 @@ describe('EntitlementsService limit checks', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('blocks a new ad once its bucket is full, counting only that bucket', async () => {
+  it('blocks a new ad once the free pool is full', async () => {
+    const live = Array.from({ length: 5 }, (_, i) => ({
+      id: `d${i}`,
+      status: 'active',
+      ...dogs,
+    }));
+    const { service } = makeService({ live }, true);
+    await expect(
+      service.assertCanHoldAnotherAd('u1', { id: 'new', ...dogs }),
+    ).rejects.toMatchObject({ response: { code: 'PLAN_LIMIT_ADS' } });
+  });
+
+  it('blocks a new ad once its scope cap is reached, even with pool room', async () => {
     const live = [
       { id: 'a', status: 'active', ...cars },
       { id: 'b', status: 'active', ...cars },
-      { id: 'c', status: 'active', categoryId: 'pets', subcategoryId: 'dogs' },
     ];
     const { service } = makeService({ caps, live }, true);
     await expect(
       service.assertCanHoldAnotherAd('u1', { id: 'new', ...cars }),
     ).rejects.toMatchObject({ response: { code: 'PLAN_LIMIT_ADS' } });
+  });
+
+  it('lets a capped category post while both pool and cap have room', async () => {
+    const live = [{ id: 'a', status: 'active', ...cars }];
+    const { service } = makeService({ caps, live }, true);
+    await expect(
+      service.assertCanHoldAnotherAd('u1', { id: 'new', ...cars }),
+    ).resolves.toBeUndefined();
   });
 
   it('does not count the ad being re-published against itself', async () => {
@@ -157,16 +187,106 @@ describe('EntitlementsService limit checks', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('blocks renewals once the per-ad allowance is used', async () => {
-    const { service } = makeService({});
-    await expect(
-      service.assertCanRenew('u1', cars, DEFAULT_FREE_PLAN.renews),
-    ).rejects.toMatchObject({ response: { code: 'PLAN_LIMIT_RENEWS' } });
+  it('blocks renewals once the pool has spent its window', async () => {
+    // One row per renewal spent in the last 30 days; five fill the free pool.
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      categoryId: 'pets',
+      subcategoryId: 'dogs',
+      id: `r${i}`,
+    }));
+    const { service } = makeService({ live: rows }, true);
+    await expect(service.assertCanRenew('u1', cars)).rejects.toMatchObject({
+      response: { code: 'PLAN_LIMIT_RENEWS' },
+    });
+  });
+
+  it('counts renewals per pool, not across the account', async () => {
+    const rows = [
+      { categoryId: 'vehicles', subcategoryId: 'cars' },
+      ...Array.from({ length: 5 }, (_, i) => ({
+        categoryId: 'pets',
+        subcategoryId: 'dogs',
+        id: `r${i}`,
+      })),
+    ];
+    // Cars sit in the held Auto pool; the dogs' spend is the free pool's.
+    const { service } = makeService(
+      { scopes, caps, held: [autoSub], live: rows },
+      true,
+    );
+    await expect(service.assertCanRenew('u1', cars)).resolves.toBeUndefined();
+  });
+});
+
+describe('EntitlementsService.view', () => {
+  it('sums the free total and every held group for the Manage Ads header', async () => {
+    const live = [
+      { id: 'a', status: 'active', ...dogs },
+      { id: 'b', status: 'restricted', ...dogs },
+    ];
+    const service = makeServiceWith([
+      settings,
+      scopes,
+      caps,
+      [autoSub],
+      live,
+      [{ total: 2 }],
+      [{ id: 'auto', name: 'Auto' }],
+    ]);
+    const view = await service.view('u1');
+    expect(view.plan).toBe('premium');
+    expect(view.limits.ads).toBe(5 + 50);
+    expect(view.limits.renews).toBe(5 + 5);
+    expect(view.usage).toEqual({ ads: 2, renews: 2, hidden: 1 });
+    expect(view.bucket).toBeNull();
+    expect(view.buckets.map((b) => b.key).sort()).toEqual([
+      'free',
+      'group:auto',
+    ]);
+  });
+
+  it('clamps a scope view to the smaller of its cap and the free total', async () => {
+    const live = [
+      { id: 'a', status: 'active', ...cars },
+      { id: 'b', status: 'active', ...cars },
+    ];
+    const service = makeServiceWith([
+      settings,
+      [],
+      caps,
+      [],
+      live,
+      [{ categoryId: 'vehicles' }],
+      [{ total: 0 }],
+      // bucketNames for the pool keys hit no table; the scope name does.
+      [{ id: 'cars', slug: 'cars-for-sale', name: 'Cars For Sale' }],
+    ]);
+    const view = await service.view('u1', 'cars');
+    expect(view.bucket).toMatchObject({ key: 'free', name: 'Cars For Sale' });
+    expect(view.bucket?.limits.ads).toBe(2);
+    expect(view.usage.ads).toBe(2);
+  });
+
+  it("reports a held group's package as the scope limit", async () => {
+    const live = [{ id: 'a', status: 'active', ...cars }];
+    const service = makeServiceWith([
+      settings,
+      scopes,
+      caps,
+      [autoSub],
+      live,
+      [{ categoryId: 'vehicles' }],
+      [{ total: 1 }],
+      [{ id: 'auto', name: 'Auto' }],
+    ]);
+    const view = await service.view('u1', 'cars');
+    expect(view.bucket).toMatchObject({ key: 'group:auto', name: 'Auto' });
+    expect(view.bucket?.limits.ads).toBe(50);
   });
 });
 
 describe('EntitlementsService.reconcileListings', () => {
-  it('restricts the oldest ads beyond their bucket and restores none', async () => {
+  it('restricts the oldest ads beyond their scope cap and restores none', async () => {
     // newest → oldest; cars-for-sale keeps the first 2
     const live = ['a', 'b', 'c'].map((id) => ({
       id,

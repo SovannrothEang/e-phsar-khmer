@@ -1,22 +1,22 @@
 import type { FreePlanSettings, PlanLimits } from './entitlements.constants';
 
 /**
- * Where an ad's limits come from. Every ad lands in exactly one bucket:
+ * Where an ad's allowance comes from. Every ad lands in exactly one pool:
  *
  *   group:<id>  its subcategory is covered by a group the owner holds — the
  *               group's package limits, `ads` shared by all of its subcategories
- *   sub:<id>    a free-plan cap on its subcategory ("Cars for sale: 2")
- *   cat:<id>    a free-plan cap on its category ("Foods: 50")
- *   other       everything else, sharing the free plan's `otherAds`
+ *   free        everything else — the free plan's account-wide `otherAds`
+ *               allowance, shared by every ad outside a held group
  *
- * A subcategory covered by a group the owner does NOT hold falls through to
- * the free buckets, exactly as if no group covered it.
+ * Free-plan caps (`free_plan_ad_limits`) are sub-limits INSIDE the free pool:
+ * they cap how many of the account's free ads may sit in one scope (a
+ * subcategory, else its whole category). A cap larger than the pool's total
+ * never binds, and a subscription covering the scope replaces both.
  */
-export type BucketKey =
-  | `group:${string}`
-  | `sub:${string}`
-  | `cat:${string}`
-  | 'other';
+export type BucketKey = `group:${string}` | 'free';
+
+/** A free-plan cap row's key, used by the public price sheet. */
+export type ScopeKey = `sub:${string}` | `cat:${string}`;
 
 export interface AllowanceConfig {
   free: FreePlanSettings;
@@ -44,6 +44,12 @@ export interface Bucket {
 export interface AdScope {
   categoryId: string;
   subcategoryId: string;
+}
+
+/** The free-plan cap that applies to one ad's scope, if any. */
+export interface ScopeCap {
+  key: ScopeKey;
+  ads: number;
 }
 
 export function freeLimits(free: FreePlanSettings, ads: number): PlanLimits {
@@ -80,6 +86,22 @@ export function groupBucket(
   };
 }
 
+/** A subcategory cap beats its category's cap; anything uncapped has none. */
+export function scopeCapOf(
+  ad: AdScope,
+  config: AllowanceConfig,
+): ScopeCap | undefined {
+  const subCap = config.subcategoryCaps.get(ad.subcategoryId);
+  if (subCap !== undefined) {
+    return { key: `sub:${ad.subcategoryId}`, ads: subCap };
+  }
+  const catCap = config.categoryCaps.get(ad.categoryId);
+  if (catCap !== undefined) {
+    return { key: `cat:${ad.categoryId}`, ads: catCap };
+  }
+  return undefined;
+}
+
 export function bucketOf(
   ad: AdScope,
   config: AllowanceConfig,
@@ -88,27 +110,8 @@ export function bucketOf(
   const groupId = config.subcategoryGroup.get(ad.subcategoryId);
   const group = groupId ? groupBucket(groupId, config, held) : undefined;
   if (group) return group;
-
-  const subCap = config.subcategoryCaps.get(ad.subcategoryId);
-  if (subCap !== undefined) {
-    return {
-      key: `sub:${ad.subcategoryId}`,
-      kind: 'free',
-      groupId: null,
-      limits: freeLimits(config.free, subCap),
-    };
-  }
-  const catCap = config.categoryCaps.get(ad.categoryId);
-  if (catCap !== undefined) {
-    return {
-      key: `cat:${ad.categoryId}`,
-      kind: 'free',
-      groupId: null,
-      limits: freeLimits(config.free, catCap),
-    };
-  }
   return {
-    key: 'other',
+    key: 'free',
     kind: 'free',
     groupId: null,
     limits: freeLimits(config.free, config.free.otherAds),
@@ -122,22 +125,36 @@ export interface LiveAd extends AdScope {
 
 /**
  * Splits a user's live ads (newest first) into the ones that fit their
- * bucket's allowance and the ones beyond it. Pure — the caller writes.
+ * allowance and the ones beyond it. The free pool enforces two constraints:
+ * the account-wide total, then the ad's scope cap (a no-op for held groups).
+ * Ads beyond a scope cap do not consume a pool slot, so one over-cap category
+ * cannot push the user's other ads out. Pure — the caller writes.
  */
 export function partitionByAllowance<T extends LiveAd>(
   liveNewestFirst: readonly T[],
   config: AllowanceConfig,
   held: ReadonlyMap<string, HeldGroup>,
 ): { within: T[]; beyond: T[] } {
-  const used = new Map<BucketKey, number>();
+  const poolUsed = new Map<BucketKey, number>();
+  const scopeUsed = new Map<ScopeKey, number>();
   const within: T[] = [];
   const beyond: T[] = [];
   for (const ad of liveNewestFirst) {
     const bucket = bucketOf(ad, config, held);
-    const count = used.get(bucket.key) ?? 0;
-    if (count < bucket.limits.ads) within.push(ad);
-    else beyond.push(ad);
-    used.set(bucket.key, count + 1);
+    const poolCount = poolUsed.get(bucket.key) ?? 0;
+    let fits = poolCount < bucket.limits.ads;
+    const cap = bucket.kind === 'free' ? scopeCapOf(ad, config) : undefined;
+    if (fits && cap) {
+      const scopeCount = scopeUsed.get(cap.key) ?? 0;
+      fits = scopeCount < Math.min(cap.ads, bucket.limits.ads);
+      if (fits) scopeUsed.set(cap.key, scopeCount + 1);
+    }
+    if (fits) {
+      within.push(ad);
+      poolUsed.set(bucket.key, poolCount + 1);
+    } else {
+      beyond.push(ad);
+    }
   }
   return { within, beyond };
 }

@@ -13,11 +13,14 @@ export interface UserSubscriptionRow {
   name: string;
   email: string | null;
   phone: string | null;
+  /** The subscription category row this subscription belongs to (the tab key). */
+  subscriptionCategoryId: string | null;
   group: string | null;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
-  plan: string | null;
+  /** The purchased duration (e.g. "6 Months"). */
+  term: string | null;
   price: string;
   paymentMethod: string | null;
   subscribedAt: string;

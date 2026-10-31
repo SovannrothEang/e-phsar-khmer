@@ -1,7 +1,7 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { ChatModule } from '../chat/chat.module';
+import { ChatPubSubModule } from '../chat/chat-pubsub.module';
 import { InAppNotificationChannel } from './channels/in-app-notification.channel';
 import { RealtimeNotificationChannel } from './channels/realtime-notification.channel';
 import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
@@ -14,11 +14,9 @@ import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
  * real choice (it now sends notifications).
  */
 @Module({
-  // ChatModule provides the socket push transport for the realtime channel.
-  // forwardRef because ChatModule's own E2eNudgeController/Service needs
-  // NotificationsService to post the "someone wants to chat" nudge — a
-  // genuine two-way dependency between these two modules.
-  imports: [forwardRef(() => ChatModule)],
+  // The pubsub leaf provides the socket push transport for the realtime
+  // channel without importing the chat feature (which imports AuthModule).
+  imports: [ChatPubSubModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

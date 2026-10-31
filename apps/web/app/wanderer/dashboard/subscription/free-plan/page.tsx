@@ -30,8 +30,8 @@ const SETTINGS: {
   { key: "autoRenews", label: "Auto-renews", hint: "Not enforced yet" },
   {
     key: "otherAds",
-    label: "Other ads",
-    hint: "Shared by uncapped categories",
+    label: "Total ads",
+    hint: "Account-wide cap on live ads",
   },
 ];
 
@@ -121,10 +121,11 @@ function FreePlanForm({ plan }: { plan: FreePlan }) {
         <div>
           <h2 className="font-semibold">Ad caps by category</h2>
           <p className="text-sm text-muted-foreground">
-            How many ads a free user may have live in one place. A subcategory
-            cap beats its category&apos;s cap; anything uncapped shares
-            &ldquo;Other ads&rdquo;. A subscription covering a subcategory
-            replaces its cap for subscribers.
+            Caps sit inside the account-wide &ldquo;Total ads&rdquo;: at most
+            this many of a free user&apos;s live ads may be in one place. A
+            subcategory cap beats its category&apos;s cap, and a number above
+            the total never binds. A subscription covering a subcategory
+            replaces both for its subscribers.
           </p>
         </div>
         <div className="divide-y rounded-lg border">
@@ -243,7 +244,7 @@ export default function FreePlanPage() {
   return (
     <main className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold text-sky-500">Free Plan</h1>
+        <h1 className="type-page-title text-sky-500">Free Plan</h1>
         <p className="text-sm text-muted-foreground">
           What every account gets without a subscription. Saving re-checks every
           seller&apos;s ads against the new limits.

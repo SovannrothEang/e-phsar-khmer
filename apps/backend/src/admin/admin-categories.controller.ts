@@ -17,26 +17,26 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/categories')
 export class AdminCategoriesController {
   constructor(private readonly service: AdminCategoriesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all categories (with en name)' })
+  @ApiOperation({ summary: 'List all categories (with en/km names)' })
   list() {
     return this.service.list();
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a category (+ en translation)' })
+  @ApiOperation({ summary: 'Create a category (+ en/km translations)' })
   create(@Body() dto: CreateCategoryDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a category (+ en name)' })
+  @ApiOperation({ summary: 'Update a category (+ en/km names)' })
   update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
     return this.service.update(id, dto);
   }

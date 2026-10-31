@@ -31,11 +31,14 @@ class SignUploadDto {
     'listing',
     'chat',
     'report',
+    'resume',
     'category',
     'subcategory',
     'brand',
     'model',
+    'product',
     'attribute',
+    'advertisement',
   ])
   scope:
     | 'avatar'
@@ -43,11 +46,14 @@ class SignUploadDto {
     | 'listing'
     | 'chat'
     | 'report'
+    | 'resume'
     | 'category'
     | 'subcategory'
     | 'brand'
     | 'model'
-    | 'attribute';
+    | 'product'
+    | 'attribute'
+    | 'advertisement';
 }
 
 class DeleteFilesDto {

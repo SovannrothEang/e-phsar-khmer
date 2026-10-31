@@ -4,29 +4,41 @@ import { ChatGateway } from './chat.gateway';
 
 const RECIPIENT = '11111111-1111-4111-8111-111111111111';
 
-function makeGateway(sendMessage: jest.Mock) {
+function makeGateway(
+  sendMessage: jest.Mock,
+  opts: { sessionId?: string | null; sessionActive?: boolean } = {},
+) {
+  const loginDevices = {
+    isSessionActive: jest.fn().mockResolvedValue(opts.sessionActive ?? true),
+  };
   const gateway = new ChatGateway(
     {} as never, // registry
     {} as never, // jwt
     { sendMessage } as never,
     { onEvent: jest.fn() } as never,
+    loginDevices as never,
     {} as never, // db
   );
   const sent: unknown[] = [];
   const send = jest.fn((raw: string) => sent.push(JSON.parse(raw)));
+  const close = jest.fn();
   const socket = {
     OPEN: 1,
     readyState: 1,
     send,
+    close,
   } as unknown as WebSocket;
   // Register the socket as an authenticated connection without running the
   // handshake (which needs a real JWT + DB).
   (
     gateway as unknown as {
-      conns: WeakMap<WebSocket, { userId: string }>;
+      conns: WeakMap<WebSocket, { userId: string; sessionId: string | null }>;
     }
-  ).conns.set(socket, { userId: 'u1' });
-  return { gateway, socket, sent, send };
+  ).conns.set(socket, {
+    userId: 'u1',
+    sessionId: opts.sessionId ?? null,
+  });
+  return { gateway, socket, sent, send, close, loginDevices };
 }
 
 describe('ChatGateway.onSendMessage', () => {
@@ -46,6 +58,22 @@ describe('ChatGateway.onSendMessage', () => {
     expect(sent).toEqual([
       { type: 'ack', payload: { clientMessageId: 'k1', ...result } },
     ]);
+  });
+
+  it('closes the socket without sending when the session was revoked', async () => {
+    const sendMessage = jest.fn();
+    const { gateway, socket, sent, close } = makeGateway(sendMessage, {
+      sessionId: 'sid-1',
+      sessionActive: false,
+    });
+
+    await gateway.onSendMessage(socket, {
+      payload: { recipientId: RECIPIENT, body: 'hi' },
+    });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+    expect(close).toHaveBeenCalledWith(4001, 'Session revoked');
   });
 
   it('rejects an invalid payload without calling the service', async () => {

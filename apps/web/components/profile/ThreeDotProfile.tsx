@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  CopyIcon,
-  ShareIcon,
-  VolumeOffIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, Bookmark, Forward, Link2 } from "lucide-react";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { EllipsisVertical } from "lucide-react";
 import { useState } from "react";
@@ -19,10 +15,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User } from "@/lib/user";
+import type { User } from "@/lib/user";
 
-export function ThreeDotProfile({ user }: { user: User }) {
+export function ThreeDotProfile({
+  user,
+  viewerId,
+}: {
+  user: User;
+  viewerId?: string | null;
+}) {
+  const t = useTranslations("Common");
   const [reportOpen, setReportOpen] = useState(false);
+  // Reporting yourself is a backend 400; don't offer it on your own profile.
+  const isOwnProfile = viewerId != null && String(user.userId) === viewerId;
   return (
     <>
       <DropdownMenu modal={false}>
@@ -38,31 +43,32 @@ export function ThreeDotProfile({ user }: { user: User }) {
         <DropdownMenuContent align="end" className="w-44">
           <DropdownMenuGroup>
             <DropdownMenuItem>
-              <VolumeOffIcon />
-              Save
+              <Bookmark />
+              {t("save")}
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <ShareIcon />
-              Share
+              <Forward />
+              {t("share")}
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <CopyIcon />
-              Copy Link
+              <Link2 />
+              {t("copyLink")}
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="text-red-500">
-              <AlertTriangleIcon />
-              <Button
-                variant="ghost"
-                onClick={() => setReportOpen(true)}
-                className="text-red-500 cursor-pointer "
-              >
-                Report
-              </Button>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          {!isOwnProfile && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  className="text-red-500"
+                  onSelect={() => setReportOpen(true)}
+                >
+                  <AlertTriangleIcon />
+                  {t("report")}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <ReportAccount

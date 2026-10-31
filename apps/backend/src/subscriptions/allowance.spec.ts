@@ -1,10 +1,15 @@
-import { bucketOf, groupBucket, partitionByAllowance } from './allowance';
+import {
+  bucketOf,
+  groupBucket,
+  partitionByAllowance,
+  scopeCapOf,
+} from './allowance';
 import type { AllowanceConfig, HeldGroup } from './allowance';
 import { DEFAULT_FREE_PLAN } from './entitlements.constants';
 
 // cars-and-vehicles: cars-for-sale (capped 2), parts (no cap) — in group "auto"
-// foods: meat — category capped 50, in group "food"
-// pets: dogs — no cap, no group → "other"
+// foods: meat — category capped 50 (above the 5 total, so it never binds)
+// pets: dogs — no cap, no group
 const config: AllowanceConfig = {
   free: { ...DEFAULT_FREE_PLAN },
   subcategoryGroup: new Map([
@@ -30,18 +35,18 @@ const holding = (...groups: HeldGroup[]) =>
   new Map(groups.map((g) => [g.groupId, g]));
 
 describe('bucketOf', () => {
-  it('uses the free subcategory cap when the group is not held', () => {
-    const bucket = bucketOf(cars, config, holding());
-    expect(bucket).toMatchObject({ key: 'sub:cars', kind: 'free' });
-    expect(bucket.limits).toMatchObject({ ads: 2, photos: 8, renews: 5 });
-  });
-
-  it('falls back to the category cap, then to other ads', () => {
-    expect(bucketOf(meat, config, holding()).key).toBe('cat:foods');
-    expect(bucketOf(meat, config, holding()).limits.ads).toBe(50);
-    expect(bucketOf(dogs, config, holding()).key).toBe('other');
-    expect(bucketOf(dogs, config, holding()).limits.ads).toBe(5);
-    expect(bucketOf(parts, config, holding()).key).toBe('other');
+  it('puts every free ad in one account-wide pool', () => {
+    expect(bucketOf(cars, config, holding())).toMatchObject({
+      key: 'free',
+      kind: 'free',
+    });
+    expect(bucketOf(cars, config, holding()).limits).toMatchObject({
+      ads: 5,
+      photos: 8,
+      renews: 5,
+    });
+    expect(bucketOf(dogs, config, holding()).key).toBe('free');
+    expect(bucketOf(parts, config, holding()).key).toBe('free');
   });
 
   it('puts every subcategory of a held group in one shared pool', () => {
@@ -52,7 +57,7 @@ describe('bucketOf', () => {
   });
 
   it('leaves other groups on the free plan', () => {
-    expect(bucketOf(meat, config, holding(auto)).key).toBe('cat:foods');
+    expect(bucketOf(meat, config, holding(auto)).key).toBe('free');
   });
 
   it('never gives a subscriber fewer photos or renews than free', () => {
@@ -64,6 +69,20 @@ describe('bucketOf', () => {
     expect(limits.photos).toBe(8);
     expect(limits.renews).toBe(5);
     expect(limits.ads).toBe(30);
+  });
+});
+
+describe('scopeCapOf', () => {
+  it('prefers a subcategory cap over its category cap', () => {
+    expect(scopeCapOf(cars, config)).toEqual({ key: 'sub:cars', ads: 2 });
+  });
+
+  it('falls back to the category cap', () => {
+    expect(scopeCapOf(meat, config)).toEqual({ key: 'cat:foods', ads: 50 });
+  });
+
+  it('returns nothing for an uncapped category', () => {
+    expect(scopeCapOf(dogs, config)).toBeUndefined();
   });
 });
 
@@ -88,22 +107,47 @@ describe('partitionByAllowance', () => {
     ...scope,
   });
 
-  it('caps each bucket independently, newest first', () => {
+  it('keeps the newest 5 free ads and enforces the scope cap inside them', () => {
     const live = [
       ad('c1', cars),
-      ad('d1', dogs),
       ad('c2', cars),
-      ad('c3', cars),
-      ad('p1', parts),
+      ad('c3', cars), // over the car cap; does not consume a pool slot
+      ad('d1', dogs),
+      ad('d2', dogs),
+      ad('d3', dogs),
+      ad('d4', dogs), // the free pool is full
     ];
     const { within, beyond } = partitionByAllowance(live, config, holding());
-    expect(beyond.map((a) => a.id)).toEqual(['c3']);
-    expect(within.map((a) => a.id)).toEqual(['c1', 'd1', 'c2', 'p1']);
+    expect(within.map((a) => a.id)).toEqual(['c1', 'c2', 'd1', 'd2', 'd3']);
+    expect(beyond.map((a) => a.id)).toEqual(['c3', 'd4']);
+  });
+
+  it('never lets a cap above the total bind', () => {
+    const live = Array.from({ length: 7 }, (_, i) => ad(`m${i}`, meat));
+    const { within, beyond } = partitionByAllowance(live, config, holding());
+    expect(within).toHaveLength(5);
+    expect(beyond.map((a) => a.id)).toEqual(['m5', 'm6']);
   });
 
   it('lifts the free caps once the group is held', () => {
-    const live = [ad('c1', cars), ad('c2', cars), ad('c3', cars)];
+    const live = [
+      ad('c1', cars),
+      ad('c2', cars),
+      ad('c3', cars),
+      ad('c4', cars),
+    ];
     const { beyond } = partitionByAllowance(live, config, holding(auto));
     expect(beyond).toEqual([]);
+  });
+
+  it('does not apply a free scope cap to ads in a held group', () => {
+    // The car cap is 2, but all four ads are in the Auto package's pool.
+    const live = Array.from({ length: 6 }, (_, i) => ad(`c${i}`, cars));
+    const { within } = partitionByAllowance(
+      live,
+      { ...config, subcategoryCaps: new Map([['cars', 2]]) },
+      holding({ ...auto, limits: { ...auto.limits, ads: 4 } }),
+    );
+    expect(within).toHaveLength(4);
   });
 });

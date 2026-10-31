@@ -26,6 +26,10 @@ import { ListingsModule } from './listings/listings.module';
 import { ReactionsModule } from './reactions/reactions.module';
 import { UserReportsModule } from './reports/reports.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { AdvertisementsModule } from './advertisements/advertisements.module';
+import { ResumeModule } from './resume/resume.module';
+import { ApplicationsModule } from './applications/applications.module';
+import { InsightsModule } from './insights/insights.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
@@ -34,6 +38,7 @@ import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
+import { ProductsModule } from './products/products.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { BullModule } from '@nestjs/bullmq';
@@ -77,7 +82,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
         // `maxRetriesPerRequest: null` is required for a connection a Worker
         // uses. BullMQ never closes a shared client; process exit does.
         connection: createQueueClient(configService),
-        prefix: configService.get<string>('queue.prefix') ?? 'psa',
+        prefix: configService.get<string>('queue.prefix') ?? 'phsarkhmer',
         // Without these, every finished job and 10k events per queue stay
         // in Redis forever — see common/queue/queue-defaults.ts. A queue that
         // sets its own defaultJobOptions REPLACES this object (Nest merges
@@ -96,6 +101,10 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     ReactionsModule,
     UserReportsModule,
     FeedbackModule,
+    AdvertisementsModule,
+    ResumeModule,
+    ApplicationsModule,
+    InsightsModule,
     BrandsModule,
     FilesModule,
     HealthModule,
@@ -104,6 +113,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     NotificationsModule,
     OutboxModule,
     AttributesModule,
+    ProductsModule,
     AdminModule,
     PaymentModule,
     SubscriptionsModule,

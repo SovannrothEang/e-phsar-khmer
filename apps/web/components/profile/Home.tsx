@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { SearchIcon, MapPin, LayoutGrid, List } from "lucide-react";
 import { IconFilterSearch, IconBasketSearch } from "@tabler/icons-react";
 import { Field } from "@/components/ui/field";
@@ -76,6 +77,7 @@ export default function HomeProfile({
   initialCursor,
   locale,
 }: HomeProfileProps) {
+  const t = useTranslations("Profile");
   const [selection, setSelection] =
     React.useState<StripSelection>(initialSelection);
   const [posts, setPosts] = React.useState(initialPosts);
@@ -229,10 +231,10 @@ export default function HomeProfile({
   // second person on someone else's profile, and wrong whenever the empty
   // result is the drill-down's doing rather than the seller's.
   const emptyMessage = subcategory
-    ? "No posts in this subcategory."
+    ? t("noPostsSub")
     : category
-      ? "No posts in this category."
-      : "No posts yet.";
+      ? t("noPostsCat")
+      : t("noPosts");
 
   const emptyState = (
     <div className="mt-8">
@@ -244,8 +246,8 @@ export default function HomeProfile({
               stroke={2}
             />
           </div>
-          <p className="text-lg text-foreground font-medium pt-4">
-            No Result Found
+          <p className="type-card-heading text-foreground pt-4">
+            {t("noResult")}
           </p>
           <p className="text-muted-foreground pt-2">{emptyMessage}</p>
         </div>
@@ -272,7 +274,7 @@ export default function HomeProfile({
                     <InputGroup className="h-10 rounded-sm">
                       <InputGroupInput
                         id="inline-start-input"
-                        placeholder="Search..."
+                        placeholder={t("search")}
                         className="h-10 border-gray-200 focus:ring-0"
                       />
                       <InputGroupAddon align="inline-end">
@@ -285,29 +287,29 @@ export default function HomeProfile({
                     className="h-10 rounded-sm px-5 border-muted-foreground/30 text-foreground hover:text-foreground font-medium"
                   >
                     <IconFilterSearch className="scale-120" />
-                    Filter
+                    {t("filter")}
                   </Button>
                 </div>
                 <div className="flex items-center justify-between mt-6 px-1">
-                  <div className="flex items-center gap-2 text-[#00a0e9] font-medium text-sm cursor-pointer">
+                  <div className="flex items-center gap-2 text-[#00a0e9] type-nav cursor-pointer">
                     <MapPin className="w-4 h-4" />
-                    <span>Location</span>
+                    <span>{t("location")}</span>
                   </div>
                   {/* Named because the profile header renders its own
                       Home/About tablist — an unnamed second one on the page is
                       ambiguous, and both triggers here are icon-only. */}
-                  <TabsList className="h-9 shrink-0" aria-label="View">
+                  <TabsList className="h-9 shrink-0" aria-label={t("view")}>
                     <TabsTrigger
                       value="list"
                       className="cursor-pointer px-3"
-                      aria-label="List view"
+                      aria-label={t("listView")}
                     >
                       <List className="w-5 h-5" />
                     </TabsTrigger>
                     <TabsTrigger
                       value="grid"
                       className="cursor-pointer px-3"
-                      aria-label="Grid view"
+                      aria-label={t("gridView")}
                     >
                       <LayoutGrid className="w-5 h-5" />
                     </TabsTrigger>
@@ -351,8 +353,8 @@ export default function HomeProfile({
               className="flex min-h-12 items-center justify-center"
             >
               {loading && (
-                <p className="text-sm text-muted-foreground">
-                  Loading more ads…
+                <p className="type-body-sm text-muted-foreground">
+                  {t("loadingMore")}
                 </p>
               )}
             </div>

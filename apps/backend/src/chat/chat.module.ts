@@ -1,11 +1,11 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
-import { ChatPubSubService } from './chat-pubsub.service';
+import { ChatPubSubModule } from './chat-pubsub.module';
 import { ChatMetricsService } from './chat-metrics.service';
 import { ConnectionRegistry } from './connection-registry';
 import { HeartbeatService } from './heartbeat.service';
@@ -27,10 +27,11 @@ import {
 @Module({
   imports: [
     AuthModule,
-    // forwardRef: NotificationsModule imports ChatModule back (for the
-    // realtime push channel) — E2eNudgeService is the other half of that
-    // cycle, needing NotificationsService to post the nudge.
-    forwardRef(() => NotificationsModule),
+    ChatPubSubModule,
+    // E2eNudgeService needs NotificationsService to post the nudge. No
+    // forwardRef: NotificationsModule imports the ChatPubSubModule leaf (not
+    // ChatModule), so the old ChatModule ↔ NotificationsModule cycle is gone.
+    NotificationsModule,
     // Attachment cleanup only — see chat-maintenance.processor.ts.
     BullModule.registerQueue({ name: CHAT_MAINTENANCE_QUEUE }),
   ],
@@ -44,7 +45,6 @@ import {
   ],
   providers: [
     ChatService,
-    ChatPubSubService,
     ChatMetricsService,
     ConnectionRegistry,
     HeartbeatService,
@@ -56,8 +56,8 @@ import {
     ChatMaintenanceScheduler,
     ChatMaintenanceProcessor,
   ],
-  // ChatPubSubService is exported for NotificationsModule's realtime channel —
-  // the per-tab socket is the app's only push transport today.
-  exports: [ChatService, ChatMetricsService, ChatPubSubService],
+  // The pubsub transport is shared with NotificationsModule's realtime
+  // channel — see chat-pubsub.module.ts for why it is not provided here.
+  exports: [ChatService, ChatMetricsService, ChatPubSubModule],
 })
 export class ChatModule {}

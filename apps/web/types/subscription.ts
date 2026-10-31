@@ -1,47 +1,5 @@
-export type SubscriptionCategory = {
-  subscriptionCateId: string;
-  subscriptioncatename: string;
-  subscriptioncateslug: string;
-  desc: string;
-  subscriptionplans: SubscriptionPlan[];
-  createdAt: Date;
-  updatedAt: Date;
-};
-export type SubscriptionPlan = {
-  subscriptionPlanId: string;
-  subscriptionplanname: string;
-  subscriptionplanslug: string;
-  subscriptionplandesc: string;
-  subscriptionpackage: SubscriptionPackageOption[];
-  createdAt: Date;
-  updatedAt: Date;
-};
-export type SubscriptionPackageOption = {
-  SubscriptionPackageId: string;
-  subscriptionPackagename: string;
-  subscriptionPackagephoto: string;
-  subscriptionPackageads: string;
-  subscriptionPackagerenews: string;
-  subscriptionPackageautorenews: string;
-  subscriptionPackagevideos: string;
-  subscriptionterm: SubscriptionTermOption[];
-  createdAt: Date;
-  updatedAt: Date;
-};
-
 export type SubscriptionTermDurationUnit = "day" | "month" | "year";
 
-export type SubscriptionTermOption = {
-  SubscriptionTermId: string;
-  subscriptiontermname: string;
-  subscriptiontermdurationvalue: number;
-  subscriptiontermdurationunit: SubscriptionTermDurationUnit;
-  subscriptiontermprice: number;
-  subscriptiontermdiscount: number;
-  subscriptiontermdiscounttype: SubscriptionTermDiscountType;
-  createdAt: Date;
-  updatedAt: Date;
-};
 export type SubscriptionTermDiscountType = "percent" | "amount";
 
 export type SupersededReason = "upgrade" | "replaced" | "expired" | "revoked";
@@ -52,19 +10,17 @@ export type SubscriptionStatus =
   | "superseded"
   | "revoked";
 
-export type BucketKey =
-  | `group:${string}`
-  | `sub:${string}`
-  | `cat:${string}`
-  | "other";
+/** An allowance pool: a held group, or the free plan's shared pool. */
+export type BucketKey = `group:${string}` | "free";
+
+/** A free-plan cap row's key on the public price sheet. */
+export type ScopeKey = `sub:${string}` | `cat:${string}`;
 
 export interface SubscriptionCatalogItem {
   groupId: string;
   groupName: string;
   groupSlug: string;
   groupDescription: string | null;
-  planId: string;
-  planName: string;
   packageId: string;
   packageName: string;
   termId: string;
@@ -89,7 +45,6 @@ export interface UserSubscription {
   /** The group this subscription belongs to. */
   groupId: string | null;
   groupName: string | null;
-  planName: string | null;
   packageName: string | null;
   photos: number;
   ads: number;
@@ -150,7 +105,8 @@ export interface PlanEntitlements {
   plan: "free" | "premium";
   limits: PlanLimits;
   expiresAt: string | null;
-  usage: { ads: number };
+  /** `ads` = live ads (active + restricted); `hidden` = the restricted subset. */
+  usage: { ads: number; renews: number; hidden: number };
   bucket: EntitlementBucket | null;
   buckets: EntitlementBucket[];
 }
@@ -160,6 +116,8 @@ export interface PublicFreePlan {
   renews: number;
   autoRenews: number;
   videos: number;
+  /** The free plan's account-wide live-ad cap. */
   otherAds: number;
-  caps: { key: BucketKey; name: string; ads: number }[];
+  /** Per-scope sub-limits inside that total. */
+  caps: { key: ScopeKey; name: string; ads: number }[];
 }

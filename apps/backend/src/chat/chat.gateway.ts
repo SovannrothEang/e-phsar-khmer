@@ -22,6 +22,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { users } from '../db/schema/users.schema';
+import { LoginDevicesService } from '../auth/login-devices.service';
 import { ConnectionRegistry } from './connection-registry';
 import type { ConnectionInfo } from './connection-registry';
 import { ChatService } from './chat.service';
@@ -64,6 +65,7 @@ export class ChatGateway
     private readonly auth: JwtService,
     private readonly core: ChatService,
     private readonly pubsub: ChatPubSubService,
+    private readonly loginDevices: LoginDevicesService,
     @Inject(DRIZZLE) private readonly db: DbClient,
   ) {}
 
@@ -111,7 +113,11 @@ export class ChatGateway
         return;
       }
 
-      const claims = this.auth.verify<{ sub: string; typ?: string }>(token);
+      const claims = this.auth.verify<{
+        sub: string;
+        typ?: string;
+        sid?: string;
+      }>(token);
       if (ticket && claims.typ !== WS_TICKET_TYP) {
         socket.close(4001, 'Invalid ticket');
         return;
@@ -130,9 +136,23 @@ export class ChatGateway
         return;
       }
 
+      // A revoked device must not hold a socket. Tickets carry the sid too,
+      // so a ticket minted before the revoke fails here as well.
+      if (claims.sid) {
+        const active = await this.loginDevices.isSessionActive(
+          claims.sub,
+          claims.sid,
+        );
+        if (!active) {
+          socket.close(4001, 'Session revoked');
+          return;
+        }
+      }
+
       const conn: ConnectionInfo = {
         socket,
         userId: claims.sub,
+        sessionId: claims.sid ?? null,
         lastPongAt: Date.now(),
       };
       // HeartbeatService evicts any socket whose lastPongAt is stale; browsers
@@ -180,6 +200,26 @@ export class ChatGateway
   async onSendMessage(socket: WebSocket, envelope: ClientEnvelope) {
     const conn = this.conns.get(socket);
     if (!conn) return;
+
+    // An already-open socket survives a revoke until its next action; check
+    // the epoch before doing any work so a signed-out device cannot send.
+    // Fail closed on a lookup error rather than letting it escape the handler
+    // (the global filter is HTTP-only).
+    if (conn.sessionId) {
+      let active = false;
+      try {
+        active = await this.loginDevices.isSessionActive(
+          conn.userId,
+          conn.sessionId,
+        );
+      } catch {
+        active = false;
+      }
+      if (!active) {
+        socket.close(4001, 'Session revoked');
+        return;
+      }
+    }
 
     const rawPayload: unknown = envelope?.payload;
     const clientMessageId =

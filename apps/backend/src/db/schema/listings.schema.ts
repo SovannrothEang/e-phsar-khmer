@@ -14,6 +14,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 import { categories, subcategories } from './categories.schema';
+import { models } from './brands.schema';
 import { communes, districts, provinces, users } from './users.schema';
 
 export const listingStatusEnum = pgEnum('listing_status', [
@@ -74,6 +75,13 @@ export const listings = pgTable(
     communeId: uuid('commune_id').references(() => communes.id, {
       onDelete: 'restrict',
     }),
+    // The trusted spec page this ad renders ("View full specs"). Nullable:
+    // every pre-existing listing has none, and the link is optional at the DB
+    // level — the phones form is what makes it required. SET NULL on model
+    // deletion so a catalogue cleanup never blocks on live ads.
+    productModelId: uuid('product_model_id').references(() => models.id, {
+      onDelete: 'set null',
+    }),
     deliveryFree: boolean('delivery_free').default(false).notNull(),
     contactName: varchar('contact_name', { length: 150 }),
     contactPhones: jsonb('contact_phones')
@@ -133,6 +141,7 @@ export const listings = pgTable(
     index('listings_province_id_idx').on(t.provinceId),
     index('listings_district_id_idx').on(t.districtId),
     index('listings_commune_id_idx').on(t.communeId),
+    index('listings_product_model_id_idx').on(t.productModelId),
     // Price sorts/filters on the final price (see effectivePrice).
     index('listings_status_effective_price_idx').on(
       t.status,

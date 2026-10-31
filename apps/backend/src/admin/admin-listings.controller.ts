@@ -21,7 +21,7 @@ import {
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/listings')
 export class AdminListingsController {

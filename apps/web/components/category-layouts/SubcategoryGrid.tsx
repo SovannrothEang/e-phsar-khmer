@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
 import DbImage from "@/components/common/DbImage";
@@ -24,7 +25,7 @@ type Props = {
  *  The circle behind it is a fixed light blue in both themes, so the label
  *  needs a fixed dark colour to stay readable on dark themes. */
 const SubcategoryNameFallback = ({ name }: { name: string }) => (
-  <span className="text-xs text-zinc-700">{name}</span>
+  <span className="type-meta text-zinc-700">{name}</span>
 );
 
 /** `cols` is only ever 5|6|7|8 (every entry in `SUBCATEGORY_LAYOUT`,
@@ -42,6 +43,7 @@ export default function SubcategoryGrid({
   subcategories,
   cols,
 }: Props) {
+  const t = useTranslations();
   const LIMIT = 24;
   const searchParams = useSearchParams();
   const [showAll, setShowAll] = useState(false);
@@ -79,7 +81,9 @@ export default function SubcategoryGrid({
                 <SubcategoryNameFallback name={sub.name} />
               )}
             </div>
-            <p className="mt-3 text-[14px] truncate w-full block">{sub.name}</p>
+            <p className="mt-3 type-body-sm truncate w-full block">
+              {sub.name}
+            </p>
           </Link>
         ))}
       </div>
@@ -88,9 +92,9 @@ export default function SubcategoryGrid({
         <div className="flex justify-center mt-2">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full border rounded py-2.5 text-sm text-muted-foreground bg-card hover:bg-gray-200"
+            className="w-full border rounded py-2.5 type-nav text-muted-foreground bg-card hover:bg-gray-200"
           >
-            {showAll ? "Show Less" : "Show More"}
+            {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>
         </div>
       )}

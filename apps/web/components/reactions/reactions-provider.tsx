@@ -9,6 +9,7 @@ import {
   unlikeListing,
   unsaveListing,
 } from "@/actions/reactions";
+import { isListingUuid } from "@/lib/listing-id";
 
 /**
  * The signed-in viewer's likes and saves, shared by every card and control on
@@ -36,16 +37,6 @@ interface ReactionsValue {
 }
 
 const ReactionsContext = React.createContext<ReactionsValue | null>(null);
-
-/**
- * Real listings carry UUID ids; the mock cards (home Top Ads, the non-UUID
- * detail slugs) carry numeric ones and have no row to react to. The controls
- * render on both, so a mock id is simply inert — before this guard, clicking
- * a demo heart fired a real request and surfaced a validation error on the
- * most-visited page.
- */
-const LISTING_UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function withMembership(
   set: Set<string>,
@@ -92,7 +83,7 @@ export function ReactionsProvider({
   };
 
   const toggleLike = (listingId: string) => {
-    if (!LISTING_UUID.test(listingId)) return;
+    if (!isListingUuid(listingId)) return;
     if (!signedIn) {
       toast.error("Sign in to like");
       router.push("/login");
@@ -127,7 +118,7 @@ export function ReactionsProvider({
   };
 
   const toggleSave = (listingId: string) => {
-    if (!LISTING_UUID.test(listingId)) return;
+    if (!isListingUuid(listingId)) return;
     if (!signedIn) {
       toast.error("Sign in to save");
       router.push("/login");

@@ -32,6 +32,8 @@ export interface AdminListingsQuery {
   q?: string;
   status?: AdminListingStatus;
   moderated?: boolean;
+  categorySlug?: string;
+  subcategorySlug?: string;
   page?: number;
   pageSize?: number;
 }
@@ -49,6 +51,9 @@ export async function getAdminListings(
   if (query.status) params.set("status", query.status);
   if (query.moderated !== undefined)
     params.set("moderated", String(query.moderated));
+  if (query.categorySlug) params.set("categorySlug", query.categorySlug);
+  if (query.subcategorySlug)
+    params.set("subcategorySlug", query.subcategorySlug);
   params.set("page", String(query.page ?? 1));
   params.set("pageSize", String(query.pageSize ?? 20));
 

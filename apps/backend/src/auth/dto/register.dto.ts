@@ -8,8 +8,8 @@ export class RegisterDto {
   })
   phone: string;
 
-  @ApiPropertyOptional({ enum: ['en', 'km', 'zh'], default: 'en' })
+  @ApiPropertyOptional({ enum: ['en', 'km'], default: 'en' })
   @IsOptional()
-  @IsIn(['en', 'km', 'zh'])
+  @IsIn(['en', 'km'])
   preferredLanguage?: string;
 }

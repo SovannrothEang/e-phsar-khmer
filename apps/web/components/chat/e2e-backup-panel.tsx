@@ -27,7 +27,7 @@ export function E2eBackupPanel() {
   return (
     <>
       {state?.kind === "locked" && (
-        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/60 px-4 py-3 text-sm">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-muted/60 px-4 py-3 type-body">
           <div className="flex items-start gap-2">
             <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0">
@@ -50,7 +50,7 @@ export function E2eBackupPanel() {
       )}
 
       {state?.kind === "error" && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 type-body">
           <AlertCircle className="size-4 shrink-0 text-destructive" />
           <span className="min-w-0 flex-1">{t("genericError")}</span>
           <Button size="sm" variant="outline" onClick={backup.retry}>
@@ -60,7 +60,7 @@ export function E2eBackupPanel() {
       )}
 
       {state?.kind === "ready" && backup.lastRestoredCount !== null && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 text-sm">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 type-body">
           <ShieldCheck className="size-4 text-green-600" />
           <span>{t("restored", { count: backup.lastRestoredCount })}</span>
         </div>

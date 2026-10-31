@@ -14,6 +14,8 @@ export interface SessionUser {
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   createdAt: string;
+  /** Paid-plan badge, derived by the backend from active subscriptions. */
+  verifiedAccount?: boolean;
 }
 
 /** The signed-in user's own profile, as `GET /users/me` returns it. */
@@ -68,6 +70,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       profilePhotoUrl: data.profilePhotoUrl,
       coverPhotoUrl: data.coverPhotoUrl,
       createdAt: data.createdAt,
+      verifiedAccount: data.verifiedAccount,
     };
   } catch {
     return null;

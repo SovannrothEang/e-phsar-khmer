@@ -19,6 +19,107 @@ How to use this file:
 
 ## [Unreleased]
 
+### Added
+
+- **Paid "Verified Account" badge + checkout success screen.** `verifiedAccount`
+  is derived from an active paid `user_subscriptions` row (no stored flag, no
+  migration) and is returned additively by `GET /users/by-username/:username`,
+  `/users/me` and `/auth/me`, and as `sellerVerifiedAccount` on feed, detail and
+  trending listing rows. The web renders a white/purple pill on ad cards, a
+  purple check beside the public-profile and `/me` names, and the pill on the
+  ad-detail seller card; the previously unconditional rosette is now
+  conditional. Checkout replaces the activation spinner with an explicit
+  "Payment successful" card carrying **Back to profile** and **My
+  subscriptions**, adds Back to profile to the activated and failure states,
+  and keeps a 15 s status read alive for 30 minutes so a confirmation that
+  lands after the QR expires still updates the page.
+- **Trusted product specs (admin-managed, in-house).** A new `product_specs`
+  table (migration `0044_rapid_skaar`; one row per `models` row, grouped
+  label/value `spec_groups` JSONB, `is_published`) backs GSMArena-style spec
+  pages written by staff — nothing is scraped and no external link is used.
+  `GET /api/v1/products?q=&limit=` (public) powers product search and the
+  phones post-form picker; `GET /api/v1/products/:brandSlug/:modelSlug`
+  returns page one. `/api/v1/admin/products` is `@Roles('admin')` CRUD with
+  `modelId` immutable and duplicates answered `409`. `listings` gains a
+  nullable `product_model_id` (FK → `models`, `ON DELETE SET NULL`); create
+  and update validate that the target spec is **published**, and
+  `GET /listings/:id` embeds `product: { modelId, brandSlug, brandName,
+modelSlug, modelName } | null`. The `phones` `field_schema` declares a
+  required `productSpec` key: the post form's picker searches the published
+  catalogue, resolves a pasted product URL (`/en/product/apple/iphone-16`),
+  auto-fills Brand/Model when empty, and clears the link when either changes;
+  submit refuses an empty picker. The listing detail shows "View full specs",
+  the search page shows a Product specs section above the ad results, and
+  `/product/[brand]/[model]` renders the grouped specs plus active ads for
+  that model. Admin UI: `/wanderer/dashboard/products` (Attributes → Product
+  Specs) with a dynamic group/row editor. No image upload in v1 — the model's
+  existing image is used through `DbImage`.
+- **Product Specifications: family-scoped spec pages.** The freeform
+  "Product Specs" surface becomes a top-level admin section —
+  **Product Specifications** → Cars, Motorcycles, Phones, Tablets, Smart
+  Watches (`/wanderer/dashboard/product-specifications/<family>`; the old
+  `/wanderer/dashboard/products` redirects to Cars). `product_specs` gains a
+  `family` enum column (migration `0047_luxuriant_earthquake`, backfilled
+  from each model's family subcategory with a phone fallback). Cars and
+  Motorcycles use the old freeform group/row editor — staff add any section
+  and field, so ICE and BEV specs fit without a schema — while Phones,
+  Tablets and Smart Watches keep fixed templates from
+  `src/products/spec-templates.ts`, rendered from
+  `GET /admin/products/template/:family` (`mode: template | freeform`) with
+  blank fields never rendering. The API also gains `?family=` on the
+  product lists. Create requires the model to be linked to the family's
+  listing subcategory; templated families reject non-template groups
+  (`INVALID_SPEC_SECTION`) except for legacy groups already stored on a row. `productSpec` is now required on `cars-for-sale`,
+  `motorcycles-for-sale`, `phones`, `tablets` and `smart-watches`, and the
+  post-form picker is scoped to the subcategory's family. The listing
+  create/update path also rejects a spec from another family.
+- **Product pages can carry their own image.** `product_specs` gains an
+  `image` column (migration `0048_lucky_harrier`); the admin create/edit
+  dialogs upload through a new staff-only `product` sign scope, and the
+  public product page and picker prefer it, falling back to `models.image`.
+  Product images render contain-fit (no square crop): a wide admin preview
+  and a 384×256 public header panel.
+- **Product spec pages redesigned.** `/product/[brand]/[model]` gets a
+  hero (4:3 contain image, brand eyebrow, 32/40 model name, Trusted-specs
+  badge, family/fuel chips) and two-column spec cards with uppercase
+  section headers. The page uses a scoped `product-type` type scale so its
+  headings stay larger without changing the app-wide 20/28 titles.
+- **Trending listings replace the mock home Top Ads.** `GET /api/v1/listings/trending`
+  (`limit` ≤ 20, `windowDays` ≤ 30) ranks live listings by weighted engagement from
+  `listing_events` (view 1, chat/call/show_contact 3, apply_job 5 — impressions are
+  deliberately excluded) plus likes/saves at 2 each (owner self-reactions excluded),
+  filters through the feed's `liveConditions()`, and fills the tail with the newest live
+  ads. The home carousel is now `components/ads/TrendingAds.tsx` (label "Trending" /
+  "កំពុងពេញនិយម"), driven by `getTrendingListings`; the 10 `TopPosts` mocks and the
+  unused `HighLightAds` component were deleted. No migration — ranking reads the
+  existing tables.
+- **Superadmin-managed storefront banners.** `advertisements` (migration
+  `0042_omniscient_cloak`) holds one row per banner: a `placement`
+  (`home | all_ads | category | subcategory | listing_detail`), the Storage image
+  path, an optional click-through, alt text, sort order and an active flag.
+  `GET /api/v1/advertisements?placement=` is public and returns active banners
+  only; `/api/v1/admin/advertisements` is super_admin-only CRUD. The dashboard
+  page is `/wanderer/dashboard/advertisements` — hidden from regular admins the
+  same way Team is — and uploads through the new staff-only `advertisement` sign
+  scope. On the storefront the five hardcoded banner `<Image>` blocks are
+  replaced by `components/ads/AdvertisementCarousel.tsx`: an embla carousel that
+  rotates when a slot holds several banners, pauses on hover/focus, honours
+  `prefers-reduced-motion`, and renders nothing when a slot is empty.
+- **The storage bucket allows only `image/jpeg | image/png | image/webp`**
+  (5 MB cap); `image/gif` is refused with `invalid_mime_type`. Animated WebP is
+  allowed, so the old 2.1 MB animated `flag-animation.gif` was re-encoded as a
+  381 KB / 25-frame WebP and keeps its animation. Allowing GIF would be a
+  Supabase bucket-settings change, not a code change.
+- **Expiry warnings for ads.** An hourly `ListingExpiryService` sweep (BullMQ
+  `listing-expiry` queue) notifies an ad's owner through the existing
+  notification feed at T-3 days (`listing.expiring`, "expires in N days") and
+  once after the lapse (`listing.expired`, only for ads that expired in the
+  last 24 h so a deploy never notifies every historical lapse). Each notice is
+  deduped by `(listingId, expiresAt)` in `notifications.data`, so a renewal —
+  which moves the date — earns a fresh warning. Manage Ads shows the same
+  3-day warning as an "Expires in N days" chip on Active rows. No migration;
+  the sweep only reads listings and writes notification rows.
+
 ### Changed
 
 - **Bakong payments are polled on demand by one poller, not by a self-rescheduling chain** (`Plans.md`, "Bakong
@@ -160,6 +261,163 @@ How to use this file:
   message insert transaction under per-user Postgres advisory locks shared with
   `registerDevice`, so a device registering mid-send surfaces as `409 E2E_DEVICES_MISMATCH`
   and is retried by the client instead of silently missing an envelope.
+- **"Update this contact to your ads" now carries the location too.** With the switch ticked,
+  `PATCH /users/me` copies the profile's province/district/commune, address and — when the profile
+  has one — map pin onto every non-deleted ad the user owns, alongside the contact name/phones/email
+  it already copied. The settings form had been making Location and Address required for this switch
+  while the backend deliberately skipped them, so ads stayed empty. A profile with no pin leaves each
+  ad's own pin untouched, and an unticked switch still never touches listings. The **post form now
+  prefills Location and Address from the profile too** (same resolved cascade, same saved address),
+  each block still gated on the subcategory's own `field_schema`; the map pin is not prefilled.
+- **Free plan is now one account-wide cap.** `free_plan_settings.other_ads` is the free plan's
+  total live-ad allowance (relabeled "Total Ads"); the `free_plan_ad_limits` rows are sub-limits
+  inside it — at most this many of the pool may sit in one subcategory/category, and a value above
+  the total never binds. A held group keeps its own pool: a Property (1000 ads) subscriber still
+  gets at most 2 cars, because car ads are outside that group. The Manage Ads cards now read
+  active live ads against the summed pools (free total + every held group), a **Hidden** tab lists
+  ads restricted over the allowance with delete/upgrade recovery, restricted ads 404 on their
+  public link, owner deletes reconcile immediately, and a restricted ad whose window lapsed can be
+  renewed. Renewals are pooled the same way (one plan's `renews` is shared by every ad in its
+  pool) and reset on a rolling 30-day window — migration `0046_noisy_wolverine` adds
+  `listing_renewals`, one row per renewal spent, cascading with its listing and user. The allowance
+  is enforced when the ad is created as well as when it is published, so an over-limit post never
+  creates a row; if a publish is refused after all, the web rolls it back. The web has no draft
+  surface. The ad-cap change itself needs no migration.
+- **Subscription catalog collapsed to group → tier → term (migration `0045_collapse_subscription_plans`).**
+  The empty `subscription_plans` level is gone: `subscription_packages` is now one fixed tier per
+  group (the `subscription_tier` enum `bronze|silver|gold`, unique on `(categoryId, tier)`) and
+  carries the limits; `subscription_terms` stay as the purchasable rows, constrained in admin to
+  fixed 3/6/12-month durations (12 stored as months, displayed "1 Year"). The four dashboard pages
+  (Categories / Plans / Packages / Terms) are replaced by three pages under
+  `/wanderer/dashboard/subscription`: **Subscriptions** (groups + coverage), **Tiers** (limits) and
+  **Terms** (prices); Free plan keeps its own page, and the sidebar section is now **Premium**.
+  The migration backfills each package's group and tier from its old plan
+  (failing loudly on unmapped names or duplicate tiers), sets the tier order, normalizes year terms
+  to 12 months, and retires every term outside 3/6/12 months (rows kept; live subscriptions keep
+  their frozen snapshot). The public catalog and `/subscriptions/me` no longer return
+  `planId`/`planName`; customer pricing, checkout and the profile/`/me/subscriptions` views render
+  package + term, checkout now refuses inactive groups, and the unenforced Videos/Auto-Renews rows
+  are no longer shown on customer surfaces.
+- **Admin catalogue tables rebuilt on a shared kit.** Models, Brands, Categories and
+  Subcategories drop the raw-UUID ID column (Copy ID now sits in each row's menu), lead
+  with a logo/initial + name cell, show category and sub-category chips and one formatted
+  Updated date, and gain click-to-sort headers, whole-row search (name, slug, brand,
+  category, sub category), category filters (plus brand on Models) and a shared
+  pagination footer — `components/dashboard/admin-table.tsx` plus `admin-page.tsx`.
+  `getAdminModels` now derives a model's category from its own subcategory rows instead of
+  a brand's first link (the bug that listed phones under "Computers & Accessories"), and
+  Brands lists every category a brand spans. The Models delete dialog no longer says
+  "Delete Brand"; the Subcategories one no longer says "Delete Category".
+- **Admin Users rebuilt on the same shared table.** Seven columns instead of ten (the ID moved
+  into the row menu, the constant Role column dropped, Created/Updated collapsed into one
+  Joined date), a round avatar + name + email cell, `@username`, click-to-sort headers,
+  pagination at 20, and the All / Premium / Normal tabs kept. Two real fixes: the phone column
+  no longer doubles the `+` (`++855…` → `+855…`), and the row menu's View no longer
+  concatenates the username with the UUID — it opens the public profile at
+  `/{locale}/{username}`.
+- **Admin report queues rebuilt.** Report Users and Report Posts share one status badge, drop
+  the report-UUID and reviewer-UUID columns, show the reviewer under the status, format the
+  created date, clamp the description with the evidence thumbnails beneath it, and move the
+  actions into the shared row menu (View profile/post, Approve, Reject, Copy ID). Fixes: the
+  created column no longer prints a raw ISO string, the reviewer column shows the reviewer's
+  name, and Report Users' View Profile opens `/{locale}/{username}` instead of concatenating
+  the display name with the target's UUID.
+- **Admin navbar: storefront-style language picker and a real notification queue.** The language
+  trigger is now the current locale's flag with a flag radio list (`/flag/uk.png`,
+  `/flag/khmer.png`), matching the storefront selector while keeping the admin cookie switch. The
+  bell no longer shows hardcoded mock entries: it counts pending user/listing reports (same
+  react-query keys as the queues) and opens a right-side drawer of report cards that link to the
+  owning queue.
+- **Admin sidebar logo no longer clips in the icon rail.** `SidebarHeader` drops to 7 px padding
+  while the sidebar is collapsed (`group-data-[collapsible=icon]:p-[7px]`) and centres the mark,
+  so the 32 px tile no longer overflows through the old 16 px padding; the expanded header is
+  unchanged.
+- **Collapsed admin sidebar groups now open a dropdown.** In the icon rail the sidebar primitive
+  hides inline sub-lists, so Attributes, Manage Users, Subscriptions and Reports expanded into
+  nothing; each now opens its children in a right-side menu from the icon, while the expanded
+  sidebar keeps the inline collapsible.
+- **Job applications: hiring is a conversation, not a row action.** Both `/me` job lists drop
+  the application-status machinery — the poster's rows keep only View Resume + Message, the
+  status pills (New/Viewed/Hired/Rejected) and both status filters are gone — because applying
+  already opened the chat thread, which is where the recruiter/interviewer decides. The button
+  label now reads "View Resume".
+- **Body Types (and the other attribute pages) rebuilt on the shared admin table.** Six columns
+  instead of ten — icon/initial + name (+ Khmer name), slug, category chip, sub-category chips,
+  formatted updated date, row menu — with sorting, search and pagination from the kit. The
+  add/edit dialog and the Years read-only mode are unchanged.
+- **Team page rebuilt on the shared admin table.** Member (avatar + name + email), @username,
+  phone, role badge (Super Admin/Admin), status, one Joined date and the standard row menu
+  replace the raw-UUID ten-column table; sorting, search, tabs and pagination come from the kit.
+- **Advertisements: admin page on the shared kit, storefront dots on the brand colour.** The
+  admin table now has a 4:1 banner thumbnail with alt text and a Live/Hidden line, placement
+  chips, a truncated link, order, the brand-blue active switch and the standard row menu, with
+  search, sorting and pagination; the storefront carousel's active dot uses `#00a0e9` instead of
+  white.
+- **Admin dialogs cap at the viewport and scroll internally, with one button language.** Every
+  `DialogContent` is now `max-h-[calc(100svh-2rem)]` with an internal scroll, and the footer is an
+  in-flow bar at the end of the form sharing the dialog's surface — symmetric around its buttons,
+  never overlapped by content — so a long form no longer stretches the dialog past the screen.
+  Cancel buttons are the neutral outline (the red/blue fills across the Attributes, Users, Team
+  and Feedback dialogs are gone) and primary actions use the theme blue.
+- **Users Subscription rebuilt on the shared admin table.** Subscriber, phone, plan + price/payment,
+  category chip, usage (ads / renews / auto), one subscription period, status and the row menu
+  replace the 15-column table whose Status/Action columns fell off-screen; search and sorting come
+  from the kit and the Grant dialog's Cancel is neutral.
+- **Admin Listings rebuilt on the shared table with category filters.** A thumbnail + title (with
+  the moderation reason beneath), seller, resolved category names, price, soft status and
+  open-report badges, one created date and the row menu (View listing / Remove / Restore / Copy ID)
+  replace the old table with its yellow/red buttons. New **Category** and **Sub-category** filters
+  ride two additive `GET /admin/listings` params (`categorySlug`, `subcategorySlug`); the admin
+  table kit gained a `serverPagination` mode so the footer drives the API page. The status tabs
+  carry counts computed under the current search/category filters, capped at **99+** (the shared
+  `formatCount` also feeds the Users, Team and Users Subscription tab badges). Status and report
+  badges use **solid tints**: Tailwind's alpha colours (e.g. `orange-500/10`) render teal fringe
+  pixels on Chrome's rounded pills — also fixed on the Users Subscription status badges.
+- **Manage Ads: the ad list is split from the controls card and rows gain an
+  actions menu.** The header, plan stats and Active/Expired tabs keep their own
+  card; the ads (and the loading/empty states) render in a separate section
+  below it. Each row's three-dot menu offers **View ad**, **Renew ad**
+  (re-publish — 30 more days, one plan renewal, confirm dialog), **Share**
+  (copy-link dialog) and **Delete ad** (soft-delete, confirm dialog), wired to
+  the existing backend endpoints; a successful action reloads the tab and the
+  plan summary. The page also renders through the existing `Me.manageAds`
+  namespace (en/km) after reading as hardcoded English since the merge.
+  Edit-listing ("no edit flow yet") and "mark as sold" (no such status) are
+  deliberately absent.
+- **Profile tabs render populated results as list rows.** Likes, Saved and
+  Manage Ads moved from the 2–4 column card grid to full-width rows
+  (thumbnail, title, location, price — plus a like/save toggle on Likes and
+  Saved), matching the captain's reference. Empty tabs keep the centred
+  "No Result!" card; the Jobs and Subscriptions tabs were already lists.
+- **Listing detail's seller button reads "Chat"; the owner sees a note instead.**
+  `Chat.messageSeller` (the default label of `ContactSellerButton`) is now
+  "Chat" (km was already "ជជែក"), and the own-ad note on the seller card reads
+  "This is your own ads - buyers will see 'Chat' here" (`Post.ownAdNote`; the
+  km copy now quotes 'ជជែក'). Labels only — the chat flow is unchanged.
+- **Typography scale trimmed: page titles 20px, section titles 16px.** The
+  captain found the 2026-10-23 scale too large away from the landing page.
+  `type-page-title` is now 20/600/28 and `type-section-title` 16/600/24 (base
+  `h1`/`h2` follow); the homepage alone keeps the display sizes — 24/32 and
+  20/28 — through a `home-type` context class on its wrapper. Ten page-title
+  `h1`s that still hard-coded `text-2xl` (the subscription dashboard, listings,
+  feedback and users-subscription pages, `/feedback`, `/settings`,
+  `/me/membership`) now use the role class, so no non-home page title exceeds
+  20px.
+- **`super_admin` is now a governance tier, not a bigger admin tier.** The
+  captain's rule: a superadmin manages the dashboard & stats, reports, team &
+  roles, advertisements and feedback — nothing else. `RolesGuard` matches roles
+  literally, so `@Roles('admin')` now **excludes** a `super_admin`; the
+  catalogue, subcategories, brands, models, listings, attributes, subscription
+  config, user-subscriptions and the admin payment route were narrowed to
+  `@Roles('admin')`. `AdminController` (stats **and** users) and
+  `ReportsController` still name both roles — the Team page is built on
+  `/admin/users`, so that endpoint cannot be closed to super_admin without
+  breaking team management (the staff-vs-user boundary there stays enforced by
+  `assertCanManageUser`). The admin sidebar mirrors the split: each menu item
+  declares a `roles` list, and the Subscriptions group is admin-only. A
+  dedicated `superadmin` account was created for this tier; `admin` and `asdf1`
+  remain plain admins.
+
 - **Chat is encrypted-only for new messages.** `ChatService.sendMessage` rejects a payload
   with neither `e2eHeader` (v1) nor `e2e` (v2) (`Encrypted messages are required`), requires a
   body, and refuses the legacy public-bucket `imagePath`
@@ -212,6 +470,18 @@ How to use this file:
   staged preview like images and voice.
 - **"Last active …"** in the thread header from `ChatUserSummary.lastSeenAt`
   (`users.last_seen_at`, coarse — 5-minute activity throttle).
+- **Browse More Filters: the mock's vehicle block, wired end to end.** On a vehicle
+  subcategory the shared dialog now shows Brand, Model (disabled until a brand is picked),
+  Year (minimum/maximum), Tax Type, Condition, Colour, Transmission, Engine Type and Body
+  Type — each gated on that subcategory's own `field_schema` and sourced exactly like the
+  grid/form (linked `bodytypes`, the managed/global `colors` rule, `enginetypes`, the
+  generated `years`). Every field edits the same URL params the browse grids and the bar
+  chips use, so a grid pick shows up in the dialog and counts on its badge, and a dialog
+  pick updates the grids/chips. `GET /listings` gains four additive optional filters —
+  `model`, `taxType`, `color`, `transmission` (display-name equality on `attributes`, values
+  bound as parameters) — so the fields really filter. The header follows the mock (✕ left,
+  centred title, Clear right), controls are h-11, and the segmented groups use the sampled
+  mock colours (`#00a0e9` selected / `#707685` rest).
 
 ### Fixed
 
@@ -232,12 +502,114 @@ How to use this file:
   that file is read by every project built from this repo, including the web project (Root Directory =
   `apps/web`), which then had no `package.json`. The exclusion is gone; the backend image build only uploads
   more (~257 MB instead of ~10 MB).
+- **Listing-detail spec values now actually filter the feed.** Every row in the Description grid used
+  to link to its subcategory page with no query, so clicking Year, Tax Type, Condition, Body Type,
+  Engine or Color landed on the unfiltered feed. Each row now carries the filter: year → an exact
+  `year_min`/`year_max` range, condition/tax type/engine/color/transmission → their shared filter
+  params, and every other attribute key (`bodyType`, `storage`, `jobType`, `bedroom`, `size`, …) →
+  the feed's multi-attribute `attrs` JSON object. Links always carry the stored English value, so
+  `/km` filtering works while the grid stays Khmer. Clear removes the object and the More Filters
+  badge counts it.
+- **More Filters is schema-driven for every subcategory.** The dialog rendered its attribute block
+  only on vehicle subcategories, so a phone page offered no Brand, Model or Storage and a laptop
+  page none of its Storage / Screen Size / RAM / CPU / VGA fields. It now renders one select per
+  `select` field the subcategory's `field_schema` declares (plus Brand/Model and the vehicle-specific
+  controls), AND-ing the generic ones through the new additive `attrs` query param
+  (`GET /listings?attrs={"storage":"128GB","ram":"8GB"}`). Keys are bound as parameters, malformed
+  or oversized input applies nothing, and each parsed filter is unit-tested. No schema change.
+- **The seller card's email row now hides the address until asked.** The full email was always
+  rendered next to a "Show Email Address" button that only logged an analytics event, so the
+  control did nothing. It now mirrors the phone row: `c***@gmail.com` until clicked, then the real
+  address as a `mailto:` link and the reveal control disappears. An expired ad still hides the row
+  entirely.
+- **The car post form was missing the Product Specification picker in an environment whose seed
+  data predated it.** The form is schema-driven, and `subcategories.field_schema` for
+  `cars-for-sale` (plus motorcycles, tablets and smart watches) had been written before
+  `productSpecField` existed, so only `phones` carried the key live. The seed source was already
+  correct; a targeted `field_schema` sync from `categoriesSeed` (by category + slug) applied it.
+  No code change. Production still needs the same targeted `UPDATE` per environment — the seed is
+  its only writer.
+- **Users Subscription tabs are built from the subscription categories, not a hardcoded list.**
+  Category names are free text (e.g. "Auto 8137"), so the old name-matching tabs counted zero and
+  filtered nothing, and any category beyond the original five had no tab at all. The admin view now
+  also returns each row's `subscriptionCategoryId` (additive field); the tabs count and filter by
+  id, so new categories appear automatically, and the strip wraps when it grows.
+- **Editing an attribute with an empty Khmer name no longer 500s.** The admin web action sends
+  `nameKm: null` for an empty field, and `AttributesService.update` called `.trim()` on it; update
+  now mirrors create's null-safe trim (null clears the Khmer name). The same guard was added to
+  the category/subcategory update paths, and a regression spec pins both cases.
+- **Chat ignored the site theme.** The workspace forced the `dark` token scope on its panel
+  (hardcoded `bg-[#1b1b1b]` / `border-white/10`, plus `dark` re-applied to the portaled delete
+  menu and dialog), so `/chats` stayed dark in light mode. The panel now uses the normal theme
+  tokens (`bg-card`, `border-border`, `bg-muted`) and follows the visitor's light/dark choice;
+  the Suspense fallback matches.
+- A thread opened via `?to=<peer>` before the conversation existed did not fill in when the
+  first inbound message created it. `chat-workspace.tsx` now reconciles the cached
+  `GET /chats/with/:userId` lookup against the inbox.
+- **Accounts without an uploaded photo rendered a broken avatar.** The shared fallback pointed at
+  `ui-avatars.com`, which now answers with `image/svg+xml`; Next's optimizer rejects SVG unless
+  `dangerouslyAllowSVG` is set, so every no-photo avatar (navbar account menu, `/me` header,
+  public profiles, follower lists, the listing seller card, settings) came back 400 and printed
+  its alt text inside the circle. The new `components/common/UserAvatar.tsx` renders the photo
+  through `DbImage` and falls back to a brand-blue initials circle instead — no third-party
+  request, no broken `<img>`. The `ui-avatars.com` remotePattern is gone.
+- **Browse filters gave no visible selection, and the header search ignored the category page.**
+  Picking a brand (e.g. MG) hid the whole Brand grid and swapped in its models, so nothing showed
+  which brand was applied except the breadcrumb. The pick now surfaces where the other applied
+  filters do: the More Filters dialog's Brand select and its badge count it. The brand click
+  itself stays a drill-in (grid steps aside, models appear) — like a body-type pick, not a
+  toggle. The header search bar's scope chip now follows the page: a category or subcategory page
+  reads that category ("Cars For Sale" / "រថយន្តសម្រាប់លក់") and a submit from there searches inside
+  it (`/search?q=…&category=…&sub=…`), instead of always starting from "All Categories".
+
+- **Expired listings vanished from browse while still reading as live.** Nothing flips
+  `listings.status` when the 30-day window closes, so a lapsed ad dropped out of every feed
+  (`liveConditions()`) but `GET /listings/:id` still served it with `status: "active"`, Manage Ads
+  still counted it under Active (its Expired tab asked for a status no row ever has), and the
+  detail page offered contact as if the offer were live. `findPublicById` now reports the derived
+  `expired` status and 404s drafts and owner-deleted ads; `findMine` derives the same status and
+  maps the Active/Expired filters to date ranges (`active` excludes lapsed rows, `expired` includes
+  both stored-expired and lapsed-active ones); the web detail page shows an expired notice and
+  disables contact/apply, and the Expired tab renders the ads with a badge. Unit tests pin the
+  derivation and both filters.
+
+- **Product Spec picker: a pasted link now explains itself.** The phones form's field advertised
+  "search or paste a product link", but only a published PhsarKhmer product URL resolves; an
+  external (GSMArena) link or a product page that is not published failed silently and the list
+  just read "No match found". A URL-shaped paste that does not resolve now toasts "That link
+  isn't a published PhsarKhmer product…", the placeholder names the source ("paste a PhsarKhmer
+  product link"), and the focused field (not only the open panel's search box) accepts a
+  keyboard paste.
+
+- **A price of 0 can no longer be submitted.** The price field accepted `0` (`min={0}`, and
+  submit only rejected `priceNum < 0`), so a real ad could be published at `$0`. The field now
+  requires a value greater than 0 (`min={0.01}`, submit `<= 0`) with the message "Enter a price
+  greater than 0". The fix applies to every subcategory that declares a price; existing ads keep
+  their stored price until edited.
+
+- **A zero/negative discount no longer renders as a discount.** `"0.00"` is a truthy string, so
+  the card and detail mappings treated any non-null discount as real: a `-0%` / `$0 OFF` badge
+  and a strikethrough price equal to the price. `toCardPost` and `toPostView` now require a
+  positive discount value before setting `oldPrice` or the percentage label, and the form never
+  sends a discount unless it is greater than 0.
+
+- **Number fields no longer change on scroll.** Chrome edits a focused `type="number"` input on
+  wheel, so scrolling the long post form with the cursor over the price/discount field silently
+  walked `1` → `0` (the reported `$0` ads and the stray `0%` discount). The shared `TextInput`
+  (number mode) and the discount input now blur on wheel, so the scroll moves the page instead
+  of the value.
 
 ### Removed
 
 - The no-op Archive menu item and the unused i18n keys `Chat.inbox.archive`,
   `Chat.thread.emptyTitle`, `Chat.thread.attachingListing` and `Chat.thread.sendingVoice` (all six
   locales).
+- **Web mock data removed.** Deleted `lib/post-ad.ts`, `lib/categories.ts`, `lib/location.ts`,
+  `lib/data.ts`, `lib/users.ts`, `lib/subcategoryGroups.ts`, `lib/brands.ts`,
+  `lib/subcategories.ts`, `components/post/PostForm.tsx`, the five mock display components
+  (`components/ads/{AdsPhoto,ListAd,NormalAd}.tsx`, `components/Card/TabsCard.tsx`,
+  `components/all-ads/AllAdsHeader.tsx`), and the mock `posts`/`users` arrays; feed cards and
+  listing detail are real-data only; `/sell` redirects to `/post`; legacy numeric `-adid-` URLs 404. Client chunks drop ~285 KB raw / ~48 KB gzip.
 
 ### Docs
 

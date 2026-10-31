@@ -3,15 +3,10 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-
-// Defined outside this module so chat can read it without importing leaflet.
-import { DEFAULT_CENTER } from "@/lib/map/default-center";
-export { DEFAULT_CENTER };
-
-export interface MapCoords {
-  lat: number;
-  lng: number;
-}
+import {
+  DEFAULT_CENTER,
+  type MapCoords,
+} from "@/components/post/location-map.constants";
 
 /** Red teardrop pin, inlined so no bundler-resolved image URL can break it. */
 const PIN_SVG =
