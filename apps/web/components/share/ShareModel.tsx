@@ -15,6 +15,7 @@ import {
   IconBrandWhatsapp,
 } from "@tabler/icons-react";
 import { Separator } from "../ui/separator";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { IconCopy, IconCheck } from "@tabler/icons-react";
 
@@ -28,6 +29,7 @@ export default function ShareModal({
   onOpenChange,
   url,
 }: ShareModalProps) {
+  const t = useTranslations("Share");
   const [copied, setCopied] = useState(false);
   const shareLinks = {
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
@@ -48,7 +50,7 @@ export default function ShareModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg pb-8">
         <DialogHeader>
-          <DialogTitle className="font-semibold">Share</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
         <Separator className="my-1" />
         <div className="flex justify-center gap-4 py-4">
@@ -93,7 +95,7 @@ export default function ShareModal({
             />
           </a>
         </div>
-        <p className="text-center text-muted-foreground mb-3">Or copy link</p>
+        <p className="text-center text-muted-foreground mb-3">{t("orCopy")}</p>
         <div className="relative flex items-center">
           <Input
             value={url}
@@ -106,7 +108,7 @@ export default function ShareModal({
             className="absolute right-1 h-9 w-9 hover:bg-transparent"
             onClick={() => {
               handleCopy();
-              toast.success("Link copied to clipboard", {
+              toast.success(t("copied"), {
                 position: "top-right",
               });
             }}

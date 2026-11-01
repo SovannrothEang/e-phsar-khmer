@@ -7,12 +7,14 @@ import { communes, districts, provinces } from '../db/schema/users.schema';
 export interface ProvinceDto {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
 }
 
 export interface DistrictDto {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
   provinceId: string;
 }
@@ -20,6 +22,7 @@ export interface DistrictDto {
 export interface CommuneDto {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
   districtId: string;
 }
@@ -33,7 +36,12 @@ export class LocationsService {
       .select()
       .from(provinces)
       .orderBy(asc(provinces.name));
-    return rows.map((r) => ({ id: r.id, name: r.name, slug: r.slug }));
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      nameKm: r.nameKm,
+      slug: r.slug,
+    }));
   }
 
   async listDistrictsByProvince(provinceSlug: string): Promise<DistrictDto[]> {
@@ -56,6 +64,7 @@ export class LocationsService {
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
+      nameKm: r.nameKm,
       slug: r.slug,
       provinceId: r.provinceId,
     }));
@@ -99,6 +108,7 @@ export class LocationsService {
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
+      nameKm: r.nameKm,
       slug: r.slug,
       districtId: r.districtId,
     }));

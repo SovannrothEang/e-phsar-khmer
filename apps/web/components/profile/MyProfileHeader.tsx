@@ -16,7 +16,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
-import { Link, useRouter } from "@/i18n/routing";
+import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountCheck } from "@/components/common/VerifiedAccountBadge";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import { uploadUserPhoto } from "@/actions/user-photo";
@@ -36,6 +38,8 @@ export interface ProfileUser {
   following: number;
   follower: number;
   joinDate: string;
+  /** Paid-plan badge (active subscription), derived by the backend. */
+  verifiedAccount?: boolean;
 }
 
 interface ProfileHeaderProps {
@@ -76,9 +80,20 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // The profile page currently renders from a mock currentUser; these overrides
-  // reflect an upload immediately. router.refresh() keeps server data in sync
-  // once the page consumes real /users/me data (tracked follow-up).
+  // The tabs are routes, so the default is derived from the URL: the highlight
+  // stays correct on a hard load of a sub-tab and on back/forward (an
+  // uncontrolled Tabs would keep showing "Manage Ads"). The key remounts Tabs
+  // when the route changes so Radix's internal state can't go stale, while a
+  // click still lights its own tab immediately — no waiting for navigation.
+  const pathname = usePathname();
+  const activeTab =
+    PROFILE_TABS.find(({ href }) => href === pathname)?.value ??
+    // /me/* pages that are not tabs (followers, membership, ...) keep the
+    // default section lit instead of dropping the highlight entirely.
+    "manage-ads";
+
+  // These overrides reflect an upload immediately; router.refresh() keeps the
+  // server data in sync.
   const displayedAvatar = avatarOverride ?? user.avatar;
   const displayedCover = coverOverride ?? user.cover;
   const handleImageClick = (src: string) => {
@@ -195,16 +210,22 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           <div className="px-6 pb-6">
             <div className="flex flex-col md:flex-row md:items-end gap-4 mt-1">
               <div
-                onClick={() => handleImageClick(displayedAvatar)}
+                onClick={() => {
+                  // No photo yet: the circle shows initials, and on your own
+                  // profile a click opens the picker (the cover behaves the
+                  // same way rather than opening a lightbox with nothing in it).
+                  if (displayedAvatar) {
+                    handleImageClick(displayedAvatar);
+                  } else if (isOwnProfile) {
+                    avatarInputRef.current?.click();
+                  }
+                }}
                 className="relative cursor-pointer"
               >
-                <Image
+                <UserAvatar
                   src={displayedAvatar}
-                  alt={user.name}
-                  width={120}
-                  height={120}
-                  unoptimized
-                  className="w-32 h-32 rounded-full border-4 border-card shadow-lg -mt-24"
+                  name={user.name}
+                  className="w-32 h-32 border-4 border-card shadow-lg -mt-24 text-4xl"
                 />
                 {isOwnProfile && (
                   <Button
@@ -229,7 +250,10 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
               <div className="flex-1">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="">
-                    <h1 className="text-xl font-medium ">{user.name}</h1>
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-xl font-medium">{user.name}</h1>
+                      {user.verifiedAccount && <VerifiedAccountCheck />}
+                    </div>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
@@ -280,8 +304,15 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs defaultValue="manage-ads" className="flex-1">
-              <TabsList variant="line" className="w-full">
+            <Tabs
+              key={activeTab}
+              defaultValue={activeTab}
+              className="flex-1 min-w-0"
+            >
+              <TabsList
+                variant="line"
+                className="w-full justify-start overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group-data-horizontal/tabs:h-auto"
+              >
                 {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}

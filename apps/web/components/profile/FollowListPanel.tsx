@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import FollowListCard from "./FollowListCard";
 import { loadFollowList } from "@/actions/follows";
 import type { FollowRowUser, FollowSide } from "@/lib/api/users";
@@ -40,6 +41,7 @@ export default function FollowListPanel({
   viewerId,
   onSelectTab,
 }: FollowListPanelProps) {
+  const t = useTranslations("Common");
   const [items, setItems] = React.useState<FollowRowUser[] | null>(null);
   const [hasMore, setHasMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function FollowListPanel({
   if (error) {
     return (
       <Frame>
-        <p className="py-8 text-center text-sm text-muted-foreground">
+        <p className="py-8 text-center type-body-sm text-muted-foreground">
           {error}
         </p>
       </Frame>
@@ -76,8 +78,8 @@ export default function FollowListPanel({
   if (items === null) {
     return (
       <Frame>
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          Loading…
+        <p className="py-8 text-center type-body-sm text-muted-foreground">
+          {t("loading")}
         </p>
       </Frame>
     );

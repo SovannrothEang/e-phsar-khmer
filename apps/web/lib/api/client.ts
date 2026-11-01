@@ -5,6 +5,7 @@ import {
   getAdminAccessToken,
   getAdminRefreshToken,
   getUserAccessToken,
+  getUserDeviceId,
   getUserRefreshToken,
   setAdminSession,
   setUserSession,
@@ -138,10 +139,14 @@ export async function serverFetch<T>(
 async function tryUserRefresh(): Promise<string | null> {
   const refreshToken = await getUserRefreshToken();
   if (!refreshToken) return null;
+  const deviceId = await getUserDeviceId();
 
   const res = await fetch(`${API_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(deviceId ? { "x-device-id": deviceId } : {}),
+    },
     body: JSON.stringify({ refreshToken }),
     cache: "no-store",
   });

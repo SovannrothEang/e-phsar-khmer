@@ -5,6 +5,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -26,6 +27,12 @@ export class UpdateSubcategoryDto {
   @IsString()
   @MinLength(1)
   name?: string;
+
+  /** Khmer display name. An empty string or null clears an existing translation. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  nameKm?: string | null;
 
   @IsOptional()
   @IsString()

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
-import { House, ChevronRight, Mail, Phone, Clock8 } from "lucide-react";
+import { CONTACT_EMAIL } from "@/lib/site";
+import { Mail, Phone, Clock8 } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import {
   Accordion,
   AccordionContent,
@@ -44,31 +46,16 @@ export default function ContactUs() {
     <div className="h-[calc(100vh-140px)] mx-auto w-full bg-muted">
       <div className="px-4 py-4 bg-muted">
         <div className="max-w-4xl mx-auto w-full px-4 pb-2">
-          <nav className="flex items-center gap-2 text-base">
-            <Link
-              href="/"
-              className="group flex items-center transition-colors duration-150 text-foreground dark:text-gray-400 hover:text-blue-300"
-            >
-              <House
-                size={16}
-                className="text-foreground dark:text-gray-400 group-hover:text-blue-300"
-              />
-              <span className="text-foreground dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-                Home
-              </span>
-            </Link>
-            <ChevronRight size={16} className="block text-muted-foreground" />
-            <h3 className="text-muted-foreground">Contact Us</h3>
-          </nav>
+          <Breadcrumbs
+            items={[{ label: "Home", href: "/" }, { label: "Contact Us" }]}
+          />
         </div>
       </div>
 
       <main className="max-w-4xl mx-auto px-4 pb-20">
         <div className="bg-card rounded-sm shadow-sm  overflow-hidden">
           <div className="p-6">
-            <h1 className="text-2xl font-medium mb-6 text-foreground">
-              Contact Us
-            </h1>
+            <h1 className="type-page-title mb-6 text-foreground">Contact Us</h1>
             <div className="flex flex-wrap gap-6 mb-2">
               {CONTACTS.map((contact, index) => (
                 <div key={index} className="flex items-center gap-2">
@@ -81,12 +68,12 @@ export default function ContactUs() {
                     />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground leading-none">
+                    <span className="type-meta text-muted-foreground">
                       {contact.label}
                     </span>
                     <Link
                       href={`tel:${contact.number}`}
-                      className="text-[#00a0e9] font-medium text-sm cursor-pointer hover:underline"
+                      className="text-[#00a0e9] type-nav cursor-pointer hover:underline"
                     >
                       {contact.number}
                     </Link>
@@ -98,17 +85,17 @@ export default function ContactUs() {
             <div className="flex items-center gap-3 mb-2">
               <Mail size={18} className="text-foreground" />
               <Link
-                href="mailto:psakhmer@email.com"
+                href={`mailto:${CONTACT_EMAIL}`}
                 className="text-[#00a0e9] hover:underline"
               >
-                psakhmer@email.com
+                {CONTACT_EMAIL}
               </Link>
             </div>
             <div className="border-t border-gray-200 dark:border-muted my-4" />
             <Accordion type="single" collapsible className="w-full border-none">
               <AccordionItem value="hours" className="border-none">
                 <AccordionTrigger className="hover:no-underline py-0 group cursor-pointer">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 type-body-sm">
                     <Clock8 size={18} className="text-gray-400" />
                     <span className="text-[#00a0e9] font-medium">Open</span>
                     <span className="text-gray-400 mx-1">•</span>
@@ -124,10 +111,10 @@ export default function ContactUs() {
                         key={item.day}
                         className="flex justify-between items-center"
                       >
-                        <span className="text-sm font-medium text-foreground">
+                        <span className="type-nav text-foreground">
                           {item.day}
                         </span>
-                        <span className="text-sm text-foreground">
+                        <span className="type-body-sm text-foreground">
                           {item.time}
                         </span>
                       </div>
@@ -138,14 +125,14 @@ export default function ContactUs() {
             </Accordion>
             <div className="flex flex-col sm:flex-row gap-3 mt-6 ">
               <Link
-                href="mailto:psakhmer@email.com"
-                className="flex-1 bg-[#00a0e9] hover:bg-[#008ccb] text-white py-2 rounded-sm font-medium transition-all flex items-center justify-center gap-2 text-sm  tracking-wide cursor-pointer"
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="flex-1 bg-[#00a0e9] hover:bg-[#008ccb] text-white py-2 rounded-sm transition-all flex items-center justify-center gap-2 type-nav tracking-wide cursor-pointer"
               >
                 <Mail size={24} /> Email
               </Link>
               <Link
                 href="tel:092724724"
-                className="flex-1 bg-[#f7941d] hover:bg-[#e68512] text-white py-2 rounded-sm font-medium transition-all flex items-center justify-center gap-2 text-sm  tracking-wide cursor-pointer"
+                className="flex-1 bg-[#f7941d] hover:bg-[#e68512] text-white py-2 rounded-sm transition-all flex items-center justify-center gap-2 type-nav tracking-wide cursor-pointer"
               >
                 <Phone size={24} /> Call
               </Link>

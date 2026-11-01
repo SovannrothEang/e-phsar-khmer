@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { MapPinned, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { MapCoords } from "@/components/post/LocationMapCanvas";
-import { DEFAULT_CENTER } from "@/components/post/LocationMapCanvas";
+import {
+  DEFAULT_CENTER,
+  type MapCoords,
+} from "@/components/post/location-map.constants";
 
 // Leaflet touches `window` at module scope — keep it client-only.
 const LocationMapCanvas = dynamic(
@@ -34,6 +37,7 @@ export default function LocationMapPicker({
   value: MapCoords | null;
   onChange: (value: MapCoords | null) => void;
 }) {
+  const t = useTranslations("Common");
   const [open, setOpen] = useState(false);
   // Edits are staged until confirmed, so Cancel/X leave the form untouched.
   const [staged, setStaged] = useState<MapCoords | null>(value);
@@ -81,7 +85,7 @@ export default function LocationMapPicker({
             <button
               type="button"
               onClick={() => onChange(null)}
-              aria-label="Remove location"
+              aria-label={t("removeLocation")}
               className="absolute right-2 top-2 z-1000 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#dc2626] text-white shadow-md transition-colors hover:bg-[#b91c1c]"
             >
               <Minus className="h-4 w-4" strokeWidth={3} />
@@ -90,19 +94,19 @@ export default function LocationMapPicker({
             <button
               type="button"
               onClick={openDialog}
-              className="absolute inset-x-0 bottom-0 z-1000 cursor-pointer bg-card/90 py-2 text-center text-sm font-medium text-card-foreground backdrop-blur-sm transition-colors hover:bg-card"
+              className="absolute inset-x-0 bottom-0 z-1000 cursor-pointer bg-card/90 py-2 text-center type-nav text-card-foreground backdrop-blur-sm transition-colors hover:bg-card"
             >
-              Change Location
+              {t("changeLocation")}
             </button>
           </>
         ) : (
           <button
             type="button"
             onClick={openDialog}
-            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-card px-4 py-2.5 text-sm font-medium text-card-foreground shadow-md transition-colors hover:bg-muted"
+            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-card px-4 py-2.5 type-nav text-card-foreground shadow-md transition-colors hover:bg-muted"
           >
             <MapPinned className="h-4 w-4 text-[#dc2626]" />
-            Select Location on Map
+            {t("selectLocationOnMap")}
           </button>
         )}
       </div>
@@ -114,7 +118,7 @@ export default function LocationMapPicker({
         >
           <DialogHeader className="px-4 pt-4 pb-4 pr-12">
             <DialogTitle className="font-bold">
-              Select Location on Map
+              {t("selectLocationOnMap")}
             </DialogTitle>
           </DialogHeader>
 
@@ -132,11 +136,11 @@ export default function LocationMapPicker({
           <div className="p-4">
             <Button
               type="button"
-              className="h-11 w-full cursor-pointer rounded-full bg-[#00a0e9] text-base font-medium text-white hover:bg-[#0090d0]"
+              className="h-11 w-full cursor-pointer rounded-full bg-[#00a0e9] type-nav text-white hover:bg-[#0090d0]"
               disabled={!staged}
               onClick={confirm}
             >
-              Save
+              {t("save")}
             </Button>
           </div>
         </DialogContent>

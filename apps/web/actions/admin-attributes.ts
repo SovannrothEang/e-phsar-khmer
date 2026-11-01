@@ -6,6 +6,7 @@ import { serverFetch, ApiError } from "@/lib/api/client";
 export interface AdminAttribute {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
   image: string | null;
   categoryId: string;
@@ -17,6 +18,7 @@ export interface AdminAttribute {
 interface BackendAttribute {
   id: string;
   name: string;
+  nameKm: string | null;
   slug: string;
   image: string | null;
   categoryId: string | null;
@@ -27,6 +29,7 @@ interface BackendAttribute {
 
 export interface AttributeInput {
   name: string;
+  nameKm?: string;
   slug: string;
   image?: string;
   categoryId?: string;
@@ -42,6 +45,7 @@ export async function getAdminAttributes(
   return data.map((a) => ({
     id: a.id,
     name: a.name,
+    nameKm: a.nameKm ?? null,
     slug: a.slug,
     image: a.image,
     categoryId: a.categoryId ?? "",
@@ -54,6 +58,7 @@ export async function getAdminAttributes(
 function body(input: AttributeInput) {
   return JSON.stringify({
     name: input.name,
+    nameKm: input.nameKm || null,
     slug: input.slug,
     image: input.image || null,
     categoryId: input.categoryId || undefined,

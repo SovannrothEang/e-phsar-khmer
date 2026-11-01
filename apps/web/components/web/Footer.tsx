@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
 import Image from "next/image";
 
 export default function Footer() {
+  const t = useTranslations("Footer");
   const [showBackToTop, setShowBackToTop] = useState(false);
   useEffect(() => {
     const onScroll = () => {
@@ -42,7 +44,7 @@ export default function Footer() {
           hover:scale-105 hover:shadow-xl
           transition-all duration-300
           cursor-pointer"
-          aria-label="Back to top"
+          aria-label={t("backToTop")}
         >
           <IconChevronUp className="scale-140" stroke={2} />
         </Button>
@@ -51,8 +53,8 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 md:px-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-bold mb-4 text-base">Follow PSA-Khmer</h3>
-              <div className="space-y-4 text-sm ">
+              <h3 className="type-footer-heading mb-4">{t("follow")}</h3>
+              <div className="space-y-4 type-footer-link">
                 <a
                   href="/"
                   target="_blank"
@@ -62,7 +64,9 @@ export default function Footer() {
                   <div className="flex items-center justify-center rounded-full bg-blue-500 w-7 h-7">
                     <IconBrandFacebook className="text-white scale-100" />
                   </div>
-                  <span className="text-sm  text-white">Facebook</span>
+                  <span className="type-footer-link text-white">
+                    {t("facebook")}
+                  </span>
                 </a>
                 <a
                   href="/"
@@ -73,8 +77,8 @@ export default function Footer() {
                   <div className="flex items-center justify-center rounded-sm bg-red-500 w-7 h-5">
                     <IconPlayerPlayFilled className="text-white scale-50" />
                   </div>
-                  <span className="text-sm font-medium text-white">
-                    Youtube
+                  <span className="type-footer-link text-white">
+                    {t("youtube")}
                   </span>
                 </a>
               </div>
@@ -82,54 +86,56 @@ export default function Footer() {
 
             {/* Customer Service */}
             <div>
-              <h3 className="font-bold mb-4 text-base">Customer Service</h3>
-              <ul className="space-y-3 text-sm px-2">
+              <h3 className="type-footer-heading mb-4">
+                {t("customerService")}
+              </h3>
+              <ul className="space-y-3 type-footer-link px-2">
                 <li>
                   <Link href="/contact-us" className="hover:underline">
-                    Contact Us
+                    {t("contactUs")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/privacy-policy" className="hover:underline">
-                    Privacy Policy
+                    {t("privacyPolicy")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/me/membership" className="hover:underline">
-                    Membership
+                    {t("membership")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/account-deletion" className="hover:underline">
-                    Account Deletion
+                    {t("accountDeletion")}
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="font-bold mb-4 text-base">Useful Information</h3>
-              <ul className="space-y-3 text-sm px-2">
+              <h3 className="type-footer-heading mb-4">
+                {t("usefulInformation")}
+              </h3>
+              <ul className="space-y-3 type-footer-link px-2">
                 <li>
                   <Link href="/safety-tips" className="hover:underline">
-                    Safety Tips
+                    {t("safetyTips")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/posting-rule" className="hover:underline">
-                    Posting Rule
+                    {t("postingRule")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/feedback" className="hover:underline">
-                    Feedback
+                    {t("feedback")}
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="font-bold mb-4 text-base">
-                Download PSA-NPIC app for FREE
-              </h3>
+              <h3 className="type-footer-heading mb-4">{t("downloadApp")}</h3>
               <div className="flex gap-3">
                 <div className="bg-white p-1 rounded-sm">
                   <Image
@@ -178,7 +184,7 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center mt-3 flex-wrap justify-end">
-            <span className="text-sm">We Accept:</span>
+            <span className="type-footer-link">{t("weAccept")}</span>
             {[
               "/icon/ABA.svg",
               "/icon/khqr.svg",

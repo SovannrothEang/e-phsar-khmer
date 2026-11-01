@@ -4,21 +4,27 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
-import { users } from '../../db/schema/users.schema';
+import { users, userPhones } from '../../db/schema/users.schema';
 import { listings } from '../../db/schema/listings.schema';
 import {
+  bannedPhones,
   reportReasons,
   userReports,
   listingReports,
 } from '../../db/schema/reports.schema';
+import { normalizePhoneE164 } from '../../reports/phone-ban.util';
 import type {
   ReportReasonRow,
   UserReportRow,
   ListingReportRow,
 } from '../../db/schema/reports.schema';
+import type { RequestUser } from '../../common/types/api-response.types';
+import { ListingsService } from '../../listings/listings.service';
+import { AdminService } from '../admin.service';
+import { FilesService } from '../../files/files.service';
 import type {
   CreateReportReasonDto,
   UpdateReportReasonDto,
@@ -37,7 +43,12 @@ function nameOf(u: {
 
 @Injectable()
 export class ReportsService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly listingsService: ListingsService,
+    private readonly adminService: AdminService,
+    private readonly files: FilesService,
+  ) {}
 
   // ── Reasons ───────────────────────────────────────────────
   listReasons(targetType?: 'user' | 'listing'): Promise<ReportReasonRow[]> {
@@ -94,6 +105,7 @@ export class ReportsService {
         reporterName: string;
         targetName: string;
         reasonText: string | null;
+        imageUrls: string[];
       }
     >
   > {
@@ -122,21 +134,101 @@ export class ReportsService {
       reporterName: nameMap.get(r.report.reporterId) ?? '—',
       targetName: nameMap.get(r.report.targetUserId) ?? '—',
       reasonText: r.reason?.reason ?? null,
+      // imagePaths are storage paths; the dashboard needs URLs to render.
+      imageUrls: r.report.imagePaths.map((p) => this.files.publicUrlFor(p)),
     }));
   }
 
+  /**
+   * Approving a user report suspends the reported account, in the same
+   * transaction and under the same account rules as editing it directly (a
+   * plain admin cannot suspend staff). Moving an approved report back to
+   * rejected/pending does NOT reinstate the account — that is an explicit
+   * status change on the Users page.
+   */
   async updateUserReportStatus(
     id: string,
     dto: UpdateReportStatusDto,
-    reviewerId: string,
+    reviewer: RequestUser,
   ) {
-    const rows = await this.db
-      .update(userReports)
-      .set({ status: dto.status, reviewedById: reviewerId })
-      .where(eq(userReports.id, id))
-      .returning();
-    if (!rows.length) throw new NotFoundException('User report not found');
-    return rows[0];
+    return this.db.transaction(async (tx) => {
+      const [report] = await tx
+        .select()
+        .from(userReports)
+        .where(eq(userReports.id, id))
+        .limit(1)
+        .for('update');
+      if (!report) throw new NotFoundException('User report not found');
+
+      const [row] = await tx
+        .update(userReports)
+        .set({ status: dto.status, reviewedById: reviewer.id })
+        .where(eq(userReports.id, id))
+        .returning();
+
+      if (dto.status === 'approved' && report.status !== 'approved') {
+        await this.adminService.authorizeManage(
+          tx,
+          reviewer,
+          report.targetUserId,
+          { status: 'suspended' },
+        );
+        await tx
+          .update(users)
+          .set({ status: 'suspended', updatedAt: new Date() })
+          .where(eq(users.id, report.targetUserId));
+
+        // The ban is keyed on the number, not the account: it must outlive
+        // the 90-day hard purge so the same numbers can never register again.
+        const [target] = await tx
+          .select({ primaryPhone: users.primaryPhone })
+          .from(users)
+          .where(eq(users.id, report.targetUserId))
+          .limit(1);
+        const extraPhones = await tx
+          .select({ phone: userPhones.phone })
+          .from(userPhones)
+          .where(eq(userPhones.userId, report.targetUserId));
+
+        const phones = [
+          ...new Set(
+            [target?.primaryPhone, ...extraPhones.map((p) => p.phone)]
+              .filter(
+                (phone): phone is string =>
+                  typeof phone === 'string' && phone.length > 0,
+              )
+              .map(normalizePhoneE164),
+          ),
+        ];
+        if (phones.length > 0) {
+          await tx
+            .insert(bannedPhones)
+            .values(
+              phones.map((phone) => ({
+                phone,
+                userId: report.targetUserId,
+                reportId: report.id,
+                bannedById: reviewer.id,
+              })),
+            )
+            // A number already banned by an earlier report stays banned.
+            .onConflictDoNothing({ target: bannedPhones.phone });
+        }
+
+        // Every other open report against this account is settled by the
+        // same decision.
+        await tx
+          .update(userReports)
+          .set({ status: 'approved', reviewedById: reviewer.id })
+          .where(
+            and(
+              eq(userReports.targetUserId, report.targetUserId),
+              eq(userReports.status, 'pending'),
+            ),
+          );
+      }
+      return row;
+    });
   }
 
   async removeUserReport(id: string): Promise<{ id: string }> {
@@ -189,18 +281,53 @@ export class ReportsService {
     }));
   }
 
+  /**
+   * Approving a listing report takes the listing down (ListingsService
+   * .moderate) in the same transaction. As with user reports, un-approving
+   * does not restore it — restoring is an explicit action on the admin
+   * Listings page.
+   */
   async updateListingReportStatus(
     id: string,
     dto: UpdateReportStatusDto,
-    reviewerId: string,
+    reviewer: RequestUser,
   ) {
-    const rows = await this.db
-      .update(listingReports)
-      .set({ status: dto.status, reviewedById: reviewerId })
-      .where(eq(listingReports.id, id))
-      .returning();
-    if (!rows.length) throw new NotFoundException('Listing report not found');
-    return rows[0];
+    return this.db.transaction(async (tx) => {
+      const [found] = await tx
+        .select({ report: listingReports, reason: reportReasons.reason })
+        .from(listingReports)
+        .leftJoin(reportReasons, eq(reportReasons.id, listingReports.reasonId))
+        .where(eq(listingReports.id, id))
+        .limit(1)
+        .for('update', { of: listingReports });
+      if (!found) throw new NotFoundException('Listing report not found');
+      const { report } = found;
+
+      const [row] = await tx
+        .update(listingReports)
+        .set({ status: dto.status, reviewedById: reviewer.id })
+        .where(eq(listingReports.id, id))
+        .returning();
+
+      if (dto.status === 'approved' && report.status !== 'approved') {
+        await this.listingsService.moderate(
+          report.listingId,
+          reviewer.id,
+          found.reason ? `Reported: ${found.reason}` : 'Reported content',
+          tx,
+        );
+        await tx
+          .update(listingReports)
+          .set({ status: 'approved', reviewedById: reviewer.id })
+          .where(
+            and(
+              eq(listingReports.listingId, report.listingId),
+              eq(listingReports.status, 'pending'),
+            ),
+          );
+      }
+      return row;
+    });
   }
 
   async removeListingReport(id: string): Promise<{ id: string }> {

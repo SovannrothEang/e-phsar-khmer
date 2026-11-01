@@ -39,12 +39,27 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Trash2, Search, MoreHorizontal } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Feedback } from "@/types/feedback";
-// Renamed the import to avoid confusing variable naming conflicts inside the scope
-import { feedbacks as initialFeedbacks } from "@/lib/feedbacks";
+import { deleteFeedback, getAdminFeedback } from "@/actions/feedback";
+import { toast } from "@/components/ui/sonner";
 
 export default function FeedbackPage() {
-  const [Feedbacks, setFeedback] = useState<Feedback[]>(initialFeedbacks);
+  const queryClient = useQueryClient();
+  const { data: Feedbacks = [], isLoading } = useQuery({
+    queryKey: ["admin", "feedback"],
+    queryFn: async (): Promise<Feedback[]> =>
+      (await getAdminFeedback()).map((f) => ({
+        FeedbackID: f.id,
+        userId: f.userId ?? undefined,
+        name: f.name,
+        phone: f.phone,
+        email: f.email ?? undefined,
+        description: f.description,
+        images: f.images,
+        CreatedAt: f.createdAt,
+      })),
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -52,8 +67,8 @@ export default function FeedbackPage() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
+  const [viewFeedback, setViewFeedback] = useState<Feedback | null>(null);
 
-  // ✅ FIXED: Now filtering from the 'Feedbacks' state variable instead of the static import file
   const filteredFeedbacks = Feedbacks.filter(
     (f) =>
       f.FeedbackID.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -75,20 +90,20 @@ export default function FeedbackPage() {
     startIndex + rowsPerPage,
   );
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedFeedback) return;
-
-    // Filter out the item from the state array
-    const updatedFeedbacks = Feedbacks.filter(
-      (f) => f.FeedbackID !== selectedFeedback.FeedbackID,
-    );
-    setFeedback(updatedFeedbacks);
+    const res = await deleteFeedback(selectedFeedback.FeedbackID);
+    if (!res.success) {
+      toast.error(res.error ?? "Delete failed");
+      return;
+    }
+    toast.success("Feedback deleted");
+    await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });
 
     setSelectedFeedback(null);
     setIsDeleteDialogOpen(false);
 
-    // Safe Guard: If you delete the last remaining item on a page (e.g. page 3),
-    // kick the pagination view backward so you don't look at an empty page.
+    // Deleting the last row on a page steps back so the view isn't empty.
     if (paginatedFeedbacks.length === 1 && currentPage > 1) {
       setCurrentPage((p) => p - 1);
     }
@@ -103,7 +118,7 @@ export default function FeedbackPage() {
     <div className="p-6">
       {/* HEADER */}
       <div className="flex flex-col gap-1 mb-4">
-        <h1 className="text-2xl text-sky-500 font-semibold">Feedbacks</h1>
+        <h1 className="type-page-title text-sky-500">Feedbacks</h1>
         <p className="text-sm text-muted-foreground">
           Manage and review user feedbacks
         </p>
@@ -142,7 +157,7 @@ export default function FeedbackPage() {
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-6">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
-                    <p>No feedbacks found</p>
+                    <p>{isLoading ? "Loading…" : "No feedbacks found"}</p>
                     {searchQuery && (
                       <p className="text-sm">
                         No Search results for &quot;{searchQuery}&quot;
@@ -161,7 +176,7 @@ export default function FeedbackPage() {
                     {feedback.userId || "null"}
                   </TableCell>
                   <TableCell>{feedback.name || "null"}</TableCell>
-                  <TableCell>+{feedback.phone || "null"}</TableCell>
+                  <TableCell>{feedback.phone || "null"}</TableCell>
                   <TableCell>{feedback.email || "null"}</TableCell>
                   <TableCell className="text-center max-w-[200px]">
                     {feedback.images && feedback.images.length > 0 ? (
@@ -181,7 +196,23 @@ export default function FeedbackPage() {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell>{feedback.description}</TableCell>
+                  <TableCell className="max-w-[320px]">
+                    <p
+                      className="line-clamp-3 whitespace-pre-wrap break-words"
+                      title={feedback.description}
+                    >
+                      {feedback.description}
+                    </p>
+                    {feedback.description.length > 140 && (
+                      <button
+                        type="button"
+                        onClick={() => setViewFeedback(feedback)}
+                        className="mt-1 type-meta text-sky-500 hover:underline cursor-pointer"
+                      >
+                        Read full text
+                      </button>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {new Date(feedback.CreatedAt).toLocaleString()}
                   </TableCell>
@@ -282,6 +313,36 @@ export default function FeedbackPage() {
           </div>
         </div>
 
+        <Dialog
+          open={viewFeedback !== null}
+          onOpenChange={(open) => {
+            if (!open) setViewFeedback(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{viewFeedback?.name}</DialogTitle>
+              <DialogDescription>
+                {viewFeedback
+                  ? new Date(viewFeedback.CreatedAt).toLocaleString()
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+            <p className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words type-body">
+              {viewFeedback?.description}
+            </p>
+            <DialogFooter>
+              <Button
+                className="h-9 rounded-sm"
+                variant="outline"
+                onClick={() => setViewFeedback(null)}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -293,7 +354,7 @@ export default function FeedbackPage() {
             </DialogHeader>
             <DialogFooter>
               <Button
-                className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+                className="h-9 rounded-sm cursor-pointer"
                 onClick={() => setIsDeleteDialogOpen(false)}
               >
                 Cancel

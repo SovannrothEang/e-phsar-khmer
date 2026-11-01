@@ -1,14 +1,18 @@
 "use server";
 
+import { headers as nextHeaders } from "next/headers";
 import { API_URL } from "@/lib/api/client";
 import type { BackendUser } from "@/lib/api/adapters";
-import { setUserSession } from "@/lib/auth/session";
+import type { DeviceIdentity } from "@/lib/device";
+import { setUserDeviceId, setUserSession } from "@/lib/auth/session";
 
 interface OtpVerifyResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn: string;
   user: BackendUser;
+  /** True when this login came from a new, non-first device. */
+  newDevice?: boolean;
 }
 
 interface Envelope<T> {
@@ -80,10 +84,12 @@ export async function verifyOtp(
   phone: string,
   token: string,
   registration?: { password: string; firstName?: string; lastName?: string },
+  device?: DeviceIdentity,
 ): Promise<
   | {
       success: true;
       user: { id: string; username: string | null; role: string };
+      newDevice: boolean;
     }
   | { success: false; error: string }
 > {
@@ -91,9 +97,25 @@ export async function verifyOtp(
     return { success: false, error: "Invalid input" };
   }
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (device) {
+    headers["x-device-id"] = device.id;
+    headers["x-device-name"] = device.name;
+    const incoming = await nextHeaders();
+    headers["x-device-info"] = encodeURIComponent(
+      JSON.stringify({
+        type: "browser",
+        clientVersion: process.env.NEXT_PUBLIC_APP_VERSION || undefined,
+        userAgent: incoming.get("user-agent") ?? undefined,
+      }),
+    );
+  }
+
   const res = await fetch(`${API_URL}/auth/otp/verify`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     // Pick fields explicitly — the handoff object carries `mode`/`phone`
     // for the web flow, and the backend's whitelist rejects unknown props.
     body: JSON.stringify({
@@ -123,9 +145,17 @@ export async function verifyOtp(
   const { user, accessToken, refreshToken } = body.data;
 
   await setUserSession({ accessToken, refreshToken });
+  if (device) {
+    try {
+      await setUserDeviceId(device.id);
+    } catch {
+      /* the client-side mirror already wrote it */
+    }
+  }
 
   return {
     success: true,
     user: { id: user.id, username: user.username, role: user.role },
+    newDevice: Boolean(body.data.newDevice),
   };
 }

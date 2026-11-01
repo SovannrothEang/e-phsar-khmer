@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
-import { Inter } from "next/font/google";
 import type { Metadata } from "next";
+import { kohSantepheap } from "@/lib/fonts";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -10,19 +10,12 @@ import NextTopLoader from "nextjs-toploader";
 import { ClientThemeProvider } from "@/components/client-theme-provider";
 import { Providers } from "@/app/providers";
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: {
-    default: "Psakhmer, Buy and Sell Everything In Cambodia",
-    template: "%s - Psakhmer",
+    default: "PhsarKhmer, Buy and Sell Everything In Cambodia",
+    template: "%s - PhsarKhmer",
   },
-  description: "Psakhmer, Buy and Sell Everything In Cambodia",
+  description: "PhsarKhmer, Buy and Sell Everything In Cambodia",
 };
 
 export default async function RootLayout({
@@ -43,7 +36,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${inter.variable}`}
+      className={`${kohSantepheap.variable}`}
       suppressHydrationWarning
     >
       <body>

@@ -1,4 +1,7 @@
 import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -24,11 +27,17 @@ import type { RegisterDto } from './dto/register.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { RefreshDto } from './dto/refresh.dto';
 import type { SocialLoginDto } from './dto/social-login.dto';
+import type { LinkSocialProviderDto } from './dto/link-social-provider.dto';
 import {
   buildUsernameBase,
   generateUniqueUsername,
+  normalizeUsername,
 } from '../users/username.util';
+import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
+import type { ClientDeviceInfo } from './client-device.decorator';
+import { LoginDevicesService } from './login-devices.service';
+import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 
 export interface AuthTokens {
   accessToken: string;
@@ -39,7 +48,28 @@ export interface AuthTokens {
 /** Mirrors AdminService.createUser bcrypt cost. */
 const PASSWORD_SALT_ROUNDS = 10;
 
+/** A `sid` is a row UUID; reject anything else before it reaches Postgres. */
+const SESSION_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** postgres.js exposes the SQLSTATE on the error object. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  );
+}
+
 export type PublicUser = Omit<UserRow, 'passwordHash'>;
+
+/** Every successful login path returns this shape. */
+export interface AuthResult extends AuthTokens {
+  user: PublicUser;
+  /** True when this login came from a new, non-first device. */
+  newDevice: boolean;
+}
 
 export interface TelegramAuthPayload {
   id: number;
@@ -58,11 +88,13 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
+    private readonly loginDevices: LoginDevicesService,
   ) {}
 
   async loginWithPassword(
     dto: LoginDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     const [user] = await this.db
       .select()
       .from(users)
@@ -70,6 +102,10 @@ export class AuthService {
         and(
           or(
             eq(users.username, dto.identifier),
+            // Generated and self-chosen handles are stored lowercased, so
+            // "SokDara" must find "sokdara". The exact match above still
+            // serves admin-created mixed-case usernames.
+            eq(users.username, normalizeUsername(dto.identifier)),
             eq(users.primaryPhone, dto.identifier),
           ),
           isNull(users.deletedAt),
@@ -94,8 +130,7 @@ export class AuthService {
       if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
 
       const revived = await this.revive(recoverable.id);
-      const revivedTokens = this.issueTokens(revived);
-      return { ...revivedTokens, user: this.toPublicUser(revived) };
+      return this.finishLogin(revived, device);
     }
 
     if (!user.passwordHash) {
@@ -112,18 +147,21 @@ export class AuthService {
     if (user.status !== 'active')
       throw new UnauthorizedException('Account suspended');
 
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    return this.finishLogin(user, device);
   }
 
   async registerWithPhone(dto: RegisterDto): Promise<{ otpSent: true }> {
+    await this.assertPhoneNotBanned(dto.phone);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
 
   async verifyPhoneOtp(
     dto: VerifyOtpDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
+    // Moderation ban first: a banned number must not even burn an OTP.
+    await this.assertPhoneNotBanned(dto.phone);
     // Password is checked BEFORE the Supabase call so a wrong password
     // never burns an OTP attempt. For an existing user this is a login
     // (password must match); for an absent user this is a registration
@@ -133,6 +171,11 @@ export class AuthService {
       .from(users)
       .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
       .limit(1);
+
+    // This endpoint bypasses loginWithPassword, so it needs its own
+    // suspension guard — otherwise a suspended account could mint tokens
+    // through the OTP login flow.
+    if (existing) this.assertAccountActive(existing);
 
     // A legacy bare account (created before passwords were required) is
     // COMPLETED in place: possessing the OTP proves phone ownership, so the
@@ -170,8 +213,7 @@ export class AuthService {
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
-      const revivedTokens = this.issueTokens(revived);
-      return { ...revivedTokens, user: this.toPublicUser(revived) };
+      return this.finishLogin(revived, device);
     }
 
     if (completingBareAccount) {
@@ -197,8 +239,7 @@ export class AuthService {
         .where(and(eq(users.id, existing.id), isNull(users.deletedAt)))
         .returning();
 
-      const tokens = this.issueTokens(row);
-      return { ...tokens, user: this.toPublicUser(row) };
+      return this.finishLogin(row, device);
     }
 
     // Extras land ONLY in the INSERT values — the conflict path (existing
@@ -223,11 +264,12 @@ export class AuthService {
       dto.phone,
       insertExtras,
     );
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    this.assertAccountActive(user);
+    return this.finishLogin(user, device);
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
+    await this.assertPhoneNotBanned(phone);
     await this.supabaseService.signInWithOtp(phone);
     return { otpSent: true };
   }
@@ -245,23 +287,84 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
 
+    // After the credential check on purpose: a wrong password still answers
+    // 401 with no SMS, so the ban is not an oracle for a number the caller
+    // cannot prove they own.
+    await this.assertPhoneNotBanned(dto.phone);
+
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
 
   async getSocialAuthUrl(
-    provider: 'google' | 'facebook',
+    provider: string,
+    redirectTo?: string,
   ): Promise<{ url: string }> {
-    const { data, error } =
-      await this.supabaseService.signInWithOAuth(provider);
+    if (provider !== 'google' && provider !== 'facebook')
+      throw new BadRequestException('UNSUPPORTED_PROVIDER');
+
+    const safeRedirect = this.resolveSocialRedirectTo(redirectTo);
+    const { data, error } = await this.supabaseService.signInWithOAuth(
+      provider,
+      safeRedirect,
+    );
     if (error || !data.url)
       throw new UnauthorizedException('Failed to get social auth URL');
     return { url: data.url };
   }
 
+  /**
+   * The URL route is public, so `redirectTo` is attacker-controlled until
+   * proven otherwise: only our own frontend origins may receive the OAuth
+   * tokens. When FRONTEND_ORIGINS is configured it is an exact-origin match;
+   * when it is not, development only loops back to localhost and production
+   * fails closed. Supabase's redirect allow-list is the second line of
+   * defence, never the only one.
+   */
+  private resolveSocialRedirectTo(redirectTo?: string): string | undefined {
+    if (!redirectTo) return undefined;
+
+    let url: URL;
+    try {
+      url = new URL(redirectTo);
+    } catch {
+      throw new BadRequestException('INVALID_REDIRECT_URI');
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:')
+      throw new BadRequestException('INVALID_REDIRECT_URI');
+    if (url.username || url.password || url.hash)
+      throw new BadRequestException('INVALID_REDIRECT_URI');
+
+    const allowed = (
+      this.configService.get<string[]>('frontendOrigins') ?? []
+    ).map((origin) => {
+      try {
+        return new URL(origin).origin;
+      } catch {
+        return origin.replace(/\/+$/, '');
+      }
+    });
+
+    if (allowed.length > 0) {
+      if (!allowed.includes(url.origin))
+        throw new BadRequestException('INVALID_REDIRECT_URI');
+      return url.toString();
+    }
+
+    const isLoopback =
+      url.hostname === 'localhost' ||
+      url.hostname === '127.0.0.1' ||
+      url.hostname === '[::1]';
+    if (process.env.NODE_ENV === 'production' || !isLoopback)
+      throw new BadRequestException('INVALID_REDIRECT_URI');
+
+    return url.toString();
+  }
+
   async handleSocialCallback(
     dto: SocialLoginDto,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     if (!dto.accessToken)
       throw new UnauthorizedException(
         'accessToken is required for social callback',
@@ -270,17 +373,204 @@ export class AuthService {
     if (error || !data.user)
       throw new UnauthorizedException('Invalid social access token');
 
-    const user = await this.mirrorSupabaseUser(data.user, dto.provider);
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    // The token must actually belong to the provider the client claims: a
+    // Google token presented as `facebook` would otherwise be recorded as a
+    // Facebook link for that account.
+    this.assertSocialProvider(data.user, dto.provider);
+    this.assertConfirmedSocialEmail(data.user);
+
+    const user =
+      dto.mode === 'admin'
+        ? await this.resolveSocialAdminUser(dto.provider, data.user)
+        : await this.mirrorSupabaseUser(
+            {
+              id: data.user.id,
+              email: data.user.email,
+              phone: data.user.phone,
+            },
+            dto.provider,
+          );
+    this.assertAccountActive(user);
+    return this.finishLogin(user, device);
+  }
+
+  /**
+   * Attach a provider identity to the signed-in account. This never mints
+   * tokens and never matches on email: the caller is authenticated, so the
+   * provider identity is linked as-is. The emailed login path keeps its own
+   * `email_confirmed_at` gate.
+   */
+  async linkSocialProvider(
+    userId: string,
+    dto: LinkSocialProviderDto,
+  ): Promise<{
+    provider: 'google' | 'facebook';
+    providerAccountId: string;
+    linked: true;
+  }> {
+    const { data, error } = await this.supabaseService.getUser(dto.accessToken);
+    if (error || !data.user)
+      throw new UnauthorizedException({
+        code: 'INVALID_PROVIDER_TOKEN',
+        message: 'Invalid social access token',
+      });
+
+    this.assertSocialProvider(data.user, dto.provider);
+    const providerAccountId = data.user.id?.trim();
+    if (!providerAccountId || providerAccountId.length > 120)
+      throw new UnauthorizedException({
+        code: 'INVALID_PROVIDER_TOKEN',
+        message: 'Invalid social access token',
+      });
+
+    const linkedTo = await this.findUserByProviderAccount(
+      dto.provider,
+      providerAccountId,
+    );
+    if (linkedTo && linkedTo.id !== userId)
+      throw new ConflictException({
+        code: 'PROVIDER_ACCOUNT_ALREADY_LINKED',
+        message: 'That account is already connected to another user.',
+      });
+
+    const [existing] = await this.db
+      .select()
+      .from(userAuthProviders)
+      .where(
+        and(
+          eq(userAuthProviders.userId, userId),
+          eq(userAuthProviders.provider, dto.provider),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      if (existing.providerAccountId === providerAccountId)
+        return { provider: dto.provider, providerAccountId, linked: true };
+      if (existing.providerAccountId !== null)
+        throw new ConflictException({
+          code: 'PROVIDER_ALREADY_LINKED',
+          message:
+            'A different account for this provider is already connected.',
+        });
+
+      // A legacy row with no account id: fill it in rather than 409.
+      await this.db
+        .update(userAuthProviders)
+        .set({ providerAccountId })
+        .where(eq(userAuthProviders.id, existing.id));
+      return { provider: dto.provider, providerAccountId, linked: true };
+    }
+
+    try {
+      await this.db.insert(userAuthProviders).values({
+        userId,
+        provider: dto.provider,
+        providerAccountId,
+      });
+    } catch (error) {
+      // The unique (userId, provider) index catches a concurrent link.
+      if (isUniqueViolation(error))
+        throw new ConflictException({
+          code: 'PROVIDER_ALREADY_LINKED',
+          message: 'This provider is already connected to your account.',
+        });
+      throw error;
+    }
+
+    return { provider: dto.provider, providerAccountId, linked: true };
+  }
+
+  /**
+   * Remove a linked provider. Refuses when it is the account's last way in:
+   * a phone, a username + password, or another provider row must remain. The
+   * user row is locked so two concurrent unlinks cannot each count the other
+   * as the remaining method.
+   */
+  async unlinkSocialProvider(
+    userId: string,
+    provider: string,
+  ): Promise<{ provider: string; unlinked: boolean }> {
+    if (
+      provider !== 'google' &&
+      provider !== 'facebook' &&
+      provider !== 'telegram'
+    )
+      throw new BadRequestException({
+        code: 'UNSUPPORTED_PROVIDER',
+        message: 'Unsupported provider',
+      });
+
+    return this.db.transaction(async (tx) => {
+      const [user] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .for('update');
+      if (!user)
+        throw new UnauthorizedException({
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'Account not found',
+        });
+
+      const rows = await tx
+        .select({
+          provider: userAuthProviders.provider,
+          providerAccountId: userAuthProviders.providerAccountId,
+        })
+        .from(userAuthProviders)
+        .where(eq(userAuthProviders.userId, userId));
+
+      const isLinked = rows.some((row) => row.provider === provider);
+      if (!isLinked) return { provider, unlinked: false };
+
+      const hasFallback =
+        user.primaryPhone !== null ||
+        (user.username !== null && user.passwordHash !== null) ||
+        rows.some(
+          (row) =>
+            row.provider !== provider &&
+            row.providerAccountId !== null &&
+            (row.provider === 'google' ||
+              row.provider === 'facebook' ||
+              row.provider === 'telegram'),
+        );
+      if (!hasFallback)
+        throw new ConflictException({
+          code: 'LAST_LOGIN_METHOD',
+          message: 'This is your only way to sign in.',
+        });
+
+      await tx
+        .delete(userAuthProviders)
+        .where(
+          and(
+            eq(userAuthProviders.userId, userId),
+            eq(userAuthProviders.provider, provider),
+          ),
+        );
+
+      return { provider, unlinked: true };
+    });
   }
 
   async loginWithTelegram(
     payload: TelegramAuthPayload,
-  ): Promise<AuthTokens & { user: PublicUser }> {
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthResult> {
     const botToken = this.configService.get<string>('telegram.botToken');
     if (!botToken)
       throw new UnauthorizedException('Telegram login not configured');
+
+    // The payload is an interface, so the ValidationPipe never checks it — a
+    // missing or non-hex hash would otherwise throw inside Buffer.from (500).
+    if (
+      typeof payload?.hash !== 'string' ||
+      !/^[0-9a-f]{64}$/i.test(payload.hash) ||
+      typeof payload.auth_date !== 'number'
+    ) {
+      throw new UnauthorizedException('Invalid Telegram auth data');
+    }
 
     const secretKey = createHash('sha256').update(botToken).digest();
     const checkString = Object.entries(payload)
@@ -350,18 +640,29 @@ export class AuthService {
       });
     }
 
-    const tokens = this.issueTokens(user);
-    return { ...tokens, user: this.toPublicUser(user) };
+    this.assertAccountActive(user);
+    return this.finishLogin(user, device);
   }
 
-  async refresh(dto: RefreshDto): Promise<AuthTokens> {
-    let payload: { sub: string; role: 'user' | 'admin' | 'super_admin' };
+  async refresh(
+    dto: RefreshDto,
+    device: ClientDeviceInfo | null = null,
+  ): Promise<AuthTokens> {
+    let payload: {
+      sub: string;
+      role: 'user' | 'admin' | 'super_admin';
+      sid?: string;
+    };
     try {
       payload = await this.jwtService.verifyAsync(dto.refreshToken, {
         secret: this.configService.get<string>('jwt.refreshSecret'),
       });
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (payload.sid !== undefined && !SESSION_ID_PATTERN.test(payload.sid)) {
+      throw new UnauthorizedException('Invalid session');
     }
 
     const [user] = await this.db
@@ -372,6 +673,37 @@ export class AuthService {
 
     if (!user || user.status !== 'active' || user.deletedAt)
       throw new UnauthorizedException('User not found');
+
+    // New tokens carry the row's revocation epoch. A rotated id means the
+    // device was revoked, so the refresh token dies with the access token.
+    if (payload.sid) {
+      const active = await this.loginDevices.touchActiveSession(
+        user.id,
+        payload.sid,
+      );
+      if (!active) throw new UnauthorizedException('Session revoked');
+      return this.issueTokens(user, payload.sid);
+    }
+
+    // A legacy (no-`sid`) refresh token can be bound on its first refresh.
+    // A row that exists but was revoked must reject — never fall back to a
+    // sid-less token for a device we know was signed out.
+    if (device) {
+      const row = await this.loginDevices.findSessionByDeviceId(
+        user.id,
+        device.id,
+      );
+      if (row) {
+        if (row.revokedAt) throw new UnauthorizedException('Session revoked');
+        const active = await this.loginDevices.touchActiveSession(
+          user.id,
+          row.sessionId,
+        );
+        if (!active) throw new UnauthorizedException('Session revoked');
+        return this.issueTokens(user, row.sessionId);
+      }
+    }
+
     return this.issueTokens(user);
   }
 
@@ -393,6 +725,7 @@ export class AuthService {
         and(
           or(
             eq(users.username, identifier),
+            eq(users.username, normalizeUsername(identifier)),
             eq(users.primaryPhone, identifier),
           ),
           isNotNull(users.deletedAt),
@@ -427,8 +760,59 @@ export class AuthService {
     return current;
   }
 
-  private issueTokens(user: UserRow): AuthTokens {
-    const jwtPayload = { sub: user.id, role: user.role };
+  /**
+   * Every token-issuing path must pass through this. `loginWithPassword` and
+   * `refresh` check inline; the alternate providers (OTP verify, social,
+   * Telegram) do not, and a suspended account must not mint a session through
+   * any of them.
+   */
+  private assertAccountActive(user: UserRow): void {
+    if (user.status !== 'active' || user.deletedAt)
+      throw new UnauthorizedException('Account suspended');
+  }
+
+  /**
+   * Moderation ban. The number may never register, receive an OTP, or be
+   * added to another account — the ban outlives the account's hard purge.
+   */
+  private async assertPhoneNotBanned(phone: string): Promise<void> {
+    if (await isPhoneBanned(this.db, phone)) {
+      throw new ForbiddenException({
+        code: 'PHONE_BANNED',
+        message: 'This phone number has been banned.',
+      });
+    }
+  }
+
+  /**
+   * The single success exit for every login path: records the device first,
+   * then signs tokens carrying its revocation epoch (`sid`). `recordLogin`
+   * never throws, so a device or notification failure cannot turn a valid
+   * credential check into a 500; a row that could not be written yields a
+   * token without `sid`, exactly like a legacy session.
+   */
+  private async finishLogin(
+    user: UserRow,
+    device: ClientDeviceInfo | null,
+  ): Promise<AuthResult> {
+    const recorded = await this.loginDevices.recordLogin(user.id, device);
+    const tokens = this.issueTokens(user, recorded.sessionId);
+    return {
+      ...tokens,
+      user: this.toPublicUser(user),
+      newDevice: recorded.isNewDevice,
+    };
+  }
+
+  private issueTokens(
+    user: UserRow,
+    sessionId: string | null = null,
+  ): AuthTokens {
+    const jwtPayload = {
+      sub: user.id,
+      role: user.role,
+      ...(sessionId ? { sid: sessionId } : {}),
+    };
     const accessExpiresIn = (this.configService.get<string>(
       'jwt.accessExpiresIn',
     ) ?? '15m') as unknown as number;
@@ -449,6 +833,148 @@ export class AuthService {
     };
   }
 
+  private assertSocialProvider(
+    user: {
+      identities?: { provider?: string }[];
+      app_metadata?: { provider?: string };
+    },
+    provider: 'google' | 'facebook',
+  ): void {
+    const identities = user.identities ?? [];
+    const matches =
+      identities.length > 0
+        ? identities.some((identity) => identity.provider === provider)
+        : user.app_metadata?.provider === provider;
+    if (!matches) throw new UnauthorizedException('SOCIAL_PROVIDER_MISMATCH');
+  }
+
+  private assertConfirmedSocialEmail(user: {
+    email?: string;
+    email_confirmed_at?: string;
+  }): void {
+    if (!user.email?.trim())
+      throw new UnauthorizedException('SOCIAL_EMAIL_REQUIRED');
+    if (!user.email_confirmed_at)
+      throw new UnauthorizedException('SOCIAL_EMAIL_UNVERIFIED');
+  }
+
+  /**
+   * Social identity resolution, in order of trust:
+   *   1. an existing (provider, provider account id) link — stable even when
+   *      the provider email changes;
+   *   2. a non-deleted account with the same confirmed email;
+   *   3. a new account created by the email upsert (the partial unique index
+   *      keeps concurrent first logins safe).
+   */
+  private async resolveSocialUser(
+    provider: 'google' | 'facebook',
+    providerAccountId: string,
+    email: string,
+  ): Promise<UserRow> {
+    const linked = await this.findUserByProviderAccount(
+      provider,
+      providerAccountId,
+    );
+    if (linked) return linked;
+
+    const existing = await this.findUserByEmail(email);
+    if (existing) {
+      await this.linkProvider(existing.id, provider, providerAccountId);
+      return existing;
+    }
+
+    const [created] = await this.db
+      .insert(users)
+      .values({ email })
+      .onConflictDoUpdate({
+        target: users.email,
+        targetWhere: isNull(users.deletedAt),
+        set: { updatedAt: new Date() },
+      })
+      .returning();
+
+    await this.linkProvider(created.id, provider, providerAccountId);
+    return created;
+  }
+
+  /**
+   * Admin social login only ever signs in an EXISTING staff account: no
+   * insert and no revive. Every failure answers the same 401 so the endpoint
+   * cannot be used to probe which emails are registered or which role they
+   * hold.
+   */
+  private async resolveSocialAdminUser(
+    provider: 'google' | 'facebook',
+    supabaseUser: { id: string; email?: string },
+  ): Promise<UserRow> {
+    const email = supabaseUser.email?.trim().toLowerCase();
+    if (!email) throw new UnauthorizedException('SOCIAL_LOGIN_NOT_ALLOWED');
+
+    const linked = await this.findUserByProviderAccount(
+      provider,
+      supabaseUser.id,
+    );
+    const user = linked ?? (await this.findUserByEmail(email));
+
+    if (
+      !user ||
+      user.deletedAt ||
+      user.status !== 'active' ||
+      (user.role !== 'admin' && user.role !== 'super_admin')
+    ) {
+      throw new UnauthorizedException('SOCIAL_LOGIN_NOT_ALLOWED');
+    }
+
+    await this.linkProvider(user.id, provider, supabaseUser.id);
+    return user;
+  }
+
+  private async findUserByProviderAccount(
+    provider: 'google' | 'facebook',
+    providerAccountId: string,
+  ): Promise<UserRow | null> {
+    const [row] = await this.db
+      .select({ user: users })
+      .from(userAuthProviders)
+      .innerJoin(users, eq(users.id, userAuthProviders.userId))
+      .where(
+        and(
+          eq(userAuthProviders.provider, provider),
+          eq(userAuthProviders.providerAccountId, providerAccountId),
+        ),
+      )
+      .limit(1);
+    return row?.user ?? null;
+  }
+
+  private async findUserByEmail(email: string): Promise<UserRow | null> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(
+        and(
+          sql`lower(${users.email}) = ${email.toLowerCase()}`,
+          isNull(users.deletedAt),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  private async linkProvider(
+    userId: string,
+    provider: 'google' | 'facebook',
+    providerAccountId: string,
+  ): Promise<void> {
+    await this.db
+      .insert(userAuthProviders)
+      .values({ userId, provider, providerAccountId })
+      .onConflictDoUpdate({
+        target: [userAuthProviders.userId, userAuthProviders.provider],
+        set: { providerAccountId },
+      });
+  }
+
   async mirrorSupabaseUser(
     supabaseUser: { id: string; phone?: string; email?: string },
     provider: 'phone' | 'google' | 'facebook',
@@ -456,6 +982,10 @@ export class AuthService {
     insertExtras?: Partial<typeof users.$inferInsert>,
   ): Promise<UserRow> {
     const resolvedPhone = phone ?? supabaseUser.phone ?? null;
+    // Defence in depth: every caller that resolves a phone is checked at its
+    // own entry point too, but this is the last gate before a row is created
+    // or returned for a number moderation banned.
+    if (resolvedPhone) await this.assertPhoneNotBanned(resolvedPhone);
 
     let user: UserRow;
 
@@ -470,25 +1000,18 @@ export class AuthService {
         })
         .returning();
       user = row;
-    } else {
-      const [row] = await this.db
-        .insert(users)
-        .values({ email: supabaseUser.email ?? null })
-        .onConflictDoUpdate({
-          target: users.email,
-          targetWhere: isNull(users.deletedAt),
-          set: { updatedAt: new Date() },
-        })
-        .returning();
-      user = row;
-    }
 
-    await this.db
-      .insert(userAuthProviders)
-      .values({ userId: user.id, provider })
-      .onConflictDoNothing({
-        target: [userAuthProviders.userId, userAuthProviders.provider],
-      });
+      await this.db
+        .insert(userAuthProviders)
+        .values({ userId: user.id, provider })
+        .onConflictDoNothing({
+          target: [userAuthProviders.userId, userAuthProviders.provider],
+        });
+    } else {
+      const email = supabaseUser.email?.trim().toLowerCase();
+      if (!email) throw new UnauthorizedException('SOCIAL_EMAIL_REQUIRED');
+      user = await this.resolveSocialUser(provider, supabaseUser.id, email);
+    }
 
     if (resolvedPhone) {
       await this.db
@@ -506,13 +1029,18 @@ export class AuthService {
     return publicUser;
   }
 
-  async findById(id: string): Promise<PublicUser> {
+  async findById(
+    id: string,
+  ): Promise<PublicUser & { verifiedAccount: boolean }> {
     const [user] = await this.db
       .select()
       .from(users)
       .where(eq(users.id, id))
       .limit(1);
     if (!user) throw new NotFoundException('User not found');
-    return this.toPublicUser(user);
+    return {
+      ...this.toPublicUser(user),
+      verifiedAccount: await hasActivePaidSubscription(this.db, id),
+    };
   }
 }

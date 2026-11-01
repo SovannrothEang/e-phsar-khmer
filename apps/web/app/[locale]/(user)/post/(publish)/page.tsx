@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
-import { Link } from "@/i18n/routing";
 import { Separator } from "@/components/ui/separator";
 import { Category, Subcategory } from "@/types/post-form";
 import {
   ChevronRight,
-  House,
   MapPin,
   Phone,
   Mail,
@@ -16,6 +15,7 @@ import {
   DollarSign,
   Truck,
 } from "lucide-react";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import ImageUpload from "@/components/post/ImageUpload";
 import ListingPostForm from "@/components/post/ListingPostForm";
 import DbImage from "@/components/common/DbImage";
@@ -166,8 +166,8 @@ const REAL_FORM_SUBCATEGORIES = [
   // rename or divergence to resolve. The family declares **no price**: these
   // listings publish with a NULL price and read "Negotiable" on the cards and
   // the detail page, exactly like the three Home & Land forms that declare
-  // none. `lib/post-ad.ts`'s Services mock carries a `company_name` payload
-  // field, but that is the mock's generic boilerplate — 146 occurrences
+  // none. The deleted `lib/post-ad.ts` mock carried a `company_name` payload
+  // field, but that was the mock's generic boilerplate — 146 occurrences
   // against 145 mock subcategory entries, i.e. one per subcategory of every
   // category, Jobs and Cars included — never Services design intent.
   "accounting-services",
@@ -217,9 +217,10 @@ const REAL_FORM_SUBCATEGORIES = [
   // Also note the type lists are admin-managed data, not seed literals —
   // spec-detail-eight spells the men's/kids options "Men's Accessories" and
   // "Baby & Kids Clothing" while the `types` set (and the design mock data in
-  // `lib/post-ad.ts`) say "Men Accessories"/"Kid Clothing". The design mock
-  // agrees with the ticked rows, so the rows stand and the spec-detail wording
-  // loses — the same mock-wins rule as apartment-for-rent's dropped `facing`.
+  // the since-deleted `lib/post-ad.ts`) say "Men Accessories"/"Kid Clothing".
+  // The design mock agrees with the ticked rows, so the rows stand and the
+  // spec-detail wording loses — the same mock-wins rule as apartment-for-rent's
+  // dropped `facing`.
   "womens-fashion",
   "mens-fashion",
   "baby-and-kids",
@@ -244,7 +245,8 @@ const REAL_FORM_SUBCATEGORIES = [
   //
   // Where Type DOES render, its options come from the admin-managed `types`
   // rows ticked for that subcategory, not from the schema's inline `options`:
-  // the rows (and the design mock data in `lib/post-ad.ts`) read "Dining Table"
+  // the rows (and the design mock data in the since-deleted `lib/post-ad.ts`)
+  // read "Dining Table"
   // / "Kids Desks" / "Kids Chairs&Seats" while spec-detail-nine.md spells them
   // "Dining Tables" / "Kid's Desks" / "Kid's Chair & Seats". The rows agree
   // with the design, so the rows stand and the spec wording loses — the same
@@ -279,7 +281,8 @@ const REAL_FORM_SUBCATEGORIES = [
   // rows ticked for it (11: the spec's 10 + the shared `other`), not from the
   // schema's inline `options` — and the two disagree on one name: the row reads
   // **"Traditional-instruments"** where spec-detail-ten.md writes "Traditional
-  // Instruments". The rows agree with the design mock (`lib/post-ad.ts:6108`),
+  // Instruments". The rows agree with the design mock (formerly
+  // `lib/post-ad.ts:6108`, deleted in the 2026-10-30 mock-data cleanup),
   // so the rows stand and the spec wording loses — the same mock-wins rule as
   // apartment-for-rent's dropped `facing` and the Fashion & Beauty / Furniture
   // type lists. Its Condition row was already in
@@ -329,23 +332,24 @@ const REAL_FORM_SUBCATEGORIES = [
 
 // ─── Step Indicator ───────────────────────────────────────────────────────────
 function StepIndicator({ step }: { step: 1 | 2 }) {
+  const t = useTranslations("PostAd");
   return (
     <div className="flex items-center gap-2 ">
       {[
-        { n: 1, label: "Choose a category" },
-        { n: 2, label: "Fill Information" },
+        { n: 1, label: t("stepChooseCategory") },
+        { n: 2, label: t("stepFillInfo") },
       ].map(({ n, label }, i) => (
         <div key={n} className="flex items-center gap-2 py-2">
           {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
           <div className="flex items-center gap-2">
             <span
-              className={`w-4 h-4 rounded-full text-xs font-bold flex items-center justify-center
+              className={`w-4 h-4 rounded-full type-button-sm flex items-center justify-center
                   ${step === n ? "bg-[#00a0e9] text-white" : step > n ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
             >
               {n}
             </span>
             <span
-              className={`text-sm  ${step === n ? "text-foreground" : "text-gray-400"}`}
+              className={`type-body  ${step === n ? "text-foreground" : "text-gray-400"}`}
             >
               {label}
             </span>
@@ -362,12 +366,14 @@ function CategorySelector({
 }: {
   onSelect: (cat: Category, sub: Subcategory) => void;
 }) {
+  const t = useTranslations("PostAd");
+  const locale = useLocale();
   const [hoveredCat, setHoveredCat] = useState<Category | null>(null);
   const [categories, setCategories] = useState<Category[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getPostCategories("en")
+    getPostCategories(locale)
       .then((rows) => {
         if (!cancelled) setCategories(rows);
       })
@@ -377,7 +383,7 @@ function CategorySelector({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale]);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCatEnter = (cat: Category) => {
@@ -397,11 +403,11 @@ function CategorySelector({
     <div className="flex">
       <div className="w-64 flex-shrink-0 flex flex-col">
         <div className="px- py-3 flex-shrink-0">
-          <span className="flex items-center gap-2 text-sm  text-foreground">
-            <span className="w-4 h-4 rounded-full bg-[#00a0e9] text-muted text-xs flex items-center justify-center">
+          <span className="flex items-center gap-2 type-body  text-foreground">
+            <span className="w-4 h-4 rounded-full bg-[#00a0e9] text-muted type-meta flex items-center justify-center">
               1
             </span>
-            Choose a category
+            {t("chooseCategory")}
           </span>
         </div>
         <ul>
@@ -425,14 +431,14 @@ function CategorySelector({
                   height={32}
                   className="object-contain"
                   fallback={
-                    <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted text-xs font-medium text-muted-foreground">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted type-button-sm text-muted-foreground">
                       {cat.name.charAt(0)}
                     </span>
                   }
                 />
               </div>
               <span
-                className={`text-sm flex-1 ${hoveredCat?.slug === cat.slug ? "font-semibold text-[#00a0e9]" : "font-medium text-foreground"}`}
+                className={`type-body flex-1 ${hoveredCat?.slug === cat.slug ? "font-semibold text-[#00a0e9]" : "font-normal text-foreground"}`}
               >
                 {cat.name}
               </span>
@@ -454,13 +460,13 @@ function CategorySelector({
         onMouseLeave={handlePanelLeave}
       >
         <div className="px-6 py-3 flex-shrink-0">
-          <span className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="flex items-center gap-2 type-body text-gray-500">
             <span
-              className={`w-4 h-4 rounded-full text-xs flex items-center justify-center ${hoveredCat ? "bg-[#00a0e9]  text-foreground" : "bg-gray-300 text-white"}`}
+              className={`w-4 h-4 rounded-full type-meta flex items-center justify-center ${hoveredCat ? "bg-[#00a0e9]  text-foreground" : "bg-gray-300 text-white"}`}
             >
               2
             </span>
-            Select a subcategory
+            {t("chooseSubcategory")}
           </span>
         </div>
 
@@ -479,7 +485,7 @@ function CategorySelector({
               <li key={sub.slug}>
                 <button
                   onClick={() => onSelect(hoveredCat, sub)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-100 transition-colors group text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-blue-100 transition-colors group text-left"
                 >
                   <div className="w-8 h-8 relative flex-shrink-0">
                     <DbImage
@@ -489,13 +495,13 @@ function CategorySelector({
                       height={32}
                       className="object-contain"
                       fallback={
-                        <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted text-xs font-medium text-muted-foreground">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-sm bg-muted type-button-sm text-muted-foreground">
                           {sub.name.charAt(0)}
                         </span>
                       }
                     />
                   </div>
-                  <span className="text-sm text-foreground group-hover:text-[#00a0e9] flex-1 transition-colors">
+                  <span className="type-body text-foreground group-hover:text-[#00a0e9] group-hover:font-semibold flex-1 transition-colors">
                     {sub.name}
                   </span>
                   <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#00a0e9] flex-shrink-0 transition-colors" />
@@ -506,7 +512,7 @@ function CategorySelector({
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-24">
             <ChevronRight className="w-8 h-8 text-gray-200 mb-2" />
-            <p className="text-sm">Hover a category to see options</p>
+            <p className="type-body">{t("hoverHint")}</p>
           </div>
         )}
       </div>
@@ -530,13 +536,13 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-card-foreground mb-1.5">
+      <label className="block type-nav text-card-foreground mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-card-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent appearance-none cursor-pointer"
+        className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-card-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent appearance-none cursor-pointer"
       >
         <option value="">Select {label}</option>
         {options.map((o) => (
@@ -568,7 +574,7 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-card-foreground mb-1.5">
+      <label className="block type-nav text-card-foreground mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="relative">
@@ -582,7 +588,7 @@ function InputField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full border border-gray-200 rounded-sm py-2.5 text-sm text-card-foreground focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent ${icon ? "pl-9 pr-3" : "px-3"}`}
+          className={`w-full border border-gray-200 rounded-sm py-2.5 type-body text-card-foreground focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent ${icon ? "pl-9 pr-3" : "px-3"}`}
         />
       </div>
     </div>
@@ -604,7 +610,7 @@ function TextareaField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+      <label className="block type-nav text-gray-700 mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <textarea
@@ -612,7 +618,7 @@ function TextareaField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
       />
     </div>
   );
@@ -632,7 +638,7 @@ function BrandModelField({
   return (
     <>
       <div>
-        <label className="block text-sm font-semibold text-card-foreground mb-1.5">
+        <label className="block type-nav text-card-foreground mb-1.5">
           Brand <span className="text-red-500">*</span>
         </label>
         <select
@@ -640,7 +646,7 @@ function BrandModelField({
           onChange={(e) =>
             setForm({ ...form, brand: e.target.value, model: "" })
           }
-          className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
+          className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
         >
           <option value="">Select Brand</option>
           {sub.brands.map((b) => (
@@ -652,13 +658,13 @@ function BrandModelField({
       </div>
       {selectedBrand?.Model && (
         <div>
-          <label className="block text-sm font-semibold text-card-foreground mb-1.5">
+          <label className="block type-nav text-card-foreground mb-1.5">
             Model
           </label>
           <select
             value={(form.model as string) || ""}
             onChange={(e) => setForm({ ...form, model: e.target.value })}
-            className="w-full border border-gray-200 rounded-sm px-3 py-2.5 text-sm text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
+            className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
           >
             <option value="">{selectedBrand.Model?.[0].name} </option>
             {selectedBrand.Model.map((m) => (
@@ -685,7 +691,7 @@ function TypesField({
   if (!sub.Types) return null;
   return (
     <div>
-      <label className="block text-sm font-semibold text-card-foreground mb-2">
+      <label className="block type-nav text-card-foreground mb-2">
         Type <span className="text-red-500">*</span>
       </label>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -707,9 +713,7 @@ function TypesField({
                 //onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
-            <span className="text-xs font-medium text-gray-600 leading-tight">
-              {t.name}
-            </span>
+            <span className="type-button-sm text-gray-600">{t.name}</span>
           </button>
         ))}
       </div>
@@ -737,16 +741,14 @@ function ColorsField({
   };
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-2">
-        Color
-      </label>
+      <label className="block type-nav text-gray-700 mb-2">Color</label>
       <div className="flex flex-wrap gap-2">
         {sub.colors.map((c) => (
           <button
             key={c}
             type="button"
             onClick={() => setForm({ ...form, color: c })}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 text-xs font-medium transition-all
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 type-button-sm transition-all
               ${form.color === c ? "border-orange-500" : "border-gray-200 hover:border-gray-300"}`}
           >
             <span
@@ -782,11 +784,11 @@ function DiscountPriceField({
       )}
       {sub.price !== undefined && (
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+          <label className="block type-nav text-gray-700 mb-1.5">
             Price <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 type-body">
               $
             </span>
             <input
@@ -794,7 +796,7 @@ function DiscountPriceField({
               value={(form.price as string) || ""}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               placeholder="0"
-              className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         </div>
@@ -842,7 +844,7 @@ function DynamicForm({
         <div />
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline"
+          className="type-nav text-[#00a0e9] hover:underline"
         >
           Reset
         </button>
@@ -858,7 +860,7 @@ function DynamicForm({
 
       {/* Post Details */}
       <div className="space-y-4">
-        <h2 className="text-lg font-bold">Post Details</h2>
+        <h2 className="type-section-title">Post Details</h2>
         <Separator />
 
         <InputField
@@ -870,16 +872,16 @@ function DynamicForm({
         />
         {/* Category breadcrumb */}
         <div>
-          <label className="block text-sm font-semibold text-card-foreground mb-1.5">
+          <label className="block type-nav text-card-foreground mb-1.5">
             Choose a category <span className="text-red-500">*</span>
           </label>
           <div className="flex items-center gap-3 border border-gray-200 rounded-sm px-3 py-2.5 flex-wrap">
-            <span className="text-sm text-foreground">{category.name}</span>
+            <span className="type-body text-foreground">{category.name}</span>
             <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-sm  text-foreground">{sub.name}</span>
+            <span className="type-body  text-foreground">{sub.name}</span>
             <button
               onClick={onBack}
-              className="text-sm bg-[#00a0e9] text-card px-3 py-1.5 rounded-sm font-semibold hover:bg-[#00a0e9]/80 transition-colors"
+              className="type-nav bg-[#00a0e9] text-card px-3 py-1.5 rounded-sm hover:bg-[#00a0e9]/80 transition-colors"
             >
               Change
             </button>
@@ -900,7 +902,7 @@ function DynamicForm({
         {/* Tax Types */}
         {sub.tax_types && (
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-foreground">
+            <label className="block type-nav text-foreground">
               Tax Type <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-2 w-full">
@@ -909,7 +911,7 @@ function DynamicForm({
                   key={t}
                   type="button"
                   onClick={() => setForm({ ...form, taxType: t })}
-                  className={`py-2.5 text-sm font-medium transition-all border rounded-sm
+                  className={`py-2.5 type-nav transition-all border rounded-sm
                     ${
                       form.taxType === t
                         ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
@@ -926,7 +928,7 @@ function DynamicForm({
         {/* Condition */}
         {sub?.condition && (
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-foreground">
+            <label className="block type-nav text-foreground">
               Condition <span className="text-red-500">*</span>
             </label>
             {/* Using grid-cols-2 for perfect 50/50 split and gap-2 for the middle space */}
@@ -936,7 +938,7 @@ function DynamicForm({
                   key={c}
                   type="button"
                   onClick={() => setForm({ ...form, condition: c })}
-                  className={`py-2.5 text-sm font-medium transition-all border rounded-sm
+                  className={`py-2.5 type-nav transition-all border rounded-sm
                    ${
                      form.condition === c
                        ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
@@ -966,7 +968,7 @@ function DynamicForm({
         {/* Transmission */}
         {sub.transmission && (
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-foreground">
+            <label className="block type-nav text-foreground">
               Transmission
             </label>
             <div className="grid grid-cols-2 gap-2 w-full">
@@ -975,7 +977,7 @@ function DynamicForm({
                   key={t}
                   type="button"
                   onClick={() => setForm({ ...form, transmission: t })}
-                  className={`py-2.5 text-sm font-medium transition-all border rounded-sm
+                  className={`py-2.5 type-nav transition-all border rounded-sm
                     ${
                       form.transmission === t
                         ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
@@ -1045,7 +1047,7 @@ function DynamicForm({
         {/* Network */}
         {sub.network && (
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700">
+            <label className="block type-nav text-gray-700">
               Network
               <span className="text-red-500">*</span>
             </label>
@@ -1070,7 +1072,7 @@ function DynamicForm({
                     alt={net.name}
                     className="object-contain"
                   />
-                  <span className="text-sm font-medium">{net.name}</span>
+                  <span className="type-nav">{net.name}</span>
                 </button>
               ))}
             </div>
@@ -1141,7 +1143,7 @@ function DynamicForm({
         {/* Salary (Jobs) */}
         {isJob && (
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            <label className="block type-nav text-gray-700 mb-1.5">
               Salary <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -1151,7 +1153,7 @@ function DynamicForm({
                 value={(form.salary as string) || ""}
                 onChange={(e) => setForm({ ...form, salary: e.target.value })}
                 placeholder="Monthly salary"
-                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           </div>
@@ -1165,7 +1167,7 @@ function DynamicForm({
         {/* Delivery */}
         {sub.delivery !== undefined && !isJob && (
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
+            <label className="block type-nav text-gray-700 mb-2">
               Delivery Available
             </label>
             <div className="flex gap-2">
@@ -1174,7 +1176,7 @@ function DynamicForm({
                   key={v}
                   type="button"
                   onClick={() => setForm({ ...form, delivery: v === "Yes" })}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 type-nav transition-all
                     ${
                       (form.delivery === true && v === "Yes") ||
                       (form.delivery === false && v === "No")
@@ -1202,7 +1204,7 @@ function DynamicForm({
 
       {/* Location & Contact */}
       <div className="bg-white rounded-xl p-5 space-y-4">
-        <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-3">
+        <h2 className="type-card-heading text-gray-800 border-b border-gray-100 pb-3">
           Location & Contact
         </h2>
 
@@ -1261,14 +1263,14 @@ function DynamicForm({
       <div className="flex justify-end gap-3 pb-8">
         <button
           onClick={onBack}
-          className="px-6 py-2.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+          className="px-6 py-2.5 rounded-lg border border-gray-200 type-nav text-gray-600 hover:bg-gray-50 transition-colors"
         >
           Back
         </button>
         <button
           type="button"
           onClick={handleSubmit}
-          className="px-8 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors shadow-sm shadow-orange-200"
+          className="px-8 py-2.5 rounded-lg bg-orange-500 text-white type-body hover:bg-orange-600 transition-colors shadow-sm shadow-orange-200"
         >
           Post Ad
         </button>
@@ -1279,6 +1281,8 @@ function DynamicForm({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PostPage() {
+  const t = useTranslations("PostAd");
+  const tSearch = useTranslations("Search");
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
@@ -1300,25 +1304,16 @@ export default function PostPage() {
   return (
     <div className="min-h-screen bg-muted">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-6">
-          <Link
-            href="/"
-            className="group flex items-center transition-colors duration-150 text-gray-500 dark:text-gray-400 hover:text-blue-300"
-          >
-            <House
-              size={16}
-              className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300"
-            />
-            <span className="text-gray-500 dark:text-gray-400 group-hover:text-blue-300 pl-1.5">
-              Home
-            </span>
-          </Link>
-          <ChevronRight size={16} className="block text-gray-500" />
-          <h1 className="text-gray-500 dark:text-gray-400">Post</h1>
-        </nav>
+        <Breadcrumbs
+          className="mb-6"
+          items={[
+            { label: tSearch("home"), href: "/" },
+            { label: t("breadcrumb") },
+          ]}
+        />
 
         <div className="bg-card border rounded-sm p-6 shadow-sm">
-          <h1 className="text-2xl font-bold  mb-1">Post an Ad</h1>
+          <h1 className="type-page-title mb-1">{t("title")}</h1>
           <StepIndicator step={step} />
 
           {step === 1 ? (

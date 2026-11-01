@@ -4,6 +4,7 @@ import z from "zod";
 import { loginSchema } from "@/schemas/login";
 import { setAdminSession } from "@/lib/auth/session";
 import { setAdminLocale } from "@/lib/auth/admin-locale";
+import { routing } from "@/i18n/routing";
 import { API_URL } from "@/lib/api/client";
 import type { BackendUser } from "@/lib/api/adapters";
 
@@ -63,11 +64,11 @@ export async function adminLogin(unsafeData: z.infer<typeof loginSchema>) {
   }
 
   await setAdminSession({ accessToken, refreshToken });
-  const locale = ["en", "km", "zh", "ko", "id", "vi"].includes(
+  const locale = (routing.locales as readonly string[]).includes(
     user.preferredLanguage,
   )
     ? user.preferredLanguage
-    : "en";
+    : routing.defaultLocale;
   await setAdminLocale(locale);
 
   return {

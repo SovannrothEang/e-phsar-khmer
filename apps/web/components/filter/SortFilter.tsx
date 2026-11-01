@@ -11,6 +11,7 @@ import { X } from "lucide-react";
 import { IconCircleCheckFilled } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import {
   SORT_OPTIONS,
@@ -26,13 +27,8 @@ import {
 export { SORT_OPTIONS, SORT_PARAM, parseSortParam };
 export type { SortValue };
 
-function SortLabel(sort: SortValue, defaultSort: SortValue) {
-  if (sort === defaultSort) return "Sort";
-  const option = SORT_OPTIONS.find((o) => o.value === sort);
-  return option ? `Sort :${option.label}` : "Sort";
-}
-
 export default function SortFilter() {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -45,7 +41,13 @@ export default function SortFilter() {
   const [open, setOpen] = useState(false);
 
   const hasActiveFilter = sortParam !== defaultSort;
-  const adsLabel = SortLabel(sortParam, defaultSort);
+  const option = SORT_OPTIONS.find((o) => o.value === sortParam);
+  const adsLabel =
+    sortParam === defaultSort
+      ? t("Filters.sort.label")
+      : t("Filters.sort.activeChip", {
+          label: option ? t(option.labelKey) : t("Filters.sort.label"),
+        });
 
   function pushSort(next: SortValue) {
     const params = new URLSearchParams(searchParams.toString());
@@ -97,7 +99,7 @@ export default function SortFilter() {
                   removeFilter(e as unknown as React.MouseEvent);
                 }
               }}
-              aria-label="Remove sort filter"
+              aria-label={t("Filters.sort.remove")}
             >
               <X className="size-4 shrink-0 text-foreground" aria-hidden />
             </span>
@@ -105,7 +107,9 @@ export default function SortFilter() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="center" className="rounded-sm w-50 p-0 mt-3">
-        <p className="text-base text-foreground text-center pt-2 ">Sort</p>
+        <p className="type-card-heading text-foreground text-center pt-2 ">
+          {t("Filters.sort.label")}
+        </p>
         <ul className="">
           <div className="border-b border-gray-200" />
           {options.map((option) => {
@@ -115,9 +119,9 @@ export default function SortFilter() {
                 <button
                   type="button"
                   onClick={() => selectSort(option.value)}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors cursor-pointer"
+                  className="flex w-full items-center justify-between px-3 py-2.5 type-nav hover:bg-muted/60 transition-colors cursor-pointer"
                 >
-                  <span>{option.label}</span>
+                  <span>{t(option.labelKey)}</span>
                   {isSelected && (
                     <IconCircleCheckFilled
                       className="size-5 shrink-0 text-sky-600"

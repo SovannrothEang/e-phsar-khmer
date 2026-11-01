@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -42,12 +43,15 @@ export class ReportsController {
   }
 
   @Patch('reasons/:id')
-  updateReason(@Param('id') id: string, @Body() dto: UpdateReportReasonDto) {
+  updateReason(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateReportReasonDto,
+  ) {
     return this.service.updateReason(id, dto);
   }
 
   @Delete('reasons/:id')
-  removeReason(@Param('id') id: string) {
+  removeReason(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeReason(id);
   }
 
@@ -59,17 +63,20 @@ export class ReportsController {
   }
 
   @Patch('users/:id')
-  @ApiOperation({ summary: 'Update a user report status (approve/reject)' })
+  @ApiOperation({
+    summary:
+      'Update a user report status. Approving suspends the reported account.',
+  })
   updateUserReportStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.service.updateUserReportStatus(id, dto, user.id);
+    return this.service.updateUserReportStatus(id, dto, user);
   }
 
   @Delete('users/:id')
-  removeUserReport(@Param('id') id: string) {
+  removeUserReport(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeUserReport(id);
   }
 
@@ -81,17 +88,20 @@ export class ReportsController {
   }
 
   @Patch('listings/:id')
-  @ApiOperation({ summary: 'Update a listing report status (approve/reject)' })
+  @ApiOperation({
+    summary:
+      'Update a listing report status. Approving takes the listing down.',
+  })
   updateListingReportStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.service.updateListingReportStatus(id, dto, user.id);
+    return this.service.updateListingReportStatus(id, dto, user);
   }
 
   @Delete('listings/:id')
-  removeListingReport(@Param('id') id: string) {
+  removeListingReport(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeListingReport(id);
   }
 }

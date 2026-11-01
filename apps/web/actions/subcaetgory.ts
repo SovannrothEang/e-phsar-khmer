@@ -17,6 +17,7 @@ export async function createsubcategories(
         categoryId: parsed.data.categoryId,
         slug: parsed.data.slug,
         name: parsed.data.name,
+        nameKm: parsed.data.nameKm,
         icon: parsed.data.subIcon || null,
       }),
     });
@@ -42,6 +43,7 @@ export async function updatesubcategories(
         categoryId: parsed.data.categoryId,
         slug: parsed.data.slug,
         name: parsed.data.name,
+        nameKm: parsed.data.nameKm,
         icon:
           parsed.data.subIcon && parsed.data.subIcon !== "/placeholder.svg"
             ? parsed.data.subIcon

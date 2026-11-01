@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -19,6 +20,7 @@ import { FilesService } from '../files/files.service';
 
 export interface AdminCategory extends CategoryRow {
   name: string;
+  nameKm: string | null;
 }
 
 @Injectable()
@@ -29,6 +31,7 @@ export class AdminCategoriesService {
   ) {}
 
   async list(): Promise<AdminCategory[]> {
+    const kmTr = alias(categoryTranslations, 'km_cat_tr');
     const rows = await this.db
       .select({
         id: categories.id,
@@ -39,6 +42,7 @@ export class AdminCategoriesService {
         createdAt: categories.createdAt,
         updatedAt: categories.updatedAt,
         name: categoryTranslations.name,
+        nameKm: kmTr.name,
       })
       .from(categories)
       .leftJoin(
@@ -48,9 +52,17 @@ export class AdminCategoriesService {
           eq(categoryTranslations.locale, 'en'),
         ),
       )
+      .leftJoin(
+        kmTr,
+        and(eq(kmTr.categoryId, categories.id), eq(kmTr.locale, 'km')),
+      )
       .orderBy(asc(categories.sortOrder));
 
-    return rows.map((r) => ({ ...r, name: r.name ?? r.slug }));
+    return rows.map((r) => ({
+      ...r,
+      name: r.name ?? r.slug,
+      nameKm: r.nameKm ?? null,
+    }));
   }
 
   async create(dto: CreateCategoryDto): Promise<AdminCategory> {
@@ -72,7 +84,16 @@ export class AdminCategoriesService {
           name: dto.name,
         });
 
-        return { ...cat, name: dto.name };
+        const nameKm = dto.nameKm?.trim() || null;
+        if (nameKm) {
+          await tx.insert(categoryTranslations).values({
+            categoryId: cat.id,
+            locale: 'km',
+            name: nameKm,
+          });
+        }
+
+        return { ...cat, name: dto.name, nameKm };
       });
     } catch (err) {
       if (this.isUniqueViolation(err)) {
@@ -116,6 +137,31 @@ export class AdminCategoriesService {
             });
         }
 
+        if (dto.nameKm !== undefined) {
+          const nameKm = dto.nameKm?.trim();
+          if (nameKm) {
+            await tx
+              .insert(categoryTranslations)
+              .values({ categoryId: id, locale: 'km', name: nameKm })
+              .onConflictDoUpdate({
+                target: [
+                  categoryTranslations.categoryId,
+                  categoryTranslations.locale,
+                ],
+                set: { name: nameKm },
+              });
+          } else {
+            await tx
+              .delete(categoryTranslations)
+              .where(
+                and(
+                  eq(categoryTranslations.categoryId, id),
+                  eq(categoryTranslations.locale, 'km'),
+                ),
+              );
+          }
+        }
+
         const [cat] = await tx
           .select()
           .from(categories)
@@ -131,7 +177,21 @@ export class AdminCategoriesService {
             ),
           )
           .limit(1);
-        return { ...cat, name: t?.name ?? cat.slug };
+        const [km] = await tx
+          .select({ name: categoryTranslations.name })
+          .from(categoryTranslations)
+          .where(
+            and(
+              eq(categoryTranslations.categoryId, id),
+              eq(categoryTranslations.locale, 'km'),
+            ),
+          )
+          .limit(1);
+        return {
+          ...cat,
+          name: t?.name ?? cat.slug,
+          nameKm: km?.name ?? null,
+        };
       });
       // After the row commits, delete the now-orphaned previous icon
       // (only when icon was changed or cleared by this update).

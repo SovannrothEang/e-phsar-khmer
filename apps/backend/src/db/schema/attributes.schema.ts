@@ -25,6 +25,8 @@ export const attributeOptions = pgTable(
     type: varchar('type', { length: 60 }).notNull(),
     slug: varchar('slug', { length: 120 }).notNull(),
     name: varchar('name', { length: 160 }).notNull(),
+    /** Khmer display name; null falls back to `name`. */
+    nameKm: varchar('name_km', { length: 160 }),
     image: varchar('image', { length: 500 }),
     categoryId: uuid('category_id').references(() => categories.id, {
       onDelete: 'set null',
