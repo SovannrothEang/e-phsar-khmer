@@ -1,15 +1,17 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
 import {
-  getCommunesForDistrict,
-  getDistrictsForProvince,
-} from "@/constants/data/districts";
-import { PROVINCES } from "@/constants/data/locations";
-import { getFiltersForCategory } from "@/constants/data/filters";
-import { Province } from "@/types/location";
+  fetchBrands,
+  fetchCommunes,
+  fetchDistricts,
+  fetchProvinces,
+  fetchSubcategory,
+} from "@/lib/api/catalog";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -24,16 +26,13 @@ interface DropdownOption {
   name: string;
 }
 
-// Sort options
 const SORT_OPTIONS: DropdownOption[] = [
-  { id: "latest", name: "Latest Ads" },
-  { id: "oldest", name: "Oldest Ads" },
-  { id: "price-low", name: "Price: Low to High" },
-  { id: "price-high", name: "Price: High to Low" },
+  { id: "newest", name: "Newest" },
+  { id: "price_asc", name: "Price: Low to High" },
+  { id: "price_desc", name: "Price: High to Low" },
 ];
 
 const DATE_OPTIONS: DropdownOption[] = [
-  { id: "any", name: "Any Time" },
   { id: "today", name: "Today" },
   { id: "week", name: "This Week" },
   { id: "month", name: "This Month" },
@@ -44,31 +43,29 @@ const CONDITION_OPTIONS: DropdownOption[] = [
   { id: "used", name: "Used" },
 ];
 
-const STORAGE_OPTIONS: DropdownOption[] = [
-  { id: "64gb", name: "64GB" },
-  { id: "128gb", name: "128GB" },
-  { id: "256gb", name: "256GB" },
-  { id: "512gb", name: "512GB" },
-  { id: "1tb", name: "1TB" },
-];
+/** Labels for the schema keys that do not carry a `label` object. */
+const FIELD_LABELS: Record<string, string> = {
+  storage: "Storage",
+  screenSize: "Screen Size",
+  ram: "RAM",
+  cpu: "CPU",
+  vga: "VGA",
+  type: "Type",
+  bodyType: "Body Type",
+  engineType: "Engine Type",
+  transmission: "Transmission",
+  taxType: "Tax Type",
+  color: "Color",
+  jobType: "Job Type",
+  experience: "Experience",
+  accessory: "Accessory",
+  network: "Network",
+  bedroom: "Bedroom",
+  bathroom: "Bathroom",
+  facing: "Facing",
+  vehicleType: "Vehicle Type",
+};
 
-const PROPERTY_TYPE_OPTIONS: DropdownOption[] = [
-  { id: "villa", name: "Villa" },
-  { id: "apartment", name: "Apartment" },
-  { id: "house", name: "House" },
-  { id: "land", name: "Land" },
-  { id: "condo", name: "Condo" },
-];
-
-const EXPERIENCE_OPTIONS: DropdownOption[] = [
-  { id: "no-exp", name: "< 1 year" },
-  { id: "1-2", name: "1-2 years" },
-  { id: "2-3", name: "2-3 years" },
-  { id: "3-5", name: "3-5 years" },
-  { id: "5-plus", name: "5+ years" },
-];
-
-// Simple dropdown component that opens a selection modal
 const SimpleDropdown = ({
   label,
   value,
@@ -85,6 +82,7 @@ const SimpleDropdown = ({
   disabled?: boolean;
 }) => {
   const [visible, setVisible] = useState(false);
+  const selected = options.find((option) => option.id === value);
 
   return (
     <>
@@ -98,9 +96,9 @@ const SimpleDropdown = ({
         <View>
           {label && <Text className="text-xs text-gray-400">{label}</Text>}
           <Text
-            className={`text-base ${value ? "text-gray-900" : "text-gray-400"}`}
+            className={`text-base ${selected ? "text-gray-900" : "text-gray-400"}`}
           >
-            {value || placeholder}
+            {selected?.name || placeholder}
           </Text>
         </View>
         <Ionicons
@@ -110,7 +108,6 @@ const SimpleDropdown = ({
         />
       </TouchableOpacity>
 
-      {/* Selection Modal */}
       <Modal
         visible={visible}
         transparent
@@ -119,17 +116,17 @@ const SimpleDropdown = ({
         onRequestClose={() => setVisible(false)}
       >
         <Pressable
-          className="flex-1 bg-black/50 justify-end"
+          className="flex-1 justify-end bg-black/50"
           onPress={() => setVisible(false)}
         >
           <Pressable
             onPress={(e) => e.stopPropagation()}
-            className="w-full max-h-[60%] rounded-t-3xl bg-white pb-8"
+            className="max-h-[60%] w-full rounded-t-3xl bg-white pb-8"
           >
             <View className="items-center py-4">
               <View className="h-1.5 w-12 rounded-full bg-gray-300" />
             </View>
-            <Text className="px-4 pb-4 text-center text-lg font-bold text-gray-900 border-b border-gray-100">
+            <Text className="border-b border-gray-100 px-4 pb-4 text-center text-lg font-bold text-gray-900">
               {placeholder}
             </Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -141,14 +138,14 @@ const SimpleDropdown = ({
                     setVisible(false);
                   }}
                   activeOpacity={0.7}
-                  className="border-b border-gray-100 px-4 py-4 flex-row justify-between items-center"
+                  className="flex-row items-center justify-between border-b border-gray-100 px-4 py-4"
                 >
                   <Text
-                    className={`text-base ${value === option.name ? "text-blue-500 font-bold" : "text-gray-900"}`}
+                    className={`text-base ${value === option.id ? "font-bold text-blue-500" : "text-gray-900"}`}
                   >
                     {option.name}
                   </Text>
-                  {value === option.name && (
+                  {value === option.id && (
                     <Ionicons name="checkmark" size={20} color="#3b82f6" />
                   )}
                 </TouchableOpacity>
@@ -161,131 +158,166 @@ const SimpleDropdown = ({
   );
 };
 
+function firstParam(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw ?? "";
+}
+
+function parseAttrs(raw: string): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>).map(
+          ([key, value]) => [key, String(value)],
+        ),
+      );
+    }
+  } catch {
+    /* malformed */
+  }
+  return {};
+}
+
 export default function FiltersScreen() {
   const params = useLocalSearchParams();
-  const categoryId = params.categoryId as string;
-  const subCategoryId = params.subCategoryId as string;
+  const categoryId = firstParam(params.categoryId);
+  const subCategoryId = firstParam(params.subCategoryId);
+  const isJobs = categoryId === "jobs";
 
-  const [sort, setSort] = useState<string>((params.sort as string) || "");
-  const [dateRange, setDateRange] = useState<string>(
-    (params.dateRange as string) || "",
+  const [sort, setSort] = useState(firstParam(params.sort));
+  const [postedWithin, setPostedWithin] = useState(
+    firstParam(params.postedWithin),
   );
-  const [province, setProvince] = useState<Province | undefined>(
-    params.provinceId
-      ? PROVINCES.find((p) => p.id === params.provinceId)
-      : undefined,
+  const [provinceSlug, setProvinceSlug] = useState(
+    firstParam(params.provinceSlug),
   );
-  const [district, setDistrict] = useState<DropdownOption | undefined>(
-    params.districtId
-      ? { id: params.districtId as string, name: params.districtName as string }
-      : undefined,
+  const [districtSlug, setDistrictSlug] = useState(
+    firstParam(params.districtSlug),
   );
-  const [commune, setCommune] = useState<DropdownOption | undefined>(
-    params.communeId
-      ? { id: params.communeId as string, name: params.communeName as string }
-      : undefined,
+  const [communeSlug, setCommuneSlug] = useState(
+    firstParam(params.communeSlug),
   );
-  const [minPrice, setMinPrice] = useState((params.minPrice as string) || "");
-  const [maxPrice, setMaxPrice] = useState((params.maxPrice as string) || "");
-  const [year, setYear] = useState((params.year as string) || "");
-  const [condition, setCondition] = useState(
-    (params.condition as string) || "",
-  );
-  const [storage, setStorage] = useState((params.storage as string) || "");
-  const [size, setSize] = useState((params.size as string) || "");
-  const [type, setType] = useState((params.type as string) || "");
-  const [salary, setSalary] = useState((params.salary as string) || "");
-  const [experience, setExperience] = useState(
-    (params.experience as string) || "",
+  const [minPrice, setMinPrice] = useState(firstParam(params.minPrice));
+  const [maxPrice, setMaxPrice] = useState(firstParam(params.maxPrice));
+  const [year, setYear] = useState(firstParam(params.yearMin));
+  const [condition, setCondition] = useState(firstParam(params.condition));
+  const [brand, setBrand] = useState(firstParam(params.brand));
+  const [attrs, setAttrs] = useState<Record<string, string>>(() =>
+    parseAttrs(firstParam(params.attrs)),
   );
 
-  const activeFilters = useMemo(
-    () => getFiltersForCategory(categoryId, subCategoryId),
-    [categoryId, subCategoryId],
+  const subQuery = useQuery({
+    queryKey: ["subcategory", categoryId, subCategoryId],
+    queryFn: () => fetchSubcategory(categoryId, subCategoryId),
+    enabled: !!categoryId && !!subCategoryId,
+  });
+  const subcategory = subQuery.data;
+
+  const brandsQuery = useQuery({
+    queryKey: ["brands", subCategoryId],
+    queryFn: () => fetchBrands(subCategoryId),
+    enabled: !!subCategoryId,
+  });
+  const brands = brandsQuery.data ?? [];
+
+  const provincesQuery = useQuery({
+    queryKey: ["provinces"],
+    queryFn: fetchProvinces,
+  });
+  const provinces = provincesQuery.data ?? [];
+
+  const districtsQuery = useQuery({
+    queryKey: ["districts", provinceSlug],
+    queryFn: () => fetchDistricts(provinceSlug),
+    enabled: !!provinceSlug,
+  });
+  const districts = districtsQuery.data ?? [];
+
+  const communesQuery = useQuery({
+    queryKey: ["communes", provinceSlug, districtSlug],
+    queryFn: () => fetchCommunes(provinceSlug, districtSlug),
+    enabled: !!provinceSlug && !!districtSlug,
+  });
+  const communes = communesQuery.data ?? [];
+
+  const selectFields = useMemo(() => {
+    const fields = subcategory?.fieldSchema ?? [];
+    return fields.filter(
+      (field) =>
+        field.type === "select" &&
+        (field.options?.length ?? 0) > 0 &&
+        !["brand", "model", "year", "condition"].includes(field.key),
+    );
+  }, [subcategory?.fieldSchema]);
+
+  const schemaKeys = useMemo(
+    () => new Set((subcategory?.fieldSchema ?? []).map((field) => field.key)),
+    [subcategory?.fieldSchema],
   );
+  const hasSchema = !!subcategory?.fieldSchema;
+  const showYear = !hasSchema || schemaKeys.has("year");
+  const showCondition = !hasSchema || schemaKeys.has("condition");
 
-  const districts = province ? getDistrictsForProvince(province.id) : [];
-  const communes =
-    province && district
-      ? getCommunesForDistrict(province.id, district.id)
-      : [];
-
-  const handleProvinceSelect = (opt: DropdownOption) => {
-    const selected = PROVINCES.find((p) => p.id === opt.id);
-    setProvince(selected);
-    setDistrict(undefined);
-    setCommune(undefined);
+  const handleProvinceSelect = (option: DropdownOption) => {
+    setProvinceSlug(option.id);
+    setDistrictSlug("");
+    setCommuneSlug("");
   };
 
-  const handleDistrictSelect = (opt: DropdownOption) => {
-    setDistrict(opt);
-    setCommune(undefined);
+  const handleDistrictSelect = (option: DropdownOption) => {
+    setDistrictSlug(option.id);
+    setCommuneSlug("");
   };
 
   const handleApply = () => {
-    const filterParams: any = {
-      sort,
-      dateRange,
-      provinceId: province?.id,
-      provinceName: province?.name,
-      districtId: district?.id,
-      districtName: district?.name,
-      communeId: commune?.id,
-      communeName: commune?.name,
-      minPrice,
-      maxPrice,
-      year,
-      condition,
-      storage,
-      size,
-      type,
-      salary,
-      experience,
-    };
+    const filterParams: Record<string, string> = {};
+    if (sort) filterParams.sort = sort;
+    if (postedWithin) filterParams.postedWithin = postedWithin;
+    if (provinceSlug) filterParams.provinceSlug = provinceSlug;
+    if (districtSlug) filterParams.districtSlug = districtSlug;
+    if (communeSlug) filterParams.communeSlug = communeSlug;
+    if (minPrice) filterParams.minPrice = minPrice.trim();
+    if (maxPrice) filterParams.maxPrice = maxPrice.trim();
+    if (year) {
+      filterParams.yearMin = year.trim();
+      filterParams.yearMax = year.trim();
+    }
+    if (condition) filterParams.condition = condition;
+    if (brand) filterParams.brand = brand;
 
-    // Remove undefined/empty values
-    Object.keys(filterParams).forEach((key) => {
-      if (!filterParams[key]) delete filterParams[key];
-    });
+    const attrEntries = Object.entries(attrs).filter(
+      ([, value]) => value.trim() !== "",
+    );
+    if (attrEntries.length > 0) {
+      filterParams.attrs = JSON.stringify(Object.fromEntries(attrEntries));
+    }
 
-    // Navigate back with params
     router.replace({
-      pathname: `/(categories)/${categoryId}${subCategoryId ? `/${subCategoryId}` : ""}`,
-      params: { ...filterParams },
-    } as any);
+      pathname: subCategoryId
+        ? `/(categories)/${categoryId}/${subCategoryId}`
+        : `/(categories)/${categoryId}`,
+      params: filterParams,
+    } as never);
   };
 
   const handleClear = () => {
     setSort("");
-    setDateRange("");
-    setProvince(undefined);
-    setDistrict(undefined);
-    setCommune(undefined);
+    setPostedWithin("");
+    setProvinceSlug("");
+    setDistrictSlug("");
+    setCommuneSlug("");
     setMinPrice("");
     setMaxPrice("");
     setYear("");
     setCondition("");
-    setStorage("");
-    setSize("");
-    setType("");
-    setSalary("");
-    setExperience("");
-  };
-
-  const provinceOptions = PROVINCES.map((p) => ({ id: p.id, name: p.name }));
-  const districtOptions = districts.map((d) => ({ id: d.id, name: d.name }));
-  const communeOptions = communes.map((c) => ({ id: c.id, name: c.name }));
-
-  const isVisible = (label: string) => {
-    if (!activeFilters) return true; // Show all if no config (default behavior)
-    return activeFilters.some(
-      (f) => f.label.toLowerCase() === label.toLowerCase(),
-    );
+    setBrand("");
+    setAttrs({});
   };
 
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      {/* Header */}
       <View className="flex-row items-center justify-between bg-[#0EA5E9] px-4 py-4">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close" size={24} color="white" />
@@ -302,98 +334,92 @@ export default function FiltersScreen() {
           contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Sort */}
-          {isVisible("Sort") && (
+          <View className="mb-4">
+            <SimpleDropdown
+              label="Sort"
+              value={sort}
+              placeholder="Sort"
+              options={SORT_OPTIONS}
+              onSelect={(option) => setSort(option.id)}
+            />
+          </View>
+
+          <View className="mb-4">
+            <SimpleDropdown
+              label="Date Range"
+              value={postedWithin}
+              placeholder="Any Time"
+              options={DATE_OPTIONS}
+              onSelect={(option) => setPostedWithin(option.id)}
+            />
+          </View>
+
+          <View className="mb-4">
+            <SimpleDropdown
+              label="Province"
+              value={provinceSlug}
+              placeholder="Select Province"
+              options={provinces.map((province) => ({
+                id: province.slug,
+                name: province.name,
+              }))}
+              onSelect={handleProvinceSelect}
+            />
+          </View>
+
+          {provinceSlug ? (
             <View className="mb-4">
               <SimpleDropdown
-                label="Sort"
-                value={sort}
-                placeholder="Sort"
-                options={SORT_OPTIONS}
-                onSelect={(opt) => setSort(opt.name)}
+                label="District"
+                value={districtSlug}
+                placeholder="Select District"
+                options={districts.map((district) => ({
+                  id: district.slug,
+                  name: district.name,
+                }))}
+                onSelect={handleDistrictSelect}
               />
             </View>
-          )}
+          ) : null}
 
-          {/* Date Range */}
-          {isVisible("Date Range") && (
+          {districtSlug ? (
             <View className="mb-4">
               <SimpleDropdown
-                label="Date Range"
-                value={dateRange}
-                placeholder="Date Range"
-                options={DATE_OPTIONS}
-                onSelect={(opt) => setDateRange(opt.name)}
+                label="Commune"
+                value={communeSlug}
+                placeholder="Select Commune"
+                options={communes.map((commune) => ({
+                  id: commune.slug,
+                  name: commune.name,
+                }))}
+                onSelect={(option) => setCommuneSlug(option.id)}
               />
             </View>
-          )}
+          ) : null}
 
-          {/* Location */}
-          {isVisible("Location") && (
-            <>
-              <View className="mb-4">
-                <SimpleDropdown
-                  label="Province"
-                  value={province?.name}
-                  placeholder="Select Province"
-                  options={provinceOptions}
-                  onSelect={handleProvinceSelect}
-                />
-              </View>
-
-              {province && (
-                <View className="mb-4">
-                  <SimpleDropdown
-                    label="District"
-                    value={district?.name}
-                    placeholder="Select District"
-                    options={districtOptions}
-                    onSelect={handleDistrictSelect}
-                  />
-                </View>
-              )}
-
-              {district && (
-                <View className="mb-4">
-                  <SimpleDropdown
-                    label="Commune"
-                    value={commune?.name}
-                    placeholder="Select Commune"
-                    options={communeOptions}
-                    onSelect={(opt) => setCommune(opt)}
-                  />
-                </View>
-              )}
-            </>
-          )}
-
-          {/* Price Range */}
-          {isVisible("Price") && (
-            <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">
-                Price Range
-              </Text>
-              <View className="flex-row gap-2">
-                <TextInput
-                  placeholder="Min"
-                  value={minPrice}
-                  onChangeText={setMinPrice}
-                  keyboardType="numeric"
-                  className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-base"
-                />
-                <TextInput
-                  placeholder="Max"
-                  value={maxPrice}
-                  onChangeText={setMaxPrice}
-                  keyboardType="numeric"
-                  className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-base"
-                />
-              </View>
+          <View className="mb-4">
+            <Text className="mb-2 text-sm font-medium text-gray-700">
+              {isJobs ? "Salary Range" : "Price Range"}
+            </Text>
+            <View className="flex-row gap-2">
+              <TextInput
+                placeholder="Min"
+                value={minPrice}
+                onChangeText={setMinPrice}
+                keyboardType="numeric"
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-base"
+              />
+              <TextInput
+                placeholder="Max"
+                value={maxPrice}
+                onChangeText={setMaxPrice}
+                keyboardType="numeric"
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-3 text-base"
+              />
             </View>
-          )}
+          </View>
 
-          {/* Year */}
-          {isVisible("Year") && (
+          {showYear ? (
             <View className="mb-4">
               <Text className="mb-2 text-sm font-medium text-gray-700">
                 Year
@@ -406,97 +432,59 @@ export default function FiltersScreen() {
                 className="rounded-lg border border-gray-200 px-4 py-3 text-base"
               />
             </View>
-          )}
+          ) : null}
 
-          {/* Condition */}
-          {(isVisible("Condition") || isVisible("Condition/Status")) && (
+          {showCondition ? (
             <View className="mb-4">
               <SimpleDropdown
                 label="Condition"
                 value={condition}
                 placeholder="Select Condition"
                 options={CONDITION_OPTIONS}
-                onSelect={(opt) => setCondition(opt.name)}
+                onSelect={(option) => setCondition(option.id)}
               />
             </View>
-          )}
+          ) : null}
 
-          {/* Storage */}
-          {isVisible("Storage") && (
+          {brands.length > 0 ? (
             <View className="mb-4">
               <SimpleDropdown
-                label="Storage"
-                value={storage}
-                placeholder="Select Storage"
-                options={STORAGE_OPTIONS}
-                onSelect={(opt) => setStorage(opt.name)}
+                label="Brand"
+                value={brand}
+                placeholder="Select Brand"
+                options={brands.map((entry) => ({
+                  id: entry.name,
+                  name: entry.name,
+                }))}
+                onSelect={(option) => setBrand(option.id)}
               />
             </View>
-          )}
+          ) : null}
 
-          {/* Size */}
-          {isVisible("Size") && (
-            <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">
-                Size
-              </Text>
-              <TextInput
-                placeholder="e.g., 100m²"
-                value={size}
-                onChangeText={setSize}
-                className="rounded-lg border border-gray-200 px-4 py-3 text-base"
-              />
-            </View>
-          )}
-
-          {/* Type */}
-          {isVisible("Type") && (
-            <View className="mb-4">
+          {selectFields.map((field) => (
+            <View key={field.key} className="mb-4">
               <SimpleDropdown
-                label="Type"
-                value={type}
-                placeholder="Select Type"
-                options={PROPERTY_TYPE_OPTIONS}
-                onSelect={(opt) => setType(opt.name)}
+                label={field.label?.en || FIELD_LABELS[field.key] || field.key}
+                value={attrs[field.key] ?? ""}
+                placeholder={`Select ${field.label?.en || FIELD_LABELS[field.key] || field.key}`}
+                options={(field.options ?? []).map((option) => ({
+                  id: option,
+                  name: option,
+                }))}
+                onSelect={(option) =>
+                  setAttrs((prev) => ({ ...prev, [field.key]: option.id }))
+                }
               />
             </View>
-          )}
+          ))}
 
-          {/* Salary */}
-          {isVisible("Salary") && (
-            <View className="mb-4">
-              <Text className="mb-2 text-sm font-medium text-gray-700">
-                Salary
-              </Text>
-              <TextInput
-                placeholder="e.g., $500-$1000"
-                value={salary}
-                onChangeText={setSalary}
-                keyboardType="numeric"
-                className="rounded-lg border border-gray-200 px-4 py-3 text-base"
-              />
-            </View>
-          )}
-
-          {/* Experience */}
-          {isVisible("Experience") && (
-            <View className="mb-4">
-              <SimpleDropdown
-                label="Experience"
-                value={experience}
-                placeholder="Select Experience"
-                options={EXPERIENCE_OPTIONS}
-                onSelect={(opt) => setExperience(opt.name)}
-              />
-            </View>
-          )}
+          {subQuery.isLoading ? <ActivityIndicator className="my-4" /> : null}
         </ScrollView>
 
-        {/* Sticky Footer */}
         <View className="border-t border-gray-100 bg-white p-4">
           <TouchableOpacity
             onPress={handleApply}
-            className="rounded-xl bg-[#0EA5E9] py-4 items-center justify-center shadow-lg"
+            className="items-center justify-center rounded-xl bg-[#0EA5E9] py-4 shadow-lg"
           >
             <Text className="text-lg font-bold text-white">Apply Filters</Text>
           </TouchableOpacity>

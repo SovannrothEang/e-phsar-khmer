@@ -1,9 +1,8 @@
-import { SAMPLE_PRODUCTS } from "@/constants/data/products";
+import ListingFeed from "@/components/category/ListingFeed";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
-import ProductCard from "../product/ProductCard";
 import PromoCard from "./PromoCard";
 
 type ViewMode = "list" | "grid";
@@ -11,24 +10,25 @@ type ViewMode = "list" | "grid";
 const LatestAds = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const { t } = useLanguage();
+  const feedQuery = useMemo(() => ({ limit: 8 }), []);
 
   return (
-    <View className="pt-5 pb-4">
+    <View className="pb-4 pt-5">
       {/* Section Header */}
-      <View className="mb-4 px-4 flex-row items-center justify-between">
+      <View className="mb-4 flex-row items-center justify-between px-4">
         <View className="flex-row items-center gap-2">
-          <View className="w-2.5 h-6 bg-sky-500 rounded-full" />
-          <Text className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+          <View className="h-6 w-2.5 rounded-full bg-sky-500" />
+          <Text className="text-xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {t("latestAds")}
           </Text>
         </View>
 
         {/* Layout Toggle Segmented Control */}
-        <View className="flex-row items-center rounded-full bg-gray-100 dark:bg-gray-800 p-1 border border-gray-200/80 dark:border-gray-700">
+        <View className="flex-row items-center rounded-full border border-gray-200/80 bg-gray-100 p-1 dark:border-gray-700 dark:bg-gray-800">
           <TouchableOpacity
-            className={`p-1.5 px-3 rounded-full flex-row items-center gap-1 ${
+            className={`flex-row items-center gap-1 rounded-full p-1.5 px-3 ${
               viewMode === "grid"
-                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700"
+                ? "border border-gray-200/60 bg-white shadow-2xs dark:border-gray-700 dark:bg-gray-900"
                 : "bg-transparent"
             }`}
             onPress={() => setViewMode("grid")}
@@ -41,9 +41,9 @@ const LatestAds = () => {
             />
           </TouchableOpacity>
           <TouchableOpacity
-            className={`p-1.5 px-3 rounded-full flex-row items-center gap-1 ${
+            className={`flex-row items-center gap-1 rounded-full p-1.5 px-3 ${
               viewMode === "list"
-                ? "bg-white dark:bg-gray-900 shadow-2xs border border-gray-200/60 dark:border-gray-700"
+                ? "border border-gray-200/60 bg-white shadow-2xs dark:border-gray-700 dark:bg-gray-900"
                 : "bg-transparent"
             }`}
             onPress={() => setViewMode("list")}
@@ -58,23 +58,12 @@ const LatestAds = () => {
         </View>
       </View>
 
-      {viewMode === "list" ? (
-        // List View
-        <View>
-          <PromoCard viewMode="list" />
-          {SAMPLE_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} viewMode="list" />
-          ))}
-        </View>
-      ) : (
-        // Grid View
-        <View className="px-1.5 flex-row flex-wrap">
-          <PromoCard viewMode="grid" />
-          {SAMPLE_PRODUCTS.map((product) => (
-            <ProductCard key={product.id} product={product} viewMode="grid" />
-          ))}
-        </View>
-      )}
+      <ListingFeed
+        query={feedQuery}
+        viewMode={viewMode}
+        leading={<PromoCard viewMode={viewMode} />}
+        emptyLabel="No ads yet."
+      />
     </View>
   );
 };

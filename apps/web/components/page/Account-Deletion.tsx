@@ -2,7 +2,7 @@ import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 
 export default function AccountDeletion() {
   return (
-    <div className="min-h-screen mx-auto w-full pb-2 pt-4 bg-muted">
+    <div className="min-h-screen mx-auto w-full pb-10 pt-4 bg-muted">
       <div className="px-4 bg-muted">
         <div className="max-w-7xl mx-auto w-full pb-2">
           <Breadcrumbs

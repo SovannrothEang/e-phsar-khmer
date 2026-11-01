@@ -123,7 +123,7 @@ export default async function SearchPage({
 
       <Tabs
         defaultValue="grid"
-        className="max-w-7xl mx-auto w-full px-4 xl:px-0 pb-8"
+        className="max-w-7xl mx-auto w-full px-4 xl:px-0 pb-10"
       >
         {/* HEADER */}
         <div className="px-6 py-3 bg-card rounded-t-sm border flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">

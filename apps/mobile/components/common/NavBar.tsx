@@ -1,5 +1,4 @@
 import { LANGUAGES, useLanguage } from "@/contexts/LanguageContext";
-import { BrandWordmark } from "@/components/common/BrandWordmark";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -43,9 +42,16 @@ const NavBar: React.FC<NavBarProps> = ({
         shadowRadius: 8,
       }}
     >
-      {/* Brand Text Logo */}
+      {/* Brand Text Logo with modern badge element */}
       <View className="flex-row items-center">
-        <BrandWordmark className="text-2xl" />
+        <Text className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+          Phsar
+        </Text>
+        <View className="ml-1 px-2 py-0.5 bg-sky-500 rounded-lg justify-center items-center shadow-xs">
+          <Text className="text-sm font-black text-white italic leading-none">
+            Khmer
+          </Text>
+        </View>
       </View>
 
       {/* Header Actions */}
@@ -69,14 +75,16 @@ const NavBar: React.FC<NavBarProps> = ({
           <Ionicons name="chevron-down" size={12} color="#6B7280" />
         </TouchableOpacity>
 
-        {/* QR Code Action Button */}
-        <TouchableOpacity
-          className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center border border-gray-200/60 dark:border-gray-700/60"
-          onPress={onQRCodePress}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="qr-code-outline" size={20} color={iconColor} />
-        </TouchableOpacity>
+        {/* QR scanning is deferred (no web counterpart): hidden without a handler. */}
+        {onQRCodePress ? (
+          <TouchableOpacity
+            className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center border border-gray-200/60 dark:border-gray-700/60"
+            onPress={onQRCodePress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="qr-code-outline" size={20} color={iconColor} />
+          </TouchableOpacity>
+        ) : null}
 
         {/* Search Action Button */}
         <TouchableOpacity

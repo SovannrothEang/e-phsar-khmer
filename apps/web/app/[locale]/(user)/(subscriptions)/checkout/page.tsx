@@ -18,7 +18,6 @@ import {
   CreditCard,
   MapPin,
   Phone,
-  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import Image from "next/image";
@@ -75,6 +74,21 @@ function money(value: string | number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+/** "02, Nov 2027" — today plus the term's duration, the plan's validity date. */
+function validUntilLabel(durationValue: number, durationUnit: string): string {
+  const date = new Date();
+  if (durationUnit === "year") {
+    date.setFullYear(date.getFullYear() + durationValue);
+  } else if (durationUnit === "day") {
+    date.setDate(date.getDate() + durationValue);
+  } else {
+    date.setMonth(date.getMonth() + durationValue);
+  }
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-US", { month: "short" });
+  return `${day}, ${month} ${date.getFullYear()}`;
 }
 
 // Picker copy per provider. Both providers hand back a KHQR, so both say
@@ -205,10 +219,14 @@ export default function CheckoutPage() {
     getPaymentProviders()
       .then((items) => {
         if (!mounted) return;
-        setProviders(items);
+        // ABA PayWay is hidden for now — its merchant API is not set up yet,
+        // so the option could only render as "Unavailable right now".
+        // Comment out (or delete) the `aba_payway` exclusion to show it again.
+        const visible = items.filter((item) => item.name !== "aba_payway");
+        setProviders(visible);
         setProviderName(
           (current) =>
-            current ?? items.find((item) => item.available)?.name ?? null,
+            current ?? visible.find((item) => item.available)?.name ?? null,
         );
       })
       .catch(() => {
@@ -508,6 +526,10 @@ export default function CheckoutPage() {
     payment?.status === "cancelled" ||
     payment?.status === "expired";
   const planPrice = offer ? priceFor(offer) : 0;
+  // List price before the term discount, and that discount — the Summary's
+  // first two rows. The backend computes the same numbers when it charges.
+  const listPrice = offer ? Number(offer.price) : 0;
+  const discountAmount = Math.max(0, listPrice - planPrice);
   const dueToday = payment ? Number(payment.amount) : planPrice;
   const credit = payment && planPrice > dueToday ? planPrice - dueToday : 0;
   const displayName =
@@ -705,19 +727,22 @@ export default function CheckoutPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-semibold text-foreground">
-                      {offer.packageName} - {offer.termName}
+                      {offer.groupName}: {offer.packageName} - {offer.termName}
                     </p>
                     <p className="mt-1 text-sm text-gray-500">
                       Account: {me?.username ?? "—"}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {offer.packageName} · {offer.groupName}
+                      Valid Until:{" "}
+                      {validUntilLabel(offer.durationValue, offer.durationUnit)}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Runs for {offer.termName} after payment
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-[#00a0e9]">
-                      ${money(dueToday)}
+                    <p className="mt-2 text-sm font-medium">
+                      {listPrice > planPrice && (
+                        <span className="mr-2 text-gray-400 line-through">
+                          ${money(listPrice)}
+                        </span>
+                      )}
+                      <span className="text-[#00a0e9]">${money(dueToday)}</span>
                     </p>
                   </div>
                 </div>
@@ -732,16 +757,21 @@ export default function CheckoutPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1 space-y-3">
-                    <p className="flex items-center gap-3 text-sm text-foreground">
-                      <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
-                      {selectedAddress?.name ?? displayName}
-                    </p>
-                    <p className="flex items-center gap-3 text-sm text-foreground">
-                      <Phone className="h-4 w-4 shrink-0 text-gray-400" />
-                      {selectedAddress?.phone ??
-                        me?.primaryPhone ??
-                        "No phone number on this account"}
-                    </p>
+                    {/* No address yet: nothing identity-shaped to show — the
+                        account name/phone are not a billing address. Only a
+                        saved address contributes contact rows. */}
+                    {selectedAddress && (
+                      <>
+                        <p className="flex items-center gap-3 text-sm text-foreground">
+                          <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
+                          {selectedAddress.name}
+                        </p>
+                        <p className="flex items-center gap-3 text-sm text-foreground">
+                          <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+                          {selectedAddress.phone}
+                        </p>
+                      </>
+                    )}
                     {selectedAddress && (
                       <p className="flex items-start gap-3 text-sm text-foreground">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
@@ -928,37 +958,44 @@ export default function CheckoutPage() {
 
               <Card title="Summary">
                 <dl className="space-y-2 text-sm">
-                  {[
-                    ["Photos per ad", offer.photos],
-                    ["Active ads", offer.ads],
-                    ["Renewals", offer.renews],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between gap-2">
-                      <dt className="text-gray-500">{label}</dt>
-                      <dd className="font-medium tabular-nums text-foreground">
-                        {value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-gray-500">Subtotal</dt>
+                    <dd className="tabular-nums text-foreground">
+                      ${money(listPrice)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-gray-500">Discount</dt>
+                    <dd className="tabular-nums text-foreground">
+                      {discountAmount > 0
+                        ? `−$${money(discountAmount)}`
+                        : "$0.00"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    {/* Subscriptions are priced without a tax line today; the
+                        backend's payment amount stays authoritative, so VAT is
+                        shown as zero rather than invented in the UI. */}
+                    <dt className="text-gray-500">VAT</dt>
+                    <dd className="tabular-nums text-foreground">$0.00</dd>
+                  </div>
                   {credit > 0 && (
-                    <>
-                      <div className="flex justify-between text-gray-500">
-                        <span>Plan price</span>
-                        <span className="tabular-nums">
-                          ${money(planPrice)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
-                        <span>Credit from current plan</span>
-                        <span className="tabular-nums">−${money(credit)}</span>
-                      </div>
-                    </>
+                    <div className="flex justify-between gap-2 text-emerald-700 dark:text-emerald-400">
+                      <dt>Credit from current plan</dt>
+                      <dd className="tabular-nums">−${money(credit)}</dd>
+                    </div>
                   )}
-                  <div className="flex items-baseline justify-between">
-                    <span className="font-medium text-foreground">
-                      Due today
+                </dl>
+              </Card>
+
+              <section className="overflow-hidden rounded-sm border bg-card">
+                <div className="p-4">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-lg font-medium text-foreground">
+                      Total{" "}
+                      <span className="text-sm font-normal text-gray-500">
+                        (incl. VAT)
+                      </span>
                     </span>
                     <span className="text-xl font-semibold tabular-nums text-foreground">
                       ${money(dueToday)}
@@ -967,31 +1004,23 @@ export default function CheckoutPage() {
                       </small>
                     </span>
                   </div>
+                  {!payment && !blocked && (
+                    <button
+                      type="button"
+                      disabled={startingCheckout || !provider}
+                      onClick={() => void startCheckout()}
+                      className="mt-4 flex h-10 w-full items-center justify-center rounded-sm bg-orange-500 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {startingCheckout
+                        ? "Preparing checkout…"
+                        : "Review Address & Check out"}
+                      {!startingCheckout && (
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
-                {!payment && !blocked && (
-                  <button
-                    type="button"
-                    disabled={startingCheckout || !provider}
-                    onClick={() => void startCheckout()}
-                    className="mt-4 flex h-10 w-full items-center justify-center rounded-sm bg-[#00a0e9] text-sm font-medium text-white transition-colors hover:bg-[#008ccb] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {startingCheckout
-                      ? "Preparing checkout…"
-                      : "Continue to payment"}
-                    {!startingCheckout && (
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    )}
-                  </button>
-                )}
-                <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-gray-500">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                  <span>
-                    Your plan activates only after{" "}
-                    {provider?.displayName ?? "the payment provider"} confirms
-                    the payment. All purchases are final — no refunds.
-                  </span>
-                </p>
-              </Card>
+              </section>
               <BillingAddressDialog
                 open={addressOpen}
                 onOpenChange={setAddressOpen}

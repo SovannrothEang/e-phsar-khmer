@@ -65,7 +65,9 @@ export default async function AllAdsPage({
           />
         </div>
       </div>
-      <div className="max-w-7xl mx-auto w-full pb-2">
+      {/* pb-10, not pb-2: the feed's last row otherwise ends 8px above the
+          footer. Matches the detail page's gutter. */}
+      <div className="max-w-7xl mx-auto w-full pb-10">
         {/* Keyed on the filters: a filter change re-renders this page, and the
             key makes the accumulated screens reset with the new first one. */}
         <AllAdsFeed

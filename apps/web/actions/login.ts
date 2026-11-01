@@ -6,6 +6,8 @@ import { setUserDeviceId, setUserSession } from "@/lib/auth/session";
 import { API_URL } from "@/lib/api/client";
 import type { BackendUser } from "@/lib/api/adapters";
 import type { DeviceIdentity } from "@/lib/device";
+import { redirect as i18nRedirect } from "@/i18n/routing";
+import { getLocale } from "next-intl/server";
 import z from "zod";
 
 interface LoginResponse {
@@ -70,7 +72,7 @@ export async function login(
     };
   }
 
-  const { user, accessToken, refreshToken } = body.data;
+  const { accessToken, refreshToken } = body.data;
 
   await setUserSession({ accessToken, refreshToken });
   // Belt and braces with the browser mirror: the server write survives a
@@ -83,9 +85,11 @@ export async function login(
     }
   }
 
-  return {
-    success: true,
-    user: { id: user.id, username: user.username, role: user.role },
-    newDevice: Boolean(body.data.newDevice),
-  };
+  // Redirect HERE, not from the client. Setting cookies makes Next answer a
+  // Server Action by re-rendering the route it was called from and shipping
+  // that tree back, so the client cannot navigate until a page the user is
+  // leaving has fully rendered (measured 8.4s on /otp). A redirect answers
+  // the action without that re-render — the current route is simply left.
+  const locale = await getLocale();
+  i18nRedirect({ href: "/me", locale });
 }

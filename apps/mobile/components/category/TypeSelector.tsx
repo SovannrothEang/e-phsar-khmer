@@ -14,7 +14,8 @@ import {
 interface TypeItem {
   id: string;
   name: string;
-  image: any;
+  /** Storage URL from the attribute row; null renders a letter tile. */
+  image: string | null;
 }
 
 interface TypeSelectorProps {
@@ -26,7 +27,6 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Show first 4 types + "Show More" = 5 items per row
   const filteredTypes = useMemo(() => {
     if (!types) return [];
     if (!searchQuery.trim()) return types;
@@ -37,6 +37,7 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
 
   if (!types || types.length === 0) return null;
 
+  // Show first 4 types + "Show More" = 5 items per row
   const displayTypes = types.slice(0, 4);
 
   const handleSelectType = (id: string) => {
@@ -54,11 +55,19 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
             className="w-1/5 items-center mb-2"
           >
             <View className="w-14 h-14 mb-4 items-center justify-center">
-              <Image
-                source={type.image}
-                className="h-full w-full bg-gray-100 rounded-full"
-                resizeMode="contain"
-              />
+              {type.image ? (
+                <Image
+                  source={{ uri: type.image }}
+                  className="h-full w-full bg-gray-100 rounded-full"
+                  resizeMode="contain"
+                />
+              ) : (
+                <View className="h-full w-full bg-gray-100 rounded-full items-center justify-center">
+                  <Text className="text-base font-bold text-gray-500">
+                    {type.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
             </View>
             <Text
               className="text-gray-900 text-xs text-center"
@@ -151,11 +160,17 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
                     activeOpacity={0.7}
                   >
                     <View className="w-11 h-11 rounded-full bg-gray-50 overflow-hidden items-center justify-center p-1 border border-gray-100">
-                      <Image
-                        source={item.image}
-                        className="w-9 h-9"
-                        resizeMode="contain"
-                      />
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          className="w-9 h-9"
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text className="text-sm font-bold text-gray-500">
+                          {item.name.charAt(0).toUpperCase()}
+                        </Text>
+                      )}
                     </View>
                     <Text className="ml-3.5 text-[15px] font-medium text-gray-900 flex-1 leading-5">
                       {item.name}

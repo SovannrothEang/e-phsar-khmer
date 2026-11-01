@@ -225,7 +225,7 @@ export default function ManageAds() {
               </p>
             </div>
           ) : items.length > 0 ? (
-            <div className="pb-8">
+            <div className="pb-10">
               {activeTab === "hidden" ? (
                 <div className="mx-4 mb-3 flex flex-col gap-2 rounded-sm border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
                   <p className="type-meta text-muted-foreground">

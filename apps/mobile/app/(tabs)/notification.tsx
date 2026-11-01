@@ -6,9 +6,10 @@ import {
 } from "@/contexts/NotificationContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -25,6 +26,10 @@ const NotificationScreen = () => {
   const {
     notifications,
     unreadCount,
+    isLoading,
+    hasMore,
+    refresh,
+    loadMore,
     markAsRead,
     markMultipleAsRead,
     markAllAsRead,
@@ -46,6 +51,13 @@ const NotificationScreen = () => {
 
   // Local preferences state for modal
   const [localPrefs, setLocalPrefs] = useState(preferences);
+
+  // No push channel exists: re-read the feed whenever the tab regains focus.
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh]),
+  );
 
   const toggleSelectNotification = (id: string) => {
     setSelectedIds((prev) =>
@@ -397,153 +409,170 @@ const NotificationScreen = () => {
             </Text>
           </View>
         ) : (
-          filteredNotifications.map((item) => {
-            const config = getCategoryConfig(item.category);
-            const isSelected = selectedIds.includes(item.id);
+          <>
+            {filteredNotifications.map((item) => {
+              const config = getCategoryConfig(item.category);
+              const isSelected = selectedIds.includes(item.id);
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                onPress={() => handleNotificationPress(item)}
-                activeOpacity={0.75}
-                className={`p-4 border-b flex-row items-start ${
-                  isDark
-                    ? isSelected
-                      ? "bg-sky-950/40 border-gray-800"
-                      : item.isRead
-                        ? "bg-gray-950 border-gray-800/80"
-                        : "bg-gray-900 border-gray-800"
-                    : isSelected
-                      ? "bg-sky-100/60 border-neutral-border/70"
-                      : item.isRead
-                        ? "bg-white border-neutral-border/60"
-                        : "bg-sky-50/70 border-neutral-border/80"
-                }`}
-              >
-                {/* Selection Checkbox in Edit Mode */}
-                {isEditMode && (
-                  <View className="mr-3 self-center">
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => handleNotificationPress(item)}
+                  activeOpacity={0.75}
+                  className={`p-4 border-b flex-row items-start ${
+                    isDark
+                      ? isSelected
+                        ? "bg-sky-950/40 border-gray-800"
+                        : item.isRead
+                          ? "bg-gray-950 border-gray-800/80"
+                          : "bg-gray-900 border-gray-800"
+                      : isSelected
+                        ? "bg-sky-100/60 border-neutral-border/70"
+                        : item.isRead
+                          ? "bg-white border-neutral-border/60"
+                          : "bg-sky-50/70 border-neutral-border/80"
+                  }`}
+                >
+                  {/* Selection Checkbox in Edit Mode */}
+                  {isEditMode && (
+                    <View className="mr-3 self-center">
+                      <Ionicons
+                        name={isSelected ? "checkbox" : "square-outline"}
+                        size={22}
+                        color={
+                          isSelected
+                            ? Colors.primary.DEFAULT
+                            : isDark
+                              ? "#6B7280"
+                              : "#9CA3AF"
+                        }
+                      />
+                    </View>
+                  )}
+
+                  {/* Category Icon */}
+                  <View
+                    className={`w-11 h-11 rounded-2xl ${config.bgColor} items-center justify-center mr-3 mt-0.5 shadow-2xs`}
+                  >
                     <Ionicons
-                      name={isSelected ? "checkbox" : "square-outline"}
-                      size={22}
-                      color={
-                        isSelected
-                          ? Colors.primary.DEFAULT
-                          : isDark
-                            ? "#6B7280"
-                            : "#9CA3AF"
-                      }
+                      name={config.icon as any}
+                      size={21}
+                      color={config.iconColor}
                     />
                   </View>
-                )}
 
-                {/* Category Icon */}
-                <View
-                  className={`w-11 h-11 rounded-2xl ${config.bgColor} items-center justify-center mr-3 mt-0.5 shadow-2xs`}
-                >
-                  <Ionicons
-                    name={config.icon as any}
-                    size={21}
-                    color={config.iconColor}
-                  />
-                </View>
-
-                {/* Main Content */}
-                <View className="flex-1 mr-2">
-                  <View className="flex-row items-center justify-between mb-1">
-                    <Text
-                      className={`text-sm flex-1 mr-2 ${
-                        item.isRead
-                          ? isDark
-                            ? "font-medium text-gray-300"
-                            : "font-semibold text-neutral-text-main"
-                          : isDark
-                            ? "font-bold text-white"
-                            : "font-bold text-neutral-text-main"
-                      }`}
-                      numberOfLines={1}
-                    >
-                      {item.title}
-                    </Text>
-                    <Text
-                      className={`text-[11px] ${
-                        isDark ? "text-gray-500" : "text-neutral-text-muted"
-                      }`}
-                    >
-                      {item.timestamp}
-                    </Text>
-                  </View>
-
-                  <Text
-                    className={`text-xs leading-4 mb-2 ${
-                      isDark ? "text-gray-400" : "text-neutral-text-sub"
-                    }`}
-                    numberOfLines={2}
-                  >
-                    {item.description}
-                  </Text>
-
-                  {/* Action Link & Tag */}
-                  <View className="flex-row items-center gap-2">
-                    {item.actionText && (
-                      <View className="flex-row items-center gap-1 self-start bg-primary/10 dark:bg-primary/20 px-2.5 py-0.5 rounded-md">
-                        <Text className="text-[11px] font-bold text-primary">
-                          {item.actionText}
-                        </Text>
-                        <Ionicons
-                          name="chevron-forward"
-                          size={12}
-                          color={Colors.primary.DEFAULT}
-                        />
-                      </View>
-                    )}
-                    <View
-                      className={`px-2 py-0.5 rounded-md ${
-                        isDark ? "bg-gray-800" : "bg-neutral-background"
-                      }`}
-                    >
+                  {/* Main Content */}
+                  <View className="flex-1 mr-2">
+                    <View className="flex-row items-center justify-between mb-1">
                       <Text
-                        className={`text-[10px] font-semibold ${
-                          isDark ? "text-gray-400" : "text-neutral-text-sub"
+                        className={`text-sm flex-1 mr-2 ${
+                          item.isRead
+                            ? isDark
+                              ? "font-medium text-gray-300"
+                              : "font-semibold text-neutral-text-main"
+                            : isDark
+                              ? "font-bold text-white"
+                              : "font-bold text-neutral-text-main"
+                        }`}
+                        numberOfLines={1}
+                      >
+                        {item.title}
+                      </Text>
+                      <Text
+                        className={`text-[11px] ${
+                          isDark ? "text-gray-500" : "text-neutral-text-muted"
                         }`}
                       >
-                        {config.tagText}
+                        {item.timestamp}
                       </Text>
                     </View>
-                  </View>
-                </View>
 
-                {/* Right Image Thumbnail or Delete */}
-                <View className="items-end gap-1.5 self-center">
-                  {item.itemImage && (
-                    <Image
-                      source={{ uri: item.itemImage }}
-                      className="w-12 h-12 rounded-xl bg-neutral-background border border-neutral-border/80"
-                    />
-                  )}
+                    <Text
+                      className={`text-xs leading-4 mb-2 ${
+                        isDark ? "text-gray-400" : "text-neutral-text-sub"
+                      }`}
+                      numberOfLines={2}
+                    >
+                      {item.description}
+                    </Text>
 
-                  {!isEditMode && (
-                    <View className="flex-row items-center gap-1">
-                      {!item.isRead && (
-                        <View className="w-2.5 h-2.5 bg-secondary-orange rounded-full" />
+                    {/* Action Link & Tag */}
+                    <View className="flex-row items-center gap-2">
+                      {item.actionText && (
+                        <View className="flex-row items-center gap-1 self-start bg-primary/10 dark:bg-primary/20 px-2.5 py-0.5 rounded-md">
+                          <Text className="text-[11px] font-bold text-primary">
+                            {item.actionText}
+                          </Text>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={12}
+                            color={Colors.primary.DEFAULT}
+                          />
+                        </View>
                       )}
-                      <TouchableOpacity
-                        onPress={() => handleDeleteSingle(item.id)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        className="p-1 opacity-40 hover:opacity-100"
+                      <View
+                        className={`px-2 py-0.5 rounded-md ${
+                          isDark ? "bg-gray-800" : "bg-neutral-background"
+                        }`}
                       >
-                        <Ionicons
-                          name="close-circle-outline"
-                          size={16}
-                          color={isDark ? "#9CA3AF" : "#6B7280"}
-                        />
-                      </TouchableOpacity>
+                        <Text
+                          className={`text-[10px] font-semibold ${
+                            isDark ? "text-gray-400" : "text-neutral-text-sub"
+                          }`}
+                        >
+                          {config.tagText}
+                        </Text>
+                      </View>
                     </View>
+                  </View>
+
+                  {/* Right Image Thumbnail or Delete */}
+                  <View className="items-end gap-1.5 self-center">
+                    {item.itemImage && (
+                      <Image
+                        source={{ uri: item.itemImage }}
+                        className="w-12 h-12 rounded-xl bg-neutral-background border border-neutral-border/80"
+                      />
+                    )}
+
+                    {!isEditMode && (
+                      <View className="flex-row items-center gap-1">
+                        {!item.isRead && (
+                          <View className="w-2.5 h-2.5 bg-secondary-orange rounded-full" />
+                        )}
+                        <TouchableOpacity
+                          onPress={() => handleDeleteSingle(item.id)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          className="p-1 opacity-40 hover:opacity-100"
+                        >
+                          <Ionicons
+                            name="close-circle-outline"
+                            size={16}
+                            color={isDark ? "#9CA3AF" : "#6B7280"}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            {hasMore ? (
+              <View className="items-center py-5">
+                <TouchableOpacity
+                  onPress={() => void loadMore()}
+                  disabled={isLoading}
+                  className="rounded-xl border border-primary px-6 py-2.5"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color={Colors.primary.DEFAULT} />
+                  ) : (
+                    <Text className="font-bold text-primary">Load more</Text>
                   )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
+                </TouchableOpacity>
+              </View>
+            ) : null}
+          </>
         )}
       </ScrollView>
 

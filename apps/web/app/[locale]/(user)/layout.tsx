@@ -18,20 +18,26 @@ export default async function UserLayout({
 
   return (
     <E2eBackupProvider userId={user?.id ?? null}>
-      <NavBar user={user} />
-      <ReactionsProvider
-        // Remount when the viewer changes: the provider seeds its sets once,
-        // and this layout survives client-side navigations — without the key,
-        // an in-tab login or account switch would keep the previous viewer's
-        // sets until a hard reload.
-        key={user?.username ?? "anon"}
-        signedIn={Boolean(user)}
-        initialLiked={reactions.liked}
-        initialSaved={reactions.saved}
-      >
-        {children}
-      </ReactionsProvider>
-      <Footer />
+      {/* Column shell so a short page keeps the footer on the bottom edge
+          instead of letting it ride up under the navbar: the content cell
+          grows to fill whatever the navbar and footer leave over. Pages that
+          set their own `min-h-screen` still own their height as before. */}
+      <div className="flex min-h-svh flex-col">
+        <NavBar user={user} />
+        <ReactionsProvider
+          // Remount when the viewer changes: the provider seeds its sets once,
+          // and this layout survives client-side navigations — without the key,
+          // an in-tab login or account switch would keep the previous viewer's
+          // sets until a hard reload.
+          key={user?.username ?? "anon"}
+          signedIn={Boolean(user)}
+          initialLiked={reactions.liked}
+          initialSaved={reactions.saved}
+        >
+          <div className="flex-1">{children}</div>
+        </ReactionsProvider>
+        <Footer />
+      </div>
     </E2eBackupProvider>
   );
 }

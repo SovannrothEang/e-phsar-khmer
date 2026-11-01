@@ -86,7 +86,7 @@ export default function PublicProfileHeader({
     <div className="w-full pb-4 bg-muted">
       {hasCover ? (
         <div
-          className="relative h-64 md:h-72 lg:h-[300px] w-full bg-slate-200 overflow-hidden cursor-pointer"
+          className="relative h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full bg-slate-200 overflow-hidden cursor-pointer"
           onClick={() => handleImageClick(coverImg)}
         >
           <Image
@@ -99,7 +99,10 @@ export default function PublicProfileHeader({
           />
         </div>
       ) : (
-        <div className="h-20 w-full border-b border-muted/20" />
+        // Same empty-cover treatment as `MyProfileHeader`: a full-height
+        // gradient banner, not a thin strip, so the profile header reads the
+        // same whether or not a cover has been uploaded.
+        <div className="h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5" />
       )}
 
       <div className="bg-card w-full">
@@ -107,8 +110,7 @@ export default function PublicProfileHeader({
           <div className="flex flex-row items-start gap-5">
             {/* ─── AVATAR WRAPPER UNIT ─── */}
             <div
-              className={`relative shrink-0 cursor-pointer group z-10 w-[120px] h-[120px] md:w-[130px] md:h-[130px]
-                        ${hasCover ? "-mt-[60px] md:-mt-[65px]" : "mt-4"}`}
+              className="relative shrink-0 cursor-pointer group z-10 w-[120px] h-[120px] md:w-[130px] md:h-[130px] -mt-[60px] md:-mt-[65px]"
               onClick={() => handleImageClick(profileImg)}
             >
               {/* The Single White Border Ring Container */}

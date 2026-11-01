@@ -1,9 +1,4 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -132,12 +127,10 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(RequestLoggerMiddleware).forRoutes('{*splat}');
-    consumer
-      .apply(IdempotencyMiddleware)
-      .forRoutes(
-        { path: '{*splat}', method: RequestMethod.POST },
-        { path: '{*splat}', method: RequestMethod.PATCH },
-        { path: '{*splat}', method: RequestMethod.PUT },
-      );
+    // The object-form `forRoutes({ path: '{*splat}', method })` registration
+    // never fired under Express 5 (verified: no rows and no rejections on
+    // keyed requests), while the string wildcard does — middleware methods
+    // are filtered inside IdempotencyMiddleware itself.
+    consumer.apply(IdempotencyMiddleware).forRoutes('{*splat}');
   }
 }

@@ -1,15 +1,29 @@
+import RestoreHistoryModal from "@/components/chat/RestoreHistoryModal";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
-import { SAMPLE_PRODUCTS } from "@/constants/data/products";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useChatBackup, type ChatBackupState } from "@/hooks/use-chat-backup";
 import {
-  Animated,
-  FlatList,
+  fetchChatMessages,
+  fetchInbox,
+  markChatRead,
+  startConversationWith,
+  type ChatMessage,
+  type ChatUserSummary,
+  type InboxItem,
+} from "@/lib/api/chat";
+import { decryptPage, type DecryptOutcome } from "@/lib/e2e/decrypt";
+import { getE2eEngine } from "@/lib/e2e/device";
+import { sendEncryptedText } from "@/lib/e2e/send";
+import type { RatchetEngine } from "@/lib/e2e/types";
+import { formatListingDate } from "@/lib/listings";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   Text,
@@ -18,713 +32,763 @@ import {
   View,
 } from "react-native";
 
-export interface Message {
+const POLL_MS = 3000;
+
+interface ActiveThread {
   id: string;
-  sender: "me" | "seller";
-  text: string;
-  timestamp: string;
-  image?: string;
+  otherUser: ChatUserSummary;
+  canMessage: boolean;
 }
 
-export interface Conversation {
-  id: string;
-  sellerName: string;
-  sellerAvatar: string;
-  isOnline: boolean;
-  itemTitle: string;
-  itemPrice: string;
-  itemImage: string;
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-  messages: Message[];
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.floor((Date.now() - then) / 60_000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return formatListingDate(iso);
 }
 
-const INITIAL_CONVERSATIONS: Conversation[] = [
-  {
-    id: "conv-1",
-    sellerName: "Sokha Electronics",
-    sellerAvatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
-    isOnline: true,
-    itemTitle: "iPhone 15 Pro Max 256GB Natural Titanium",
-    itemPrice: "$1,150",
-    itemImage:
-      "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=600",
-    lastMessage: "Yes, it is still available! Warranty valid for 8 months.",
-    lastMessageTime: "2m ago",
-    unreadCount: 2,
-    messages: [
-      {
-        id: "m1",
-        sender: "me",
-        text: "Hello! Is this iPhone 15 Pro Max still available?",
-        timestamp: "10:30 AM",
-      },
-      {
-        id: "m2",
-        sender: "seller",
-        text: "Yes, it is still available! Warranty valid for 8 months.",
-        timestamp: "10:32 AM",
-      },
-      {
-        id: "m3",
-        sender: "seller",
-        text: "You can come test it at Toul Kork anytime today.",
-        timestamp: "10:33 AM",
-      },
-    ],
-  },
-  {
-    id: "conv-2",
-    sellerName: "Angkor Motors KH",
-    sellerAvatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400",
-    isOnline: false,
-    itemTitle: "Lexus RX350 2021 Super Full Option",
-    itemPrice: "$68,500",
-    itemImage:
-      "https://images.unsplash.com/photo-1583121274602-3e2820c69888?w=600",
-    lastMessage: "Can you offer $67,000? I can arrange viewing tomorrow.",
-    lastMessageTime: "1h ago",
-    unreadCount: 0,
-    messages: [
-      {
-        id: "m1",
-        sender: "me",
-        text: "Hi, what is the best final price for this Lexus?",
-        timestamp: "Yesterday",
-      },
-      {
-        id: "m2",
-        sender: "seller",
-        text: "Can you offer $67,000? I can arrange viewing tomorrow.",
-        timestamp: "1h ago",
-      },
-    ],
-  },
-  {
-    id: "conv-3",
-    sellerName: "Phnom Penh Property",
-    sellerAvatar:
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400",
-    isOnline: true,
-    itemTitle: "Modern Condo 2 Bedrooms BKK1",
-    itemPrice: "$145,000",
-    itemImage:
-      "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600",
-    lastMessage: "Here are the floor plan photos of the unit.",
-    lastMessageTime: "Yesterday",
-    unreadCount: 0,
-    messages: [
-      {
-        id: "m1",
-        sender: "seller",
-        text: "Here are the floor plan photos of the unit.",
-        timestamp: "Yesterday",
-      },
-    ],
-  },
-  {
-    id: "conv-4",
-    sellerName: "Dara Camera Store",
-    sellerAvatar:
-      "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400",
-    isOnline: false,
-    itemTitle: "Sony A7IV Mirrorless Camera Body",
-    itemPrice: "$2,100",
-    itemImage:
-      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600",
-    lastMessage: "Includes 2 extra original Sony batteries and 128GB SD card.",
-    lastMessageTime: "3 days ago",
-    unreadCount: 0,
-    messages: [
-      {
-        id: "m1",
-        sender: "me",
-        text: "Does it come with extra batteries?",
-        timestamp: "3 days ago",
-      },
-      {
-        id: "m2",
-        sender: "seller",
-        text: "Includes 2 extra original Sony batteries and 128GB SD card.",
-        timestamp: "3 days ago",
-      },
-    ],
-  },
-];
+function makeClientMessageId(): string {
+  const hex = (length: number) =>
+    Array.from(
+      { length },
+      () => "0123456789abcdef"[Math.floor(Math.random() * 16)],
+    ).join("");
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`;
+}
 
-const AUTO_REPLIES = [
-  "Thanks for your message! Yes, this item is available for inspection.",
-  "I can give a small discount if you can pickup today!",
-  "Feel free to call me or drop by our store in Phnom Penh.",
-  "Condition is 100% original, clean box and accessories included.",
-];
+function displayName(other: ChatUserSummary | null): string {
+  return other?.username ? `@${other.username}` : "Seller";
+}
 
-const ChatScreen = () => {
-  const router = useRouter();
+function previewFor(item: InboxItem): string {
+  const last = item.lastMessage;
+  if (!last) return "No messages yet";
+  if (!last.isE2e) return last.body ?? "Message";
+  return "Encrypted message";
+}
+
+/**
+ * The banner above a thread whose rows this device cannot read. A device that
+ * already holds the backup key says plainly that the rows are not in the
+ * backup — asking for the passcode again would only repeat the same result.
+ */
+function lockedBannerText(count: number, state: ChatBackupState): string {
+  const noun = count === 1 ? "message" : "messages";
+  switch (state.kind) {
+    case "ready":
+      return count === 1
+        ? "1 message isn't in your backup — it was sent before this device joined and none of your devices had opened it."
+        : `${count} messages aren't in your backup — they were sent before this device joined and none of your devices had opened them.`;
+    case "restorable":
+      return `${count} ${noun} locked on this device.`;
+    case "no-passcode":
+      return `${count} ${noun} can't be shown here: this account has no backup passcode. Set one on a device that has this history.`;
+    case "no-backup":
+      return `${count} ${noun} can't be shown here: no chat-history backup exists for this account.`;
+    case "error":
+      return `${count} ${noun} locked on this device. Could not check your chat backup.`;
+    default:
+      return `${count} ${noun} locked on this device.`;
+  }
+}
+
+function avatarSource(other: ChatUserSummary | null) {
+  if (other?.profilePhotoUrl) return { uri: other.profilePhotoUrl };
+  return null;
+}
+
+export default function ChatScreen() {
   const params = useLocalSearchParams<{
-    sellerName?: string;
-    title?: string;
-    price?: string;
-    image?: string;
+    userId?: string | string[];
+    listingId?: string | string[];
   }>();
+  const targetUserId = Array.isArray(params.userId)
+    ? params.userId[0]
+    : params.userId;
+  const listingId = Array.isArray(params.listingId)
+    ? params.listingId[0]
+    : params.listingId;
 
-  const [conversations, setConversations] = useState<Conversation[]>(
-    INITIAL_CONVERSATIONS,
+  const { isAuthenticated, userId } = useAuth();
+
+  const [engine, setEngine] = useState<RatchetEngine | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [inboxLoading, setInboxLoading] = useState(true);
+  const [inboxError, setInboxError] = useState<string | null>(null);
+
+  const [thread, setThread] = useState<ActiveThread | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [decrypted, setDecrypted] = useState<Map<string, DecryptOutcome>>(
+    new Map(),
   );
-  const [activeTab, setActiveTab] = useState<"all" | "buying" | "selling">(
-    "all",
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [threadError, setThreadError] = useState<string | null>(null);
+  const [latestCursor, setLatestCursor] = useState<string | null>(null);
+  const [peerLastReadAt, setPeerLastReadAt] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
 
-  const [inputText, setInputText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
+  const {
+    state: backupState,
+    restore: restoreBackup,
+    pull: pullBackupSegments,
+  } = useChatBackup(userId ?? null, engine?.deviceId ?? null);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
 
-  // If redirected from product page with params, open or create chat automatically!
+  const scrollRef = useRef<ScrollView>(null);
+  const openedFromParams = useRef(false);
+  /** Messages already re-tried after a backup restore, per thread open. */
+  const retriedDecrypt = useRef<Set<string>>(new Set());
+
+  // ── E2E device bootstrap ───────────────────────────────────────────────
   useEffect(() => {
-    if (params.sellerName || params.title) {
-      const existing = conversations.find(
-        (c) =>
-          c.sellerName === params.sellerName || c.itemTitle === params.title,
-      );
-      if (existing) {
-        setSelectedConv(existing);
-      } else {
-        const newConv: Conversation = {
-          id: `conv-${Date.now()}`,
-          sellerName: params.sellerName || "Verified Seller",
-          sellerAvatar:
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400",
-          isOnline: true,
-          itemTitle: params.title || "Selected Item",
-          itemPrice: params.price || "$0",
-          itemImage:
-            params.image ||
-            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600",
-          lastMessage: "Hi, I am interested in this item!",
-          lastMessageTime: "Just now",
-          unreadCount: 0,
-          messages: [
-            {
-              id: `msg-${Date.now()}`,
-              sender: "me",
-              text: `Hi! I'm interested in "${params.title || "this item"}" listed for ${params.price || "sale"}. Is it still available?`,
-              timestamp: "Just now",
-            },
-          ],
-        };
-        setConversations((prev) => [newConv, ...prev]);
-        setSelectedConv(newConv);
-      }
+    let cancelled = false;
+    if (!isAuthenticated || !userId) return;
+
+    setEngineError(null);
+    getE2eEngine(userId)
+      .then((ready) => {
+        if (!cancelled) setEngine(ready);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEngineError("Could not prepare encrypted chat. Pull to retry.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, userId]);
+
+  // ── Inbox ──────────────────────────────────────────────────────────────
+  const loadInbox = useCallback(async () => {
+    setInboxLoading(true);
+    setInboxError(null);
+    try {
+      const page = await fetchInbox(undefined, 30);
+      setInbox(page.items);
+    } catch {
+      setInboxError("Could not load your conversations.");
+    } finally {
+      setInboxLoading(false);
     }
-  }, [params.sellerName, params.title]);
+  }, []);
 
-  const filteredConversations = conversations.filter((conv) => {
-    const matchesSearch =
-      conv.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.itemTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
-
-  const totalUnread = conversations.reduce(
-    (acc, curr) => acc + curr.unreadCount,
-    0,
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated && !thread) void loadInbox();
+    }, [isAuthenticated, thread, loadInbox]),
   );
 
-  const handleOpenConversation = (conv: Conversation) => {
-    // Mark as read
-    setConversations((prev) =>
-      prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c)),
-    );
-    setSelectedConv({ ...conv, unreadCount: 0 });
-  };
-
-  const handleSendMessage = (textToSend?: string) => {
-    const messageContent = textToSend || inputText;
-    if (!messageContent.trim() || !selectedConv) return;
-
-    const newMsg: Message = {
-      id: `msg-${Date.now()}`,
-      sender: "me",
-      text: messageContent.trim(),
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-
-    const updatedConv = {
-      ...selectedConv,
-      lastMessage: messageContent.trim(),
-      lastMessageTime: "Just now",
-      messages: [...selectedConv.messages, newMsg],
-    };
-
-    setSelectedConv(updatedConv);
-    setConversations((prev) =>
-      prev.map((c) => (c.id === selectedConv.id ? updatedConv : c)),
-    );
-    setInputText("");
-
-    // Simulate real-time response from seller after 1.2s!
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      const replyText =
-        AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
-      const replyMsg: Message = {
-        id: `msg-reply-${Date.now()}`,
-        sender: "seller",
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      };
-
-      setSelectedConv((prevSelected) => {
-        if (!prevSelected || prevSelected.id !== updatedConv.id)
-          return prevSelected;
-        const autoUpdated = {
-          ...prevSelected,
-          lastMessage: replyText,
-          lastMessageTime: "Just now",
-          messages: [...prevSelected.messages, replyMsg],
-        };
-        setConversations((prevList) =>
-          prevList.map((c) => (c.id === autoUpdated.id ? autoUpdated : c)),
-        );
-        return autoUpdated;
+  // ── Thread loading and polling ─────────────────────────────────────────
+  const decryptAndStore = useCallback(
+    async (ready: RatchetEngine, rows: ChatMessage[]) => {
+      const outcomes = await decryptPage(ready, rows);
+      setDecrypted((current) => {
+        const next = new Map(current);
+        for (const [id, outcome] of outcomes) next.set(id, outcome);
+        return next;
       });
-    }, 1400);
+      return outcomes;
+    },
+    [],
+  );
+
+  /**
+   * A device that holds the backup key can still be missing segments another
+   * device uploaded after its last pull. Fetch them before calling a row
+   * unavailable — but never ask for the passcode here: the key is already on
+   * this phone.
+   */
+  const retryWithBackup = useCallback(
+    async (rows: ChatMessage[], outcomes: Map<string, DecryptOutcome>) => {
+      if (!engine || backupState.kind !== "ready") return;
+      const locked = rows.filter(
+        (message) => outcomes.get(message.id)?.status !== "ok",
+      );
+      if (locked.length === 0) return;
+      const restored = await pullBackupSegments();
+      if (restored === 0) return;
+      retriedDecrypt.current.clear();
+      await decryptAndStore(engine, locked);
+    },
+    [engine, backupState.kind, pullBackupSegments, decryptAndStore],
+  );
+
+  const openThread = useCallback(
+    async (next: ActiveThread) => {
+      setThread(next);
+      setThreadLoading(true);
+      setThreadError(null);
+      setSendError(null);
+      setMessages([]);
+      setDecrypted(new Map());
+      setLatestCursor(null);
+      setPeerLastReadAt(null);
+      retriedDecrypt.current = new Set();
+
+      // No engine yet: the thread view shows "Preparing encrypted chat…" and
+      // the polling effect loads the page as soon as the engine arrives.
+      if (!engine) return;
+
+      try {
+        const page = await fetchChatMessages(next.id, { limit: 30 });
+        const ordered = [...page.items].reverse();
+        setMessages(ordered);
+        setLatestCursor(page.meta.latestCursor);
+        setPeerLastReadAt(page.meta.peerLastReadAt);
+        const outcomes = await decryptAndStore(engine, ordered);
+        await markChatRead(next.id);
+        setTimeout(
+          () => scrollRef.current?.scrollToEnd({ animated: false }),
+          80,
+        );
+        await retryWithBackup(ordered, outcomes);
+      } catch {
+        setThreadError("Could not load this conversation.");
+      } finally {
+        setThreadLoading(false);
+      }
+    },
+    [engine, decryptAndStore, retryWithBackup],
+  );
+
+  // Open the thread requested by the listing detail's "Chat Now".
+  useEffect(() => {
+    if (!targetUserId || !engine || openedFromParams.current) return;
+    openedFromParams.current = true;
+
+    (async () => {
+      try {
+        const result = await startConversationWith(targetUserId);
+        if (!result.conversation) {
+          setInboxError("You cannot message this account.");
+          return;
+        }
+        await openThread({
+          id: result.conversation.id,
+          otherUser: result.otherUser,
+          canMessage: result.canMessage,
+        });
+      } catch {
+        setInboxError("Could not open this conversation.");
+      }
+    })();
+  }, [targetUserId, engine, openThread]);
+
+  useEffect(() => {
+    if (!thread || !engine) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        if (!latestCursor) {
+          const page = await fetchChatMessages(thread.id, { limit: 30 });
+          const ordered = [...page.items].reverse();
+          if (cancelled) return;
+          setMessages((current) => (current.length === 0 ? ordered : current));
+          const outcomes = await decryptAndStore(engine, ordered);
+          await markChatRead(thread.id);
+          setLatestCursor(page.meta.latestCursor);
+          setPeerLastReadAt(page.meta.peerLastReadAt);
+          setThreadLoading(false);
+          await retryWithBackup(ordered, outcomes);
+          return;
+        }
+        const page = await fetchChatMessages(thread.id, {
+          after: latestCursor,
+          limit: 50,
+        });
+        if (cancelled) return;
+        if (page.items.length > 0) {
+          setMessages((current) => mergeMessages(current, page.items));
+          await decryptAndStore(engine, page.items);
+          await markChatRead(thread.id);
+          setTimeout(
+            () => scrollRef.current?.scrollToEnd({ animated: true }),
+            80,
+          );
+        }
+        setLatestCursor(page.meta.latestCursor ?? latestCursor);
+        setPeerLastReadAt(page.meta.peerLastReadAt);
+      } catch {
+        /* transient poll failure — the next tick retries */
+      }
+    };
+
+    const timer = setInterval(() => void poll(), POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [thread, engine, latestCursor, decryptAndStore, retryWithBackup]);
+
+  // Coming back from the backup screen: retry messages this device could not
+  // decrypt once — the restored plaintext makes them readable now.
+  useFocusEffect(
+    useCallback(() => {
+      if (!thread || !engine) return;
+      const locked = messages.filter(
+        (message) =>
+          decrypted.get(message.id)?.status !== "ok" &&
+          !retriedDecrypt.current.has(message.id),
+      );
+      if (locked.length === 0) return;
+      for (const message of locked) retriedDecrypt.current.add(message.id);
+      void decryptAndStore(engine, locked);
+    }, [thread, engine, messages, decrypted, decryptAndStore]),
+  );
+
+  // ── Send ───────────────────────────────────────────────────────────────
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text || !engine || !thread || sending) return;
+    if (!thread.canMessage) {
+      setSendError("Messaging is unavailable for this conversation.");
+      return;
+    }
+
+    setSending(true);
+    setSendError(null);
+    try {
+      const outcome = await sendEncryptedText(engine, {
+        recipientId: thread.otherUser.id,
+        plaintext: text,
+        clientMessageId: makeClientMessageId(),
+        ...(listingId && messages.length === 0 ? { listingId } : {}),
+      });
+
+      if (!outcome.ok) {
+        setSendError(outcome.message);
+        return;
+      }
+
+      setDraft("");
+      const local: ChatMessage = {
+        id: outcome.messageId,
+        conversationId: outcome.conversationId,
+        senderId: userId ?? "",
+        body: null,
+        listingId: listingId && messages.length === 0 ? listingId : null,
+        imageUrl: null,
+        imagePath: null,
+        groupId: null,
+        readAt: null,
+        createdAt: new Date().toISOString(),
+        isE2e: true,
+        e2eHeader: null,
+        e2eVersion: 2,
+        senderDeviceId: engine.deviceId,
+      };
+      setMessages((current) => [...current, local]);
+      setDecrypted((current) =>
+        new Map(current).set(local.id, { status: "ok", plaintext: text }),
+      );
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch {
+      setSendError("Could not send the message.");
+    } finally {
+      setSending(false);
+    }
   };
 
+  const unavailableCount = messages.filter(
+    (message) => decrypted.get(message.id)?.status === "unavailable",
+  ).length;
+  const lockedBanner =
+    unavailableCount > 0 ? lockedBannerText(unavailableCount, backupState) : "";
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView className="flex-1 bg-neutral-background">
+        <View className="flex-1 items-center justify-center px-6">
+          <Ionicons name="chatbubbles-outline" size={44} color="#9CA3AF" />
+          <Text className="mt-3 text-center text-neutral-text-sub">
+            Sign in to see your messages.
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push("/(auth)/sign-in")}
+            className="mt-4 rounded-lg bg-secondary-orange px-8 py-3"
+          >
+            <Text className="font-bold text-white">Sign in</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Thread view ────────────────────────────────────────────────────────
+  if (thread) {
+    return (
+      <SafeAreaView
+        statusBarColor={Colors.primary.DEFAULT}
+        statusBarStyle="light-content"
+        className="flex-1 bg-neutral-background"
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          className="flex-1"
+        >
+          <View className="flex-row items-center gap-3 bg-primary px-4 py-3">
+            <TouchableOpacity onPress={() => setThread(null)}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
+            <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-white/20">
+              {avatarSource(thread.otherUser) ? (
+                <Image
+                  source={avatarSource(thread.otherUser)!}
+                  className="h-full w-full"
+                />
+              ) : (
+                <Text className="text-sm font-bold text-white">
+                  {displayName(thread.otherUser)
+                    .replace("@", "")
+                    .charAt(0)
+                    .toUpperCase()}
+                </Text>
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-white">
+                {displayName(thread.otherUser)}
+              </Text>
+              {!thread.canMessage && (
+                <Text className="text-[11px] text-white/80">
+                  Messaging unavailable
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {unavailableCount > 0 && !threadLoading && (
+            <View className="flex-row items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2">
+              <Ionicons
+                name={
+                  backupState.kind === "ready"
+                    ? "archive-outline"
+                    : "lock-closed-outline"
+                }
+                size={15}
+                color="#B45309"
+              />
+              <Text className="flex-1 text-xs leading-4 text-amber-800">
+                {lockedBanner}
+              </Text>
+              {backupState.kind === "restorable" && (
+                <TouchableOpacity onPress={() => setRestoreOpen(true)}>
+                  <Text className="text-xs font-bold text-amber-900">
+                    Restore
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {restoreNotice && (
+            <View className="border-b border-emerald-200 bg-emerald-50 px-4 py-2">
+              <Text className="text-xs text-emerald-800">{restoreNotice}</Text>
+            </View>
+          )}
+
+          {!engine ? (
+            <View className="flex-1 items-center justify-center px-6">
+              {engineError ? (
+                <>
+                  <Text className="text-center text-neutral-text-sub">
+                    {engineError}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEngineError(null);
+                      if (userId) {
+                        getE2eEngine(userId)
+                          .then(setEngine)
+                          .catch(() =>
+                            setEngineError("Could not prepare encrypted chat."),
+                          );
+                      }
+                    }}
+                    className="mt-3 rounded-lg border border-primary px-5 py-2"
+                  >
+                    <Text className="font-bold text-primary">Retry</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <ActivityIndicator color={Colors.primary.DEFAULT} />
+                  <Text className="mt-3 text-sm text-neutral-text-sub">
+                    Preparing encrypted chat…
+                  </Text>
+                </>
+              )}
+            </View>
+          ) : (
+            <ScrollView
+              ref={scrollRef}
+              className="flex-1 px-4 pt-3"
+              onContentSizeChange={() =>
+                scrollRef.current?.scrollToEnd({ animated: false })
+              }
+            >
+              {threadLoading ? (
+                <View className="items-center py-6">
+                  <ActivityIndicator color={Colors.primary.DEFAULT} />
+                </View>
+              ) : threadError ? (
+                <Text className="py-6 text-center text-sm text-neutral-text-sub">
+                  {threadError}
+                </Text>
+              ) : messages.length === 0 ? (
+                <Text className="py-6 text-center text-sm text-neutral-text-sub">
+                  Say hello — messages are end-to-end encrypted.
+                </Text>
+              ) : (
+                messages.map((message) => {
+                  const mine = message.senderId === userId;
+                  const outcome = decrypted.get(message.id);
+                  const text =
+                    outcome?.status === "ok"
+                      ? outcome.plaintext
+                      : outcome?.status === "failed"
+                        ? "Could not decrypt this message."
+                        : backupState.kind === "ready"
+                          ? "Not in your backup — sent before this device joined and none of your devices had opened it."
+                          : mine
+                            ? "Sent from another device — this phone has no key for it."
+                            : "Encrypted message — not available on this device.";
+                  const seen =
+                    mine &&
+                    peerLastReadAt !== null &&
+                    new Date(message.createdAt).getTime() <=
+                      new Date(peerLastReadAt).getTime();
+
+                  return (
+                    <View
+                      key={message.id}
+                      className={`mb-2 max-w-[82%] ${
+                        mine ? "self-end items-end" : "self-start items-start"
+                      }`}
+                    >
+                      {message.listingId && (
+                        <TouchableOpacity
+                          onPress={() =>
+                            router.push(
+                              `/product/${message.listingId}` as never,
+                            )
+                          }
+                          className="mb-1 rounded-lg border border-neutral-border bg-white px-3 py-2"
+                        >
+                          <Text className="text-[11px] font-semibold text-primary">
+                            Listing context
+                          </Text>
+                          <Text className="text-[11px] text-neutral-text-sub">
+                            Tap to view the ad
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      <View
+                        className={`rounded-2xl px-3.5 py-2.5 ${
+                          mine
+                            ? "rounded-br-sm bg-primary"
+                            : "rounded-bl-sm bg-white"
+                        }`}
+                      >
+                        <Text
+                          className={
+                            mine
+                              ? "text-[15px] leading-5 text-white"
+                              : "text-[15px] leading-5 text-neutral-text-main"
+                          }
+                        >
+                          {text}
+                        </Text>
+                      </View>
+                      <Text className="mt-0.5 text-[10px] text-neutral-text-muted">
+                        {relativeTime(message.createdAt)}
+                        {seen ? " · Seen" : ""}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          )}
+
+          {sendError && (
+            <Text className="bg-red-50 px-4 py-2 text-xs text-red-600">
+              {sendError}
+            </Text>
+          )}
+
+          <View className="flex-row items-end gap-2 border-t border-neutral-border bg-white px-3 py-2">
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Type a message…"
+              placeholderTextColor={Colors.text.muted}
+              multiline
+              maxLength={2000}
+              editable={Boolean(engine) && thread.canMessage}
+              className="max-h-28 flex-1 rounded-2xl bg-neutral-background px-4 py-2.5 text-base text-neutral-text-main"
+            />
+            <TouchableOpacity
+              onPress={() => void handleSend()}
+              disabled={!engine || sending || !draft.trim()}
+              className={`h-11 w-11 items-center justify-center rounded-full ${
+                draft.trim() ? "bg-primary" : "bg-neutral-border"
+              }`}
+            >
+              {sending ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Ionicons name="send" size={18} color="white" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+
+        <RestoreHistoryModal
+          visible={restoreOpen}
+          onClose={() => setRestoreOpen(false)}
+          onSubmit={restoreBackup}
+          onRestored={(restored) => {
+            setRestoreOpen(false);
+            retriedDecrypt.current.clear();
+            if (engine) {
+              const locked = messages.filter(
+                (message) => decrypted.get(message.id)?.status !== "ok",
+              );
+              if (locked.length > 0) void decryptAndStore(engine, locked);
+            }
+            setRestoreNotice(
+              restored > 0
+                ? `Restored ${restored} message${
+                    restored === 1 ? "" : "s"
+                  } from your backup.`
+                : "The backup had nothing to restore yet. Locked messages stay unavailable.",
+            );
+            setTimeout(() => setRestoreNotice(null), 6000);
+          }}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // ── Inbox view ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView
       statusBarColor={Colors.primary.DEFAULT}
       statusBarStyle="light-content"
-      className="bg-neutral-background flex-1"
+      className="flex-1 bg-neutral-background"
     >
-      {/* Top Header */}
-      <View className="bg-primary px-4 py-3.5 flex-row items-center justify-between shadow-md">
-        <View className="flex-row items-center gap-2">
-          <Text className="text-white text-xl font-bold tracking-wide">
-            Messages
-          </Text>
-          {totalUnread > 0 && (
-            <View className="bg-secondary-orange px-2 py-0.5 rounded-full">
-              <Text className="text-white text-xs font-bold">
-                {totalUnread} new
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          onPress={() => {
-            const first = SAMPLE_PRODUCTS[0];
-            router.push({
-              pathname: "/(tabs)/chat",
-              params: {
-                sellerName: first.seller?.name || "Demo Seller",
-                title: first.title,
-                price: `$${first.price}`,
-                image: first.image,
-              },
-            });
-          }}
-          className="flex-row items-center bg-white/20 px-3 py-1.5 rounded-full"
-        >
-          <Ionicons name="add-circle" size={16} color="white" />
-          <Text className="text-white font-bold text-xs ml-1">
-            New Demo Chat
-          </Text>
-        </TouchableOpacity>
+      <View className="bg-primary px-4 py-4">
+        <Text className="text-xl font-bold text-white">Chats</Text>
       </View>
 
-      {/* Search Bar & Filter Tabs */}
-      <View className="bg-neutral-surface border-b border-neutral-border p-3 gap-3">
-        {/* Search Input */}
-        <View className="flex-row items-center bg-neutral-background px-3 py-2 rounded-xl border border-neutral-border">
-          <Ionicons name="search" size={18} color={Colors.text.muted} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search messages, seller or item..."
-            placeholderTextColor={Colors.text.muted}
-            className="flex-1 ml-2 text-sm text-neutral-text-main py-0"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons
-                name="close-circle"
-                size={16}
-                color={Colors.text.muted}
-              />
-            </TouchableOpacity>
-          )}
+      {inboxLoading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={Colors.primary.DEFAULT} />
         </View>
-
-        {/* Segmented Category Filter Tabs */}
-        <View className="flex-row gap-2">
-          {[
-            { id: "all", label: "All Chats" },
-            { id: "buying", label: "Buying" },
-            { id: "selling", label: "Selling" },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-1.5 rounded-full border ${
-                  isActive
-                    ? "bg-primary border-primary"
-                    : "bg-neutral-surface border-neutral-border"
-                }`}
-              >
-                <Text
-                  className={`text-xs font-bold ${
-                    isActive ? "text-white" : "text-neutral-text-sub"
-                  }`}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+      ) : inboxError ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-center text-neutral-text-sub">
+            {inboxError}
+          </Text>
+          <TouchableOpacity
+            onPress={() => void loadInbox()}
+            className="mt-3 rounded-lg border border-primary px-5 py-2"
+          >
+            <Text className="font-bold text-primary">Try again</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Conversation List */}
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 80 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredConversations.length === 0 ? (
-          <View className="items-center justify-center p-8 mt-10">
-            <View className="w-20 h-20 bg-sky-50 rounded-full items-center justify-center mb-3">
-              <Ionicons
-                name="chatbubbles-outline"
-                size={40}
-                color={Colors.primary.DEFAULT}
-              />
-            </View>
-            <Text className="text-base font-bold text-neutral-text-main text-center">
-              No messages found
-            </Text>
-            <Text className="text-xs text-neutral-text-sub text-center mt-1">
-              Start chatting with sellers on any item page to see messages here!
-            </Text>
-          </View>
-        ) : (
-          filteredConversations.map((conv) => (
+      ) : inbox.length === 0 ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <Ionicons name="chatbubbles-outline" size={44} color="#9CA3AF" />
+          <Text className="mt-3 text-center text-neutral-text-sub">
+            No conversations yet. Message a seller from any ad.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView className="flex-1">
+          {inbox.map((item) => (
             <TouchableOpacity
-              key={conv.id}
-              onPress={() => handleOpenConversation(conv)}
-              activeOpacity={0.7}
-              className={`flex-row items-center p-4 border-b border-neutral-border/60 ${
-                conv.unreadCount > 0 ? "bg-sky-50/60" : "bg-neutral-surface"
-              }`}
+              key={item.id}
+              onPress={() =>
+                void openThread({
+                  id: item.id,
+                  otherUser: item.otherUser ?? {
+                    id: "",
+                    username: null,
+                    profilePhotoUrl: null,
+                  },
+                  canMessage: Boolean(item.otherUser),
+                })
+              }
+              className="flex-row items-center gap-3 border-b border-neutral-border/60 bg-white px-4 py-3"
             >
-              {/* Seller Avatar with Active Indicator */}
-              <View className="relative mr-3.5">
-                <Image
-                  source={{ uri: conv.sellerAvatar }}
-                  className="w-14 h-14 rounded-full bg-neutral-background border border-neutral-border"
-                />
-                {conv.isOnline && (
-                  <View className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+              <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+                {avatarSource(item.otherUser) ? (
+                  <Image
+                    source={avatarSource(item.otherUser)!}
+                    className="h-full w-full"
+                  />
+                ) : (
+                  <Text className="text-base font-bold text-primary">
+                    {displayName(item.otherUser)
+                      .replace("@", "")
+                      .charAt(0)
+                      .toUpperCase()}
+                  </Text>
                 )}
               </View>
-
-              {/* Chat Info */}
-              <View className="flex-1 mr-2">
-                <View className="flex-row items-center justify-between mb-0.5">
+              <View className="flex-1">
+                <View className="flex-row items-center justify-between">
                   <Text className="text-sm font-bold text-neutral-text-main">
-                    {conv.sellerName}
+                    {displayName(item.otherUser)}
                   </Text>
-                  <Text className="text-[11px] text-neutral-text-sub">
-                    {conv.lastMessageTime}
+                  <Text className="text-[11px] text-neutral-text-muted">
+                    {relativeTime(item.lastMessageAt)}
                   </Text>
                 </View>
-
-                {/* Item Chip Tag */}
-                <View className="flex-row items-center bg-neutral-background px-2 py-0.5 rounded-md border border-neutral-border/50 self-start mb-1 gap-1">
-                  <Image
-                    source={{ uri: conv.itemImage }}
-                    className="w-4 h-4 rounded"
-                  />
+                <View className="mt-0.5 flex-row items-center justify-between">
                   <Text
-                    className="text-[11px] font-semibold text-neutral-text-main"
-                    numberOfLines={1}
-                    style={{ maxWidth: 160 }}
-                  >
-                    {conv.itemTitle}
-                  </Text>
-                  <Text className="text-[11px] font-bold text-danger">
-                    {conv.itemPrice}
-                  </Text>
-                </View>
-
-                {/* Last Message Preview */}
-                <Text
-                  className={`text-xs ${
-                    conv.unreadCount > 0
-                      ? "font-bold text-neutral-text-main"
-                      : "text-neutral-text-sub"
-                  }`}
-                  numberOfLines={1}
-                >
-                  {conv.lastMessage}
-                </Text>
-              </View>
-
-              {/* Unread Pill Badge */}
-              {conv.unreadCount > 0 && (
-                <View className="w-5 h-5 bg-secondary-orange rounded-full items-center justify-center">
-                  <Text className="text-white text-[10px] font-bold">
-                    {conv.unreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
-
-      {/* Interactive Conversation Modal / Thread */}
-      <Modal
-        visible={!!selectedConv}
-        animationType="slide"
-        onRequestClose={() => setSelectedConv(null)}
-      >
-        {selectedConv && (
-          <SafeAreaView className="flex-1 bg-neutral-background">
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              className="flex-1"
-            >
-              {/* Chat Thread Header */}
-              <View className="bg-primary px-3 py-3 flex-row items-center justify-between shadow-md">
-                <View className="flex-row items-center flex-1">
-                  <TouchableOpacity
-                    onPress={() => setSelectedConv(null)}
-                    className="p-1 mr-1"
-                  >
-                    <Ionicons name="arrow-back" size={24} color="white" />
-                  </TouchableOpacity>
-
-                  {/* Avatar & Info */}
-                  <Image
-                    source={{ uri: selectedConv.sellerAvatar }}
-                    className="w-10 h-10 rounded-full border border-white/40 mr-2.5"
-                  />
-                  <View className="flex-1">
-                    <Text
-                      className="text-white font-bold text-base"
-                      numberOfLines={1}
-                    >
-                      {selectedConv.sellerName}
-                    </Text>
-                    <Text className="text-sky-100 text-[11px]">
-                      {selectedConv.isOnline
-                        ? "Online Now • Usually replies in ~5 mins"
-                        : "Offline"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Call Seller Quick Shortcut */}
-                <TouchableOpacity
-                  onPress={() =>
-                    alert(`Calling ${selectedConv.sellerName} at 012 345 678`)
-                  }
-                  className="bg-secondary-orange p-2 rounded-full shadow-sm"
-                >
-                  <Ionicons name="call" size={18} color="white" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Item Header Banner */}
-              <View className="bg-white px-4 py-2.5 flex-row items-center border-b border-neutral-border shadow-xs">
-                <Image
-                  source={{ uri: selectedConv.itemImage }}
-                  className="w-12 h-12 rounded-lg mr-3 bg-neutral-background border border-neutral-border"
-                />
-                <View className="flex-1 mr-2">
-                  <Text
-                    className="text-xs font-bold text-neutral-text-main"
+                    className="mr-2 flex-1 text-xs text-neutral-text-sub"
                     numberOfLines={1}
                   >
-                    {selectedConv.itemTitle}
+                    {previewFor(item)}
                   </Text>
-                  <Text className="text-sm font-bold text-danger">
-                    {selectedConv.itemPrice}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    const found = SAMPLE_PRODUCTS.find(
-                      (p) => p.title === selectedConv.itemTitle,
-                    );
-                    setSelectedConv(null);
-                    if (found) {
-                      router.push(`/(categories)/product/${found.id}`);
-                    }
-                  }}
-                  className="bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-200"
-                >
-                  <Text className="text-xs font-bold text-primary">
-                    View Item
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Messages Feed */}
-              <ScrollView
-                className="flex-1 p-4"
-                contentContainerStyle={{ paddingBottom: 20 }}
-                ref={(ref) => {
-                  if (ref) ref.scrollToEnd({ animated: true });
-                }}
-              >
-                {/* Safety Warning */}
-                <View className="bg-amber-50 p-3 rounded-xl border border-amber-200 mb-4 items-center">
-                  <Ionicons name="shield-checkmark" size={20} color="#D97706" />
-                  <Text className="text-amber-800 text-[11px] text-center font-medium mt-1">
-                    Safety Tip: Inspect item carefully & test functionality in
-                    person before making payment.
-                  </Text>
-                </View>
-
-                {/* Message Bubbles */}
-                {selectedConv.messages.map((msg) => {
-                  const isMe = msg.sender === "me";
-                  return (
-                    <View
-                      key={msg.id}
-                      className={`mb-3 flex-row ${isMe ? "justify-end" : "justify-start"}`}
-                    >
-                      <View
-                        className={`max-w-[80%] px-4 py-2.5 rounded-2xl ${
-                          isMe
-                            ? "bg-primary rounded-tr-xs"
-                            : "bg-white border border-neutral-border rounded-tl-xs shadow-xs"
-                        }`}
-                      >
-                        <Text
-                          className={`text-sm ${
-                            isMe ? "text-white" : "text-neutral-text-main"
-                          }`}
-                        >
-                          {msg.text}
-                        </Text>
-                        <View className="flex-row items-center justify-end gap-1 mt-1">
-                          <Text
-                            className={`text-[10px] ${
-                              isMe ? "text-sky-200" : "text-neutral-text-muted"
-                            }`}
-                          >
-                            {msg.timestamp}
-                          </Text>
-                          {isMe && (
-                            <Ionicons
-                              name="checkmark-done"
-                              size={14}
-                              color="#7DD3FC"
-                            />
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-
-                {/* Typing Indicator Bubble */}
-                {isTyping && (
-                  <View className="flex-row justify-start mb-3">
-                    <View className="bg-white border border-neutral-border px-4 py-2.5 rounded-2xl rounded-tl-xs flex-row items-center gap-1.5">
-                      <View className="w-2 h-2 rounded-full bg-neutral-text-muted animate-pulse" />
-                      <View className="w-2 h-2 rounded-full bg-neutral-text-muted animate-pulse" />
-                      <View className="w-2 h-2 rounded-full bg-neutral-text-muted animate-pulse" />
-                      <Text className="text-xs text-neutral-text-sub ml-1 italic">
-                        {selectedConv.sellerName} is typing...
+                  {item.unreadCount > 0 && (
+                    <View className="min-w-5 items-center rounded-full bg-secondary-orange px-1.5 py-0.5">
+                      <Text className="text-[10px] font-bold text-white">
+                        {item.unreadCount}
                       </Text>
                     </View>
-                  </View>
-                )}
-              </ScrollView>
-
-              {/* Quick Reply Suggestions */}
-              <View className="px-3 py-1.5 bg-white border-t border-neutral-border">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row gap-2 py-1">
-                    {[
-                      "Is this still available?",
-                      "What is the lowest price?",
-                      "Can we meet at Toul Kork?",
-                      "Can you send more photos?",
-                    ].map((suggestion, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        onPress={() => handleSendMessage(suggestion)}
-                        className="bg-neutral-background px-3 py-1.5 rounded-full border border-neutral-border"
-                      >
-                        <Text className="text-xs font-semibold text-neutral-text-main">
-                          {suggestion}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
+                  )}
+                </View>
               </View>
-
-              {/* Bottom Input Controls */}
-              <View className="bg-white p-3 border-t border-neutral-border flex-row items-center gap-2">
-                <TouchableOpacity
-                  onPress={() =>
-                    handleSendMessage("📷 [Photo attachment: item_preview.jpg]")
-                  }
-                  className="p-2 rounded-full bg-neutral-background"
-                >
-                  <Ionicons
-                    name="camera"
-                    size={22}
-                    color={Colors.primary.DEFAULT}
-                  />
-                </TouchableOpacity>
-
-                <TextInput
-                  value={inputText}
-                  onChangeText={setInputText}
-                  placeholder="Type a message..."
-                  placeholderTextColor={Colors.text.muted}
-                  className="flex-1 bg-neutral-background px-4 py-2.5 rounded-full border border-neutral-border text-sm text-neutral-text-main max-h-24"
-                />
-
-                <TouchableOpacity
-                  onPress={() => handleSendMessage()}
-                  className={`w-10 h-10 rounded-full items-center justify-center ${
-                    inputText.trim() ? "bg-primary" : "bg-neutral-border"
-                  }`}
-                  disabled={!inputText.trim()}
-                >
-                  <Ionicons name="send" size={18} color="white" />
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </SafeAreaView>
-        )}
-      </Modal>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
-};
+}
 
-export default ChatScreen;
+function mergeMessages(
+  current: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
+  const seen = new Set(current.map((message) => message.id));
+  const additions = incoming.filter((message) => !seen.has(message.id));
+  return additions.length > 0 ? [...current, ...additions] : current;
+}

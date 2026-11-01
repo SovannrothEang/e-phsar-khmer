@@ -104,6 +104,22 @@ describe('IdempotencyMiddleware', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
+  it('ignores non-mutating methods even when a key is present', async () => {
+    const middleware = makeMiddleware(db);
+    await middleware.use(
+      makeReq({
+        method: 'GET',
+        headers: { 'idempotency-key': 'get-key' },
+      }),
+      makeRes().res,
+      next,
+    );
+
+    expect(next).toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
   it('rejects a blank Idempotency-Key with 400', async () => {
     const middleware = makeMiddleware(db);
     const { res, status } = makeRes();

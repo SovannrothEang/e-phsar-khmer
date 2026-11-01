@@ -126,7 +126,9 @@ export default async function CategoryPage({
           grid → grid post cards, list → list post cards (All Ads behaviour).
           The layout is NOT wrapped in a short div — the bar inside it is
           sticky and needs the tall Tabs root as its containing block. */}
-      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
+      {/* pb-10, not pb-2: the feed's last row otherwise ends 8px above the
+          footer. Matches the detail page's gutter. */}
+      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-10">
         <Layout category={category} />
         <div>
           <SubcategoryGrid

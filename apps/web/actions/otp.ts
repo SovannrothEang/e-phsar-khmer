@@ -5,6 +5,8 @@ import { API_URL } from "@/lib/api/client";
 import type { BackendUser } from "@/lib/api/adapters";
 import type { DeviceIdentity } from "@/lib/device";
 import { setUserDeviceId, setUserSession } from "@/lib/auth/session";
+import { redirect as i18nRedirect } from "@/i18n/routing";
+import { getLocale } from "next-intl/server";
 
 interface OtpVerifyResponse {
   accessToken: string;
@@ -85,14 +87,10 @@ export async function verifyOtp(
   token: string,
   registration?: { password: string; firstName?: string; lastName?: string },
   device?: DeviceIdentity,
-): Promise<
-  | {
-      success: true;
-      user: { id: string; username: string | null; role: string };
-      newDevice: boolean;
-    }
-  | { success: false; error: string }
-> {
+  // No success branch: the flow ends in a redirect (below). The inferred
+  // `| undefined` is what the client sees — on success the framework rejects
+  // the call with its redirect signal, so `res` is never a success value.
+) {
   if (registration && registration.password.length < 8) {
     return { success: false, error: "Invalid input" };
   }
@@ -142,7 +140,7 @@ export async function verifyOtp(
     };
   }
 
-  const { user, accessToken, refreshToken } = body.data;
+  const { accessToken, refreshToken } = body.data;
 
   await setUserSession({ accessToken, refreshToken });
   if (device) {
@@ -153,9 +151,11 @@ export async function verifyOtp(
     }
   }
 
-  return {
-    success: true,
-    user: { id: user.id, username: user.username, role: user.role },
-    newDevice: Boolean(body.data.newDevice),
-  };
+  // Redirect HERE, not from the client. Setting cookies makes Next answer a
+  // Server Action by re-rendering the route it was called from and shipping
+  // that tree back, so the client cannot navigate until a page the user is
+  // leaving has fully rendered (measured 8.4s of the 10.9s verify on /otp).
+  // A redirect answers the action without that re-render.
+  const locale = await getLocale();
+  i18nRedirect({ href: "/me", locale });
 }

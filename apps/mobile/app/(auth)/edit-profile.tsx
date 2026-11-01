@@ -2,7 +2,15 @@ import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import {
+  changeMyUsername,
+  updateMyProfile,
+  uploadMyPhoto,
+  type ProfilePatch,
+} from "@/lib/api/account";
+import { ApiError } from "@/lib/api/client";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -86,7 +94,7 @@ const CAMBODIA_CITIES = [
 
 const EditProfileScreen = () => {
   const router = useRouter();
-  const { user, updateUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { isDark } = useTheme();
 
   // Sanitize initial values to avoid showing placeholder "DATA"
@@ -124,36 +132,111 @@ const EditProfileScreen = () => {
 
   const MAX_BIO_LENGTH = 180;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert("Missing Name", "Please enter your full name.");
       return;
     }
 
     setIsSaving(true);
+    try {
+      const parts = name.trim().split(/\s+/);
+      const patch: ProfilePatch = {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(" ") || undefined,
+      };
 
-    const cleanUsername = username.trim().replace(/^@+/, "");
+      const normalizedGender = gender.toLowerCase();
+      if (normalizedGender === "male" || normalizedGender === "female") {
+        patch.gender = normalizedGender;
+      }
+      if (email.trim() && email.trim() !== user.email) {
+        patch.email = email.trim();
+      }
+      if (location.trim()) {
+        patch.address = location.trim();
+      }
 
-    updateUser({
-      name: name.trim(),
-      username: cleanUsername || "bansreypov",
-      phone: phone.trim(),
-      email: email.trim(),
-      location: location.trim(),
-      bio: bio.trim(),
-      accountType,
-      gender,
-      telegram: telegram.trim().replace(/^@+/, ""),
-      avatar,
-      coverPhoto,
+      await updateMyProfile(patch);
+
+      const cleanUsername = username.trim().replace(/^@+/, "");
+      if (cleanUsername && cleanUsername !== (user.username ?? "")) {
+        await changeMyUsername(cleanUsername);
+      }
+
+      await refreshUser();
+      setSavedSuccess(true);
+      setTimeout(() => {
+        router.back();
+      }, 700);
+    } catch (error) {
+      Alert.alert(
+        "Could not save",
+        error instanceof ApiError
+          ? error.message
+          : "Please check your connection and try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [uploadingPhoto, setUploadingPhoto] = useState<
+    "avatar" | "cover" | null
+  >(null);
+
+  const pickAndUpload = async (kind: "avatar" | "cover") => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Photo permission",
+        "Allow photo access to change this image.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: kind === "avatar" ? [1, 1] : [16, 9],
+      quality: 0.8,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
+    if (result.canceled || result.assets.length === 0) return;
 
-    setSavedSuccess(true);
-    setIsSaving(false);
+    const asset = result.assets[0];
+    const mime = asset.mimeType ?? "image/jpeg";
+    if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
+      Alert.alert("Unsupported photo", "Use a JPEG, PNG or WebP image.");
+      return;
+    }
+    if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+      Alert.alert("Photo too large", "Each photo must be 5 MB or smaller.");
+      return;
+    }
 
-    setTimeout(() => {
-      router.back();
-    }, 700);
+    setUploadingPhoto(kind);
+    try {
+      const updated = await uploadMyPhoto(kind, {
+        uri: asset.uri,
+        name: asset.fileName ?? `${kind}-${Date.now()}.${mime.split("/")[1]}`,
+        type: mime,
+      });
+      if (kind === "avatar") {
+        setAvatar(updated.profilePhotoUrl ?? avatar);
+      } else {
+        setCoverPhoto(updated.coverPhotoUrl ?? coverPhoto);
+      }
+      await refreshUser();
+    } catch (error) {
+      Alert.alert(
+        "Upload failed",
+        error instanceof ApiError ? error.message : "Please try again.",
+      );
+    } finally {
+      setUploadingPhoto(null);
+    }
   };
 
   const handleSelectAvatar = (url: string) => {
@@ -209,7 +292,7 @@ const EditProfileScreen = () => {
 
         <TouchableOpacity
           onPress={handleSave}
-          disabled={isSaving}
+          disabled={isSaving || uploadingPhoto !== null}
           activeOpacity={0.8}
           className="bg-secondary-orange px-4 py-1.5 rounded-full flex-row items-center gap-1.5 shadow-sm"
         >
@@ -260,7 +343,7 @@ const EditProfileScreen = () => {
 
               {/* Cover Photo Button */}
               <TouchableOpacity
-                onPress={() => setShowCoverPicker(!showCoverPicker)}
+                onPress={() => void pickAndUpload("cover")}
                 className="absolute top-3 right-3 bg-black/50 px-3 py-1.5 rounded-full flex-row items-center gap-1.5 backdrop-blur-md"
               >
                 <Ionicons name="camera-outline" size={16} color="white" />
@@ -310,7 +393,7 @@ const EditProfileScreen = () => {
 
               {/* Camera Icon Overlay Badge */}
               <TouchableOpacity
-                onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                onPress={() => void pickAndUpload("avatar")}
                 activeOpacity={0.85}
                 className="absolute bottom-0 right-0 bg-primary w-8 h-8 rounded-full items-center justify-center border-2 border-white shadow-md"
               >
@@ -321,7 +404,7 @@ const EditProfileScreen = () => {
             {/* Quick label next to avatar */}
             <View className="ml-36 pt-3 pr-4">
               <TouchableOpacity
-                onPress={() => setShowAvatarPicker(!showAvatarPicker)}
+                onPress={() => void pickAndUpload("avatar")}
                 className="flex-row items-center gap-1"
               >
                 <Text className="text-primary font-bold text-sm">
@@ -942,7 +1025,7 @@ const EditProfileScreen = () => {
             {/* Big Save Button */}
             <TouchableOpacity
               onPress={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || uploadingPhoto !== null}
               activeOpacity={0.88}
               className="mt-2 mb-6 rounded-2xl overflow-hidden shadow-md"
               style={{

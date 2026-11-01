@@ -148,7 +148,7 @@ export default function Notifications({
   }
 
   return (
-    <div className="min-h-screen bg-muted py-6 px-4">
+    <div className="min-h-screen bg-muted pt-6 pb-10 px-4">
       {/* Removed overflow-hidden here to allow sticky to work relative to the viewport */}
       <div className="max-w-[980px] mx-auto bg-background rounded-sm shadow-sm border border-muted relative">
         {/* Header Section */}

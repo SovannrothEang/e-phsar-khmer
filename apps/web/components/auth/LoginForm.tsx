@@ -16,7 +16,7 @@ import { requestLoginOtp } from "@/actions/otp";
 import { isLocalPhone, normalizePhone } from "@/lib/phone";
 import { getDeviceIdentity } from "@/lib/device";
 import { storeOtpRegistration } from "@/lib/otp-registration";
-import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
+import { isServerRedirect } from "@/lib/next-redirect";
 import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -139,17 +139,18 @@ export function LoginForm({
       }
 
       const device = getDeviceIdentity();
-      const result = await login(value, device ?? undefined);
-
-      if (result.success) {
-        // Register this browser for E2E chat as part of signing in, not when
-        // some later page happens to render the provider.
-        if (result.user) bootstrapE2eAfterAuth(result.user.id);
-        form.reset();
-        toast.success("Login successfully!", { position: "top-right" });
-        router.push("/me");
-      } else {
-        toast.error(result.error || "Login failed.");
+      try {
+        // A successful login redirects to /me FROM the action: the call
+        // rejects with the framework's redirect signal while it navigates, so
+        // there is no success value. Only a real failure returns an error. The
+        // E2E device is registered by the provider on the destination page.
+        const result = await login(value, device ?? undefined);
+        if (result && !result.success) {
+          toast.error(result.error || "Login failed.");
+        }
+      } catch (error) {
+        if (isServerRedirect(error)) return;
+        toast.error("Failed to log in. Please try again.");
       }
     },
   });

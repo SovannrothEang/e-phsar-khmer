@@ -1,67 +1,78 @@
-import { Colors } from "@/constants/Colors";
-import { SAMPLE_PRODUCTS } from "@/constants/data/products";
+import SafeAreaView from "@/components/common/SafeAreaView";
 import ProductCard from "@/components/product/ProductCard";
+import { Colors } from "@/constants/Colors";
+import { fetchCategories } from "@/lib/api/listings";
+import { fetchFeed } from "@/lib/api/feed";
+import { toCardProduct } from "@/lib/listing-card";
 import { Ionicons } from "@expo/vector-icons";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import SafeAreaView from "@/components/common/SafeAreaView";
-
-const SUGGESTIONS = [
-  "iPhone",
-  "Lexus",
-  "Condo",
-  "Jobs",
-  "Honda",
-  "Yamaha",
-  "Bicycle",
-  "Camera",
-  "Villa",
-  "Nail Salon",
-];
 
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [categorySlug, setCategorySlug] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    // Focus search input on mount
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 150);
+    const timer = setTimeout(() => inputRef.current?.focus(), 150);
+    return () => clearTimeout(timer);
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    if (query.trim() === "") return [];
-    const normalizedQuery = query.toLowerCase();
-
-    return SAMPLE_PRODUCTS.filter((product) => {
-      const matchesTitle = product.title
-        .toLowerCase()
-        .includes(normalizedQuery);
-      const matchesDesc =
-        product.description?.toLowerCase().includes(normalizedQuery) || false;
-      const matchesMainCat =
-        product.mainCategory?.toLowerCase().includes(normalizedQuery) || false;
-      const matchesCat =
-        product.category?.toLowerCase().includes(normalizedQuery) || false;
-
-      return matchesTitle || matchesDesc || matchesMainCat || matchesCat;
-    });
+  // Debounce typing so every keystroke does not hit the feed.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 350);
+    return () => clearTimeout(timer);
   }, [query]);
+
+  const categoriesQuery = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    staleTime: 5 * 60_000,
+  });
+  const categories = categoriesQuery.data ?? [];
+
+  const hasFilter = debouncedQuery.length > 0 || categorySlug.length > 0;
+
+  const results = useInfiniteQuery({
+    queryKey: ["search", debouncedQuery, categorySlug],
+    queryFn: ({ pageParam }) =>
+      fetchFeed({
+        q: debouncedQuery || undefined,
+        categorySlug: categorySlug || undefined,
+        cursor: pageParam,
+        limit: 20,
+        includeTotal: true,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: hasFilter,
+  });
+
+  const products = useMemo(
+    () =>
+      (results.data?.pages ?? [])
+        .flatMap((page) => page.items)
+        .map(toCardProduct),
+    [results.data],
+  );
+  const total = results.data?.pages[0]?.total ?? products.length;
 
   return (
     <SafeAreaView statusBarColor="white" statusBarStyle="dark-content">
       {/* Search Header */}
       <View
-        className="flex-row items-center bg-white px-4 py-3 border-b border-neutral-border/50"
+        className="flex-row items-center border-b border-neutral-border/50 bg-white px-4 py-3"
         style={{
           elevation: 2,
           shadowColor: "#000",
@@ -73,19 +84,18 @@ export default function SearchScreen() {
         <TouchableOpacity
           onPress={() => router.back()}
           activeOpacity={0.7}
-          className="mr-3 p-1 rounded-full"
+          className="mr-3 rounded-full p-1"
         >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
 
-        {/* Input Field */}
-        <View className="flex-1 flex-row items-center bg-neutral-background px-3 py-2 rounded-xl border border-neutral-border/30">
+        <View className="flex-1 flex-row items-center rounded-xl border border-neutral-border/30 bg-neutral-background px-3 py-2">
           <Ionicons name="search" size={20} color={Colors.text.muted} />
           <TextInput
             ref={inputRef}
             placeholder="Search products, jobs, cars..."
             placeholderTextColor={Colors.text.muted}
-            className="ml-2 flex-1 text-base text-neutral-text-main py-0.5"
+            className="ml-2 flex-1 py-0.5 text-base text-neutral-text-main"
             value={query}
             onChangeText={setQuery}
             returnKeyType="search"
@@ -93,7 +103,7 @@ export default function SearchScreen() {
           {query.length > 0 && (
             <TouchableOpacity
               onPress={() => setQuery("")}
-              className="p-0.5 rounded-full bg-neutral-border/60"
+              className="rounded-full bg-neutral-border/60 p-0.5"
             >
               <Ionicons name="close" size={16} color={Colors.text.sub} />
             </TouchableOpacity>
@@ -101,47 +111,100 @@ export default function SearchScreen() {
         </View>
 
         <TouchableOpacity onPress={() => router.back()} className="ml-4 py-2">
-          <Text className="text-primary font-bold text-base">Cancel</Text>
+          <Text className="text-base font-bold text-primary">Cancel</Text>
         </TouchableOpacity>
       </View>
 
       <View className="flex-1 bg-white">
-        {/* Suggestion block (when query is empty) */}
-        {query.trim() === "" ? (
+        {!hasFilter ? (
           <ScrollView className="flex-1 px-4 pt-6">
-            <Text className="text-base font-bold text-neutral-text-main mb-4">
-              Popular Searches
+            <Text className="mb-4 text-base font-bold text-neutral-text-main">
+              Browse categories
             </Text>
             <View className="flex-row flex-wrap gap-2.5">
-              {SUGGESTIONS.map((suggestion, i) => (
+              {categories.map((category) => (
                 <TouchableOpacity
-                  key={i}
-                  onPress={() => setQuery(suggestion)}
+                  key={category.id}
+                  onPress={() =>
+                    router.push(`/(categories)/${category.slug}` as never)
+                  }
                   activeOpacity={0.7}
-                  className="bg-neutral-background px-4 py-2 rounded-full border border-neutral-border/20"
+                  className="rounded-full border border-neutral-border/20 bg-neutral-background px-4 py-2"
                 >
                   <Text className="text-sm font-medium text-neutral-text-sub">
-                    {suggestion}
+                    {category.name}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </ScrollView>
         ) : (
-          /* Results view */
           <View className="flex-1">
+            {/* Category facet */}
+            <View className="border-b border-neutral-border/10 bg-white py-2">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+              >
+                <TouchableOpacity
+                  onPress={() => setCategorySlug("")}
+                  className={`rounded-full px-3.5 py-1.5 ${
+                    categorySlug === ""
+                      ? "bg-sky-500"
+                      : "border border-neutral-border/40 bg-neutral-background"
+                  }`}
+                >
+                  <Text
+                    className={`text-xs font-semibold ${
+                      categorySlug === ""
+                        ? "text-white"
+                        : "text-neutral-text-sub"
+                    }`}
+                  >
+                    All
+                  </Text>
+                </TouchableOpacity>
+                {categories.map((category) => {
+                  const selected = categorySlug === category.slug;
+                  return (
+                    <TouchableOpacity
+                      key={category.id}
+                      onPress={() =>
+                        setCategorySlug(selected ? "" : category.slug)
+                      }
+                      className={`rounded-full px-3.5 py-1.5 ${
+                        selected
+                          ? "bg-sky-500"
+                          : "border border-neutral-border/40 bg-neutral-background"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${
+                          selected ? "text-white" : "text-neutral-text-sub"
+                        }`}
+                      >
+                        {category.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
             {/* Header info bar */}
-            <View className="flex-row items-center justify-between px-4 py-3 bg-neutral-background/30 border-b border-neutral-border/10">
-              <Text className="text-sm text-neutral-text-sub font-medium">
-                {filteredProducts.length} result
-                {filteredProducts.length !== 1 ? "s" : ""} found
+            <View className="flex-row items-center justify-between border-b border-neutral-border/10 bg-neutral-background/30 px-4 py-3">
+              <Text className="text-sm font-medium text-neutral-text-sub">
+                {results.isLoading
+                  ? "Searching…"
+                  : `${total} result${total !== 1 ? "s" : ""} found`}
               </Text>
-              {filteredProducts.length > 0 && (
+              {products.length > 0 && (
                 <TouchableOpacity
                   onPress={() =>
                     setViewMode((prev) => (prev === "list" ? "grid" : "list"))
                   }
-                  className="p-1 rounded-md"
+                  className="rounded-md p-1"
                 >
                   <Ionicons
                     name={viewMode === "list" ? "grid-outline" : "list-outline"}
@@ -157,28 +220,44 @@ export default function SearchScreen() {
               contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
             >
-              {filteredProducts.length === 0 ? (
-                /* No Results UI */
-                <View className="items-center justify-center p-8 mt-20">
-                  <View className="w-20 h-20 bg-neutral-background rounded-full items-center justify-center mb-6">
+              {results.isLoading ? (
+                <View className="mt-20 items-center">
+                  <ActivityIndicator color={Colors.primary.DEFAULT} />
+                </View>
+              ) : results.isError ? (
+                <View className="mt-20 items-center px-8">
+                  <Text className="text-center text-neutral-text-sub">
+                    Could not run this search.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => results.refetch()}
+                    className="mt-3 rounded-lg border border-primary px-5 py-2"
+                  >
+                    <Text className="font-bold text-primary">Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : products.length === 0 ? (
+                <View className="mt-20 items-center justify-center p-8">
+                  <View className="mb-6 h-20 w-20 items-center justify-center rounded-full bg-neutral-background">
                     <Ionicons
                       name="search-outline"
                       size={40}
                       color={Colors.text.muted}
                     />
                   </View>
-                  <Text className="text-xl font-bold text-neutral-text-main text-center mb-2">
-                    No results found for &quot;{query}&quot;
+                  <Text className="mb-2 text-center text-xl font-bold text-neutral-text-main">
+                    {debouncedQuery
+                      ? `No results found for "${debouncedQuery}"`
+                      : "No ads in this category yet"}
                   </Text>
-                  <Text className="text-sm text-neutral-text-sub text-center px-8 leading-5">
-                    Check the spelling or try searching for something more
-                    general like &quot;iPhone&quot; or &quot;Car&quot;.
+                  <Text className="px-8 text-center text-sm leading-5 text-neutral-text-sub">
+                    Check the spelling or try something more general like
+                    &quot;iPhone&quot; or &quot;Car&quot;.
                   </Text>
                 </View>
               ) : viewMode === "list" ? (
-                /* List View Results */
                 <View>
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -187,9 +266,8 @@ export default function SearchScreen() {
                   ))}
                 </View>
               ) : (
-                /* Grid View Results */
                 <View className="flex-row flex-wrap px-1.5 pt-1.5">
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
@@ -198,6 +276,22 @@ export default function SearchScreen() {
                   ))}
                 </View>
               )}
+
+              {results.hasNextPage ? (
+                <View className="items-center px-6 py-5">
+                  <TouchableOpacity
+                    onPress={() => results.fetchNextPage()}
+                    disabled={results.isFetchingNextPage}
+                    className="rounded-xl border border-primary px-6 py-2.5"
+                  >
+                    {results.isFetchingNextPage ? (
+                      <ActivityIndicator color={Colors.primary.DEFAULT} />
+                    ) : (
+                      <Text className="font-bold text-primary">Load more</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </ScrollView>
           </View>
         )}

@@ -1,53 +1,54 @@
+import { FeedScrollView } from "@/components/category/FeedScrollView";
 import NavBar from "@/components/common/NavBar";
 import SafeAreaView from "@/components/common/SafeAreaView";
+import HomeBanner from "@/components/home/HomeBanner";
 import LatestAds from "@/components/home/LatestAds";
 import NearbySection from "@/components/home/NearbySection";
-import { CATEGORIES } from "@/constants/data/categories";
+import TrendingStrip from "@/components/home/TrendingStrip";
+import { Colors } from "@/constants/Colors";
+import { fetchAdvertisements } from "@/lib/api/advertisements";
+import { fetchCategories } from "@/lib/api/listings";
+import { categoryImage } from "@/lib/category-images";
+import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
-import { useLanguage } from "@/contexts/LanguageContext";
-
 const HomeScreen = () => {
-  const { getCategoryName } = useLanguage();
+  const categoriesQuery = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    staleTime: 5 * 60_000,
+  });
+  const bannersQuery = useQuery({
+    queryKey: ["advertisements", "home"],
+    queryFn: () => fetchAdvertisements("home"),
+    staleTime: 5 * 60_000,
+  });
+
+  const categories = categoriesQuery.data ?? [];
+  const banners = bannersQuery.data ?? [];
 
   return (
     <SafeAreaView className="bg-slate-50 dark:bg-gray-950">
-      <NavBar
-        onQRCodePress={() => router.push("/scan")}
-        onSearchPress={() => router.push("/search")}
-      />
-      <ScrollView
+      <NavBar onSearchPress={() => router.push("/search")} />
+      <FeedScrollView
         contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
         className="bg-slate-50 dark:bg-gray-950"
       >
-        {/* Animated Banner Header */}
-        <View className="px-3 pt-3">
-          <View
-            className="w-full overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"
-            style={{
-              elevation: 4,
-              shadowColor: "#0EA5E9",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.08,
-              shadowRadius: 12,
-            }}
-          >
-            <View style={{ width: "100%", aspectRatio: 640 / 290 }}>
-              <Image
-                source={require("@/assets/images/ai.gif")}
-                resizeMode="cover"
-                style={{ width: "100%", height: "100%" }}
-              />
-            </View>
-          </View>
-        </View>
+        <HomeBanner banners={banners} />
 
-        {/* Main Category Grid Container matching user screenshot */}
+        {/* Main Category Grid */}
         <View
-          className="mx-3 mt-4 bg-white dark:bg-gray-900 px-1 pt-4 pb-2 rounded-3xl border border-gray-100 dark:border-gray-800"
+          className="mx-3 mt-4 rounded-3xl border border-gray-100 bg-white px-1 pb-2 pt-4 dark:border-gray-800 dark:bg-gray-900"
           style={{
             elevation: 2,
             shadowColor: "#0F172A",
@@ -56,44 +57,74 @@ const HomeScreen = () => {
             shadowRadius: 8,
           }}
         >
-          <View className="flex-row flex-wrap">
-            {CATEGORIES.map((item, index) => (
-              <Animated.View
-                key={item.id}
-                entering={FadeInDown.delay(index * 25).duration(300)}
-                className="w-1/4 items-center mb-5"
-              >
-                <TouchableOpacity
-                  onPress={() => router.push(`/(categories)/${item.id}`)}
-                  className="items-center w-full px-1"
-                  activeOpacity={0.7}
-                >
-                  <View className="w-14 h-14 items-center justify-center mb-1.5">
-                    <Image
-                      source={item.image}
-                      className="w-12 h-12"
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text
-                    className="text-[11px] font-semibold text-gray-800 dark:text-gray-200 text-center leading-4 px-0.5"
-                    numberOfLines={2}
-                    style={{ minHeight: 32 }}
+          {categoriesQuery.isLoading ? (
+            <View className="items-center py-6">
+              <ActivityIndicator color={Colors.primary.DEFAULT} />
+            </View>
+          ) : categories.length === 0 ? (
+            <View className="items-center py-6">
+              <Text className="text-sm text-gray-500">
+                Could not load categories.
+              </Text>
+            </View>
+          ) : (
+            <View className="flex-row flex-wrap">
+              {categories.map((item, index) => {
+                const image = categoryImage(item.slug);
+                return (
+                  <Animated.View
+                    key={item.id}
+                    entering={FadeInDown.delay(index * 25).duration(300)}
+                    className="mb-5 w-1/4 items-center"
                   >
-                    {getCategoryName(item.id, item.name)}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push(`/(categories)/${item.slug}` as never)
+                      }
+                      className="w-full items-center px-1"
+                      activeOpacity={0.7}
+                    >
+                      <View className="mb-1.5 h-14 w-14 items-center justify-center">
+                        {image ? (
+                          <Image
+                            source={image}
+                            className="h-12 w-12"
+                            resizeMode="contain"
+                          />
+                        ) : (
+                          <View className="h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-gray-800">
+                            <Ionicons
+                              name="grid-outline"
+                              size={25}
+                              color="#0EA5E9"
+                            />
+                          </View>
+                        )}
+                      </View>
+                      <Text
+                        className="px-0.5 text-center text-[11px] font-semibold leading-4 text-gray-800 dark:text-gray-200"
+                        numberOfLines={2}
+                        style={{ minHeight: 32 }}
+                      >
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {/* Nearby Deals Banner Section */}
         <NearbySection />
 
+        {/* Engagement-ranked strip */}
+        <TrendingStrip />
+
         {/* Latest Ads Listing Feed */}
         <LatestAds />
-      </ScrollView>
+      </FeedScrollView>
     </SafeAreaView>
   );
 };

@@ -18,7 +18,8 @@ export interface Product {
   taxPaper?: boolean;
   experienceLevel?: string;
   jobType?: string;
-  price: number;
+  /** Null renders "Negotiable" — Services and some Home & Land forms omit it. */
+  price: number | null;
   oldPrice?: number;
   imageCount?: number;
   isVerified?: boolean;
