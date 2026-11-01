@@ -70,8 +70,7 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async onModuleInit() {
-    await this.sub.subscribe(CHANNEL);
+  onModuleInit(): void {
     this.sub.on('message', (_channel, raw) => {
       if (!this.handler) return;
       try {
@@ -79,6 +78,19 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
       } catch (err) {
         this.logger.warn(`Dropped malformed chat push payload: ${String(err)}`);
       }
+    });
+
+    // Subscribing is a push optimisation, not a boot requirement. ioredis
+    // queues the command while disconnected and only rejects after
+    // maxRetriesPerRequest — long enough to hold NestFactory.create past a
+    // serverless startup deadline, so the app never reaches app.listen and
+    // every route answers 503 (Vercel, 2026-11-01). Kick the subscribe off in
+    // the background instead: chat falls back to REST polling, and a
+    // subscription that lands later still starts delivering.
+    void this.sub.subscribe(CHANNEL).catch((err: unknown) => {
+      this.logger.warn(
+        `Chat pub/sub unavailable (${String(err)}): pushes degrade to polling`,
+      );
     });
   }
 
