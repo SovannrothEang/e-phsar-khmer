@@ -19,6 +19,7 @@ import { Link } from "@/i18n/routing";
 import LocalSelector from "../LocalSelector";
 import SearchBar from "./SearchBar";
 import { SocialBar } from "./SocialBar";
+import { NotificationBell } from "./NotificationBell";
 import type { User } from "./NavBar";
 
 /**
@@ -31,63 +32,66 @@ export function MobileNavSheet({ user }: { user: User | null }) {
   const isLoggedIn = !!user;
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-lg"
-          className="h-11 w-11"
-          aria-label="Open menu"
-        >
-          <Menu className="scale-125" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="gap-4 overflow-y-auto p-4">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Menu</SheetTitle>
-          <SheetDescription>
-            Search, language, theme, and account links.
-          </SheetDescription>
-        </SheetHeader>
-        <Suspense fallback={<div className="h-[42px]" />}>
-          <SearchBar />
-        </Suspense>
-        <div className="flex items-center gap-1">
-          <LocalSelector defaultValue={locale} label="Language" />
-          <ThemeSwitcher />
-        </div>
-        <Separator />
-        {isLoggedIn ? (
-          <SocialBar user={user!} />
-        ) : (
-          <div className="flex flex-col items-stretch gap-2">
-            <Button
-              asChild
-              variant="ghost"
-              className="h-[42px] px-4 rounded text-base font-medium rounded text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
-            >
-              <Link href="/login">Login</Link>
-            </Button>
-            <Button
-              asChild
-              variant="ghost"
-              className="h-[42px] px-4 rounded text-base font-medium text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
-            >
-              <Link href="/register">Register</Link>
-            </Button>
-            <Button
-              asChild
-              variant="ghost"
-              className="h-[42px] bg-[#f68b1e] text-white px-6 text-base font-medium rounded transition-colors hover:bg-[#f68b1e]/80 hover:text-white"
-            >
-              <Link href={`/login`}>
-                <FaCamera className="scale-120" strokeWidth={2.5} />
-                Sell
-              </Link>
-            </Button>
+    <div className="flex items-center gap-1">
+      {isLoggedIn ? <NotificationBell variant="drawer" /> : null}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="h-11 w-11"
+            aria-label="Open menu"
+          >
+            <Menu className="scale-125" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="right" className="gap-4 overflow-y-auto p-4">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Menu</SheetTitle>
+            <SheetDescription>
+              Search, language, theme, and account links.
+            </SheetDescription>
+          </SheetHeader>
+          <Suspense fallback={<div className="h-[42px]" />}>
+            <SearchBar />
+          </Suspense>
+          <div className="flex items-center gap-1">
+            <LocalSelector defaultValue={locale} label="Language" />
+            <ThemeSwitcher />
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+          <Separator />
+          {isLoggedIn ? (
+            <SocialBar user={user!} hideNotificationBell />
+          ) : (
+            <div className="flex flex-col items-stretch gap-2">
+              <Button
+                asChild
+                variant="ghost"
+                className="h-[42px] px-4 rounded text-base font-medium rounded text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
+              >
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                className="h-[42px] px-4 rounded text-base font-medium text-[#00a0e9] bg-transparent border border-transparent transition-all duration-200 hover:bg-[#00a0e9]/80 hover:text-white"
+              >
+                <Link href="/register">Register</Link>
+              </Button>
+              <Button
+                asChild
+                variant="ghost"
+                className="h-[42px] bg-[#f68b1e] text-white px-6 text-base font-medium rounded transition-colors hover:bg-[#f68b1e]/80 hover:text-white"
+              >
+                <Link href={`/login`}>
+                  <FaCamera className="scale-120" strokeWidth={2.5} />
+                  Sell
+                </Link>
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

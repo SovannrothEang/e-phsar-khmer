@@ -1,11 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useLocale, useTranslations } from "next-intl";
-import { MONTH_LABELS } from "@/lib/locale-labels";
+import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
-import { IconBellFilled } from "@tabler/icons-react";
-import { MoreVertical, ShieldAlert } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,27 +19,11 @@ import {
   markNotificationRead,
 } from "@/actions/notifications";
 import { notificationKeys } from "@/lib/notifications/queries";
+import { NotificationRow } from "@/components/notifications/NotificationRow";
 import type { BackendNotification } from "@/types/notification";
 
 /** Matches the backend's own default page size. */
 const PAGE_SIZE = 20;
-
-/** The template's date format — "12, Aug 2026". */
-function formatDate(iso: string, locale: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "numeric",
-    year: "numeric",
-    timeZone: "Asia/Phnom_Penh",
-  }).formatToParts(date);
-  const part = (type: string) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  const month =
-    (MONTH_LABELS[locale] ?? MONTH_LABELS.en)[Number(part("month")) - 1] ?? "";
-  return `${part("day")}, ${month} ${part("year")}`;
-}
 
 interface NotificationsProps {
   /** Page one, fetched by the page's server component. */
@@ -64,17 +46,19 @@ export default function Notifications({
 }: NotificationsProps) {
   const t = useTranslations("Notifications");
   const tCommon = useTranslations("Common");
-  const locale = useLocale();
   const [items, setItems] = React.useState(initial);
   const [hasMore, setHasMore] = React.useState(initialHasMore);
   const [page, setPage] = React.useState(1);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const queryClient = useQueryClient();
 
-  /** Keep the navbar bell badge in step with this page's mutations. */
+  /** Keep the navbar bell badge and its recent-list panel in step with this page's mutations. */
   function refreshUnreadCount() {
     void queryClient.invalidateQueries({
       queryKey: notificationKeys.unread(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: notificationKeys.recent(),
     });
   }
 
@@ -186,88 +170,11 @@ export default function Notifications({
           <ul className="divide-y divide-background">
             {items.map((notification) => (
               <li key={notification.id}>
-                <div
-                  className={`flex items-start p-4 transition-colors
-                    ${notification.isRead ? "bg-background hover:bg-gray-200" : "bg-muted hover:bg-gray-200"}`}
-                >
-                  {/* The message area is the click target: clicking an unread
-                      row marks it read. The 3-dot menu is a sibling, so its
-                      clicks never bubble into this handler. */}
-                  <div
-                    role={notification.isRead ? undefined : "button"}
-                    tabIndex={notification.isRead ? undefined : 0}
-                    aria-label={
-                      notification.isRead
-                        ? undefined
-                        : t("markRowAria", { title: notification.title })
-                    }
-                    onClick={() => {
-                      if (!notification.isRead) void markOne(notification);
-                    }}
-                    onKeyDown={(event) => {
-                      if (notification.isRead) return;
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        void markOne(notification);
-                      }
-                    }}
-                    className={`flex flex-1 items-start text-left outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-sky-500 ${
-                      notification.isRead ? "cursor-default" : "cursor-pointer"
-                    }`}
-                  >
-                    {/* Bell Icon Circle */}
-                    <div className="flex-shrink-0 w-14 h-14 bg-muted rounded-full flex items-center justify-center ">
-                      {notification.type === "security.new_login" ? (
-                        <ShieldAlert className="text-amber-600" />
-                      ) : (
-                        <IconBellFilled />
-                      )}
-                    </div>
-
-                    {/* Text Content */}
-                    <div className="ml-4 flex-1">
-                      <p className="text-foreground type-body">
-                        {notification.title}
-                      </p>
-                      {notification.body ? (
-                        <p className="type-body-sm text-gray-600 mt-1">
-                          {notification.body}
-                        </p>
-                      ) : null}
-                      <p className="type-meta text-gray-600 mt-1">
-                        {formatDate(notification.createdAt, locale)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Per-notification actions */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      aria-label={t("actionsAria", {
-                        title: notification.title,
-                      })}
-                      className="p-3 rounded-full transition-all text-gray-400 hover:bg-gray-100 cursor-pointer outline-none"
-                    >
-                      <MoreVertical className="text-xl" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {notification.isRead ? null : (
-                        <DropdownMenuItem
-                          className="text-sky-500 cursor-pointer"
-                          onClick={() => markOne(notification)}
-                        >
-                          {t("markRead")}
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        className="text-destructive cursor-pointer"
-                        onClick={() => removeOne(notification)}
-                      >
-                        {tCommon("delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <NotificationRow
+                  notification={notification}
+                  onMarkRead={markOne}
+                  onDelete={removeOne}
+                />
               </li>
             ))}
           </ul>
