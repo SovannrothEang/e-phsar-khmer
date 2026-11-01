@@ -196,6 +196,18 @@ export interface ThreadMessage extends ChatMessage {
   sharedLocation?: SharedLocation;
   /** Decrypted body is the structured "listing card only" marker. */
   listingOnly?: boolean;
+  /**
+   * No envelope for this device (`decrypt-message.ts` "unavailable" outcome)
+   * — predates this device joining the account's active set. Drives the
+   * collapsed notice row in `message-thread.tsx` (`lib/chat/group-unavailable`).
+   */
+  unavailable?: boolean;
+  /**
+   * Local-only row for a send the recipient cannot receive yet (no E2E device
+   * registered): "held" waits and sends by itself, "expired" gave up after the
+   * hold lifetime. Never present on server rows.
+   */
+  held?: "held" | "expired";
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */

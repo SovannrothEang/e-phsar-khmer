@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
-import { ChatModule } from '../chat/chat.module';
+import { ChatPubSubModule } from '../chat/chat-pubsub.module';
 import { InAppNotificationChannel } from './channels/in-app-notification.channel';
 import { RealtimeNotificationChannel } from './channels/realtime-notification.channel';
 import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
@@ -14,8 +14,9 @@ import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
  * real choice (it now sends notifications).
  */
 @Module({
-  // ChatModule provides the socket push transport for the realtime channel.
-  imports: [ChatModule],
+  // The pubsub leaf provides the socket push transport for the realtime
+  // channel without importing the chat feature (which imports AuthModule).
+  imports: [ChatPubSubModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,

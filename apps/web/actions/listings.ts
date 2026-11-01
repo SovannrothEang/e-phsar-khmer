@@ -12,9 +12,11 @@ import {
   getCommunes,
   getDistricts,
   getProvinces,
+  resolvePlaceSelection,
   getBodyTypes,
   getCategoryWithSubcategories,
   getColors,
+  getLinkedAttributeOptions,
   getModelsForBrand,
   getYears,
   getAllCategories,
@@ -23,6 +25,9 @@ import {
   type ListingsFeedParams,
 } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
+import type { ProductSummary } from "@/types/product";
+import { getProducts } from "@/lib/api/products";
+import { familyForSubcategory } from "@/lib/product-spec-families";
 import type { BackendUser } from "@/lib/api/adapters";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { formatPhoneLocal } from "@/lib/phone";
@@ -122,9 +127,35 @@ export interface ContactPrefill {
   email: string | null;
 }
 
-async function getUserContactPrefill(): Promise<ContactPrefill> {
+/**
+ * The signed-in user's saved location, shaped for the post form's cascade.
+ * The user row carries ids only, so the names come from the same public
+ * geography lookups the settings form resolves through.
+ */
+export interface LocationPrefill {
+  province: BackendPlace | null;
+  district: BackendPlace | null;
+  commune: BackendPlace | null;
+  address: string | null;
+}
+
+const EMPTY_LOCATION_PREFILL: LocationPrefill = {
+  province: null,
+  district: null,
+  commune: null,
+  address: null,
+};
+
+async function getUserProfilePrefill(): Promise<{
+  contact: ContactPrefill;
+  location: LocationPrefill;
+}> {
   const user = await getCurrentUser();
-  if (!user) return { name: "", phones: [], email: null };
+  if (!user)
+    return {
+      contact: { name: "", phones: [], email: null },
+      location: EMPTY_LOCATION_PREFILL,
+    };
 
   const [phonesRes, meRes] = await Promise.all([
     userServerFetch<UserPhoneRow[]>("/users/me/phones").catch(() => null),
@@ -140,10 +171,24 @@ async function getUserContactPrefill(): Promise<ContactPrefill> {
   const phones = (phonesRes?.data ?? []).map((p) => p.phone);
   if (phones.length === 0 && user.primaryPhone) phones.push(user.primaryPhone);
 
+  // Resolves at most two extra lookups, and only for the levels the account
+  // actually saved — an empty profile costs nothing.
+  const place = me
+    ? await resolvePlaceSelection(me.provinceId, me.districtId, me.communeId)
+    : EMPTY_LOCATION_PREFILL;
+
   return {
-    name,
-    phones: [...new Set(phones)].map(formatPhoneLocal).slice(0, 3),
-    email: me?.email ?? null,
+    contact: {
+      name,
+      phones: [...new Set(phones)].map(formatPhoneLocal).slice(0, 3),
+      email: me?.email ?? null,
+    },
+    location: {
+      province: place.province,
+      district: place.district,
+      commune: place.commune,
+      address: me?.address ?? null,
+    },
   };
 }
 
@@ -175,12 +220,22 @@ export interface ListingFormConfig {
   labels: Record<string, string>;
   brands: BackendBrand[];
   /**
+   * Published trusted product pages — only fetched when this subcategory
+   * declares `productSpec` (the phones form). Drives the required picker and
+   * local resolution of pasted product URLs; capped at 200 for v1.
+   */
+  products: ProductSummary[];
+  /**
    * Resolved options for whichever "kind of vehicle" field this subcategory
    * declares — `bodyType` (cars, lorries, motorcycles) or `vehicleType`
    * (Vehicles For Rent, Parts & Accessories). See the resolver in
    * `getListingFormConfig` for why three sources feed it.
    */
-  vehicleKinds: { name: string; image: string | null }[];
+  vehicleKinds: {
+    name: string;
+    nameKm?: string | null;
+    image: string | null;
+  }[];
   colors: BackendAttributeRow[];
   /**
    * Option lists for the plain-dropdown pickers (`storage`, `accessory`,
@@ -188,7 +243,10 @@ export interface ListingFormConfig {
    * only when the subcategory declares it — see `PICKER_ATTR_TYPES` for which
    * source wins for each.
    */
-  pickLists: Record<string, { name: string; image: string | null }[]>;
+  pickLists: Record<
+    string,
+    { name: string; nameKm?: string | null; image: string | null }[]
+  >;
   years: string[];
   /**
    * The subcategory's own photo cap, read from its `photos` field (`max`).
@@ -207,6 +265,12 @@ export interface ListingFormConfig {
   /** Province rows for the Location cascade (public lookup). */
   provinces: BackendPlace[];
   contact: ContactPrefill;
+  /**
+   * The user's saved location, so a new ad starts with Location and Address
+   * filled in. The form still applies each block only where the subcategory's
+   * schema declares it.
+   */
+  location: LocationPrefill;
 }
 
 export async function getListingFormConfig(
@@ -232,16 +296,31 @@ export async function getListingFormConfig(
     ),
   ];
 
-  const [brands, bodyTypes, colors, years, provinces, contact, pickerRows] =
-    await Promise.all([
-      has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
-      has("bodyType") || has("vehicleType") ? getBodyTypes() : [],
-      has("color") ? getColors() : [],
-      has("year") ? getYears() : [],
-      getProvinces(),
-      getUserContactPrefill(),
-      Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
-    ]);
+  const [
+    brands,
+    bodyTypes,
+    colors,
+    years,
+    provinces,
+    profile,
+    pickerRows,
+    products,
+  ] = await Promise.all([
+    has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
+    has("bodyType") || has("vehicleType") ? getBodyTypes() : [],
+    has("color") ? getColors() : [],
+    has("year") ? getYears() : [],
+    getProvinces(),
+    getUserProfilePrefill(),
+    Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
+    has("productSpec")
+      ? getProducts(
+          undefined,
+          200,
+          familyForSubcategory(subcategorySlug) ?? undefined,
+        )
+      : [],
+  ]);
 
   /**
    * Scope an option set to this subcategory.
@@ -311,9 +390,10 @@ export async function getListingFormConfig(
     pickLists[key] = managed
       ? scoped.map((r) => ({
           name: r.name,
+          nameKm: r.nameKm ?? null,
           image: textOnly ? null : r.image,
         }))
-      : inline.map((name) => ({ name, image: null }));
+      : inline.map((name) => ({ name, nameKm: null, image: null }));
   }
 
   /**
@@ -345,8 +425,12 @@ export async function getListingFormConfig(
     (sub.fieldSchema ?? []).find((f) => f.key === kindKey)?.options ?? [];
   const vehicleKinds =
     linkedKinds.length > 0
-      ? linkedKinds.map((r) => ({ name: r.name, image: r.image }))
-      : inlineKinds.map((name) => ({ name, image: null }));
+      ? linkedKinds.map((r) => ({
+          name: r.name,
+          nameKm: r.nameKm ?? null,
+          image: r.image,
+        }))
+      : inlineKinds.map((name) => ({ name, nameKm: null, image: null }));
 
   const labels: Record<string, string> = {};
   for (const field of sub.fieldSchema ?? []) {
@@ -370,6 +454,7 @@ export async function getListingFormConfig(
     fields,
     labels,
     brands,
+    products,
     vehicleKinds,
     colors: forSub(colors),
     pickLists,
@@ -377,7 +462,8 @@ export async function getListingFormConfig(
     photoMax,
     plan,
     provinces,
-    contact,
+    contact: profile.contact,
+    location: profile.location,
   };
 }
 
@@ -458,6 +544,110 @@ export async function getBrandModels(
   return getModelsForBrand(brandId, subcategorySlug);
 }
 
+/** One subcategory's option lists for the More Filters dialog. */
+export interface BrowseFilterOptions {
+  /** The subcategory's own field-schema keys — every dialog field is gated on
+   *  one of these, so a phone page never offers a Body Type. */
+  fields: string[];
+  brands: { id: string; slug: string; name: string }[];
+  /** The `bodytypes` rows linked to this subcategory; `slug` is the value the
+   *  browse grid writes into `ad_type`, so the dialog and the grid agree. */
+  bodyTypes: { slug: string; name: string }[];
+  colors: string[];
+  engineTypes: string[];
+  years: string[];
+  /**
+   * Every other `select` field the subcategory's schema declares (storage,
+   * screen size, RAM, CPU, job type, …), with its inline options. These are
+   * AND-ed through the feed's `attrs` JSON param; the dialog renders one
+   * select per entry, so the fields follow the form instead of a fixed list.
+   */
+  selects: {
+    key: string;
+    /** English schema label — the fallback when no `Specs.attributes` key exists. */
+    label: string;
+    options: { value: string; label: string }[];
+  }[];
+}
+
+/**
+ * Option lists for the More Filters dialog's vehicle fields.
+ *
+ * Gated by the subcategory's `field_schema`, and sourced exactly like the
+ * browse grid / post form so a value picked here always matches what listings
+ * actually store: brands from the subcategory's linked set, body types from
+ * the same linked `bodytypes` rows the grid renders, colours through the form's
+ * managed/global set rule, engine types from `enginetypes`, years from the
+ * generated `years` set.
+ */
+const DEDICATED_FILTER_KEYS = new Set([
+  "brand",
+  "model",
+  "condition",
+  "year",
+  "taxType",
+  "color",
+  "transmission",
+  "engineType",
+  "bodyType",
+  "vehicleType",
+]);
+
+export async function getBrowseFilterOptions(
+  categorySlug: string,
+  subcategorySlug: string,
+  locale: string,
+): Promise<BrowseFilterOptions | null> {
+  const category = await getCategoryWithSubcategories(categorySlug, locale);
+  const sub = category?.subcategories.find((s) => s.slug === subcategorySlug);
+  if (!sub) return null;
+
+  const fields = (sub.fieldSchema ?? []).map((f) => f.key);
+  const has = (key: string) => fields.includes(key);
+  const wantsBodyType = has("bodyType") || has("vehicleType");
+
+  const [brands, linkedRows, colors, engineRows, years] = await Promise.all([
+    has("brand") ? getBrandsForSubcategory(subcategorySlug) : [],
+    wantsBodyType ? getLinkedAttributeOptions(sub.id) : [],
+    has("color") ? getColors() : [],
+    has("engineType") ? getAttributeOptions("enginetypes") : [],
+    has("year") ? getYears() : [],
+  ]);
+
+  // Colours follow the post form's set rule: a managed set's ticks are the
+  // whole truth; a global picklist returns in full (see `forSub`).
+  const colorRows = colors.some((r) => r.subcategoryIds.length > 0)
+    ? colors.filter((r) => r.subcategoryIds.includes(sub.id))
+    : colors;
+
+  return {
+    fields,
+    brands: brands.map((b) => ({ id: b.id, slug: b.slug, name: b.name })),
+    // The grid renders exactly these linked rows, so the dialog's select can
+    // never offer a body type the grid cannot also select.
+    bodyTypes: linkedRows
+      .filter((r) => r.type === "bodytypes")
+      .map((r) => ({ slug: r.slug, name: r.name })),
+    colors: colorRows.map((r) => r.name),
+    engineTypes: engineRows.map((r) => r.name),
+    years: years.map((y) => y.name),
+    selects: (sub.fieldSchema ?? [])
+      // Keys with a dedicated control below are excluded here so the dialog
+      // cannot render the same dimension twice.
+      .filter(
+        (f) =>
+          f.type === "select" &&
+          !DEDICATED_FILTER_KEYS.has(f.key) &&
+          (f.options?.length ?? 0) > 0,
+      )
+      .map((f) => ({
+        key: f.key,
+        label: f.label?.en ?? f.key,
+        options: (f.options ?? []).map((o) => ({ value: o, label: o })),
+      })),
+  };
+}
+
 export interface AllAdsBatch {
   items: Post[];
   nextCursor: string | null;
@@ -531,6 +721,8 @@ export interface CreateListingPayload {
   provinceId?: string;
   districtId?: string;
   communeId?: string;
+  /** Trusted spec page (a `models` id) — required by the phones form. */
+  productModelId?: string;
   latitude?: number;
   longitude?: number;
   deliveryFree?: boolean;
@@ -540,21 +732,23 @@ export interface CreateListingPayload {
 }
 
 export type CreateListingResult =
-  | { success: true; listingId: string; warning?: string }
+  | { success: true; listingId: string }
   | { success: false; error: string };
 
 /**
- * Creates the listing (backend stores it as a draft) then immediately
- * publishes it — the feed only shows `active`. A publish failure still counts
- * as success so the seller can view/retry their draft; a create failure is a
- * hard error.
+ * Creates the listing (the backend stores it as a draft) then immediately
+ * publishes it — the feed only shows `active`. The web has no draft surface,
+ * so a refused publish rolls the created ad back instead of leaving an
+ * orphaned row nobody can see; both a create and a publish failure are hard
+ * errors shown on the form.
  */
 export async function createListing(
   payload: CreateListingPayload,
 ): Promise<CreateListingResult> {
-  // Refuse up front when the plan has no free ad slot, so a failed publish
-  // doesn't leave an orphaned draft behind.
-  // Limits are per category bucket, so ask for the one this ad lands in.
+  // Fast path: refuse up front when the plan has no room, so the common
+  // over-limit case never creates a row at all.
+  // Limits are the free/group pool plus the posting scope's cap, so ask for
+  // the subcategory this ad lands in.
   const plan = await getMyEntitlements(payload.subcategoryId).catch(() => null);
   if (plan && plan.usage.ads >= plan.limits.ads) {
     const bucketCopy = describeBucket(plan.bucket);
@@ -575,13 +769,17 @@ export async function createListing(
         method: "POST",
       });
     } catch (err) {
+      // Nothing in the app lists drafts, so an unpublished ad would vanish
+      // for its owner. Roll it back and surface the backend's own reason.
+      await userServerFetch(`/listings/${data.id}`, { method: "DELETE" }).catch(
+        () => undefined,
+      );
       return {
-        success: true,
-        listingId: data.id,
-        warning:
-          err instanceof ApiError && err.code.startsWith("PLAN_")
-            ? `Your ad was saved as a draft. ${err.message}`
-            : "Your ad was saved as a draft but could not be published yet.",
+        success: false,
+        error:
+          err instanceof ApiError
+            ? err.message
+            : "Your ad could not be published. Please try again.",
       };
     }
     return { success: true, listingId: data.id };

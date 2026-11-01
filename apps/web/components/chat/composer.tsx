@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   Camera,
+  ImageIcon,
   Loader2,
   Lock,
   MapPin,
@@ -11,6 +12,7 @@ import {
   Plus,
   SendHorizonal,
   Square,
+  Tag,
   Trash2,
   X,
 } from "lucide-react";
@@ -23,6 +25,9 @@ import {
   VoicePlayer,
   formatVoiceDuration,
 } from "@/components/chat/voice-player";
+import { AdPicker } from "@/components/chat/ad-picker";
+import type { PickedAd } from "@/components/chat/ad-picker";
+import { LocationPickerDialog } from "@/components/chat/location-picker-dialog";
 
 export interface ComposerDraft {
   body?: string;
@@ -32,6 +37,8 @@ export interface ComposerDraft {
   location?: { latitude: number; longitude: number; accuracyMeters?: number };
   /** Recorded voice note; the caller encrypts and uploads it as an attachment. */
   voice?: { file: File; durationMs: number };
+  /** Listing card picked from "my ads"; rides the message as its context. */
+  listingId?: string;
 }
 
 interface StagedImage {
@@ -94,14 +101,23 @@ export function Composer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  // The attachment panel is an overlay; the trigger is the focus anchor when it
+  // closes (Esc, outside tap, or picking a tile).
+  const plusRef = useRef<HTMLButtonElement>(null);
 
   const [text, setText] = useState("");
   const [staged, setStaged] = useState<StagedImage[]>([]);
   const [location, setLocation] = useState<StagedLocation | null>(null);
-  const [locating, setLocating] = useState(false);
   const [voice, setVoice] = useState<StagedVoice | null>(null);
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [ad, setAd] = useState<PickedAd | null>(null);
+  const [adPickerOpen, setAdPickerOpen] = useState(false);
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  // Bumped on every open so `LocationPickerDialog` remounts fresh instead of
+  // carrying over a previous pick, GPS fix or error message.
+  const [locationPickerKey, setLocationPickerKey] = useState(0);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -125,7 +141,8 @@ export function Composer({
     text.trim() !== "" ||
     staged.length > 0 ||
     location !== null ||
-    voice !== null;
+    voice !== null ||
+    ad !== null;
   const canSend = !disabled && !sending && !recording && hasContent;
   // Stay mounted while a send is in flight: submit clears the draft, and the
   // button must not disappear out from under the spinner.
@@ -329,35 +346,12 @@ export function Composer({
     else void startRecording();
   }
 
-  function requestLocation() {
-    if (locating) return;
-    // Only ever ask after an explicit click — a permission prompt on mount is
-    // hostile, and most threads never share a position.
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      toast.error(t("composer.locationUnsupported"));
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        if (!aliveRef.current) return;
-        setLocating(false);
-        const accuracy = position.coords.accuracy;
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          ...(Number.isFinite(accuracy) ? { accuracyMeters: accuracy } : {}),
-        });
-        toast.success(t("composer.locationReady"));
-        onActivity?.();
-      },
-      () => {
-        if (!aliveRef.current) return;
-        setLocating(false);
-        toast.error(t("composer.locationError"));
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
-    );
+  function openLocationPicker() {
+    // Only ever opens the dialog here — the GPS prompt itself lives inside
+    // `LocationPickerDialog`, behind its own "use current location" button.
+    setAttachOpen(false);
+    setLocationPickerKey((key) => key + 1);
+    setLocationPickerOpen(true);
   }
 
   function addFiles(files: File[]) {
@@ -405,6 +399,7 @@ export function Composer({
       voice: voice
         ? { file: voice.file, durationMs: voice.durationMs }
         : undefined,
+      listingId: ad?.id,
     });
     // Detach the registry keys before clearing state: the caller keeps reading
     // the draft files while it uploads, so the unmount cleanup must not release
@@ -413,6 +408,8 @@ export function Composer({
     setText("");
     setStaged([]);
     setLocation(null);
+    setAd(null);
+    setAttachOpen(false);
     discardVoice();
     onActivity?.();
   }, [
@@ -421,6 +418,7 @@ export function Composer({
     staged,
     location,
     voice,
+    ad,
     onSend,
     onActivity,
     discardVoice,
@@ -436,7 +434,7 @@ export function Composer({
   }
 
   return (
-    <div className="shrink-0 border-t border-border bg-card">
+    <div className="relative shrink-0 border-t border-border bg-card">
       {recording && (
         <div
           role="status"
@@ -462,30 +460,29 @@ export function Composer({
 
       <div className="flex items-center gap-0.5 px-2 py-2 sm:px-3">
         <button
+          ref={plusRef}
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={sending || remaining <= 0}
-          aria-label={t("composer.attachImage")}
-          className={ICON_BUTTON_CLASS}
-        >
-          <Plus className="size-[18px]" />
-        </button>
-
-        <button
-          type="button"
-          onClick={requestLocation}
-          disabled={sending || locating}
+          onClick={() => setAttachOpen((open) => !open)}
+          disabled={sending}
+          aria-expanded={attachOpen}
+          aria-controls={attachOpen ? "chat-attach-menu" : undefined}
           aria-label={
-            locating
-              ? t("composer.locationLocating")
-              : t("composer.shareLocation")
+            attachOpen
+              ? t("composer.attachMenuClose")
+              : t("composer.attachMenu")
           }
-          className={ICON_BUTTON_CLASS}
+          className={cn(
+            "shrink-0 transition-colors",
+            attachOpen
+              ? // Reference: the trigger becomes a large ringed X once open.
+                "mr-1 flex size-12 items-center justify-center rounded-full border-2 border-sky-500 text-sky-400 hover:bg-sky-500/10"
+              : ICON_BUTTON_CLASS,
+          )}
         >
-          {locating ? (
-            <Loader2 className="size-[18px] animate-spin" />
+          {attachOpen ? (
+            <X className="size-5" strokeWidth={3} />
           ) : (
-            <MapPin className="size-[18px]" />
+            <Plus className="size-[18px]" />
           )}
         </button>
 
@@ -571,7 +568,68 @@ export function Composer({
         )}
       </div>
 
-      {(staged.length > 0 || location !== null || voice !== null) && (
+      {attachOpen && (
+        <>
+          {/* Outside tap dismisses the overlay without dimming the thread. */}
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={t("composer.attachMenuClose")}
+            onClick={() => setAttachOpen(false)}
+            className="fixed inset-0 z-10 cursor-default"
+          />
+          <div
+            id="chat-attach-menu"
+            role="group"
+            aria-label={t("composer.attachMenu")}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.stopPropagation();
+              setAttachOpen(false);
+              plusRef.current?.focus();
+            }}
+            className="absolute bottom-full left-2 z-20 mb-2 w-[min(92vw,460px)] rounded-xl border border-white/10 bg-[#232327] p-2 shadow-2xl"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <AttachTile
+                icon={<ImageIcon />}
+                label={t("composer.tilePhoto")}
+                disabled={sending || remaining <= 0}
+                onClick={() => {
+                  setAttachOpen(false);
+                  fileInputRef.current?.click();
+                }}
+              />
+              <AttachTile
+                icon={<Mic />}
+                label={t("composer.tileVoice")}
+                disabled={sending || recording}
+                onClick={() => {
+                  setAttachOpen(false);
+                  void toggleRecording();
+                }}
+              />
+              <AttachTile
+                icon={<MapPin />}
+                label={t("composer.tileLocation")}
+                disabled={sending}
+                onClick={openLocationPicker}
+              />
+              <AttachTile
+                icon={<Tag />}
+                label={t("composer.tileAd")}
+                disabled={sending}
+                onClick={() => {
+                  setAttachOpen(false);
+                  setAdPickerOpen(true);
+                }}
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {(staged.length > 0 || location !== null || voice !== null || ad) && (
         <div className="flex items-center gap-2 overflow-x-auto px-3 pb-2.5">
           {staged.map((item, index) => (
             <div
@@ -638,6 +696,23 @@ export function Composer({
             </div>
           )}
 
+          {ad && (
+            <div className="flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border border-border bg-muted/50 py-1 pl-2.5 pr-1">
+              <Tag className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs text-foreground">
+                {ad.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAd(null)}
+                aria-label={t("composer.removeAd")}
+                className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
           {staged.length > 0 && (
             <span
               className={cn(
@@ -674,6 +749,50 @@ export function Composer({
           e.target.value = "";
         }}
       />
+
+      <AdPicker
+        open={adPickerOpen}
+        onOpenChange={setAdPickerOpen}
+        onSelect={(picked) => {
+          setAd(picked);
+          onActivity?.();
+        }}
+      />
+
+      <LocationPickerDialog
+        key={locationPickerKey}
+        open={locationPickerOpen}
+        onOpenChange={setLocationPickerOpen}
+        onConfirm={(picked) => {
+          setLocation(picked);
+          onActivity?.();
+        }}
+      />
     </div>
+  );
+}
+
+/** One tile in the composer's "+" menu: icon above a short label. */
+function AttachTile({
+  icon,
+  label,
+  disabled,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-lg bg-[#2d2d31] px-3 py-4 text-sm font-medium text-white transition-colors hover:bg-[#36363c] disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <span className="text-white/90 [&_svg]:size-6">{icon}</span>
+      <span className="text-center leading-tight">{label}</span>
+    </button>
   );
 }

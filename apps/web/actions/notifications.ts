@@ -35,6 +35,14 @@ export async function getNotifications(
   return { items: data ?? [], hasMore: meta?.hasMore ?? false };
 }
 
+/** Unread count for the navbar bell badge. */
+export async function getUnreadNotificationCount(): Promise<number> {
+  const { data } = await userServerFetch<{ total: number }>(
+    "/notifications/unread-count",
+  );
+  return data?.total ?? 0;
+}
+
 export async function markNotificationRead(
   id: string,
 ): Promise<NotificationActionResult> {

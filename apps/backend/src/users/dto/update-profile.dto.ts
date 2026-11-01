@@ -1,5 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
+  IsDateString,
   IsEmail,
   IsIn,
   IsInt,
@@ -38,6 +40,16 @@ export class UpdateProfileDto {
   @IsIn(['male', 'female'])
   gender?: 'male' | 'female' | null;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'ISO date (YYYY-MM-DD); also keeps `yearOfBirth` in sync.',
+    example: '1995-04-17',
+  })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  dateOfBirth?: string | null;
+
+  // Legacy year-only field; the settings form now sends `dateOfBirth`.
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsInt()
@@ -77,20 +89,64 @@ export class UpdateProfileDto {
   @IsString()
   address?: string | null;
 
-  @ApiPropertyOptional()
+  // `null` clears the pin — the settings map's remove control. The service
+  // maps a null to SQL NULL (`String(null)` would write the literal "null").
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsLatitude()
   @Type(() => Number)
-  latitude?: number;
+  latitude?: number | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsLongitude()
   @Type(() => Number)
-  longitude?: number;
+  longitude?: number | null;
 
-  @ApiPropertyOptional({ enum: ['en', 'km', 'zh', 'ko', 'id', 'vi'] })
+  /**
+   * Settings-only switch behind "Update this contact to your ads": after the
+   * profile write, copy the contact block and location (province/district/
+   * commune, address, and the map pin when the profile has one) to every
+   * non-deleted listing the user owns. Additive and optional, so existing
+   * callers are unaffected.
+   */
+  @ApiPropertyOptional()
   @IsOptional()
-  @IsIn(['en', 'km', 'zh', 'ko', 'id', 'vi'])
+  @IsBoolean()
+  updateAdsContact?: boolean;
+
+  @ApiPropertyOptional({ enum: ['en', 'km'] })
+  @IsOptional()
+  @IsIn(['en', 'km'])
   preferredLanguage?: string;
+
+  /**
+   * Settings → Privacy lookup visibility: `true` = Public, `false` = Only Me.
+   * Optional like every other field, so a PATCH that flips one toggle leaves
+   * the other four untouched.
+   */
+  @ApiPropertyOptional({ description: 'true = Public, false = Only Me' })
+  @IsOptional()
+  @IsBoolean()
+  discoverableByGender?: boolean;
+
+  @ApiPropertyOptional({ description: 'true = Public, false = Only Me' })
+  @IsOptional()
+  @IsBoolean()
+  discoverableByDateOfBirth?: boolean;
+
+  @ApiPropertyOptional({ description: 'true = Public, false = Only Me' })
+  @IsOptional()
+  @IsBoolean()
+  discoverableByPhone?: boolean;
+
+  @ApiPropertyOptional({ description: 'true = Public, false = Only Me' })
+  @IsOptional()
+  @IsBoolean()
+  discoverableByEmail?: boolean;
+
+  @ApiPropertyOptional({ description: 'true = Public, false = Only Me' })
+  @IsOptional()
+  @IsBoolean()
+  discoverableByLocation?: boolean;
 }

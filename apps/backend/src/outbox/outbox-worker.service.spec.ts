@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { OutboxWorker } from './outbox-worker.service';
 import type { DispatchOutcome } from './outbox.types';
 
@@ -16,15 +17,36 @@ function makeConfigService(values: Record<string, unknown> = {}) {
   return { get: jest.fn((key: string) => values[key]) };
 }
 
+/**
+ * `peeks` are the successive answers of `OutboxService.msUntilNextDue()`;
+ * once they run out it answers `null` ("nothing waiting").
+ */
+function makeOutbox(...peeks: Array<number | null | Error>) {
+  const msUntilNextDue = jest.fn<Promise<number | null>, []>();
+  peeks.forEach((p) =>
+    p instanceof Error
+      ? msUntilNextDue.mockRejectedValueOnce(p)
+      : msUntilNextDue.mockResolvedValueOnce(p),
+  );
+  msUntilNextDue.mockResolvedValue(null);
+  return { instanceId: 'test-instance', msUntilNextDue };
+}
+
 function makeWorker(
   dispatcher: { dispatchDue: jest.Mock },
   values: Record<string, unknown> = {},
+  outbox: ReturnType<typeof makeOutbox> = makeOutbox(),
 ) {
   return new OutboxWorker(
     dispatcher as never,
-    { instanceId: 'test-instance' } as never,
+    outbox as never,
     makeConfigService(values) as never,
   );
+}
+
+function waiterCount(worker: OutboxWorker): number {
+  return (worker as unknown as { wakeupSignal: { waiters: Set<unknown> } })
+    .wakeupSignal.waiters.size;
 }
 
 /** Drains microtasks (and lets worker loops reach their next await) on real timers. */
@@ -70,106 +92,173 @@ describe('OutboxWorker.runOnce', () => {
 });
 
 describe('OutboxWorker lifecycle', () => {
+  const started = {
+    'outbox.workerEnabled': true,
+    'outbox.workerConcurrency': 2,
+    'outbox.pollIntervalMs': 60_000,
+  };
+
   it('does not start when the worker is disabled', async () => {
     const { dispatcher, dispatchDue } = makeDispatcher([]);
-    const worker = makeWorker(dispatcher, { 'outbox.workerEnabled': false });
+    const outbox = makeOutbox();
+    const worker = makeWorker(
+      dispatcher,
+      { 'outbox.workerEnabled': false },
+      outbox,
+    );
 
     worker.onApplicationBootstrap();
     await worker.onModuleDestroy();
 
     expect(dispatchDue).not.toHaveBeenCalled();
+    expect(outbox.msUntilNextDue).not.toHaveBeenCalled();
   });
 
-  it('a wakeup triggers a dispatch without waiting for the poll interval', async () => {
+  it('boots against an empty table with one cheap peek and no claim', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
+    const outbox = makeOutbox();
+    const worker = makeWorker(dispatcher, started, outbox);
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(outbox.msUntilNextDue).toHaveBeenCalledTimes(1);
+    expect(dispatchDue).not.toHaveBeenCalled();
+    await worker.onModuleDestroy();
+  });
+
+  it('claims at boot when the peek says a backlog is already due', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
+    const worker = makeWorker(dispatcher, started, makeOutbox(0));
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
+    await worker.onModuleDestroy();
+  });
+
+  it('a wakeup triggers a dispatch without waiting for any timer', async () => {
     jest.useFakeTimers();
     const { dispatcher, dispatchDue } = makeDispatcher([]);
     const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 2,
-      'outbox.pollIntervalMs': 60_000,
+      ...started,
+      'outbox.workerConcurrency': 1,
     });
 
     worker.onApplicationBootstrap();
-    // Startup wakeup broadcasts to both workers.
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(2);
+    expect(dispatchDue).not.toHaveBeenCalled();
 
-    // A producer's wakeup drains again, 60s before the fallback would fire.
     worker.wakeup();
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(4);
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
 
     await worker.onModuleDestroy();
   });
 
-  it('polls via the fallback timeout when no wakeup arrives', async () => {
+  it('makes no claim queries at all while the table stays empty', async () => {
     jest.useFakeTimers();
     const { dispatcher, dispatchDue } = makeDispatcher([]);
-    const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 1,
-      'outbox.pollIntervalMs': 50,
-    });
+    const outbox = makeOutbox();
+    const worker = makeWorker(dispatcher, started, outbox);
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(10 * 60_000);
+
+    expect(dispatchDue).not.toHaveBeenCalled();
+    // One heartbeat peek a minute (plus boot) — not one query every 2 s.
+    expect(outbox.msUntilNextDue.mock.calls.length).toBeLessThanOrEqual(12);
+    await worker.onModuleDestroy();
+  });
+
+  it('sleeps until the next row is due instead of polling for it', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
+    // Boot: a retry is due in 5 s. At that point the peek says "now".
+    const outbox = makeOutbox(5_000, 0);
+    const worker = makeWorker(dispatcher, started, outbox);
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(4_000);
+    expect(dispatchDue).not.toHaveBeenCalled();
+    expect(outbox.msUntilNextDue).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(1_500);
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
+    await worker.onModuleDestroy();
+  });
+
+  it('recovers a lost wakeup within one heartbeat', async () => {
+    jest.useFakeTimers();
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
+    // Boot sees nothing; a row inserted by another process shows up at the
+    // first heartbeat.
+    const outbox = makeOutbox(null, 0);
+    const worker = makeWorker(dispatcher, started, outbox);
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(59_000);
+    expect(dispatchDue).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(2_000);
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
+    await worker.onModuleDestroy();
+  });
+
+  it('re-arms from the database after handling events, so a backoff retry is not left to the heartbeat', async () => {
+    jest.useFakeTimers();
+    // The drain handles one event, which its handler pushes 1 s into the future.
+    const { dispatcher, dispatchDue } = makeDispatcher([
+      outcome('retry', 'evt-1'),
+    ]);
+    const outbox = makeOutbox(0, 1_000, 0);
+    const worker = makeWorker(
+      dispatcher,
+      { ...started, 'outbox.workerConcurrency': 1 },
+      outbox,
+    );
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
     expect(dispatchDue).toHaveBeenCalledTimes(1);
 
-    // No wakeup — the fallback timer is the only thing that can run it again.
-    await jest.advanceTimersByTimeAsync(50);
+    // Well inside the 60 s heartbeat.
+    await jest.advanceTimersByTimeAsync(2_000);
     expect(dispatchDue).toHaveBeenCalledTimes(2);
-
     await worker.onModuleDestroy();
   });
 
-  it('costs one claim per fallback tick regardless of pool size, and retains no waiters', async () => {
+  it('falls back to a plain claim when the peek fails, and keeps its heartbeat', async () => {
     jest.useFakeTimers();
     const { dispatcher, dispatchDue } = makeDispatcher([]);
-    const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 3,
-      'outbox.pollIntervalMs': 50,
-    });
+    const outbox = makeOutbox(new Error('peek is broken'), 0);
+    const worker = makeWorker(dispatcher, started, outbox);
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
-    // The startup wakeup fans out to all workers. Subsequent idle fallback
-    // should perform one claim per pool interval, not one claim per worker.
-    expect(dispatchDue).toHaveBeenCalledTimes(3);
+    // A broken peek must never leave due rows unclaimed: claim anyway.
+    expect(dispatchDue).toHaveBeenCalledTimes(1);
 
-    await jest.advanceTimersByTimeAsync(150);
-    expect(dispatchDue).toHaveBeenCalledTimes(6);
-
-    const signal = (
-      worker as unknown as {
-        wakeupSignal: { waiters: Set<unknown> };
-      }
-    ).wakeupSignal;
-    // Every tick wakes one worker that re-parks afterwards, so the waiter set
-    // never grows past the pool size.
-    expect(signal.waiters.size).toBe(3);
-
+    await jest.advanceTimersByTimeAsync(61_000);
+    expect(outbox.msUntilNextDue).toHaveBeenCalledTimes(2);
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
     await worker.onModuleDestroy();
   });
 
-  it('keeps draining after a tick throws', async () => {
+  it('keeps draining after a claim throws', async () => {
     jest.useFakeTimers();
     const dispatchDue = jest
       .fn<Promise<DispatchOutcome[]>, [number]>()
       .mockRejectedValueOnce(new Error('database is down'))
       .mockResolvedValue([]);
-    const worker = makeWorker(
-      { dispatchDue },
-      {
-        'outbox.workerEnabled': true,
-        'outbox.workerConcurrency': 1,
-        'outbox.pollIntervalMs': 50,
-      },
-    );
+    const worker = makeWorker({ dispatchDue }, started, makeOutbox(0, 0));
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(50);
+    await jest.advanceTimersByTimeAsync(61_000);
 
     expect(dispatchDue).toHaveBeenCalledTimes(2);
     await worker.onModuleDestroy();
@@ -181,16 +270,15 @@ describe('OutboxWorker lifecycle', () => {
       outcome('published', `evt-${i}`),
     );
     const { dispatcher, dispatchDue } = makeDispatcher(full);
-    const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 1,
-      'outbox.pollIntervalMs': 60_000,
-      'outbox.batchSize': 10,
-    });
+    const worker = makeWorker(
+      dispatcher,
+      { ...started, 'outbox.workerConcurrency': 1, 'outbox.batchSize': 10 },
+      makeOutbox(0),
+    );
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
-    // Full batch → immediate second dispatch, not a 60s wait.
+    // Full batch → immediate second dispatch, not a 60 s wait.
     await jest.advanceTimersByTimeAsync(1);
 
     expect(dispatchDue).toHaveBeenCalledTimes(2);
@@ -213,14 +301,15 @@ describe('OutboxWorker lifecycle', () => {
 
     const worker = makeWorker(
       { dispatchDue },
-      {
-        'outbox.workerEnabled': true,
-        'outbox.workerConcurrency': 3,
-        'outbox.pollIntervalMs': 60_000,
-      },
+      { ...started, 'outbox.workerConcurrency': 3 },
     );
 
     worker.onApplicationBootstrap();
+    await flush();
+    // Three wakeups reach the three parked workers.
+    worker.wakeup();
+    worker.wakeup();
+    worker.wakeup();
     await flush();
     expect(active).toBe(3);
     expect(maxActive).toBe(3);
@@ -243,42 +332,28 @@ describe('OutboxWorker lifecycle', () => {
     await worker.onModuleDestroy();
   });
 
-  it('uses a fallback claim to wake idle peers when backlog exists', async () => {
+  it('a check that finds due work wakes the idle peers too', async () => {
     jest.useFakeTimers();
-    const found = [outcome('published', 'evt-found')];
-    const { dispatcher, dispatchDue } = makeDispatcher(
-      [],
-      [],
-      [],
-      found,
-      [],
-      [],
+    const { dispatcher, dispatchDue } = makeDispatcher([
+      outcome('published', 'evt-found'),
+      outcome('published', 'evt-found-2'),
+    ]);
+    const worker = makeWorker(
+      dispatcher,
+      { ...started, 'outbox.workerConcurrency': 3, 'outbox.batchSize': 2 },
+      makeOutbox(0),
     );
-    const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 3,
-      'outbox.pollIntervalMs': 50,
-      'outbox.batchSize': 2,
-    });
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(3); // startup fan-out
-    expect(
-      (worker as unknown as { wakeupSignal: { waiters: Set<unknown> } })
-        .wakeupSignal.waiters.size,
-    ).toBe(3);
-
-    await jest.advanceTimersByTimeAsync(50);
     await jest.advanceTimersByTimeAsync(0);
-    // The fallback worker finds due work and broadcasts to its two idle
-    // peers, which each make a concurrent claim.
-    expect(dispatchDue).toHaveBeenCalledTimes(6);
 
+    // One worker found a full batch and fanned out to its two idle peers.
+    expect(dispatchDue.mock.calls.length).toBeGreaterThanOrEqual(3);
     await worker.onModuleDestroy();
   });
 
-  it('keeps polling while one worker is stuck in a hung handler', async () => {
+  it('keeps running while one worker is stuck in a hung handler', async () => {
     jest.useFakeTimers();
     let calls = 0;
     const dispatchDue = jest.fn(async (): Promise<DispatchOutcome[]> => {
@@ -287,22 +362,17 @@ describe('OutboxWorker lifecycle', () => {
       if (calls === 1) await new Promise<void>(() => undefined);
       return [];
     });
-    const worker = makeWorker(
-      { dispatchDue },
-      {
-        'outbox.workerEnabled': true,
-        'outbox.workerConcurrency': 2,
-        'outbox.pollIntervalMs': 50,
-      },
-    );
+    const worker = makeWorker({ dispatchDue }, started, makeOutbox(null, 0));
 
     worker.onApplicationBootstrap();
+    worker.wakeup();
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(2); // startup fan-out
+    // A wakeup reaches both parked workers; the first one never comes back.
+    expect(dispatchDue).toHaveBeenCalledTimes(2);
 
-    // The fallback keeps ticking through the surviving worker.
-    await jest.advanceTimersByTimeAsync(150);
-    expect(dispatchDue).toHaveBeenCalledTimes(5);
+    // The heartbeat is independent of the hung worker and reaches the other.
+    await jest.advanceTimersByTimeAsync(61_000);
+    expect(dispatchDue).toHaveBeenCalledTimes(3);
 
     // Shutdown gives the hung worker its grace period, then gives up on it.
     const destroyed = worker.onModuleDestroy();
@@ -310,43 +380,84 @@ describe('OutboxWorker lifecycle', () => {
     await destroyed;
   });
 
-  it('stops the fallback timer on shutdown', async () => {
+  it('stops checking on shutdown', async () => {
     jest.useFakeTimers();
-    const { dispatcher, dispatchDue } = makeDispatcher([], []);
-    const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
-      'outbox.workerConcurrency': 2,
-      'outbox.pollIntervalMs': 50,
-    });
+    const { dispatcher } = makeDispatcher([]);
+    const outbox = makeOutbox();
+    const worker = makeWorker(dispatcher, started, outbox);
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
     await worker.onModuleDestroy();
-    await jest.advanceTimersByTimeAsync(500);
+    const after = outbox.msUntilNextDue.mock.calls.length;
+    await jest.advanceTimersByTimeAsync(10 * 60_000);
 
-    expect(dispatchDue).toHaveBeenCalledTimes(2);
+    expect(outbox.msUntilNextDue).toHaveBeenCalledTimes(after);
   });
 
   it('releases parked workers on shutdown without starting another drain', async () => {
     jest.useFakeTimers();
-    const { dispatcher, dispatchDue } = makeDispatcher([], [], []);
+    const { dispatcher, dispatchDue } = makeDispatcher([]);
     const worker = makeWorker(dispatcher, {
-      'outbox.workerEnabled': true,
+      ...started,
       'outbox.workerConcurrency': 3,
-      'outbox.pollIntervalMs': 60_000,
     });
 
     worker.onApplicationBootstrap();
     await jest.advanceTimersByTimeAsync(0);
-    expect(dispatchDue).toHaveBeenCalledTimes(3);
+    expect(waiterCount(worker)).toBe(3);
 
     await worker.onModuleDestroy();
     await jest.advanceTimersByTimeAsync(0);
 
-    expect(dispatchDue).toHaveBeenCalledTimes(3);
-    expect(
-      (worker as unknown as { wakeupSignal: { waiters: Set<unknown> } })
-        .wakeupSignal.waiters.size,
-    ).toBe(0);
+    expect(dispatchDue).not.toHaveBeenCalled();
+    expect(waiterCount(worker)).toBe(0);
+  });
+});
+
+describe('OutboxWorker stats', () => {
+  const started = {
+    'outbox.workerEnabled': true,
+    'outbox.workerConcurrency': 1,
+    'outbox.pollIntervalMs': 60_000,
+  };
+
+  it('counts checks, drains and handled events', async () => {
+    jest.useFakeTimers();
+    const { dispatcher } = makeDispatcher([
+      outcome('published', 'a'),
+      outcome('published', 'b'),
+    ]);
+    const worker = makeWorker(dispatcher, started, makeOutbox(0));
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(0);
+
+    const stats = worker.getStats();
+    expect(stats.drains).toBe(1);
+    expect(stats.events).toBe(2);
+    expect(stats.checks).toBeGreaterThanOrEqual(1);
+    await worker.onModuleDestroy();
+  });
+
+  it('logs a summary line every ten minutes and starts a new window', async () => {
+    jest.useFakeTimers();
+    const log = jest
+      .spyOn(Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    const { dispatcher } = makeDispatcher([]);
+    const worker = makeWorker(dispatcher, started);
+
+    worker.onApplicationBootstrap();
+    await jest.advanceTimersByTimeAsync(11 * 60_000);
+
+    const summaries = log.mock.calls.filter(([m]) =>
+      String(m).startsWith('Outbox stats'),
+    );
+    expect(summaries).toHaveLength(1);
+    expect(worker.getStats().checks).toBeLessThan(11);
+
+    await worker.onModuleDestroy();
+    log.mockRestore();
   });
 });

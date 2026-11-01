@@ -1,6 +1,6 @@
 "use server";
 
-import { ApiError } from "@/lib/api/user-client";
+import { ApiError, userServerFetch } from "@/lib/api/user-client";
 import { getMyAdsPage } from "@/lib/api/my-ads";
 import type { MyAdsTab } from "@/lib/api/my-ads";
 import { getMyEntitlements } from "@/actions/subscriptions";
@@ -14,6 +14,41 @@ export interface MyAdsPageResult {
   /** Plan limits + live usage; null when unavailable (fail-soft). */
   plan?: PlanEntitlements | null;
   error?: string;
+}
+
+export interface MyAdActionResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Renew = re-publish. The backend extends the ad by 30 days, and an ad that
+ * already went live spends one renewal from the owner's plan — refused with
+ * `PLAN_LIMIT_RENEWS` / `PLAN_LIMIT_ADS` when the plan says no.
+ */
+export async function renewMyListing(id: string): Promise<MyAdActionResult> {
+  try {
+    await userServerFetch(`/listings/${id}/publish`, { method: "POST" });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Network error",
+    };
+  }
+}
+
+/** Soft-delete: the ad leaves the feed and both Manage Ads tabs. */
+export async function deleteMyListing(id: string): Promise<MyAdActionResult> {
+  try {
+    await userServerFetch(`/listings/${id}`, { method: "DELETE" });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Network error",
+    };
+  }
 }
 
 /**

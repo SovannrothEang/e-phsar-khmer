@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   numeric,
@@ -86,6 +87,9 @@ export const users = pgTable(
     firstName: varchar('first_name', { length: 100 }),
     lastName: varchar('last_name', { length: 100 }),
     gender: userGenderEnum('gender'),
+    /** Full birthday (the settings day picker). */
+    dateOfBirth: date('date_of_birth'),
+    /** Legacy year-only field, kept in sync from `dateOfBirth` on writes. */
     yearOfBirth: integer('year_of_birth'),
     company: varchar('company', { length: 150 }),
     coverPhotoUrl: text('cover_photo_url'),
@@ -110,6 +114,24 @@ export const users = pgTable(
     role: userRoleEnum('role').default('user').notNull(),
     status: userStatusEnum('status').default('active').notNull(),
     isBusiness: boolean('is_business').default(false).notNull(),
+    // Settings → Privacy lookup visibility: `true` = Public, `false` = Only Me.
+    // Defaults reproduce the page's pre-persistence mock: phone, email and
+    // location public; gender and date of birth private.
+    discoverableByGender: boolean('discoverable_by_gender')
+      .default(false)
+      .notNull(),
+    discoverableByDateOfBirth: boolean('discoverable_by_date_of_birth')
+      .default(false)
+      .notNull(),
+    discoverableByPhone: boolean('discoverable_by_phone')
+      .default(true)
+      .notNull(),
+    discoverableByEmail: boolean('discoverable_by_email')
+      .default(true)
+      .notNull(),
+    discoverableByLocation: boolean('discoverable_by_location')
+      .default(true)
+      .notNull(),
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),

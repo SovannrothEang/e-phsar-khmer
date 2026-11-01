@@ -46,3 +46,8 @@ yarn-error.log*
 
 # lavish review artifacts
 .lavish/
+
+# Local Claude Code harness state (sessions, transcripts, runtime)
+.claude/
+docs/
+.harness/

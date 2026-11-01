@@ -204,6 +204,14 @@ export class SendMessageDto {
 
 `chat.gateway.ts`'s `send_message` event already forwards the full DTO into `ChatService.sendMessage`. `e2eHeader` rides along for free. This is the one place the module's existing "one write path, REST or WS" design (documented in `chat/README.md`) pays off directly for this feature — zero WS-specific crypto work.
 
+### 7b. Realtime hint for the backup (2026-10-26)
+
+The one backup event (`e2e.backup_updated`, fired when another device uploads segments) rides the same
+`notification` frame as any other push, to the user's own tabs only, with ids and no ciphertext. It replaces the
+old 60 s backup pull while the socket is up; the poll stays as a 5-minute safety net and as the fallback when the
+socket is down. Contract and delivery rules: `apps/backend/src/chat/README.md`. Device approval was removed the
+same day — the backup passcode is the only way a new device obtains the backup key.
+
 ### 8. Client-side key storage
 
 - Identity keypair (now: keypairs, plural — decision #9) generated on first use of the feature, stored locally (native app: platform keystore/secure enclave; web: IndexedDB — accepted as weaker, see Risks).
@@ -246,6 +254,78 @@ belonging to (this account, this install)
 **Sharp edge, stated explicitly so it isn't rediscovered mid-implementation:** identity is per-_account_, not per-_device_ (decision #2 — single device, v1). A second device logging in **overwrites** the server's identity record for that user (`onConflictDoUpdate` on `userId`, per the endpoint design above). This silently invalidates any session the first device had established with its contacts — their next message to this user triggers a fresh X3DH handshake against the new identity, because the old one no longer resolves. This is the single-device model working as designed, not a bug, but it is a real, visible behavior change for a user who logs into a second device, so client UX should say something (e.g. "signing in here starts fresh secure sessions with your contacts") rather than let it happen invisibly.
 
 **Fail-closed on missing recipient keys (decision #6):** if `GET .../keys/:userId/bundle` 404s (recipient's client hasn't bootstrapped yet), the sender's client refuses the E2E send with a clear error — no plaintext fallback, no silent queue-and-retry. Dev-stage, this is easy: every test client can be forced through the bootstrap flow above before it's usable at all, so the 404 case becomes rare by construction rather than something to design a fallback UX around.
+
+### 9b. Key availability — a chat partner is never "not set up yet" (2026-10-27)
+
+End-to-end encryption is unchanged and strict (decision #6: no plaintext fallback, the server never holds a
+body it can read). What changed is that an account that has signed in is always reachable, and the sender
+no longer sees "ask them to open Messages once".
+
+1. **Registration invariant.** Every successful sign-in registers this browser as a device straight away:
+   `bootstrapE2eAfterAuth` (`apps/web/lib/e2e/bootstrap-after-auth.ts`) runs after a password login and
+   after an OTP verify (login and registration). Measured in a fresh browser profile: the device row exists
+   ~0.75 s after submit, before the redirect, with no reload. `E2eBackupProvider` remains the safety net.
+2. **Targetability rule** (`loadTargetDevices`, `apps/backend/src/chat/e2e/e2e-devices.util.ts`). Per user:
+   the non-revoked devices seen within `DEVICE_STALE_DAYS` (30); if there are none, the
+   `STALE_FALLBACK_DEVICES` (2) most recently seen non-revoked devices. The devices list, the bundle fetch
+   and both send-path set checks all call it, so the sender's envelope set and the server's expected set
+   cannot disagree. A user with at least one non-revoked device is therefore always targetable.
+   **Limit:** a message to a stale device is readable only if the person comes back on that same browser; a
+   different browser or cleared data is a new device with no envelope for it (only the history backup helps).
+3. **Staying fresh.** The leader tab re-runs the device heartbeat and prekey top-up about every 6 h and on
+   becoming visible after a long gap (`heartbeat-schedule.ts`). After the first bootstrap the browser is
+   asked for persistent storage (`navigator.storage.persist()`), since identity keys live only in
+   IndexedDB. Consecutive bootstrap failures are counted (`bootstrap-health.ts`) and one dismissible notice
+   appears in the chat column after two in a row (storage blocked vs other).
+4. **A recipient with no device at all** (never signed in on an E2E build). The sender **holds** the sealed
+   message locally (`held-sends.ts`, IndexedDB `npic-e2e-held-sends`, glue in `held-sends-runtime.ts`):
+   - the bubble reads "Waiting for <name> to join secure chat. It will send automatically." with Cancel;
+   - it is retried when the thread opens and by one app-wide loop that exists only while something is held
+     (30 s, doubling to 2 min; leader tab, visible tabs only); a send happens at most once (per-recipient
+     Web Lock plus a re-read before each send, and the server dedups on `clientMessageId`);
+   - after 14 days, or on a permanent 4xx error, it becomes a visible "not sent" row with Remove;
+   - encrypted-attachment sends use the same hold through the attachment outbox.
+5. **Nudge.** The first held message for a recipient calls `POST /chats/e2e/nudge/:userId`: JWT, 404 unknown
+   user, 403 when either side blocked the other, a no-op when this sender already nudged this recipient in
+   the last 24 h (checked against the `notifications` table, no migration). It creates an in-app
+   notification `chat.e2e_nudge` with a fixed title (or the title of an optional attached listing) and no
+   body. **No Telegram delivery yet**: the codebase has no Telegram messaging channel (Telegram is login only).
+
+**Residual limits.** Held plaintext sits in the sender's IndexedDB until sent, cancelled or expired (the
+same exposure as the decrypted-message cache). The nudge reveals that someone wants to talk, never what
+they said. A held message survives only as long as the sender's browser profile does.
+
+### 9c. History availability (2026-10-27)
+
+A message is readable on a device only if (a) it carries an envelope for that device, or (b) some device of
+the account decrypted it while holding the backup key and uploaded it. Private keys, ratchet sessions and the
+backup key never reach the server in the clear. Device-to-device approval no longer exists: the backup
+passcode is the only way to unlock the backup key on a new device.
+
+1. **Catch-up decrypt** (`hooks/use-e2e-catch-up.ts`, `lib/e2e/catch-up.ts`, resume marks in the IndexedDB
+   `npic-e2e-catchup`). A signed-in tab that is **not** on `/chats` still decrypts incoming messages and
+   caches the plaintext, so (b) covers every message a device _received_, not only those it displayed. It
+   runs in one visible leader tab per browser, oldest first per conversation, in pages of 100 with a
+   200-message budget per tick, never advances a ratchet twice (the decrypt cache makes a re-run a no-op),
+   and runs whether the backup is locked or unlocked (the plaintext is uploaded once the device holds the
+   key). Triggers: a socket push, then a safety tick every 5 min (2 min without a socket).
+2. **Unavailable messages are one notice, not a wall.** A run of consecutive messages this device has no
+   envelope for renders as a single row with a count (`lib/chat/group-unavailable.ts`; a readable message
+   splits a run, own sent rows group like any other). Its text depends on the backup state: _locked with a
+   passcode_ ("Enter your backup passcode to see these N messages", with an inline button), _ready_ ("not in
+   your backup: sent before this device joined and none of your devices had opened it"), or _locked, no
+   passcode_ ("set a passcode on the device that has your history"). The "ready" state says honestly that
+   passcode entry cannot help.
+3. **Passcode prompt.** Opening a thread that has unavailable messages on a locked device with a passcode
+   opens the passcode dialog every time; "Not now" silences it for the browser session
+   (`sessionStorage` key `chat:e2e-restore-snoozed`), and the inline button or the chat banner reopens it.
+4. **Flush on hide.** The leader tab uploads pending plaintext when the tab becomes hidden
+   (`visibilitychange`); `pagehide` is only a best-effort second chance, because the browser can kill the
+   request on a real close.
+
+**Limit.** A message that **no** device ever received while signed in cannot be recovered by anyone. The "ready"
+notice says so instead of pointing at a passcode that cannot help. Resetting a forgotten or missing passcode
+(decision D1 in `Plans.md`) is not implemented.
 
 ## Deciding the numeric parameters — two different methods, bucketed by what the number actually depends on
 

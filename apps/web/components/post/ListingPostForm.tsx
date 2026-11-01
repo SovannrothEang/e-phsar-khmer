@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { useRouter } from "@/i18n/routing";
 import { ChevronDown, ChevronRight, Loader2, Minus, Plus } from "lucide-react";
@@ -14,7 +14,7 @@ import LocationPicker, {
   placeLabel,
   type PlaceSelection,
 } from "@/components/post/LocationPicker";
-import type { MapCoords } from "@/components/post/LocationMapCanvas";
+import type { MapCoords } from "@/components/post/location-map.constants";
 import { signUploadUser } from "@/actions/files";
 import {
   createListing,
@@ -45,6 +45,61 @@ import DbImage from "@/components/common/DbImage";
 const TAX_TYPES = ["Tax Paper", "Plate Number"] as const;
 const ENGINE_TYPES = ["Diesel", "Electric", "Hybrid", "LPG", "Petrol"] as const;
 const TRANSMISSIONS = ["Auto", "Manual"] as const;
+
+/** Stored engine values → `PostForm.options.*` message keys. */
+const ENGINE_KEYS: Record<string, string> = {
+  Diesel: "diesel",
+  Electric: "electric",
+  Hybrid: "hybrid",
+  LPG: "lpg",
+  Petrol: "petrol",
+};
+
+/** English `field_schema` labels → `PostForm.labels.*` message keys. */
+const LABEL_KEYS: Record<string, string> = {
+  Photos: "photos",
+  Logo: "logo",
+  Title: "title",
+  "Job Title": "jobTitle",
+  Brand: "brand",
+  Model: "model",
+  "Product Spec": "productSpec",
+  "Product Specification": "productSpec",
+  Year: "year",
+  "Tax Type": "taxType",
+  Condition: "condition",
+  "Body Type": "bodyType",
+  "Engine Type": "engineType",
+  Transmission: "transmission",
+  Color: "color",
+  Price: "price",
+  "Minimum salary": "minSalary",
+  Discount: "discount",
+  "Free Delivery": "deliveryFree",
+  Description: "description",
+  Location: "location",
+  Address: "address",
+  Company: "company",
+  Name: "name",
+  "Phone Number": "phone",
+  Email: "email",
+  Bedroom: "bedroom",
+  Bathroom: "bathroom",
+  Facing: "facing",
+  Size: "size",
+  Accessory: "accessory",
+  "Accessory Type": "accessoryType",
+  Network: "network",
+  Type: "type",
+  "Job Type": "jobType",
+  Experience: "experience",
+  "Screen Size": "screenSize",
+  Storage: "storage",
+  RAM: "ram",
+  CPU: "cpu",
+  VGA: "vga",
+  "Vehicle Type": "vehicleType",
+};
 
 /**
  * Where the Condition block sits in a subcategory's Post Details section.
@@ -136,7 +191,7 @@ function TextInput({
       <FieldLabel label={label} required={required} />
       <div className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 type-body text-gray-500">
             {prefix}
           </span>
         )}
@@ -147,9 +202,18 @@ function TextInput({
           min={min}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full border border-gray-200 rounded-lg py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+          // Chrome changes a focused number input on wheel — scrolling the
+          // page with the cursor over the field just typed silently walked
+          // "1" down to "0" (captain, 2026-10-28). Blur on wheel so the
+          // scroll moves the page, never the value.
+          onWheel={
+            type === "number"
+              ? (event) => event.currentTarget.blur()
+              : undefined
+          }
+          className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
-          } ${trailing ? "pr-11" : "pr-3"}`}
+          } ${trailing ? "pr-14" : "pr-3"}`}
         />
         {trailing && (
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -174,11 +238,18 @@ function SearchPicker({
   onChange,
   required,
   disabled,
-  placeholder = "Choose…",
-  emptyLabel = "No match found.",
+  placeholder,
+  emptyLabel,
+  showOnlyKm,
+  resolveInput,
 }: {
   label: string;
-  options: { id: string; name: string; image?: string | null }[];
+  options: {
+    id: string;
+    name: string;
+    nameKm?: string | null;
+    image?: string | null;
+  }[];
   value: string;
   onChange: (id: string) => void;
   required?: boolean;
@@ -187,8 +258,43 @@ function SearchPicker({
   disabled?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  /** Drop the English half of `nameKm/name` (colours and the range pickers). */
+  showOnlyKm?: boolean;
+  /**
+   * Optional paste resolver (the Product Spec picker): a pasted product URL is
+   * matched against the loaded options and selected outright. Normal search
+   * filtering is untouched — a miss simply falls through to it.
+   */
+  resolveInput?: (text: string) => { id: string; name: string } | null;
 }) {
+  const t = useTranslations("PostForm");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
+  /**
+   * Inline pick-list ranges (storage / screen size / RAM / VGA) carry no
+   * `nameKm` in the DB — their seeded options are strings like "1TB & Above".
+   * Translate only the words; the number/unit prefix is already universal and
+   * the stored value stays the English option name.
+   */
+  const kmOptionLabel = (name: string): string | null => {
+    if (name === "Integrated") return t("options.integrated");
+    const above = name.match(/^(.*?)\s*&\s*(?:Above|Larger)$/);
+    if (above) return t("options.andAbove", { value: above[1] });
+    const below = name.match(/^(.*?)\s*(?:&\s*(?:Under|Below)|or below)$/);
+    if (below) return t("options.andBelow", { value: below[1] });
+    return null;
+  };
+  const optionKm = (option: { name: string; nameKm?: string | null }) =>
+    option.nameKm ?? (locale === "km" ? kmOptionLabel(option.name) : null);
+  /** Bilingual on km ("សេដាន/Sedan"); the stored value stays the English name. */
+  const displayName = (option: { name: string; nameKm?: string | null }) => {
+    const km = optionKm(option);
+    return locale === "km" && km
+      ? showOnlyKm
+        ? km
+        : `${km}/${option.name}`
+      : option.name;
+  };
   const selected = options.find((o) => o.id === value);
   const withIcons = options.some((o) => !!o.image);
 
@@ -200,14 +306,34 @@ function SearchPicker({
           <button
             type="button"
             disabled={disabled}
-            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm focus:outline-none ${
+            // Keyboard paste on the focused (closed) trigger: the placeholder
+            // invites pasting a link, so it must work before the panel opens
+            // too — clicking the trigger opens the panel and pastes land in
+            // the CommandInput instead.
+            onPaste={
+              resolveInput
+                ? (event) => {
+                    const hit = resolveInput(
+                      event.clipboardData.getData("text"),
+                    );
+                    if (!hit) return;
+                    event.preventDefault();
+                    onChange(hit.id);
+                  }
+                : undefined
+            }
+            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left type-body focus:outline-none ${
               disabled
                 ? "cursor-not-allowed bg-gray-100 text-gray-400"
                 : "cursor-pointer text-gray-700 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             }`}
           >
             <span className={selected ? "" : "text-gray-400"}>
-              {selected?.name ?? (disabled ? "" : placeholder)}
+              {selected
+                ? displayName(selected)
+                : disabled
+                  ? ""
+                  : (placeholder ?? t("chooseOption"))}
             </span>
             <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
           </button>
@@ -217,33 +343,51 @@ function SearchPicker({
           className="w-[var(--radix-popover-trigger-width)] p-0"
         >
           <Command>
-            <CommandInput placeholder="Search..." />
+            <CommandInput
+              placeholder={t("search")}
+              onPaste={
+                resolveInput
+                  ? (event) => {
+                      const hit = resolveInput(
+                        event.clipboardData.getData("text"),
+                      );
+                      if (!hit) return;
+                      event.preventDefault();
+                      onChange(hit.id);
+                      setOpen(false);
+                    }
+                  : undefined
+              }
+            />
             <CommandList>
-              <CommandEmpty>{emptyLabel}</CommandEmpty>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={option.name}
-                  onSelect={() => {
-                    onChange(option.id);
-                    setOpen(false);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {withIcons && (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                      <DbImage
-                        src={option.image ?? ""}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="object-contain"
-                      />
-                    </span>
-                  )}
-                  <span>{option.name}</span>
-                </CommandItem>
-              ))}
+              <CommandEmpty>{emptyLabel ?? t("noMatch")}</CommandEmpty>
+              {options.map((option) => {
+                const km = optionKm(option);
+                return (
+                  <CommandItem
+                    key={option.id}
+                    value={km ? `${km} ${option.name}` : option.name}
+                    onSelect={() => {
+                      onChange(option.id);
+                      setOpen(false);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {withIcons && (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        <DbImage
+                          src={option.image ?? ""}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="object-contain"
+                        />
+                      </span>
+                    )}
+                    <span>{displayName(option)}</span>
+                  </CommandItem>
+                );
+              })}
             </CommandList>
           </Command>
         </PopoverContent>
@@ -258,12 +402,15 @@ function ToggleGroup({
   onChange,
   options,
   required,
+  displayLabels,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   required?: boolean;
+  /** Localized labels keyed by the stored English value. */
+  displayLabels?: Record<string, string>;
 }) {
   return (
     <div>
@@ -279,13 +426,13 @@ function ToggleGroup({
             key={o}
             type="button"
             onClick={() => onChange(o)}
-            className={`h-11 cursor-pointer rounded-sm border text-sm transition-colors ${
+            className={`h-11 cursor-pointer rounded-sm border type-nav transition-colors ${
               value === o
                 ? "border-gray-300 bg-gray-100 font-medium text-gray-800"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            {o}
+            {displayLabels?.[o] ?? o}
           </button>
         ))}
       </div>
@@ -319,6 +466,7 @@ export default function ListingPostForm({
   onBack: () => void;
 }) {
   const locale = useLocale();
+  const t = useTranslations("PostForm");
   const router = useRouter();
 
   const [config, setConfig] = useState<ListingFormConfig | null>(null);
@@ -332,6 +480,9 @@ export default function ListingPostForm({
   const [models, setModels] = useState<BackendModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [model, setModel] = useState("");
+  // The trusted spec page this phone ad links to (a `models` id). Kept apart
+  // from `attributes` — the backend stores it on `listings.product_model_id`.
+  const [productModelId, setProductModelId] = useState("");
   const [year, setYear] = useState("");
   const [condition, setCondition] = useState("");
   const [vehicleType, setVehicleType] = useState("");
@@ -391,7 +542,7 @@ export default function ListingPostForm({
       if (cancelled) return;
       if (!cfg) {
         setConfigError(true);
-        toast.error("Could not load the listing form");
+        toast.error(t("loadErrorToast"));
       } else {
         setConfig(cfg);
         // Prefill the contact section from the logged-in user's profile.
@@ -406,17 +557,35 @@ export default function ListingPostForm({
           Math.min(3, Math.max(1, prefilled.filter((x) => x.trim()).length)),
         );
         setContactEmail(cfg.contact.email ?? "");
+        // Location + Address start from the profile too, but only where the
+        // subcategory's schema declares the block — the same gate that decides
+        // whether it renders at all. Read `cfg.fields`, not `has()`: `config`
+        // state is not set yet inside this callback.
+        const declares = (key: string) => cfg.fields.includes(key);
+        if (declares("location")) {
+          setPlace({
+            province: cfg.location.province,
+            district: cfg.location.district,
+            commune: cfg.location.commune,
+          });
+        }
+        if (declares("address") && cfg.location.address) {
+          setAddress(cfg.location.address);
+        }
       }
       setConfigLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [categorySlug, subcategorySlug, locale]);
+  }, [categorySlug, subcategorySlug, locale, t]);
 
   const onBrandChange = async (id: string) => {
     setBrandId(id);
     setModel("");
+    // Changing the ad's identity drops its spec link: the page is for one
+    // model, so a mismatched pair would advertise someone else's specs.
+    setProductModelId("");
     setModels([]);
     if (!id) return;
     setModelsLoading(true);
@@ -430,21 +599,88 @@ export default function ListingPostForm({
     }
   };
 
+  /**
+   * Attach a trusted spec page. Selecting it also fills Brand/Model when they
+   * are still empty, so the ad and the linked page agree; a later Brand/Model
+   * change clears the link (see `onBrandChange` and the model picker).
+   */
+  const applyProductSelection = async (modelId: string) => {
+    setProductModelId(modelId);
+    const product = config?.products.find((p) => p.modelId === modelId);
+    if (!product) return;
+
+    if (has("brand") && brandId === "") {
+      if (!config?.brands.some((b) => b.id === product.brandId)) return;
+      setBrandId(product.brandId);
+      setModel("");
+      setModels([]);
+      setModelsLoading(true);
+      try {
+        const list = await getBrandModels(product.brandId, subcategorySlug);
+        setModels(list);
+        if (list.some((m) => m.name === product.modelName)) {
+          setModel(product.modelName);
+        }
+      } catch {
+        setModels([]);
+      } finally {
+        setModelsLoading(false);
+      }
+      return;
+    }
+
+    if (
+      has("model") &&
+      model === "" &&
+      models.some((m) => m.name === product.modelName)
+    ) {
+      setModel(product.modelName);
+    }
+  };
+
+  /**
+   * Pasted product URLs (`/en/product/apple/iphone-16`) resolve locally against
+   * the published list. A URL-shaped paste that does not resolve (an external
+   * link, or a product page that is not published) gets a toast — silently
+   * filtering the list read as "paste is not allowed" (2026-10-28).
+   */
+  const resolveProductPaste = (text: string) => {
+    const trimmed = text.trim();
+    const looksLikeUrl =
+      /^(https?:\/\/|\/)/i.test(trimmed) || trimmed.includes("/product/");
+    const match = trimmed.match(/\/?product\/([^/?#\s]+)\/([^/?#\s]+)\/?/);
+    const product = match
+      ? config?.products.find(
+          (p) =>
+            p.brandSlug === decodeURIComponent(match[1]) &&
+            p.modelSlug === decodeURIComponent(match[2]),
+        )
+      : undefined;
+    if (!product) {
+      if (looksLikeUrl) toast.error(t("errors.productLinkInvalid"));
+      return null;
+    }
+    return {
+      id: product.modelId,
+      name: `${product.brandName} ${product.modelName}`,
+    };
+  };
+
   const submit = async () => {
     if (!config) {
-      toast.error("Form data is not loaded yet");
+      toast.error(t("errors.formNotLoaded"));
       return;
     }
     if (has("title") && !title.trim()) {
-      toast.error("Title is required");
+      toast.error(t("errors.titleRequired"));
       return;
     }
     const priceNum = Number(price);
     if (
       has("price") &&
-      (price === "" || !Number.isFinite(priceNum) || priceNum < 0)
+      (price === "" || !Number.isFinite(priceNum) || priceNum <= 0)
     ) {
-      toast.error("Enter a valid price");
+      toast.error(t("errors.priceInvalid"));
       return;
     }
     if (
@@ -452,34 +688,40 @@ export default function ListingPostForm({
       typeValue === "" &&
       !TYPE_OPTIONAL.has(subcategorySlug)
     ) {
-      toast.error("Choose a type");
+      toast.error(t("errors.typeRequired"));
       return;
     }
     // Jobs' two pickers are starred in the design (2026-09-23 mock), so an
     // empty one is a star that lies — enforce both here.
     if (has("jobType") && jobType === "") {
-      toast.error("Choose a job type");
+      toast.error(t("errors.jobTypeRequired"));
       return;
     }
     if (has("experience") && experience === "") {
-      toast.error("Choose experience");
+      toast.error(t("errors.experienceRequired"));
       return;
     }
     if (has("accessory") && accessory === "") {
-      toast.error("Choose an accessory");
+      toast.error(t("errors.accessoryRequired"));
       return;
     }
     if (has("network") && network === "") {
-      toast.error("Choose a network");
+      toast.error(t("errors.networkRequired"));
       return;
     }
     if (has("brand") && brandId === "") {
-      toast.error("Choose a brand");
+      toast.error(t("errors.brandRequired"));
+      return;
+    }
+    // The trusted spec link is starred on the phones form — enforce it here or
+    // the star is a lie (required-ness is never read from `field_schema`).
+    if (has("productSpec") && productModelId === "") {
+      toast.error(t("errors.productRequired"));
       return;
     }
     // The computers spec cluster — all starred on every form that declares them.
     if (has("screenSize") && screenSize === "") {
-      toast.error("Choose a screen size");
+      toast.error(t("errors.screenSizeRequired"));
       return;
     }
     if (
@@ -487,39 +729,39 @@ export default function ListingPostForm({
       STORAGE_REQUIRED.includes(subcategorySlug) &&
       storage === ""
     ) {
-      toast.error("Choose storage");
+      toast.error(t("errors.storageRequired"));
       return;
     }
     if (has("ram") && ram === "") {
-      toast.error("Choose a RAM size");
+      toast.error(t("errors.ramRequired"));
       return;
     }
     if (has("cpu") && cpu === "") {
-      toast.error("Choose a CPU");
+      toast.error(t("errors.cpuRequired"));
       return;
     }
     if (has("vga") && vga === "") {
-      toast.error("Choose a VGA");
+      toast.error(t("errors.vgaRequired"));
       return;
     }
     if (has("year") && year === "") {
-      toast.error("Choose a year");
+      toast.error(t("errors.yearRequired"));
       return;
     }
     if (has("vehicleType") && vehicleType === "") {
-      toast.error("Choose a vehicle type");
+      toast.error(t("errors.vehicleTypeRequired"));
       return;
     }
     if (has("taxType") && taxType === "") {
-      toast.error("Choose a tax type");
+      toast.error(t("errors.taxTypeRequired"));
       return;
     }
     if (has("condition") && condition === "") {
-      toast.error("Choose a condition");
+      toast.error(t("errors.conditionRequired"));
       return;
     }
     if (has("color") && color === "") {
-      toast.error("Choose a color");
+      toast.error(t("errors.colorRequired"));
       return;
     }
     // These three carry a red `*` on screen, so they must be enforced here or
@@ -529,23 +771,23 @@ export default function ListingPostForm({
     // filter and is invisible to location search (the silent drop migration
     // 0018 was written to prevent).
     if (has("description") && !description.trim()) {
-      toast.error("Description is required");
+      toast.error(t("errors.descriptionRequired"));
       return;
     }
     if (has("location") && !placeLabel(place)) {
-      toast.error("Choose a location");
+      toast.error(t("errors.locationRequired"));
       return;
     }
     if (has("address") && !address.trim()) {
-      toast.error("Address is required");
+      toast.error(t("errors.addressRequired"));
       return;
     }
     if (has("contactName") && !contactName.trim()) {
-      toast.error("Contact name is required");
+      toast.error(t("errors.contactNameRequired"));
       return;
     }
     if (has("contactPhones") && !(contactPhones[0] ?? "").trim()) {
-      toast.error("Phone number is required");
+      toast.error(t("errors.phoneRequired"));
       return;
     }
 
@@ -604,12 +846,18 @@ export default function ListingPostForm({
     if (has("condition")) {
       payload.condition = condition === "New" ? "new" : "used";
     }
-    if (has("discount") && discountValue !== "") {
+    // 0 / empty means "no discount" — never persist a zero discount, which the
+    // cards render as a real "-0%" badge and a pointless strikethrough price
+    // (captain, 2026-10-28).
+    if (has("discount") && Number(discountValue) > 0) {
       payload.discountValue = Number(discountValue);
       payload.discountType = discountType;
     }
     if (photos.length > 0) {
       payload.photos = photos.map((p, sort) => ({ ...p, sort }));
+    }
+    if (has("productSpec") && productModelId) {
+      payload.productModelId = productModelId;
     }
 
     setSubmitting(true);
@@ -620,8 +868,7 @@ export default function ListingPostForm({
       toast.error(result.error);
       return;
     }
-    if (result.warning) toast.warning(result.warning);
-    else toast.success("Your ad was published");
+    toast.success("Your ad was published");
     router.push({
       pathname: "/post/[slug]",
       params: { slug: result.listingId },
@@ -638,16 +885,23 @@ export default function ListingPostForm({
   if (configError || !config) {
     return (
       <div className="py-16 text-center text-gray-500">
-        <p className="mb-4">Could not load the listing form.</p>
+        <p className="mb-4">{t("loadError")}</p>
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline"
+          className="type-nav text-[#00a0e9] hover:underline"
         >
-          Back
+          {t("back")}
         </button>
       </div>
     );
   }
+
+  /** The schema's English label, translated through `PostForm.labels.*`. */
+  const labelFor = (key: string, fallback: string) => {
+    const raw = config.labels[key] ?? fallback;
+    const messageKey = LABEL_KEYS[raw];
+    return messageKey ? t(`labels.${messageKey}`) : raw;
+  };
 
   const removePhoneRow = (index: number) => {
     setContactPhones((prev) => {
@@ -668,9 +922,13 @@ export default function ListingPostForm({
       : declaredSlot;
   const conditionBlock = has("condition") ? (
     <ToggleGroup
-      label="Condition"
+      label={labelFor("condition", "Condition")}
       required
-      options={["Used", "New"]}
+      options={["New", "Used"]}
+      displayLabels={{
+        New: t("options.new"),
+        Used: t("options.used"),
+      }}
       value={condition}
       onChange={setCondition}
     />
@@ -683,9 +941,9 @@ export default function ListingPostForm({
         <div />
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline cursor-pointer"
+          className="type-nav text-[#00a0e9] hover:underline cursor-pointer"
         >
-          Reset
+          {t("reset")}
         </button>
       </div>
 
@@ -723,17 +981,19 @@ export default function ListingPostForm({
         onChange={setFiles}
         signFn={signUploadUser}
         onSigned={(p) => setPhotos((prev) => [...prev, p])}
-        title={config.labels.photos ?? "Photos"}
+        title={labelFor("photos", "Photos")}
         max={config.photoMax}
       />
 
       {/* ── Post Details ───────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">Post Details</h2>
+        <h2 className="type-section-title text-foreground">
+          {t("postDetails")}
+        </h2>
 
         {has("title") && (
           <TextInput
-            label={config.labels.title ?? "Title"}
+            label={labelFor("title", "Title")}
             required
             maxLength={200}
             value={title}
@@ -743,16 +1003,16 @@ export default function ListingPostForm({
 
         {/* Category breadcrumb */}
         <div>
-          <FieldLabel label="Choose a category" required />
+          <FieldLabel label={t("category")} required />
           <div className="flex flex-wrap items-center gap-3 rounded-sm border border-dashed border-gray-300 px-3 py-2.5">
-            <span className="text-sm text-foreground">{categoryName}</span>
+            <span className="type-body text-foreground">{categoryName}</span>
             <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-foreground">{subName}</span>
+            <span className="type-body text-foreground">{subName}</span>
             <button
               onClick={onBack}
-              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 text-sm font-semibold text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
+              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 type-nav text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
             >
-              Change
+              {t("change")}
             </button>
           </div>
         </div>
@@ -767,43 +1027,46 @@ export default function ListingPostForm({
             renders as one. All four are unstarred in that mock. */}
         {has("bedroom") && (
           <SearchPicker
-            label={config.labels.bedroom ?? "Bedroom"}
+            label={labelFor("bedroom", "Bedroom")}
             options={(config.pickLists.bedroom ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={bedroom}
             onChange={setBedroom}
-            placeholder="Choose a bedroom"
+            placeholder={t("placeholders.chooseBedroom")}
           />
         )}
         {has("bathroom") && (
           <SearchPicker
-            label={config.labels.bathroom ?? "Bathroom"}
+            label={labelFor("bathroom", "Bathroom")}
             options={(config.pickLists.bathroom ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={bathroom}
             onChange={setBathroom}
-            placeholder="Choose a bathroom"
+            placeholder={t("placeholders.chooseBathroom")}
           />
         )}
         {has("facing") && (
           <SearchPicker
-            label={config.labels.facing ?? "Facing"}
+            label={labelFor("facing", "Facing")}
             options={(config.pickLists.facing ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={facing}
             onChange={setFacing}
-            placeholder="Choose facing"
+            placeholder={t("placeholders.chooseFacing")}
           />
         )}
         {has("size") && (
           <TextInput
-            label={config.labels.size ?? "Size"}
+            label={labelFor("size", "Size")}
             type="number"
             min={0}
             value={size}
@@ -819,43 +1082,47 @@ export default function ListingPostForm({
             set, so its ticks control which values the form offers. */}
         {has("accessory") && (
           <SearchPicker
-            label={config.labels.accessory ?? "Accessory"}
+            label={labelFor("accessory", "Accessory")}
             options={(config.pickLists.accessory ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
               image: o.image,
             }))}
             value={accessory}
             onChange={setAccessory}
-            placeholder="Choose an accessory"
+            placeholder={t("placeholders.chooseAccessory")}
             required
           />
         )}
         {has("network") && (
           <SearchPicker
-            label={config.labels.network ?? "Network"}
+            label={labelFor("network", "Network")}
             options={(config.pickLists.network ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
               image: o.image,
             }))}
             value={network}
             onChange={setNetwork}
-            placeholder="Choose a network"
+            placeholder={t("placeholders.chooseNetwork")}
             required
           />
         )}
         {has("type") && (
           <SearchPicker
-            label={config.labels.type ?? "Type"}
+            label={labelFor("type", "Type")}
             options={(config.pickLists.type ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
               image: o.image,
             }))}
             value={typeValue}
             onChange={setTypeValue}
-            placeholder="Choose a type"
+            placeholder={t("placeholders.chooseType")}
+            showOnlyKm
             required={!TYPE_OPTIONAL.has(subcategorySlug)}
           />
         )}
@@ -865,34 +1132,36 @@ export default function ListingPostForm({
             has uploaded them and the plain row text until then. */}
         {has("jobType") && (
           <SearchPicker
-            label={config.labels.jobType ?? "Job Type"}
+            label={labelFor("jobType", "Job Type")}
             options={(config.pickLists.jobType ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
               image: o.image,
             }))}
             value={jobType}
             onChange={setJobType}
-            placeholder="Choose a job type"
+            placeholder={t("placeholders.chooseJobType")}
             required
           />
         )}
         {has("experience") && (
           <SearchPicker
-            label={config.labels.experience ?? "Experience"}
+            label={labelFor("experience", "Experience")}
             options={(config.pickLists.experience ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={experience}
             onChange={setExperience}
-            placeholder="Choose experience"
+            placeholder={t("placeholders.chooseExperience")}
             required
           />
         )}
         {has("brand") && (
           <SearchPicker
-            label="Brand"
+            label={labelFor("brand", "Brand")}
             options={config.brands.map((b) => ({
               id: b.id,
               name: b.name,
@@ -900,33 +1169,58 @@ export default function ListingPostForm({
             }))}
             value={brandId}
             onChange={onBrandChange}
-            placeholder="Choose a brand"
+            placeholder={t("placeholders.chooseBrand")}
             required
           />
         )}
         {has("model") && (
           <SearchPicker
-            label="Model"
+            label={labelFor("model", "Model")}
             options={models.map((m) => ({ id: m.name, name: m.name }))}
             value={model}
-            onChange={setModel}
+            onChange={(id) => {
+              setModel(id);
+              // A different model means a different spec page — keep them in
+              // lockstep rather than linking an unrelated handset's specs.
+              setProductModelId("");
+            }}
             disabled={has("brand") && brandId === ""}
-            placeholder={modelsLoading ? "Loading..." : "Choose a model"}
-            emptyLabel="No model found."
+            placeholder={
+              modelsLoading ? t("loadingModels") : t("placeholders.chooseModel")
+            }
+            emptyLabel={t("noModel")}
+          />
+        )}
+        {has("productSpec") && (
+          <SearchPicker
+            label={labelFor("productSpec", "Product Specification")}
+            options={config.products.map((p) => ({
+              id: p.modelId,
+              name: `${p.brandName} ${p.modelName}`,
+              image: p.image,
+            }))}
+            value={productModelId}
+            onChange={applyProductSelection}
+            resolveInput={resolveProductPaste}
+            placeholder={t("placeholders.chooseProduct")}
+            emptyLabel={t("noProduct")}
+            required
           />
         )}
         {conditionSlot === "lead" && conditionBlock}
 
         {has("screenSize") && (
           <SearchPicker
-            label={config.labels.screenSize ?? "Screen Size"}
+            label={labelFor("screenSize", "Screen Size")}
             options={(config.pickLists.screenSize ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={screenSize}
             onChange={setScreenSize}
-            placeholder="Choose a screen size"
+            placeholder={t("placeholders.chooseScreenSize")}
+            showOnlyKm
             required
           />
         )}
@@ -935,91 +1229,102 @@ export default function ListingPostForm({
 
         {has("storage") && (
           <SearchPicker
-            label={config.labels.storage ?? "Storage"}
+            label={labelFor("storage", "Storage")}
             options={(config.pickLists.storage ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={storage}
             onChange={setStorage}
-            placeholder="Choose storage"
+            placeholder={t("placeholders.chooseStorage")}
+            showOnlyKm
             required={STORAGE_REQUIRED.includes(subcategorySlug)}
           />
         )}
 
         {has("ram") && (
           <SearchPicker
-            label={config.labels.ram ?? "RAM"}
+            label={labelFor("ram", "RAM")}
             options={(config.pickLists.ram ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={ram}
             onChange={setRam}
-            placeholder="Choose a RAM size"
+            placeholder={t("placeholders.chooseRam")}
+            showOnlyKm
             required
           />
         )}
 
         {has("cpu") && (
           <SearchPicker
-            label={config.labels.cpu ?? "CPU"}
+            label={labelFor("cpu", "CPU")}
             options={(config.pickLists.cpu ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={cpu}
             onChange={setCpu}
-            placeholder="Choose a CPU"
+            placeholder={t("placeholders.chooseCpu")}
             required
           />
         )}
 
         {has("vga") && (
           <SearchPicker
-            label={config.labels.vga ?? "VGA"}
+            label={labelFor("vga", "VGA")}
             options={(config.pickLists.vga ?? []).map((o) => ({
               id: o.name,
               name: o.name,
+              nameKm: o.nameKm,
             }))}
             value={vga}
             onChange={setVga}
-            placeholder="Choose a VGA"
+            placeholder={t("placeholders.chooseVga")}
+            showOnlyKm
             required
           />
         )}
         {has("year") && (
           <SearchPicker
-            label="Year"
+            label={labelFor("year", "Year")}
             options={config.years.map((y) => ({ id: y, name: y }))}
             value={year}
             onChange={setYear}
-            placeholder="Choose a year"
+            placeholder={t("placeholders.chooseYear")}
             required
           />
         )}
         {has("vehicleType") && (
           <SearchPicker
-            label={config.labels.vehicleType ?? "Vehicle Type"}
+            label={labelFor("vehicleType", "Vehicle Type")}
             options={config.vehicleKinds.map((v) => ({
               id: v.name,
               name: v.name,
+              nameKm: v.nameKm,
               image: v.image,
             }))}
             value={vehicleType}
             onChange={setVehicleType}
-            placeholder="Choose a vehicle type"
+            placeholder={t("placeholders.chooseVehicleType")}
             required
           />
         )}
 
         {has("engineType") && (
           <SearchPicker
-            label="Engine Type"
-            options={ENGINE_TYPES.map((t) => ({ id: t, name: t }))}
+            label={labelFor("engineType", "Engine Type")}
+            options={ENGINE_TYPES.map((e) => ({
+              id: e,
+              name: t(`options.${ENGINE_KEYS[e]}`),
+            }))}
             value={engineType}
             onChange={setEngineType}
-            placeholder="Choose engine type"
+            placeholder={t("placeholders.chooseEngine")}
           />
         )}
 
@@ -1027,22 +1332,27 @@ export default function ListingPostForm({
 
         {has("bodyType") && (
           <SearchPicker
-            label={config.labels.bodyType ?? "Body Type"}
+            label={labelFor("bodyType", "Body Type")}
             options={config.vehicleKinds.map((bt) => ({
               id: bt.name,
               name: bt.name,
+              nameKm: bt.nameKm,
               image: bt.image,
             }))}
             value={bodyType}
             onChange={setBodyType}
-            placeholder="Choose a body type"
+            placeholder={t("placeholders.chooseBodyType")}
           />
         )}
 
         {has("transmission") && (
           <ToggleGroup
-            label="Transmission"
+            label={labelFor("transmission", "Transmission")}
             options={[...TRANSMISSIONS]}
+            displayLabels={{
+              Auto: t("options.auto"),
+              Manual: t("options.manual"),
+            }}
             value={transmission}
             onChange={setTransmission}
           />
@@ -1050,9 +1360,13 @@ export default function ListingPostForm({
 
         {has("taxType") && (
           <ToggleGroup
-            label="Tax Type"
+            label={labelFor("taxType", "Tax Type")}
             required
             options={[...TAX_TYPES]}
+            displayLabels={{
+              "Tax Paper": t("options.taxPaper"),
+              "Plate Number": t("options.plateNumber"),
+            }}
             value={taxType}
             onChange={setTaxType}
           />
@@ -1062,21 +1376,26 @@ export default function ListingPostForm({
 
         {has("color") && (
           <SearchPicker
-            label="Color"
-            options={config.colors.map((c) => ({ id: c.name, name: c.name }))}
+            label={labelFor("color", "Color")}
+            options={config.colors.map((c) => ({
+              id: c.name,
+              name: c.name,
+              nameKm: c.nameKm,
+            }))}
             value={color}
             onChange={setColor}
-            placeholder="Choose a color"
+            placeholder={t("placeholders.chooseColor")}
             required
+            showOnlyKm
           />
         )}
 
         {has("price") && (
           <TextInput
-            label={config.labels.price ?? "Price"}
+            label={labelFor("price", "Price")}
             required
             type="number"
-            min={0}
+            min={0.01}
             prefix="$"
             value={price}
             onChange={setPrice}
@@ -1085,14 +1404,18 @@ export default function ListingPostForm({
 
         {has("discount") && (
           <div>
-            <FieldLabel label="Discount" />
+            <FieldLabel label={labelFor("discount", "Discount")} />
             <div className="flex gap-2">
               <input
                 type="number"
                 min={0}
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                // Same wheel guard as TextInput: a scrolled focused field must
+                // not turn an untouched discount into "0" (which then rendered
+                // as a 0% discount).
+                onWheel={(event) => event.currentTarget.blur()}
+                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
               <div className="flex shrink-0 overflow-hidden rounded-sm border border-gray-200">
                 {(
@@ -1106,7 +1429,7 @@ export default function ListingPostForm({
                     type="button"
                     onClick={() => setDiscountType(kind)}
                     aria-pressed={discountType === kind}
-                    className={`w-12 cursor-pointer text-sm transition-colors ${
+                    className={`w-12 cursor-pointer type-nav transition-colors ${
                       discountType === kind
                         ? "bg-gray-100 font-medium text-gray-800"
                         : "bg-white text-gray-500 hover:bg-gray-50"
@@ -1122,10 +1445,10 @@ export default function ListingPostForm({
 
         {has("deliveryFree") && (
           <div>
-            <FieldLabel label="Free Delivery" />
+            <FieldLabel label={labelFor("deliveryFree", "Free Delivery")} />
             <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
-              <span className="text-sm text-gray-700">
-                {deliveryFree ? "Yes" : "No"}
+              <span className="type-body text-gray-700">
+                {deliveryFree ? t("yes") : t("no")}
               </span>
               <Switch
                 checked={deliveryFree}
@@ -1138,12 +1461,15 @@ export default function ListingPostForm({
 
         {has("description") && (
           <div>
-            <FieldLabel label="Description" required />
+            <FieldLabel
+              label={labelFor("description", "Description")}
+              required
+            />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={8}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1159,12 +1485,12 @@ export default function ListingPostForm({
 
         {has("address") && (
           <div>
-            <FieldLabel label="Address" required />
+            <FieldLabel label={labelFor("address", "Address")} required />
             <textarea
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={3}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1175,14 +1501,14 @@ export default function ListingPostForm({
 
       {/* ── Contact ────────────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">Contact</h2>
+        <h2 className="type-section-title text-foreground">{t("contact")}</h2>
 
         {/* The jobs form's Company sits at the top of Contact — its own spec
             lists it directly after Address, ahead of Name. Unstarred. */}
         {has("company") && (
           <TextInput
-            label={config.labels.company ?? "Company"}
-            placeholder="Your company"
+            label={labelFor("company", "Company")}
+            placeholder={t("placeholders.yourCompany")}
             value={company}
             onChange={setCompany}
           />
@@ -1190,9 +1516,9 @@ export default function ListingPostForm({
 
         {has("contactName") && (
           <TextInput
-            label="Name"
+            label={labelFor("contactName", "Name")}
             required
-            placeholder="Your name"
+            placeholder={t("placeholders.yourName")}
             value={contactName}
             onChange={setContactName}
           />
@@ -1203,7 +1529,11 @@ export default function ListingPostForm({
             <div key={i} className="flex items-end gap-2">
               <div className="flex-1">
                 <TextInput
-                  label={i === 0 ? "Phone Number" : `Phone Number ${i + 1}`}
+                  label={
+                    i === 0
+                      ? t("labels.phone")
+                      : `${t("labels.phone")} ${i + 1}`
+                  }
                   required={i === 0}
                   placeholder="012 345 678"
                   value={p}
@@ -1217,8 +1547,8 @@ export default function ListingPostForm({
                       <button
                         type="button"
                         onClick={() => removePhoneRow(i)}
-                        aria-label={`Remove phone number ${i + 1}`}
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+                        aria-label={`${t("removePhone")} ${i + 1}`}
+                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
                       >
                         <Minus className="h-4 w-4" strokeWidth={3} />
                       </button>
@@ -1230,7 +1560,7 @@ export default function ListingPostForm({
                 <button
                   type="button"
                   onClick={() => setPhoneRows((n) => Math.min(3, n + 1))}
-                  aria-label="Add phone number"
+                  aria-label={t("addPhone")}
                   className="mb-0.5 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-card transition-colors hover:bg-[#00a0e9]/80"
                 >
                   <Plus className="h-5 w-5" />
@@ -1241,7 +1571,7 @@ export default function ListingPostForm({
 
         {has("contactEmail") && (
           <TextInput
-            label="Email"
+            label={labelFor("contactEmail", "Email")}
             type="email"
             placeholder="you@example.com"
             value={contactEmail}
@@ -1249,27 +1579,27 @@ export default function ListingPostForm({
           />
         )}
 
-        <p className="text-sm text-gray-600">
-          By continuing, you agree to our{" "}
+        <p className="type-body text-gray-600">
+          {t("agreement.prefix")}{" "}
           <Link href="/posting-rule" className="text-[#00a0e9] hover:underline">
-            Posting Rule
+            {t("agreement.postingRule")}
           </Link>{" "}
-          and{" "}
+          {t("agreement.and")}{" "}
           <Link
             href="/privacy-policy"
             className="text-[#00a0e9] hover:underline"
           >
-            Privacy Policy
+            {t("agreement.privacyPolicy")}
           </Link>{" "}
-          Terms of Use
+          {t("agreement.suffix")}
         </p>
 
         <button
           onClick={submit}
           disabled={submitting}
-          className="w-full rounded-sm bg-[#f68b1e] py-3 text-base font-semibold text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
+          className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
         >
-          {submitting ? "Publishing..." : "Submit"}
+          {submitting ? t("publishing") : t("submit")}
         </button>
       </div>
     </div>

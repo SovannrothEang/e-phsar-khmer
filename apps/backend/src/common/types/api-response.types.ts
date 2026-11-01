@@ -28,4 +28,9 @@ export interface PaginatedResponse<T> {
 export interface RequestUser {
   id: string;
   role: 'user' | 'admin' | 'super_admin';
+  /**
+   * The device row's revocation epoch (`sid` claim). Absent on legacy tokens
+   * and on clients that never sent device headers (admin/social/Telegram).
+   */
+  sessionId?: string | null;
 }

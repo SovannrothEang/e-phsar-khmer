@@ -15,12 +15,10 @@ export interface SubCategory {
   /** Listing subcategories this group covers (empty on plans). */
   subcategoryIds?: string[];
 }
-export interface SubPlan extends SubCategory {
-  categoryId: string;
-}
 export interface SubPackage {
   id: string;
-  planId: string;
+  categoryId: string;
+  tier: "bronze" | "silver" | "gold";
   name: string;
   photos: number;
   ads: number;
@@ -85,27 +83,11 @@ export async function deleteSubCategory(id: string) {
   return mutate(`/admin/subscriptions/categories/${id}`, "DELETE");
 }
 
-// ── Plans ───────────────────────────────────────────────────
-export async function getSubPlans(categoryId?: string): Promise<SubPlan[]> {
+// ── Packages (a group's fixed tier) ─────────────────────────
+export async function getSubPackages(
+  categoryId?: string,
+): Promise<SubPackage[]> {
   const qs = categoryId ? `?categoryId=${categoryId}` : "";
-  const { data } = await serverFetch<SubPlan[]>(
-    `/admin/subscriptions/plans${qs}`,
-  );
-  return data;
-}
-export async function createSubPlan(b: unknown) {
-  return mutate("/admin/subscriptions/plans", "POST", b);
-}
-export async function updateSubPlan(id: string, b: unknown) {
-  return mutate(`/admin/subscriptions/plans/${id}`, "PATCH", b);
-}
-export async function deleteSubPlan(id: string) {
-  return mutate(`/admin/subscriptions/plans/${id}`, "DELETE");
-}
-
-// ── Packages ────────────────────────────────────────────────
-export async function getSubPackages(planId?: string): Promise<SubPackage[]> {
-  const qs = planId ? `?planId=${planId}` : "";
   const { data } = await serverFetch<SubPackage[]>(
     `/admin/subscriptions/packages${qs}`,
   );

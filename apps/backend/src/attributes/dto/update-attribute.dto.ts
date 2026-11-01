@@ -6,6 +6,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -19,6 +20,11 @@ export class UpdateAttributeDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(160)
+  nameKm?: string | null;
+
+  @IsOptional()
+  @IsString()
   @Matches(SLUG_RE, {
     message: 'slug must be lowercase with hyphens only (e.g. my-option)',
   })
@@ -26,7 +32,7 @@ export class UpdateAttributeDto {
 
   @IsOptional()
   @IsString()
-  image?: string;
+  image?: string | null;
 
   @IsOptional()
   @IsUUID()

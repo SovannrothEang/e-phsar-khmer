@@ -1,9 +1,9 @@
 export interface PlanLimits {
   /** Photos per ad. */
   photos: number;
-  /** Ads that may be live (active) at once in one allowance bucket. */
+  /** Ads that may be live (active) at once in one allowance pool. */
   ads: number;
-  /** Times one ad may be re-published after its first publish. */
+  /** Re-publishes one allowance pool may spend in total. */
   renews: number;
   /** Auto-renewals — no auto-renew feature exists yet, so nothing spends this. */
   autoRenews: number;
@@ -17,7 +17,11 @@ export interface FreePlanSettings {
   renews: number;
   autoRenews: number;
   videos: number;
-  /** Ads across every subcategory with no group or cap of its own. */
+  /**
+   * The free plan's account-wide live-ad cap. Every ad outside a held group
+   * counts against it; the per-category rows in `DEFAULT_FREE_AD_CAPS` are
+   * sub-limits inside this total.
+   */
   otherAds: number;
 }
 
@@ -47,7 +51,10 @@ export function toFreePlanSettings(
     : { ...DEFAULT_FREE_PLAN };
 }
 
-/** Seed values for `free_plan_ad_limits`, by subcategory or category slug. */
+/**
+ * Seed values for `free_plan_ad_limits`, by subcategory or category slug.
+ * Each is a sub-limit inside `otherAds`; values above the total never bind.
+ */
 export const DEFAULT_FREE_AD_CAPS: readonly {
   subcategorySlug?: string;
   categorySlug?: string;
@@ -62,3 +69,10 @@ export const DEFAULT_FREE_AD_CAPS: readonly {
 
 export const ENTITLEMENTS_QUEUE = 'entitlements';
 export const LISTING_SWEEP_JOB = 'listing-restriction-sweep';
+
+/**
+ * Renewals reset on a rolling window: the plan's `renews` number is how many
+ * an ad pool may spend in the last 30 days. Matches the 30-day ad lifetime, so
+ * "renew or repost" is the same cadence.
+ */
+export const RENEW_WINDOW_DAYS = 30;

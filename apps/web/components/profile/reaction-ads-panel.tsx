@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Bookmark, Heart } from "lucide-react";
-import { GridCardPost } from "@/components/ads/GridCardPost";
+import { ProfileListingRow } from "@/components/profile/ProfileListingRow";
 import { loadMyReactionPage } from "@/actions/reactions";
 import { useReactions } from "@/components/reactions/reactions-provider";
 import type { Post } from "@/lib/posts";
@@ -17,16 +18,8 @@ import type { Post } from "@/lib/posts";
  * is the design these pages shipped with; only the list branch is new.
  */
 const COPY = {
-  likes: {
-    title: "Liked",
-    Icon: Heart,
-    body: "Oops! Looks like you haven't liked any posts yet.",
-  },
-  saves: {
-    title: "Saved",
-    Icon: Bookmark,
-    body: "Oops! Looks like you haven't saved any posts yet.",
-  },
+  likes: { titleKey: "liked", Icon: Heart, bodyKey: "likedEmpty" },
+  saves: { titleKey: "saved", Icon: Bookmark, bodyKey: "savedEmpty" },
 } as const;
 
 export default function ReactionAdsPanel({
@@ -34,8 +27,10 @@ export default function ReactionAdsPanel({
 }: {
   side: "likes" | "saves";
 }) {
-  const { title, Icon, body } = COPY[side];
-  const { isToggledOff } = useReactions();
+  const t = useTranslations("Me.reactions");
+  const tCommon = useTranslations("Common");
+  const { titleKey, Icon, bodyKey } = COPY[side];
+  const reactions = useReactions();
   const [items, setItems] = React.useState<Post[] | null>(null);
   const [page, setPage] = React.useState(1);
   const [hasMore, setHasMore] = React.useState(false);
@@ -91,13 +86,13 @@ export default function ReactionAdsPanel({
   // would blank the whole list whenever that seed fetch failed.
   const kind = side === "likes" ? "like" : "save";
   const visible = (items ?? []).filter(
-    (post) => !isToggledOff(kind, String(post.postId)),
+    (post) => !reactions.isToggledOff(kind, String(post.postId)),
   );
 
   const messageCard = (message: React.ReactNode) => (
     <main className="max-w-2xl mx-auto mt-3">
       <div className="bg-card rounded-xs shadow-sm min-h-[500px] flex items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className="type-body-sm text-muted-foreground">{message}</p>
       </div>
     </main>
   );
@@ -105,11 +100,11 @@ export default function ReactionAdsPanel({
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-medium text-foreground mb-4">{title}</h1>
+        <h1 className="type-page-title text-foreground mb-4">{t(titleKey)}</h1>
         {error ? (
           messageCard(error)
         ) : items === null ? (
-          messageCard("Loading…")
+          messageCard(tCommon("loading"))
         ) : visible.length === 0 ? (
           <main className="max-w-2xl mx-auto mt-3">
             <div className="bg-card rounded-xs shadow-sm  min-h-[500px] flex flex-col items-center justify-center p-6">
@@ -117,19 +112,60 @@ export default function ReactionAdsPanel({
                 <Icon className="w-16 h-16 text-gray-500" strokeWidth={2.5} />
               </div>
               <div className="text-center">
-                <h2 className="text-lg font-medium text-foreground mb-2">
-                  No Result!
+                <h2 className="type-section-title text-foreground mb-2">
+                  {t("noResult")}
                 </h2>
-                <p className="text-muted-foreground text-sm">{body}</p>
+                <p className="text-muted-foreground type-body-sm">
+                  {t(bodyKey)}
+                </p>
               </div>
             </div>
           </main>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-3">
-              {visible.map((post) => (
-                <GridCardPost key={post.postId} post={post} />
-              ))}
+            {/* List rows, not a grid (captain, 2026-10-27): a populated tab
+                fills the column; only the empty state is a centred card. */}
+            <div className="mt-3 space-y-3">
+              {visible.map((post) => {
+                const listingId = String(post.postId);
+                return (
+                  <ProfileListingRow
+                    key={post.postId}
+                    post={post}
+                    action={
+                      <button
+                        type="button"
+                        disabled={reactions.isPending(listingId)}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (kind === "save") reactions.toggleSave(listingId);
+                          else reactions.toggleLike(listingId);
+                        }}
+                        className="cursor-pointer rounded-full p-2 transition-colors hover:bg-muted disabled:opacity-60"
+                      >
+                        {kind === "save" ? (
+                          <Bookmark
+                            className={`h-5 w-5 ${
+                              reactions.isSaved(listingId)
+                                ? "fill-blue-500 text-blue-500"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        ) : (
+                          <Heart
+                            className={`h-5 w-5 ${
+                              reactions.isLiked(listingId)
+                                ? "fill-red-500 text-red-500"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        )}
+                      </button>
+                    }
+                  />
+                );
+              })}
             </div>
             {hasMore && (
               <div className="mt-6 flex justify-center">
@@ -137,9 +173,9 @@ export default function ReactionAdsPanel({
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="rounded-sm border bg-card px-6 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
+                  className="rounded-sm border bg-card px-6 py-2 type-nav text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer"
                 >
-                  {loadingMore ? "Loading…" : "Load more"}
+                  {loadingMore ? tCommon("loading") : tCommon("loadMore")}
                 </button>
               </div>
             )}

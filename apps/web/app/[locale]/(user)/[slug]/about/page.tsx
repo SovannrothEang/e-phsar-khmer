@@ -1,5 +1,6 @@
 import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
 import AboutProfile from "@/components/profile/About";
+import { getLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import {
@@ -19,7 +20,7 @@ export default async function AboutPage({
   const profile = await getPublicProfile(slug);
   if (!profile) notFound();
 
-  const user = toProfileUser(profile);
+  const user = toProfileUser(profile, await getLocale());
   const viewer = await getCurrentUser();
   const following = await getFollowStatus(profile.id);
 

@@ -185,7 +185,7 @@ function EncryptedFile({ meta }: { meta: AttachmentMeta }) {
     <button
       type="button"
       onClick={() => void download()}
-      className="flex max-w-60 items-center gap-2 rounded-2xl border border-border bg-muted px-3 py-2 text-left text-sm"
+      className="flex max-w-60 items-center gap-2 rounded-2xl border border-border bg-muted px-3 py-2 text-left type-body"
     >
       {busy ? (
         <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -194,7 +194,7 @@ function EncryptedFile({ meta }: { meta: AttachmentMeta }) {
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{meta.name ?? "file"}</span>
-        <span className="block text-[10px] text-muted-foreground">
+        <span className="block type-meta text-muted-foreground">
           {failed ? t("message.decryptFailed") : `${sizeKb} KB`}
         </span>
       </span>

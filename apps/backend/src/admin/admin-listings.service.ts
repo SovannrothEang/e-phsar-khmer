@@ -63,6 +63,10 @@ export class AdminListingsService {
     const conditions = [];
     if (dto.status) conditions.push(eq(listings.status, dto.status));
     if (dto.userId) conditions.push(eq(listings.userId, dto.userId));
+    if (dto.categorySlug)
+      conditions.push(eq(categories.slug, dto.categorySlug));
+    if (dto.subcategorySlug)
+      conditions.push(eq(subcategories.slug, dto.subcategorySlug));
     if (dto.moderated === true)
       conditions.push(isNotNull(listings.moderatedAt));
     if (dto.moderated === false) conditions.push(isNull(listings.moderatedAt));

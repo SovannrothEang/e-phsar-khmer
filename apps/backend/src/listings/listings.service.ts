@@ -14,6 +14,7 @@ import {
   isNotNull,
   isNull,
   lte,
+  notInArray,
   or,
   sql,
   inArray,
@@ -23,8 +24,15 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
 import { ReactionsService } from '../reactions/reactions.service';
 import { EntitlementsService } from '../subscriptions/entitlements.service';
+import { activePaidSubscriptionExistsSql } from '../subscriptions/verified-account.util';
+import { parseAttributeFilters } from './attribute-filters';
+import { ProductsService } from '../products/products.service';
+import type { ProductRef } from '../products/products.service';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
+import { listingRenewals } from '../db/schema/subscriptions.schema';
+import { listingEvents } from '../db/schema/insights.schema';
+import { listingLikes, listingSaves } from '../db/schema/reactions.schema';
 import type {
   ListingPhotoRow,
   ListingRow,
@@ -53,6 +61,15 @@ import {
   keywordCondition,
   resolveFeedOrdering,
 } from './keyword-search';
+import {
+  TRENDING_CACHE_MS,
+  TRENDING_LIKE_WEIGHT,
+  TRENDING_LIMIT,
+  TRENDING_SAVE_WEIGHT,
+  TRENDING_WINDOW_DAYS,
+  trendingEventScoreSql,
+} from './trending';
+import type { QueryTrendingDto } from './dto/query-trending.dto';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
@@ -65,11 +82,25 @@ export interface ListingWithPhotos extends ListingRow {
    */
   sellerUsername?: string | null;
   /**
+   * Whether the seller holds an active paid subscription — the card/profile
+   * "Verified Account" badge. Present on the public feed, the detail read and
+   * the trending strip; derived by an EXISTS subquery, never stored.
+   */
+  sellerVerifiedAccount?: boolean;
+  /**
    * How many users liked this listing — resolved by `findById` only (same
    * reasoning as `sellerUsername`), so the detail page's "N Likes" control
    * starts truthful. Counted on read; there is no counter column to drift.
    */
   likeCount?: number;
+  /**
+   * The trusted spec page linked to this ad, resolved by `findById` only.
+   * Null when the listing has no `productModelId`, or the spec has since been
+   * unpublished / its brand or model deactivated — the detail page hides the
+   * "View full specs" link on null, while `productModelId` still reports the
+   * stored link.
+   */
+  product?: ProductRef | null;
 }
 
 export interface FeedFacet {
@@ -92,6 +123,24 @@ interface ResolvedFilters {
   geo: SQL[];
 }
 
+/**
+ * What a listing's status means to a client. Nothing flips `status` when the
+ * 30-day window closes (see `liveConditions`), so a lapsed `active` row must
+ * read as `expired` wherever the stored word would otherwise claim it is live.
+ */
+function effectiveStatus(
+  listing: Pick<ListingRow, 'status' | 'expiresAt'>,
+): ListingRow['status'] {
+  const lapsed =
+    listing.expiresAt !== null && listing.expiresAt.getTime() <= Date.now();
+  // A lapsed restricted ad is no longer "hidden over the limit": it is an
+  // expired ad the owner can renew once they have a free slot.
+  return lapsed &&
+    (listing.status === 'active' || listing.status === 'restricted')
+    ? 'expired'
+    : listing.status;
+}
+
 @Injectable()
 export class ListingsService {
   constructor(
@@ -99,7 +148,18 @@ export class ListingsService {
     private readonly filesService: FilesService,
     private readonly reactionsService: ReactionsService,
     private readonly entitlements: EntitlementsService,
+    private readonly products: ProductsService,
   ) {}
+
+  /**
+   * Per-process trend cache. Ranking aggregates the engagement window, so it
+   * is the heaviest public read; a five-minute-old list is indistinguishable
+   * to a visitor and keeps the home page off the event table.
+   */
+  private readonly trendingCache = new Map<
+    string,
+    { at: number; rows: ListingWithPhotos[] }
+  >();
 
   async create(
     userId: string,
@@ -130,6 +190,21 @@ export class ListingsService {
       .limit(1);
     if (!sub) throw new NotFoundException('Subcategory not found');
 
+    // The web has no draft surface, so a create that cannot be published is
+    // an invisible row. Check the allowance here too: an over-limit post never
+    // creates anything, even for a client that skips the publish step.
+    await this.entitlements.assertCanHoldAnotherAd(userId, dto);
+
+    // Trusted spec link: only a published page is a legal target. The read
+    // happens before the transactional write (see the TOCTOU note in the
+    // products service); the column is nullable for pre-existing ads.
+    if (dto.productModelId) {
+      await this.products.assertPublishedModel(
+        dto.productModelId,
+        dto.subcategoryId,
+      );
+    }
+
     const values: NewListing = {
       userId,
       categoryId: dto.categoryId,
@@ -150,6 +225,7 @@ export class ListingsService {
       provinceId: dto.provinceId ?? null,
       districtId: dto.districtId ?? null,
       communeId: dto.communeId ?? null,
+      productModelId: dto.productModelId ?? null,
       deliveryFree: dto.deliveryFree ?? false,
       contactName: dto.contactName ?? null,
       contactPhones: dto.contactPhones ?? [],
@@ -248,6 +324,15 @@ export class ListingsService {
       updates.discountType = dto.discountType ?? null;
     if (dto.condition !== undefined) updates.condition = dto.condition ?? null;
     if (dto.attributes !== undefined) updates.attributes = dto.attributes;
+    if (dto.productModelId !== undefined) {
+      if (dto.productModelId) {
+        await this.products.assertPublishedModel(
+          dto.productModelId,
+          existing.subcategoryId,
+        );
+      }
+      updates.productModelId = dto.productModelId ?? null;
+    }
     if (dto.location !== undefined) updates.location = dto.location;
     if (dto.address !== undefined) updates.address = dto.address;
     if (dto.latitude !== undefined)
@@ -328,27 +413,36 @@ export class ListingsService {
     // links to profiles that do not exist. Left join: a soft-deleted owner
     // must not make their listing unreadable.
     const [row] = await this.db
-      .select({ listing: listings, sellerUsername: users.username })
+      .select({
+        listing: listings,
+        sellerUsername: users.username,
+        sellerVerifiedAccount: activePaidSubscriptionExistsSql(listings.userId),
+      })
       .from(listings)
       .leftJoin(users, eq(users.id, listings.userId))
       .where(eq(listings.id, id))
       .limit(1);
     if (!row) throw new NotFoundException('Listing not found');
 
-    const [photos, likeCount] = await Promise.all([
+    const [photos, likeCount, product] = await Promise.all([
       this.db
         .select()
         .from(listingPhotos)
         .where(eq(listingPhotos.listingId, row.listing.id))
         .orderBy(listingPhotos.sort),
       this.reactionsService.countLikes(row.listing.id),
+      row.listing.productModelId
+        ? this.products.getPublishedRefByModelId(row.listing.productModelId)
+        : Promise.resolve(null),
     ]);
 
     return {
       ...row.listing,
       photos,
       sellerUsername: row.sellerUsername ?? null,
+      sellerVerifiedAccount: row.sellerVerifiedAccount ?? false,
       likeCount,
+      product,
     };
   }
 
@@ -409,6 +503,9 @@ export class ListingsService {
             ...getTableColumns(listings),
             sortKey: sortKeyExpr(ordering),
             sellerUsername: users.username,
+            sellerVerifiedAccount: activePaidSubscriptionExistsSql(
+              listings.userId,
+            ),
           })
           .from(listings)
           .leftJoin(users, eq(users.id, listings.userId))
@@ -467,6 +564,144 @@ export class ListingsService {
   }
 
   /**
+   * Engagement-ranked "Trending" carousel.
+   *
+   * Score = weighted buyer actions from `listing_events` + likes + saves over
+   * a rolling window. Impressions are excluded (they measure placement, not
+   * demand). Only live listings rank; the tail is filled with the newest live
+   * listings so the carousel is never empty. Deliberately not paginated: the
+   * score moves as events land, so a cursor over it would skip or repeat rows.
+   */
+  async findTrending(query: QueryTrendingDto): Promise<{
+    data: ListingWithPhotos[];
+    meta: { limit: number; windowDays: number };
+  }> {
+    const limit = query.limit ?? TRENDING_LIMIT;
+    const windowDays = query.windowDays ?? TRENDING_WINDOW_DAYS;
+    const meta = { limit, windowDays };
+
+    const cacheKey = `${limit}:${windowDays}`;
+    const cached = this.trendingCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < TRENDING_CACHE_MS) {
+      return { data: cached.rows, meta };
+    }
+
+    const cutoff = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    // Aggregates are derived tables rather than correlated subqueries: each
+    // scans its window once, then joins, instead of running once per listing.
+    const eventScores = this.db
+      .select({
+        listingId: listingEvents.listingId,
+        score: trendingEventScoreSql().as('event_score'),
+      })
+      .from(listingEvents)
+      .where(gte(listingEvents.createdAt, cutoff))
+      .groupBy(listingEvents.listingId)
+      .as('trend_events');
+
+    // The owner's own like/save must not help their ad trend.
+    const likeScores = this.db
+      .select({
+        listingId: listingLikes.listingId,
+        score: sql<number>`(count(*) * ${TRENDING_LIKE_WEIGHT})::int`.as(
+          'like_score',
+        ),
+      })
+      .from(listingLikes)
+      .innerJoin(listings, eq(listings.id, listingLikes.listingId))
+      .where(
+        and(
+          gte(listingLikes.createdAt, cutoff),
+          sql`${listingLikes.userId} <> ${listings.userId}`,
+        ),
+      )
+      .groupBy(listingLikes.listingId)
+      .as('trend_likes');
+
+    const saveScores = this.db
+      .select({
+        listingId: listingSaves.listingId,
+        score: sql<number>`(count(*) * ${TRENDING_SAVE_WEIGHT})::int`.as(
+          'save_score',
+        ),
+      })
+      .from(listingSaves)
+      .innerJoin(listings, eq(listings.id, listingSaves.listingId))
+      .where(
+        and(
+          gte(listingSaves.createdAt, cutoff),
+          sql`${listingSaves.userId} <> ${listings.userId}`,
+        ),
+      )
+      .groupBy(listingSaves.listingId)
+      .as('trend_saves');
+
+    const trendScore = sql<number>`(
+      coalesce(${eventScores.score}, 0)
+      + coalesce(${likeScores.score}, 0)
+      + coalesce(${saveScores.score}, 0)
+    )`;
+
+    // `score` only feeds the ordering; strip it from the card contract.
+    const rankedRows = await this.db
+      .select({
+        ...getTableColumns(listings),
+        sellerUsername: users.username,
+        sellerVerifiedAccount: activePaidSubscriptionExistsSql(listings.userId),
+        score: trendScore,
+      })
+      .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
+      .leftJoin(eventScores, eq(eventScores.listingId, listings.id))
+      .leftJoin(likeScores, eq(likeScores.listingId, listings.id))
+      .leftJoin(saveScores, eq(saveScores.listingId, listings.id))
+      .where(and(...this.liveConditions(), sql`${trendScore} > 0`))
+      .orderBy(desc(trendScore), desc(listings.createdAt), desc(listings.id))
+      .limit(limit);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const ranked = rankedRows.map(({ score, ...row }) => row);
+
+    const fillCount = limit - ranked.length;
+    let filled: typeof ranked = [];
+    if (fillCount > 0) {
+      const conditions = [...this.liveConditions()];
+      if (ranked.length > 0) {
+        conditions.push(
+          notInArray(
+            listings.id,
+            ranked.map((row) => row.id),
+          ),
+        );
+      }
+      filled = await this.db
+        .select({
+          ...getTableColumns(listings),
+          sellerUsername: users.username,
+          sellerVerifiedAccount: activePaidSubscriptionExistsSql(
+            listings.userId,
+          ),
+        })
+        .from(listings)
+        .leftJoin(users, eq(users.id, listings.userId))
+        .where(and(...conditions))
+        .orderBy(desc(listings.createdAt), desc(listings.id))
+        .limit(fillCount);
+    }
+
+    const rows = [...ranked, ...filled];
+    const photosMap = await this.batchLoadPhotos(rows.map((row) => row.id));
+    const data = rows.map((row) => ({
+      ...row,
+      photos: photosMap.get(row.id) ?? [],
+    }));
+
+    this.trendingCache.set(cacheKey, { at: Date.now(), rows: data });
+    return { data, meta };
+  }
+
+  /**
    * What makes a listing publicly visible: active AND not past its expiry.
    * Nothing flips `status` to 'expired' when `expires_at` passes (no job does
    * it yet), so the date itself must be checked or 30-day-old ads never leave
@@ -486,7 +721,29 @@ export class ListingsService {
     const limit = query.limit ?? 20;
     const conditions: SQL[] = [eq(listings.userId, userId)];
 
-    if (query.status) {
+    if (query.status === 'active') {
+      // "Active" means live right now, not merely the stored word: an ad past
+      // its 30-day window belongs to the Expired tab below.
+      conditions.push(...this.liveConditions());
+    } else if (query.status === 'expired') {
+      conditions.push(
+        or(
+          eq(listings.status, 'expired'),
+          and(
+            inArray(listings.status, ['active', 'restricted']),
+            isNotNull(listings.expiresAt),
+            sql`${listings.expiresAt} <= now()`,
+          ),
+        )!,
+      );
+    } else if (query.status === 'restricted') {
+      // Hidden-by-plan list: only rows still inside their window. A lapsed
+      // restricted ad reads as expired (and is renewable) instead.
+      conditions.push(
+        eq(listings.status, 'restricted'),
+        or(isNull(listings.expiresAt), sql`${listings.expiresAt} > now()`)!,
+      );
+    } else if (query.status) {
       conditions.push(
         eq(listings.status, query.status as ListingRow['status']),
       );
@@ -528,6 +785,9 @@ export class ListingsService {
     const photosMap = await this.batchLoadPhotos(rows.map((l) => l.id));
     const dataWithPhotos = rows.map((l) => ({
       ...l,
+      // Same derived status the public detail reports, so the owner's tabs and
+      // the card badge never disagree with what browsing shows.
+      status: effectiveStatus(l),
       photos: photosMap.get(l.id) ?? [],
     }));
 
@@ -556,15 +816,19 @@ export class ListingsService {
       });
     }
 
-    if (existing.status === 'restricted') {
+    const now = new Date();
+    const lapsed =
+      existing.expiresAt !== null &&
+      existing.expiresAt.getTime() <= now.getTime();
+    // A restricted ad whose 30-day window is still open cannot be re-published
+    // into a full plan; once it lapses it is a renewal like any expired ad.
+    if (existing.status === 'restricted' && !lapsed) {
       throw new ForbiddenException({
         code: 'PLAN_RESTRICTED',
         message:
           'This ad is hidden because it is over your plan’s limit. Renew or upgrade your subscription to show it again.',
       });
     }
-
-    const now = new Date();
     if (existing.publishedAt === null) {
       // A brand-new ad: needs a free slot, and its photos must fit the plan.
       await this.entitlements.assertPhotos(
@@ -576,11 +840,7 @@ export class ListingsService {
     } else {
       // Re-publishing an ad that already went live is a renewal. An ad that
       // lapsed (or was deleted) is no longer counted, so it also needs a slot.
-      await this.entitlements.assertCanRenew(
-        userId,
-        existing,
-        existing.renewCount,
-      );
+      await this.entitlements.assertCanRenew(userId, existing);
       const stillLive =
         existing.status === 'active' &&
         (existing.expiresAt === null || existing.expiresAt > now);
@@ -591,20 +851,27 @@ export class ListingsService {
 
     const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    const [updated] = await this.db
-      .update(listings)
-      .set({
-        status: 'active',
-        publishedAt: existing.publishedAt ?? now,
-        expiresAt,
-        renewCount:
-          existing.publishedAt === null
-            ? existing.renewCount
-            : existing.renewCount + 1,
-        updatedAt: now,
-      })
-      .where(eq(listings.id, id))
-      .returning();
+    // A renewal is an extra publish of an ad that already went live; the
+    // extension and the window's spend log commit together, so the plan can
+    // never count a renewal the ad did not get (or miss one it did).
+    const isRenewal = existing.publishedAt !== null;
+    const updated = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(listings)
+        .set({
+          status: 'active',
+          publishedAt: existing.publishedAt ?? now,
+          expiresAt,
+          renewCount: isRenewal ? existing.renewCount + 1 : existing.renewCount,
+          updatedAt: now,
+        })
+        .where(eq(listings.id, id))
+        .returning();
+      if (isRenewal) {
+        await tx.insert(listingRenewals).values({ listingId: id, userId });
+      }
+      return row;
+    });
 
     // The count check above is not atomic with the write; settling here keeps
     // two parallel publishes from leaving the user over their allowance.
@@ -727,6 +994,23 @@ export class ListingsService {
     if (query.bodyType) {
       out.push(eq(sql`${listings.attributes}->>'bodyType'`, query.bodyType));
     }
+    // The other attribute filters the browse dialog offers — same display-name
+    // equality as `brand`/`bodyType`. The keys are literals in the query (never
+    // caller-supplied paths); only the values are bound.
+    if (query.model) {
+      out.push(eq(sql`${listings.attributes}->>'model'`, query.model));
+    }
+    if (query.taxType) {
+      out.push(eq(sql`${listings.attributes}->>'taxType'`, query.taxType));
+    }
+    if (query.color) {
+      out.push(eq(sql`${listings.attributes}->>'color'`, query.color));
+    }
+    if (query.transmission) {
+      out.push(
+        eq(sql`${listings.attributes}->>'transmission'`, query.transmission),
+      );
+    }
     // Generic attribute filter for every grid that is NOT a car's Body Type.
     // The key is bound as a parameter (`->>$n`), never interpolated, and the
     // DTO additionally constrains it to a plain identifier — so this stays a
@@ -737,6 +1021,12 @@ export class ListingsService {
       out.push(
         eq(sql`${listings.attributes}->>${query.attrKey}`, query.attrValue),
       );
+    }
+    // Multi-attribute filter from the More Filters dialog: one JSON object,
+    // one AND'ed condition per entry. Each key is bound (`->>$n`), never
+    // interpolated; malformed or oversized input applies nothing.
+    for (const [key, value] of parseAttributeFilters(query.attrs)) {
+      out.push(eq(sql`${listings.attributes}->>${key}`, value));
     }
 
     // Model year lives in the JSONB as the display string ("2021"); anything
@@ -767,6 +1057,13 @@ export class ListingsService {
 
     if (query.deliveryFree) {
       out.push(eq(listings.deliveryFree, true));
+    }
+    // A discount exists only when both fields are set and the value is
+    // positive — the same rule the generated `effective_price` column uses.
+    if (query.hasDiscount) {
+      out.push(
+        sql`${listings.discountValue} is not null and ${listings.discountValue} > 0 and ${listings.discountType} is not null`,
+      );
     }
     return out;
   }
@@ -856,6 +1153,11 @@ export class ListingsService {
       .where(eq(listingPhotos.listingId, id))
       .orderBy(listingPhotos.sort);
 
+    // A removed ad frees a plan slot: settle the allowance now instead of
+    // waiting for the ten-minute sweep, so the owner can post right away and
+    // a restricted ad they made room for comes back immediately.
+    await this.entitlements.reconcileListingsSafely(userId);
+
     return { ...updated, photos };
   }
 
@@ -867,7 +1169,22 @@ export class ListingsService {
   async findPublicById(id: string): Promise<ListingWithPhotos> {
     const listing = await this.findById(id);
     if (listing.moderatedAt) throw new NotFoundException('Listing not found');
-    return listing;
+    // The public detail must not serve what the marketplace already hides:
+    // a never-published draft, an ad its owner withdrew, or one hidden for
+    // exceeding its plan's allowance. (Moderated rows are `deleted` too, and
+    // are rejected just above with their own comment.)
+    if (
+      listing.status === 'draft' ||
+      listing.status === 'deleted' ||
+      listing.status === 'restricted'
+    ) {
+      throw new NotFoundException('Listing not found');
+    }
+    // A lapsed ad keeps its link (shares, old messages, search history) but
+    // must read as expired — the page shows the notice and stops offering
+    // contact instead of pretending the offer is still live.
+    const status = effectiveStatus(listing);
+    return status === listing.status ? listing : { ...listing, status };
   }
 
   /**

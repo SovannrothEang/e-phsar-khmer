@@ -1,20 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   Check,
   CircleAlert,
   Clock3,
   CreditCard,
-  LockKeyhole,
+  MapPin,
+  Phone,
   ShieldCheck,
+  UserRound,
 } from "lucide-react";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
+import { Breadcrumbs } from "@/components/common/Breadcrumbs";
+import { getUserProfile, type CurrentUser } from "@/actions/user";
+import {
+  getBillingAddresses,
+  type BillingAddress,
+} from "@/actions/billing-addresses";
+import BillingAddressDialog from "@/components/billing/BillingAddressDialog";
+import AddressMapPreview from "@/components/billing/AddressMapPreview";
 import {
   createSubscriptionCheckout,
   getMySubscriptions,
@@ -34,9 +50,9 @@ import {
   packageIdOf,
   priceFor,
 } from "@/lib/subscription-pricing";
-import { Button } from "@/components/ui/button";
 import { KhqrCard } from "@/components/payment/KhqrCard";
 import { useNotificationEvents } from "@/hooks/use-chat-ws";
+import { isTabAttending } from "@/hooks/use-tab-attention";
 import { useMobilePlatform } from "@/hooks/use-mobile-platform";
 
 // Waiting for the charge job to hand back the KHQR: up to ~20s.
@@ -45,6 +61,7 @@ const QR_WAIT_TRIES = 20;
 // Payment status reads only when no push can arrive: socket down, or the
 // code just expired (failures and expiry are not pushed).
 const FALLBACK_REFRESH_MS = 5_000;
+const FALLBACK_MAX_REFRESH_MS = 15_000;
 // Kept above the backend's 30 s expiry sweep slack (PaymentReconciler), so
 // the page is still reading when an expired checkout flips to failed.
 const EXPIRY_GRACE_MS = 60_000;
@@ -129,6 +146,18 @@ function clock(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
+/** One stacked panel of the checkout column: a titled header over a body. */
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-sm border bg-card">
+      <div className="border-b px-4 py-3">
+        <h2 className="text-lg font-medium text-foreground">{title}</h2>
+      </div>
+      <div className="p-4">{children}</div>
+    </section>
+  );
+}
+
 export default function CheckoutPage() {
   const params = useSearchParams();
   const termId = params.get("termId");
@@ -143,6 +172,12 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
+  // The billing-contact block reads the signed-in account; a failed read just
+  // leaves the rows out rather than blocking the payment.
+  const [me, setMe] = useState<CurrentUser | null>(null);
+  const [addresses, setAddresses] = useState<BillingAddress[]>([]);
+  const [addressId, setAddressId] = useState<string | null>(null);
+  const [addressOpen, setAddressOpen] = useState(false);
   const idempotencyKey = useRef<string | null>(null);
   const platform = useMobilePlatform();
   const appOpenedFor = useRef<string | null>(null);
@@ -179,6 +214,16 @@ export default function CheckoutPage() {
       .catch(() => {
         if (mounted) setProviders([]);
       });
+    getUserProfile()
+      .then((user) => {
+        if (mounted) setMe(user);
+      })
+      .catch(() => {});
+    getBillingAddresses()
+      .then((items) => {
+        if (mounted) setAddresses(items);
+      })
+      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -339,10 +384,34 @@ export default function CheckoutPage() {
 
   // No socket at all (blocked, misconfigured, reconnects exhausted): a slow
   // read keeps the page settling on its own.
+  // Backs off (5s, 10s, 15s, then steady) and reads nothing while the tab is
+  // hidden; coming back to the tab reads once at once and restarts the pace.
   useEffect(() => {
     if (!awaitingResult || isConnected) return;
-    const timer = setInterval(() => void refreshPayment(), FALLBACK_REFRESH_MS);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = FALLBACK_REFRESH_MS;
+    const run = () => {
+      // "Attending" also covers an abandoned-but-visible tab: the socket closes
+      // when the tab goes idle, and without this the fallback would then poll a
+      // parked checkout page every few seconds.
+      if (isTabAttending()) {
+        void refreshPayment();
+        delay = Math.min(delay + FALLBACK_REFRESH_MS, FALLBACK_MAX_REFRESH_MS);
+      }
+      timer = setTimeout(run, delay);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      delay = FALLBACK_REFRESH_MS;
+      run();
+    };
+    timer = setTimeout(run, delay);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [awaitingResult, isConnected, refreshPayment]);
 
   // Failures and expiry are not pushed, so once the code can no longer be
@@ -438,439 +507,503 @@ export default function CheckoutPage() {
     payment?.status === "failed" ||
     payment?.status === "cancelled" ||
     payment?.status === "expired";
-  const step = activated ? 3 : payment ? 2 : 1;
   const planPrice = offer ? priceFor(offer) : 0;
   const dueToday = payment ? Number(payment.amount) : planPrice;
   const credit = payment && planPrice > dueToday ? planPrice - dueToday : 0;
+  const displayName =
+    [me?.firstName, me?.lastName].filter(Boolean).join(" ").trim() ||
+    me?.username ||
+    "This account";
+
+  const reloadAddresses = useCallback(() => {
+    getBillingAddresses()
+      .then(setAddresses)
+      .catch(() => {});
+  }, []);
+
+  // The picked one, else the account default, else the first saved row.
+  const selectedAddress =
+    addresses.find((item) => item.id === addressId) ??
+    addresses.find((item) => item.isDefault) ??
+    addresses[0] ??
+    null;
 
   return (
     <div className="min-h-screen bg-muted pb-16">
-      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
-        <Link
-          href={
-            offer
-              ? {
-                  pathname: "/premium-account/[category]",
-                  params: { category: offer.groupSlug },
-                }
-              : "/premium-account"
-          }
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" /> Back to plans
-        </Link>
-
-        <div className="mt-3 mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              Checkout
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Review your plan, choose how to pay, then scan the KHQR.
-            </p>
-          </div>
-          <ol className="flex items-center gap-3 text-sm" aria-label="Progress">
-            {["Review", "Pay", "Active"].map((label, index) => {
-              const number = index + 1;
-              const done = number < step || (number === 3 && activated);
-              const current = number === step && !done;
-              return (
-                <li key={label} className="flex items-center gap-3">
-                  <span className="flex items-center gap-2">
-                    <span
-                      className={`flex size-6 items-center justify-center rounded-full text-xs font-semibold ${
-                        done
-                          ? "bg-emerald-600 text-white"
-                          : current
-                            ? "bg-[#00a0e9] text-white"
-                            : "bg-card text-muted-foreground ring-1 ring-border"
-                      }`}
-                    >
-                      {done ? <Check className="size-3.5" /> : number}
-                    </span>
-                    <span
-                      className={
-                        current
-                          ? "font-medium text-foreground"
-                          : "hidden text-muted-foreground sm:inline"
-                      }
-                    >
-                      {label}
-                    </span>
-                  </span>
-                  {index < 2 && (
-                    <span
-                      aria-hidden
-                      className="hidden h-px w-6 bg-border sm:block"
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+      <div className="mx-auto max-w-5xl px-4 pt-6">
+        <Breadcrumbs
+          items={[
+            { label: "Home", href: "/" },
+            { label: "Profile", href: "/me" },
+            { label: "Membership", href: "/me/membership" },
+            { label: "Check Out" },
+          ]}
+        />
 
         {error && (
           <div
             role="alert"
-            className="mb-5 flex items-start gap-2 rounded-xl bg-card p-4 text-sm text-destructive ring-1 ring-destructive/30"
+            className="mt-4 flex items-start gap-2 rounded-sm border border-destructive/30 bg-card p-4 text-sm text-destructive"
           >
-            <CircleAlert className="mt-0.5 size-4 shrink-0" /> {error}
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /> {error}
           </div>
         )}
 
-        <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="rounded-2xl bg-card p-6 shadow-sm ring-1 ring-border sm:p-8">
-            {loadingCatalog ? (
-              <div className="h-72 animate-pulse rounded-xl bg-muted" />
-            ) : !offer ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="flex size-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-                  <CircleAlert className="size-6" />
-                </span>
-                <h2 className="mt-4 font-semibold text-foreground">
+        <div className="mt-4 space-y-3">
+          {loadingCatalog ? (
+            <div className="h-72 animate-pulse rounded-sm border bg-card" />
+          ) : !offer ? (
+            <Card title="Subscription">
+              <div className="flex min-h-56 flex-col items-center justify-center text-center">
+                <CircleAlert className="h-8 w-8 text-amber-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
                   Offer unavailable
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
                   This term may have been removed or deactivated.
                 </p>
                 <Link
                   href="/premium-account"
-                  className="mt-4 text-sm font-medium text-[#0089c8] hover:underline"
+                  className="mt-4 text-sm font-medium text-[#00a0e9] hover:underline"
                 >
                   Browse available plans
                 </Link>
               </div>
-            ) : blocked ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="flex size-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
-                  <BadgeCheck className="size-8" />
-                </span>
-                <h2 className="mt-4 text-xl font-semibold text-foreground">
+            </Card>
+          ) : blocked ? (
+            <Card title="Subscription">
+              <div className="flex min-h-56 flex-col items-center justify-center text-center">
+                <BadgeCheck className="h-9 w-9 text-emerald-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
                   {blocked === "current"
                     ? "You're already on this plan"
                     : "Not an upgrade from your current plan"}
-                </h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                </h3>
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
                   {blocked === "current"
                     ? `Your ${offer.packageName} package is active — nothing to pay.`
                     : "Your current plan already covers this for the time left. Pick a bigger package to upgrade."}
                 </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
                   <Link
                     href={{
                       pathname: "/premium-account/[category]",
                       params: { category: offer.groupSlug },
                     }}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
+                    className="inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
                   >
-                    See upgrade options <ArrowRight className="size-4" />
+                    See upgrade options <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/me/subscriptions"
-                    className="inline-flex h-11 items-center rounded-xl px-5 text-sm font-semibold text-foreground ring-1 ring-border hover:bg-muted"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
                   >
                     My subscriptions
                   </Link>
                 </div>
               </div>
-            ) : activated ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="flex size-14 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
-                  <BadgeCheck className="size-8" />
-                </span>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
+            </Card>
+          ) : activated ? (
+            <Card title="Subscription">
+              <div className="flex min-h-56 flex-col items-center justify-center text-center">
+                <BadgeCheck className="h-9 w-9 text-emerald-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
                   You&apos;re all set
-                </h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                </h3>
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
                   Payment confirmed and your {offer.packageName} package is
                   ready to use.
                 </p>
-                <Link
-                  href="/me/subscriptions"
-                  className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#00a0e9] px-5 text-sm font-semibold text-white hover:bg-[#008ccb]"
-                >
-                  View my subscriptions <ArrowRight className="size-4" />
-                </Link>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
+                  >
+                    Back to profile <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/me/subscriptions"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    View my subscriptions
+                  </Link>
+                </div>
               </div>
-            ) : paymentFailed ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="flex size-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-                  <CircleAlert className="size-8" />
-                </span>
-                <h2 className="mt-4 text-xl font-semibold text-foreground">
+            </Card>
+          ) : paymentFailed ? (
+            <Card title="Subscription">
+              <div className="flex min-h-56 flex-col items-center justify-center text-center">
+                <CircleAlert className="h-8 w-8 text-amber-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
                   Payment didn&apos;t complete
-                </h2>
-                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                </h3>
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
                   The code expired or the payment wasn&apos;t received, so no
                   subscription was activated. Start a new checkout to try again.
                 </p>
-                <Button
-                  onClick={retryCheckout}
-                  className="mt-6 h-11 rounded-xl bg-[#00a0e9] px-6 text-white hover:bg-[#008ccb]"
-                >
-                  Try again
-                </Button>
-              </div>
-            ) : payment?.status === "succeeded" ? (
-              <div className="flex min-h-72 flex-col items-center justify-center text-center">
-                <span className="size-10 animate-spin rounded-full border-2 border-border border-t-emerald-600" />
-                <h2 className="mt-5 text-xl font-semibold text-foreground">
-                  Payment received
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Activating your subscription — this page updates by itself.
-                </p>
-              </div>
-            ) : payment ? (
-              <div className="grid gap-8 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                    <Clock3 className="size-3.5" />
-                    Waiting for payment
-                  </span>
-                  <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-                    Scan to pay{" "}
-                    <span className="tabular-nums">
-                      ${money(payment.amount)}
-                    </span>
-                  </h2>
-                  <ol className="mt-5 space-y-3 text-sm text-foreground">
-                    {[
-                      `Open ${ui?.appName ?? "Bakong"} or any KHQR banking app`,
-                      "Scan the KHQR code",
-                      "Confirm the amount and approve",
-                    ].map((text, index) => (
-                      <li key={text} className="flex items-center gap-3">
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        {text}
-                      </li>
-                    ))}
-                  </ol>
-                  <p className="mt-5 text-xs text-muted-foreground">
-                    Keep this page open — it confirms automatically.
-                  </p>
-                </div>
-                <div className="mx-auto w-full max-w-[260px]">
-                  <KhqrCard
-                    qr={qrInfo?.qr ?? null}
-                    receiverName={receiverName}
-                    amount={Number(payment.amount)}
-                    currency={payment.currency}
-                  />
-                  {/* Expiry and app hand-off sit outside the card, per the
-                      guideline: only name, amount and QR belong inside it. */}
-                  {remainingMs !== null && (
-                    <p className="mt-4 text-center text-xs tabular-nums text-muted-foreground">
-                      {clock(remainingMs)} | QR will expire
-                    </p>
-                  )}
-                  {appLink && platform && (
-                    <div>
-                      <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="h-px flex-1 bg-border" /> Or
-                        <span className="h-px flex-1 bg-border" />
-                      </div>
-                      <a
-                        href={appLink}
-                        className="flex h-11 w-full items-center justify-center rounded-xl bg-[#E1232E] text-sm font-semibold text-white hover:bg-[#c81e28]"
-                      >
-                        Pay via {ui?.appName ?? "app"}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">
-                  Payment method
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Your KHQR code appears here once you continue.
-                </p>
-                {providers === null ? (
-                  <div className="mt-5 space-y-3">
-                    {[0, 1].map((row) => (
-                      <div
-                        key={row}
-                        className="h-[74px] animate-pulse rounded-xl bg-muted"
-                      />
-                    ))}
-                  </div>
-                ) : providers.length === 0 ? (
-                  <p className="mt-5 rounded-xl bg-muted p-4 text-sm text-muted-foreground">
-                    We couldn&apos;t load payment methods. Refresh the page to
-                    try again.
-                  </p>
-                ) : (
-                  <div
-                    role="radiogroup"
-                    aria-label="Payment method"
-                    className="mt-5 space-y-3"
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={retryCheckout}
+                    className="h-10 rounded-sm bg-[#00a0e9] px-6 text-sm font-medium text-white transition-colors hover:bg-[#008ccb]"
                   >
-                    {providers.map((item) => {
-                      const itemUi = providerUi(item);
-                      const selected = item.name === providerName;
-                      return (
-                        <button
-                          key={item.name}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          disabled={!item.available}
-                          onClick={() => selectProvider(item.name)}
-                          className={`flex w-full items-center gap-4 rounded-xl p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                            selected
-                              ? "bg-[#00a0e9]/5 ring-2 ring-[#00a0e9]"
-                              : "ring-1 ring-border hover:bg-muted/60"
-                          }`}
-                        >
-                          <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-white ring-1 ring-border">
-                            {itemUi.icon ? (
-                              <Image
-                                src={itemUi.icon}
-                                alt=""
-                                width={40}
-                                height={40}
-                                unoptimized
-                                className="size-full object-contain"
-                              />
-                            ) : (
-                              <CreditCard className="size-5 text-muted-foreground" />
-                            )}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block font-semibold text-foreground">
-                              {itemUi.title}
+                    Try again
+                  </button>
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Back to profile
+                  </Link>
+                </div>
+              </div>
+            </Card>
+          ) : payment?.status === "succeeded" ? (
+            <Card title="Subscription">
+              <div className="flex min-h-56 flex-col items-center justify-center text-center">
+                <BadgeCheck className="h-10 w-10 text-emerald-600" />
+                <h3 className="mt-3 text-lg font-medium text-foreground">
+                  Payment successful
+                </h3>
+                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                  Your payment was received. We&apos;re activating your{" "}
+                  {offer.packageName} plan — this page updates by itself.
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/me"
+                    className="inline-flex h-10 items-center gap-2 rounded-sm bg-[#00a0e9] px-5 text-sm font-medium text-white hover:bg-[#008ccb]"
+                  >
+                    Back to profile <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/me/subscriptions"
+                    className="inline-flex h-10 items-center rounded-sm border px-5 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    My subscriptions
+                  </Link>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <>
+              <Card title="Subscription">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted">
+                    {me?.profilePhotoUrl ? (
+                      <Image
+                        src={me.profilePhotoUrl}
+                        alt=""
+                        width={80}
+                        height={80}
+                        unoptimized
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <UserRound className="h-9 w-9 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-base font-semibold text-foreground">
+                      {offer.packageName} - {offer.termName}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Account: {me?.username ?? "—"}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {offer.packageName} · {offer.groupName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Runs for {offer.termName} after payment
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-[#00a0e9]">
+                      ${money(dueToday)}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                title={
+                  selectedAddress
+                    ? `Address: ${selectedAddress.label}`
+                    : "Billing Address"
+                }
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <p className="flex items-center gap-3 text-sm text-foreground">
+                      <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
+                      {selectedAddress?.name ?? displayName}
+                    </p>
+                    <p className="flex items-center gap-3 text-sm text-foreground">
+                      <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+                      {selectedAddress?.phone ??
+                        me?.primaryPhone ??
+                        "No phone number on this account"}
+                    </p>
+                    {selectedAddress && (
+                      <p className="flex items-start gap-3 text-sm text-foreground">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                        <span>
+                          {selectedAddress.address}
+                          {selectedAddress.company && (
+                            <span className="block text-gray-500">
+                              {selectedAddress.company}
                             </span>
-                            <span className="block text-sm text-muted-foreground">
-                              {item.available
-                                ? itemUi.subtitle
-                                : "Unavailable right now"}
+                          )}
+                        </span>
+                      </p>
+                    )}
+                    {!selectedAddress && (
+                      <p className="text-sm text-gray-500">
+                        No saved billing address yet — the plan is linked to
+                        this account either way.
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedAddress?.latitude && selectedAddress.longitude && (
+                    <AddressMapPreview
+                      coords={{
+                        lat: Number(selectedAddress.latitude),
+                        lng: Number(selectedAddress.longitude),
+                      }}
+                    />
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAddressOpen(true)}
+                  className="mt-3 w-full rounded-sm bg-[#00a0e9]/10 py-2.5 text-sm font-semibold text-[#00a0e9] transition-colors hover:bg-[#00a0e9] hover:text-white"
+                >
+                  {selectedAddress ? "Change Address" : "Add Address"}
+                </button>
+              </Card>
+
+              {payment ? (
+                <Card title="Payment">
+                  <div className="grid gap-6 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-center">
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 rounded-sm bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        Waiting for payment
+                      </span>
+                      <h3 className="mt-3 text-xl font-semibold text-foreground">
+                        Scan to pay{" "}
+                        <span className="tabular-nums">
+                          ${money(payment.amount)}
+                        </span>
+                      </h3>
+                      <ol className="mt-4 space-y-2 text-sm text-foreground">
+                        {[
+                          `Open ${ui?.appName ?? "Bakong"} or any KHQR banking app`,
+                          "Scan the KHQR code",
+                          "Confirm the amount and approve",
+                        ].map((text, index) => (
+                          <li key={text} className="flex items-center gap-3">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-gray-500">
+                              {index + 1}
                             </span>
-                          </span>
-                          <span
-                            aria-hidden
-                            className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
+                            {text}
+                          </li>
+                        ))}
+                      </ol>
+                      <p className="mt-4 text-xs text-gray-500">
+                        Keep this page open — it confirms automatically.
+                      </p>
+                    </div>
+                    <div className="mx-auto w-full max-w-[240px]">
+                      <KhqrCard
+                        qr={qrInfo?.qr ?? null}
+                        receiverName={receiverName}
+                        amount={Number(payment.amount)}
+                        currency={payment.currency}
+                      />
+                      {/* Expiry and app hand-off sit outside the card, per the
+                          guideline: only name, amount and QR belong inside it. */}
+                      {remainingMs !== null && (
+                        <p className="mt-3 text-center text-xs tabular-nums text-gray-500">
+                          {clock(remainingMs)} | QR will expire
+                        </p>
+                      )}
+                      {appLink && platform && (
+                        <div>
+                          <div className="my-3 flex items-center gap-3 text-xs text-gray-500">
+                            <span className="h-px flex-1 bg-border" /> Or
+                            <span className="h-px flex-1 bg-border" />
+                          </div>
+                          <a
+                            href={appLink}
+                            className="flex h-10 w-full items-center justify-center rounded-sm bg-[#E1232E] text-sm font-medium text-white hover:bg-[#c81e28]"
+                          >
+                            Pay via {ui?.appName ?? "app"}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <Card title="Payment Methods">
+                  {providers === null ? (
+                    <div className="space-y-2">
+                      {[0, 1].map((row) => (
+                        <div
+                          key={row}
+                          className="h-[68px] animate-pulse rounded-sm bg-muted"
+                        />
+                      ))}
+                    </div>
+                  ) : providers.length === 0 ? (
+                    <p className="rounded-sm bg-muted p-4 text-sm text-gray-500">
+                      We couldn&apos;t load payment methods. Refresh the page to
+                      try again.
+                    </p>
+                  ) : (
+                    <div
+                      role="radiogroup"
+                      aria-label="Payment method"
+                      className="space-y-2"
+                    >
+                      {providers.map((item) => {
+                        const itemUi = providerUi(item);
+                        const selected = item.name === providerName;
+                        return (
+                          <button
+                            key={item.name}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            disabled={!item.available}
+                            onClick={() => selectProvider(item.name)}
+                            className={`flex w-full items-center gap-3 rounded-sm border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                               selected
-                                ? "bg-[#00a0e9] text-white"
-                                : "ring-1 ring-border"
+                                ? "border-[#00a0e9] bg-[#00a0e9]/5"
+                                : "hover:bg-muted"
                             }`}
                           >
-                            {selected && <Check className="size-3" />}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          <aside className="rounded-2xl bg-card shadow-sm ring-1 ring-border md:sticky md:top-20">
-            <div className="p-6">
-              <h2 className="text-sm font-semibold text-foreground">
-                Order summary
-              </h2>
-              {loadingCatalog ? (
-                <div className="mt-4 h-40 animate-pulse rounded-xl bg-muted" />
-              ) : offer ? (
-                <>
-                  <div className="mt-4">
-                    <span className="text-xs font-medium text-[#0089c8]">
-                      {offer.groupName}
-                    </span>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {offer.packageName}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {offer.planName} · {offer.termName} ·{" "}
-                      {offer.durationValue} {offer.durationUnit}
-                      {offer.durationValue === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                  <dl className="mt-5 space-y-2.5 border-t border-border pt-5 text-sm">
-                    {[
-                      ["Photos per ad", offer.photos],
-                      ["Active ads", offer.ads],
-                      ["Renewals", offer.renews],
-                      ["Auto-renewals", offer.autoRenews],
-                      ["Videos", offer.videos],
-                    ].map(([label, value]) => (
-                      <div key={label} className="flex justify-between gap-2">
-                        <dt className="text-muted-foreground">{label}</dt>
-                        <dd className="font-medium tabular-nums text-foreground">
-                          {value}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <div className="mt-5 space-y-2 border-t border-border pt-5 text-sm">
-                    {credit > 0 && (
-                      <>
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Plan price</span>
-                          <span className="tabular-nums">
-                            ${money(planPrice)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
-                          <span>Credit from current plan</span>
-                          <span className="tabular-nums">
-                            −${money(credit)}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    <div className="flex items-baseline justify-between">
-                      <span className="font-medium text-foreground">
-                        Due today
-                      </span>
-                      <span className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                        ${money(dueToday)}
-                        <small className="ml-1 text-xs font-medium text-muted-foreground">
-                          {payment?.currency ?? "USD"}
-                        </small>
-                      </span>
+                            <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white ring-1 ring-border">
+                              {itemUi.icon ? (
+                                <Image
+                                  src={itemUi.icon}
+                                  alt=""
+                                  width={64}
+                                  height={48}
+                                  unoptimized
+                                  className="h-full w-full object-contain"
+                                />
+                              ) : (
+                                <CreditCard className="h-5 w-5 text-gray-400" />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-semibold text-foreground">
+                                {itemUi.title}
+                              </span>
+                              <span className="block text-sm text-gray-500">
+                                {item.available
+                                  ? itemUi.subtitle
+                                  : "Unavailable right now"}
+                              </span>
+                            </span>
+                            <span
+                              aria-hidden
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                selected
+                                  ? "border-[#00a0e9] bg-[#00a0e9] text-white"
+                                  : "border-gray-300"
+                              }`}
+                            >
+                              {selected && <Check className="h-3 w-3" />}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  </div>
-                  {!payment && !blocked && (
-                    <Button
-                      disabled={startingCheckout || !provider}
-                      onClick={() => void startCheckout()}
-                      className="mt-5 h-11 w-full rounded-xl bg-[#00a0e9] text-sm font-semibold text-white hover:bg-[#008ccb]"
-                    >
-                      {startingCheckout
-                        ? "Preparing checkout…"
-                        : "Continue to payment"}
-                      {!startingCheckout && (
-                        <ArrowRight className="ml-2 size-4" />
-                      )}
-                    </Button>
                   )}
-                </>
-              ) : (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Offer details unavailable.
-                </p>
+                </Card>
               )}
-            </div>
-            <div className="flex items-start gap-2 rounded-b-2xl border-t border-border bg-muted/60 px-6 py-4 text-xs leading-5 text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-              <span>
-                Your plan activates only after{" "}
-                {provider?.displayName ?? "the payment provider"} confirms the
-                payment. All purchases are final — no refunds.
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-6 py-3 text-xs text-muted-foreground">
-              <LockKeyhole className="size-3.5" /> Linked to your account
-            </div>
-          </aside>
+
+              <Card title="Summary">
+                <dl className="space-y-2 text-sm">
+                  {[
+                    ["Photos per ad", offer.photos],
+                    ["Active ads", offer.ads],
+                    ["Renewals", offer.renews],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-2">
+                      <dt className="text-gray-500">{label}</dt>
+                      <dd className="font-medium tabular-nums text-foreground">
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+                  {credit > 0 && (
+                    <>
+                      <div className="flex justify-between text-gray-500">
+                        <span>Plan price</span>
+                        <span className="tabular-nums">
+                          ${money(planPrice)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                        <span>Credit from current plan</span>
+                        <span className="tabular-nums">−${money(credit)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-medium text-foreground">
+                      Due today
+                    </span>
+                    <span className="text-xl font-semibold tabular-nums text-foreground">
+                      ${money(dueToday)}
+                      <small className="ml-1 text-xs font-medium text-gray-500">
+                        {payment?.currency ?? "USD"}
+                      </small>
+                    </span>
+                  </div>
+                </div>
+                {!payment && !blocked && (
+                  <button
+                    type="button"
+                    disabled={startingCheckout || !provider}
+                    onClick={() => void startCheckout()}
+                    className="mt-4 flex h-10 w-full items-center justify-center rounded-sm bg-[#00a0e9] text-sm font-medium text-white transition-colors hover:bg-[#008ccb] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {startingCheckout
+                      ? "Preparing checkout…"
+                      : "Continue to payment"}
+                    {!startingCheckout && (
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    )}
+                  </button>
+                )}
+                <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-gray-500">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>
+                    Your plan activates only after{" "}
+                    {provider?.displayName ?? "the payment provider"} confirms
+                    the payment. All purchases are final — no refunds.
+                  </span>
+                </p>
+              </Card>
+              <BillingAddressDialog
+                open={addressOpen}
+                onOpenChange={setAddressOpen}
+                addresses={addresses}
+                selectedId={selectedAddress?.id ?? null}
+                defaultName={displayName}
+                defaultPhone={me?.primaryPhone ?? ""}
+                onApply={setAddressId}
+                onChanged={reloadAddresses}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

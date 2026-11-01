@@ -5,6 +5,7 @@ import { serverFetch } from "@/lib/api/client";
 export interface AdminCategory {
   cateId: string;
   name: string;
+  nameKm: string;
   slug: string;
   cateIcon: string;
   isActive: boolean;
@@ -19,6 +20,7 @@ interface BackendCategory {
   slug: string;
   icon: string | null;
   name: string;
+  nameKm: string | null;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -37,6 +39,7 @@ export async function getAdminCategories(): Promise<AdminCategory[]> {
   return data.map((c) => ({
     cateId: c.id,
     name: c.name,
+    nameKm: c.nameKm ?? "",
     slug: c.slug,
     cateIcon: iconToSrc(c.icon),
     isActive: c.isActive,

@@ -16,6 +16,7 @@ export async function createcategories(
       body: JSON.stringify({
         slug: parsed.data.slug,
         name: parsed.data.name,
+        nameKm: parsed.data.nameKm,
         icon: parsed.data.cateIcon || null,
       }),
     });
@@ -40,6 +41,7 @@ export async function updatecategories(
       body: JSON.stringify({
         slug: parsed.data.slug,
         name: parsed.data.name,
+        nameKm: parsed.data.nameKm,
         icon:
           parsed.data.cateIcon && parsed.data.cateIcon !== "/placeholder.svg"
             ? parsed.data.cateIcon

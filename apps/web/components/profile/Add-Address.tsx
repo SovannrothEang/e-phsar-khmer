@@ -14,9 +14,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { FieldSet, FieldGroup } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import SettingSidebar from "../setting/SettingSidebar";
 import { useState } from "react";
+
+const DEPARTMENTS = [
+  "engineering",
+  "design",
+  "marketing",
+  "sales",
+  "support",
+  "hr",
+  "finance",
+  "operations",
+] as const;
+
 export default function AddAddress() {
+  const t = useTranslations("Me.billing");
+  const tCommon = useTranslations("Common");
+  const tSettings = useTranslations("Settings");
   const [autoUpdate, setAutoUpdate] = useState(false);
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
@@ -25,26 +41,32 @@ export default function AddAddress() {
           <SettingSidebar />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
-              <h1 className="text-2xl font-medium text-foreground mb-4 mt-4 px-4">
-                Add Address
+              <h1 className="type-page-title text-foreground mb-4 mt-4 px-4">
+                {t("addTitle")}
               </h1>
               <div className="mt-2 px-4 space-y-4">
                 <Field>
                   <FieldLabel htmlFor="input-required">
-                    Name <span className="text-destructive">*</span>
+                    {t("name")} <span className="text-destructive">*</span>
                   </FieldLabel>
                   <Input
                     id="input-required"
-                    placeholder="First Name"
+                    placeholder={t("firstNamePlaceholder")}
                     required
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">Company</FieldLabel>
-                  <Input id="input-required" placeholder="Company" required />
+                  <FieldLabel htmlFor="input-required">
+                    {t("company")}
+                  </FieldLabel>
+                  <Input
+                    id="input-required"
+                    placeholder={t("company")}
+                    required
+                  />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">Email</FieldLabel>
+                  <FieldLabel htmlFor="input-required">{t("email")}</FieldLabel>
                   <Input
                     id="input-required"
                     placeholder="[EMAIL_ADDRESS]"
@@ -53,7 +75,8 @@ export default function AddAddress() {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="input-required">
-                    Phone Number <span className="text-destructive">*</span>
+                    {t("phoneNumber")}{" "}
+                    <span className="text-destructive">*</span>
                   </FieldLabel>
                   <Input
                     id="input-required"
@@ -62,23 +85,18 @@ export default function AddAddress() {
                   />
                 </Field>
                 <Field className="w-full">
-                  <FieldLabel>Location</FieldLabel>
+                  <FieldLabel>{t("location")}</FieldLabel>
                   <Select>
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose Location" />
+                      <SelectValue placeholder={t("chooseLocation")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="support">
-                          Customer Support
-                        </SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
+                        {DEPARTMENTS.map((department) => (
+                          <SelectItem key={department} value={department}>
+                            {t(`departments.${department}`)}
+                          </SelectItem>
+                        ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -86,52 +104,53 @@ export default function AddAddress() {
                 <FieldSet className="w-full">
                   <FieldGroup>
                     <Field>
-                      <FieldLabel htmlFor="address">Address</FieldLabel>
+                      <FieldLabel htmlFor="address">{t("address")}</FieldLabel>
                       <Textarea
                         id="address"
-                        placeholder="Enter your address..."
+                        placeholder={t("addressPlaceholder")}
                         rows={4}
                       />
                     </Field>
                   </FieldGroup>
                 </FieldSet>
                 <Field className="w-full">
-                  <FieldLabel>Select Location</FieldLabel>
+                  <FieldLabel>{t("selectLocation")}</FieldLabel>
                   <Select>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Location" />
+                      <SelectValue placeholder={t("selectLocation")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                        <SelectItem value="design">Design</SelectItem>
-                        <SelectItem value="marketing">Marketing</SelectItem>
-                        <SelectItem value="sales">Sales</SelectItem>
-                        <SelectItem value="support">
-                          Customer Support
-                        </SelectItem>
-                        <SelectItem value="hr">Human Resources</SelectItem>
-                        <SelectItem value="finance">Finance</SelectItem>
-                        <SelectItem value="operations">Operations</SelectItem>
+                        {DEPARTMENTS.map((department) => (
+                          <SelectItem key={department} value={department}>
+                            {t(`departments.${department}`)}
+                          </SelectItem>
+                        ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">Tax ID</FieldLabel>
-                  <Input id="input-required" placeholder="Tax ID" required />
+                  <FieldLabel htmlFor="input-required">{t("taxId")}</FieldLabel>
+                  <Input
+                    id="input-required"
+                    placeholder={t("taxId")}
+                    required
+                  />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="input-required">Gender</FieldLabel>
+                  <FieldLabel htmlFor="input-required">
+                    {t("gender")}
+                  </FieldLabel>
                   <div className="flex gap-2">
                     <button className="flex-1 border border-sky-400 bg-sky-100 text-sky-600 py-1.5 rounded-sm">
-                      Home
+                      {t("home")}
                     </button>
                     <button className="flex-1 border border-border py-1.5 rounded-sm">
-                      Work
+                      {t("work")}
                     </button>
                     <button className="flex-1 border border-border py-1.5 rounded-sm">
-                      Other
+                      {t("other")}
                     </button>
                   </div>
                 </Field>
@@ -142,24 +161,24 @@ export default function AddAddress() {
                       () =>
                         new Promise((resolve) =>
                           setTimeout(
-                            () => resolve({ name: "Your store" }),
+                            () => resolve({ name: tSettings("storeName") }),
                             2000,
                           ),
                         ),
                       {
-                        loading: "Loading...",
+                        loading: tSettings("loading"),
                         success: (data) =>
-                          `${data.name} setting has been saved successfully`,
+                          tSettings("savedToast", { name: data.name }),
                         position: "top-right",
-                        error: "Error",
+                        error: tSettings("error"),
                       },
                     );
                     setAutoUpdate(!autoUpdate);
                   }}
                   className="flex items-center justify-between p-3 bg-card border border-muted-foreground/20 rounded-sm cursor-pointer"
                 >
-                  <FieldLabel className="px-1 text-muted-foreground text-sm cursor-pointer">
-                    Set as Default
+                  <FieldLabel className="px-1 text-muted-foreground cursor-pointer">
+                    {t("setAsDefault")}
                   </FieldLabel>
 
                   <Switch
@@ -170,10 +189,10 @@ export default function AddAddress() {
                 </Field>
                 <div className="flex gap-2">
                   <Button className="bg-muted-foreground/40 text-card rounded-sm w-1/2 h-10 mb-4">
-                    Cancel
+                    {tCommon("cancel")}
                   </Button>
                   <Button className="bg-orange-500 text-card rounded-sm w-1/2 h-10 mb-4">
-                    Submit
+                    {tCommon("submit")}
                   </Button>
                 </div>
               </div>

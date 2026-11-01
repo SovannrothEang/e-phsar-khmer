@@ -23,7 +23,9 @@ export const STAFF_SCOPES = [
   'subcategory',
   'brand',
   'model',
+  'product',
   'attribute',
+  'advertisement',
 ] as const;
 
 @Injectable()
@@ -216,6 +218,12 @@ export class FilesService {
 
   private safeName(name: string): string {
     return name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  }
+
+  /** Public URL for an object path in the default bucket (DB paths → admin cells). */
+  getPublicUrl(path: string): string {
+    return this.supabaseService.getPublicUrl(this.defaultBucket, path).data
+      .publicUrl;
   }
 
   getDefaultBucket() {

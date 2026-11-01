@@ -24,6 +24,7 @@ export function MessageBubble({
   peerName,
   peerAvatarUrl,
   onRetry,
+  onCancelHeld,
   onOpenImage,
 }: {
   message: ThreadMessage;
@@ -32,6 +33,7 @@ export function MessageBubble({
   peerName: string;
   peerAvatarUrl: string | null;
   onRetry?: (message: ThreadMessage) => void;
+  onCancelHeld?: (message: ThreadMessage) => void;
   onOpenImage?: (url: string) => void;
 }) {
   const t = useTranslations("Chat");
@@ -53,7 +55,7 @@ export function MessageBubble({
       {!isMine && (
         <Avatar className="h-8 w-8 shrink-0">
           {peerAvatarUrl && <AvatarImage src={peerAvatarUrl} alt={peerName} />}
-          <AvatarFallback className="bg-muted text-xs">
+          <AvatarFallback className="bg-muted type-meta">
             {peerName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
@@ -104,7 +106,7 @@ export function MessageBubble({
         {message.body && (
           <div
             className={cn(
-              "overflow-hidden rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap break-words",
+              "overflow-hidden rounded-2xl px-3.5 py-2 type-body whitespace-pre-wrap break-words",
               isMine
                 ? "rounded-br-sm bg-muted text-foreground"
                 : "rounded-bl-sm bg-sky-500 text-white",
@@ -121,7 +123,7 @@ export function MessageBubble({
             isMine ? "flex-row-reverse" : "flex-row",
           )}
         >
-          <span className="text-[10px] text-muted-foreground">{time}</span>
+          <span className="type-meta text-muted-foreground">{time}</span>
           {isMine && message.pending && (
             <Loader2
               aria-label={t("message.sending")}
@@ -132,7 +134,7 @@ export function MessageBubble({
             <button
               type="button"
               onClick={() => onRetry?.(message)}
-              className="flex items-center gap-1 text-[10px] font-medium text-destructive"
+              className="flex items-center gap-1 type-meta text-destructive"
             >
               <TriangleAlert className="size-3" />
               {t("message.retry")}
@@ -142,6 +144,7 @@ export function MessageBubble({
           {isMine &&
             !message.pending &&
             !message.failed &&
+            !message.held &&
             (read ? (
               <CheckCheck
                 aria-label={t("message.read")}
@@ -154,6 +157,30 @@ export function MessageBubble({
               />
             ))}
         </div>
+        {isMine && message.held && (
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-x-2 px-1 text-[10px]">
+            <span
+              className={
+                message.held === "expired"
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }
+            >
+              {message.held === "expired"
+                ? t("message.heldExpired", { name: peerName })
+                : t("message.heldWaiting", { name: peerName })}
+            </span>
+            <button
+              type="button"
+              onClick={() => onCancelHeld?.(message)}
+              className="font-medium underline-offset-2 hover:underline"
+            >
+              {message.held === "expired"
+                ? t("message.heldRemove")
+                : t("message.heldCancel")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

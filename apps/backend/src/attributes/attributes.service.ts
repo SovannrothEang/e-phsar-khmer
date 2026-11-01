@@ -86,6 +86,7 @@ export class AttributesService {
         type: 'years',
         slug: String(y),
         name: String(y),
+        nameKm: null,
         image: null,
         categoryId,
         subcategoryIds: categoryId ? subIds : [],
@@ -113,6 +114,7 @@ export class AttributesService {
         .values({
           type,
           name: dto.name,
+          nameKm: dto.nameKm?.trim() || null,
           slug: dto.slug,
           image: dto.image ?? null,
           categoryId: dto.categoryId ?? null,
@@ -139,6 +141,10 @@ export class AttributesService {
     }
     const patch: Partial<AttributeOptionRow> = {};
     if (dto.name !== undefined) patch.name = dto.name;
+    // `nameKm: null` is how a client clears the Khmer name (the web action
+    // sends `input.nameKm || null`), and @IsOptional lets null through — the
+    // optional chain is load-bearing, not defensive noise.
+    if (dto.nameKm !== undefined) patch.nameKm = dto.nameKm?.trim() || null;
     if (dto.slug !== undefined) patch.slug = dto.slug;
     if (dto.image !== undefined) patch.image = dto.image;
     if (dto.categoryId !== undefined) patch.categoryId = dto.categoryId;

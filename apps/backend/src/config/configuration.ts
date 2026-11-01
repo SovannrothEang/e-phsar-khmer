@@ -21,6 +21,9 @@ export default () => {
       filesBucket: env.CHAT_FILES_BUCKET,
       attachmentDailyBytes: env.CHAT_ATTACHMENT_DAILY_BYTES,
     },
+    resume: {
+      filesBucket: env.RESUME_FILES_BUCKET,
+    },
     database: {
       url: env.DATABASE_URL,
       poolMax: env.DATABASE_POOL_MAX,
@@ -73,6 +76,7 @@ export default () => {
       workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
       reconcilerEnabled: env.PAYMENT_RECONCILER_ENABLED,
       reconcileIntervalMs: env.PAYMENT_RECONCILE_INTERVAL_MS,
+      reconcileIdleIntervalMs: env.PAYMENT_RECONCILE_IDLE_INTERVAL_MS,
       reconcileProviders: env.PAYMENT_RECONCILE_PROVIDERS.split(',')
         .map((name) => name.trim())
         .filter(Boolean),
@@ -96,7 +100,6 @@ export default () => {
       merchantCity: env.BAKONG_MERCHANT_CITY,
       acquiringBank: env.BAKONG_ACQUIRING_BANK,
       qrExpirySeconds: env.BAKONG_QR_EXPIRY_SECONDS,
-      pollIntervalMs: env.BAKONG_POLL_INTERVAL_MS,
     },
   };
 };

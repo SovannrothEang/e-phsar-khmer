@@ -91,10 +91,10 @@ export default function Feedback() {
   return (
     <div className="min-h-screen bg-muted pb-10">
       <div className="max-w-4xl mx-auto py-6 px-2">
-        <h1 className="text-2xl font-medium text-foreground">Feedback</h1>
+        <h1 className="type-page-title text-foreground">Feedback</h1>
 
         <div className="bg-card rounded-sm border p-4 mt-4 ">
-          Give feedback about your Psakhmer experience.
+          Give feedback about your PhsarKhmer experience.
         </div>
         <div className="bg-card rounded-sm border p-4 mt-3">
           <h2 className="text-base">

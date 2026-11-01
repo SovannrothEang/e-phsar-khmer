@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -42,12 +43,15 @@ export class ReportsController {
   }
 
   @Patch('reasons/:id')
-  updateReason(@Param('id') id: string, @Body() dto: UpdateReportReasonDto) {
+  updateReason(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateReportReasonDto,
+  ) {
     return this.service.updateReason(id, dto);
   }
 
   @Delete('reasons/:id')
-  removeReason(@Param('id') id: string) {
+  removeReason(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeReason(id);
   }
 
@@ -64,7 +68,7 @@ export class ReportsController {
       'Update a user report status. Approving suspends the reported account.',
   })
   updateUserReportStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
@@ -72,7 +76,7 @@ export class ReportsController {
   }
 
   @Delete('users/:id')
-  removeUserReport(@Param('id') id: string) {
+  removeUserReport(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeUserReport(id);
   }
 
@@ -89,7 +93,7 @@ export class ReportsController {
       'Update a listing report status. Approving takes the listing down.',
   })
   updateListingReportStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
@@ -97,7 +101,7 @@ export class ReportsController {
   }
 
   @Delete('listings/:id')
-  removeListingReport(@Param('id') id: string) {
+  removeListingReport(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.removeListingReport(id);
   }
 }

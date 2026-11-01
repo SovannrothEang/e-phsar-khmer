@@ -1,6 +1,7 @@
 "use client";
 
 import { Locale, usePathname, useRouter } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import {
   DropdownMenu,
@@ -22,44 +23,22 @@ type Props = {
 
 type Language = {
   value: string;
-  label: string;
   icon: string;
 };
 
 const languages: Language[] = [
   {
     value: "en",
-    label: "English",
     icon: "/flag/uk.png",
   },
   {
     value: "km",
-    label: "Khmer",
     icon: "/flag/khmer.png",
-  },
-  {
-    value: "zh",
-    label: "Chinese",
-    icon: "/flag/zh.png",
-  },
-  {
-    value: "ko",
-    label: "Korean",
-    icon: "/flag/south-korea.png",
-  },
-  {
-    value: "id",
-    label: "Indonesia",
-    icon: "/flag/indonesia.png",
-  },
-  {
-    value: "vi",
-    label: "Vietnamese",
-    icon: "/flag/vietnam.png",
   },
 ];
 
 export default function LocalSelector({ defaultValue, label }: Props) {
+  const t = useTranslations("Nav");
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -83,7 +62,7 @@ export default function LocalSelector({ defaultValue, label }: Props) {
           <Button variant="ghost" size="icon-lg" className="rounded-full">
             <Image
               src={`${languages.find((lang) => lang.value === defaultValue)?.icon}`}
-              alt={defaultValue}
+              alt={t(`languages.${defaultValue}`)}
               width={20}
               height={20}
             />
@@ -104,12 +83,12 @@ export default function LocalSelector({ defaultValue, label }: Props) {
               >
                 <Image
                   src={`${lang.icon}`}
-                  alt={lang.label}
+                  alt={t(`languages.${lang.value}`)}
                   width={20}
                   height={20}
                   className="rounded-md"
                 />
-                {lang.label}
+                {t(`languages.${lang.value}`)}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

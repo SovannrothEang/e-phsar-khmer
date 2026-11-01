@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -19,6 +20,7 @@ const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
+  const t = useTranslations("Settings.phonePage");
   const router = useRouter();
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState(
@@ -49,11 +51,11 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
     setBusy(false);
 
     if (!result.success) {
-      toast.error(result.error ?? "Could not send the code");
+      toast.error(result.error ?? t("sendFailed"));
       return;
     }
 
-    toast.success("We sent a verification code to that number");
+    toast.success(t("codeSent"));
     setCode("");
     setStep("code");
     setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -67,11 +69,11 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
     setBusy(false);
 
     if (!result.success) {
-      toast.error(result.error ?? "Could not verify that code");
+      toast.error(result.error ?? t("verifyFailed"));
       return;
     }
 
-    toast.success("Your active phone number has been updated");
+    toast.success(t("updated"));
     setStep("phone");
     setCode("");
     // The rail, the hub and the navbar all read the user row.
@@ -85,20 +87,24 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm ">
-              <h1 className="text-2xl font-medium text-foreground  mb-4 mt-12 text-center ">
-                Change Active Phone
+              <h1 className="type-page-title text-foreground mb-4 mt-12 text-center">
+                {t("title")}
               </h1>
-              <p className="text-center text-base w-full max-w-lg mx-auto mt-6 px-4">
+              <p className="text-center type-body w-full max-w-lg mx-auto mt-6 px-4">
                 {step === "phone"
-                  ? "Please enter your phone number in the box below to verify your phone number. We will send the verification code to your device."
-                  : `Enter the ${OTP_LENGTH}-digit code we sent to ${phone}.`}
+                  ? t("description")
+                  : t("codeDescription", {
+                      length: OTP_LENGTH,
+                      phone,
+                    })}
               </p>
 
               {step === "phone" ? (
                 <>
                   <Field className="w-full max-w-md mx-auto mt-6">
-                    <FieldLabel className="text-sm text-foreground tracking-tight">
-                      Phone Number <span className="text-destructive">*</span>
+                    <FieldLabel className="text-foreground tracking-tight">
+                      {t("phoneNumber")}{" "}
+                      <span className="text-destructive">*</span>
                     </FieldLabel>
                     <Input
                       type="tel"
@@ -113,7 +119,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                     />
                     {isPhoneInvalid && (
                       <FieldDescription className="text-destructive">
-                        Please enter a valid phone number.
+                        {t("invalidPhone")}
                       </FieldDescription>
                     )}
                   </Field>
@@ -124,7 +130,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                       disabled={busy || !e164}
                       className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-card rounded-sm cursor-pointer"
                     >
-                      {busy ? "Sending…" : "Submit"}
+                      {busy ? t("sending") : t("submit")}
                     </Button>
                   </div>
                 </>
@@ -149,10 +155,10 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                     disabled={busy || code.length !== OTP_LENGTH}
                     className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-card rounded-sm cursor-pointer"
                   >
-                    {busy ? "Verifying…" : "Verify"}
+                    {busy ? t("verifying") : t("verify")}
                   </Button>
 
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-4 type-body-sm">
                     <button
                       type="button"
                       className="text-muted-foreground hover:underline cursor-pointer"
@@ -161,7 +167,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                         setCode("");
                       }}
                     >
-                      Use a different number
+                      {t("differentNumber")}
                     </button>
                     <button
                       type="button"
@@ -169,7 +175,9 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                       onClick={() => void sendCode()}
                       className="text-[#00a0e9] hover:underline disabled:text-muted-foreground disabled:no-underline cursor-pointer"
                     >
-                      {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+                      {cooldown > 0
+                        ? t("resendIn", { seconds: cooldown })
+                        : t("resend")}
                     </button>
                   </div>
                 </div>

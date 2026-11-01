@@ -1,145 +1,228 @@
-# Review — Likes & Saved
+# Review — Resume (CV) persistence
 
-**Verdict: approve.** No correctness defect was found in the likes/saves
-domain — confirmed by two independent adversarial reads (the stage-1 planner's
-written review and the stage-4 reviewer agent's report, whose deep pass raised
-five further findings). Everything fixable in scope was fixed and re-verified;
-the remainder is small, specific follow-up tickets. Nothing is committed or
-merged — the working tree is the review surface.
+Reviewer: senior-review pass, 2026-10-15. Reviewed against `.pipeline/spec.md`
+(R1 + R2), the working tree (nothing committed), `AGENTS.md` and `CLAUDE.md`.
+Everything below was verified by reading the code, re-running gates, and one
+live browser check of the branch the tester could not reach.
 
-**Provenance.** The stage-4 reviewer agent's report was received (snapshot
-23:33 ICT) and is folded in, including its deep pass. Its closing section was
-received: it confirmed the DELETE-side contract change is correctly recorded in
-`CLAUDE.md` and `changes.md`, and flagged one stale line in `changes.md`'s file
-table (fixed). Its F7 "currently RED" reading was a pre-fix snapshot — the same
-helper fix it prescribed landed before the message arrived, and the suite is
-green (32/32 suites, 373/373). Both reviews read a
-tree that moved during the night: a concurrent session is active in this
-checkout (its changes are noted where they touch this ship).
+**VERDICT: SHIP.**
 
-## Verdict history
+No blocking finding. The two unverified paths are both acceptable (one is now
+verified live, see §2). The coder's two deviations are the right calls. The
+follow-ups in §5 are small, none of them code-wrong today.
 
-1. Stage-1 planner review → four findings; all fixed and re-verified (below).
-2. Stage-4 reviewer agent → "approve the feature — but do NOT call the gate
-   green until B1/B2 are cleared." **Both cleared** (below).
-3. Stage-4 deep pass → F2–F7 (below): **F2 and F7 fixed; F3/F5/F6 ticketed.**
-   The verdict is unchanged: **approve**.
+## 1. What I re-ran independently
 
-## Findings — all fixed and re-verified
+| Check                                                              | Result                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter backend test`                                       | **43 suites / 573 tests passed** (matches the coder's and the lead's numbers)                                                                                                                                                           |
+| `pnpm --filter backend test -- --testPathPatterns=resume`          | **2 suites / 40 passed**                                                                                                                                                                                                                |
+| `drizzle-kit generate` (run in an isolated copy of `apps/backend`) | `No schema changes, nothing to migrate` — CI's drift gate is green; repo `drizzle/` untouched                                                                                                                                           |
+| DB: `max(created_at)` in `drizzle.__drizzle_migrations`            | `1792051899211` = the `0035_resume` journal `when` → applied, watermark correct                                                                                                                                                         |
+| DB: `\dt resume*`                                                  | nine `resume*` tables present; `resumes` = 0 rows                                                                                                                                                                                       |
+| DB: FK delete actions                                              | geography → **restrict**, `resume*` → `resumes` **cascade**, `resume_attachments.user_id` → `users` **cascade**, `resume_attachments.resume_id` → `resumes` **set null** — exactly the spec's map, so `AccountPurgeService` still works |
+| Supabase `resume-files` bucket                                     | `public: false`, `file_size_limit: 5242880`, four allowed MIME types (pdf, msword, docx, text/plain)                                                                                                                                    |
+| Test-runner hygiene                                                | no processes left by me; `git status` shows the same 66 entries as at session start (43 changed + 23 untracked), no build artifact in the tree                                                                                          |
 
-| #   | Severity                                   | Finding                                                                                                                                                                                                           | Resolution                                                                                                                                                                                                                                                     | Verification                                                                                                                                                                                                                                                                                                                                                                             |
-| --- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | High (regression on the most-visited page) | Mock cards (home Top Ads; non-UUID detail slugs) rendered live hearts: a signed-in visitor's click fired a real request → `ParseUUIDPipe` 400 → red "Validation failed" toast, where the old mock fake-succeeded. | Provider guard: non-UUID ids are inert — no request, no toast, no flip.                                                                                                                                                                                        | Browser: mock heart clicked on `/en` — no toast, no navigation, no state change. Reviewer independently re-checked (**covered**), with one accepted nuance: a _signed-out_ visitor clicking a mock heart now gets nothing rather than the sign-in bounce, because the UUID guard runs before the signed-in check — knowingly accepted: a demo surface should not drag anyone to sign-in. |
-| 2   | Medium (stale UI)                          | Unliking on `/me/likes` (or unsaving on `/me/saved`) left the row until a reload.                                                                                                                                 | Provider records the session's toggle-offs (`isToggledOff`, keyed `kind:id`); the panel filters on that — deliberately **not** on membership, since the seed sets fail soft to empty and a membership filter would blank the lists whenever that fetch failed. | Browser: unlike from `/me/likes` drops the row live; the empty state shows when it was the last row. Reviewer traced the rollback path and marked covered.                                                                                                                                                                                                                               |
-| 3   | Low (contract inconsistency)               | `DELETE`-side toggles asserted the listing exists → a stale unlike of a hard-deleted listing 404'd (error toast + rollback), against the repo's toggle idiom (`unfollowUser` never 404s).                         | The DELETE side no longer asserts existence; `POST` keeps it. Spec said "both verbs" — deviation recorded in `changes.md` and `CLAUDE.md`, implemented per the idiom.                                                                                          | API: DELETE on a non-existent listing → `200 {liked:false, likeCount:0}` / `{saved:false}`; unit tests lock the no-probe path. Reviewer marked covered.                                                                                                                                                                                                                                  |
-| 4   | Info (docs)                                | Neither new controller carried `@ApiTags` / `@ApiBearerAuth`.                                                                                                                                                     | Added to both.                                                                                                                                                                                                                                                 | build / lint green. Reviewer marked covered.                                                                                                                                                                                                                                                                                                                                             |
+## 2. The two unverified paths
 
-Integration item caught cross-session: the feed's listing rows now carry
-`sellerUsername` (the concurrent change), so `/users/me/likes|saves` resolve it
-with the same `leftJoin` — the cards on those pages are the feed's cards.
-Live-verified (`sellerUsername: "testtest001"` on a liked row).
+### 2a. The failed-`GET /resume` error card — EXERCISED LIVE, PASS
 
-## Stage-4 deep pass — F2–F7
+I exercised it without touching the shared backend or the repo: a stub API on
+`:3999` (`GET /api/v1/auth/me` → 200, `GET /api/v1/resume` → 500, everything
+else 404, which the `getJson` helpers tolerate), a second `next dev` on `:3011`
+with `API_URL=http://127.0.0.1:3999/api/v1`, and headless Chromium via CDP with
+a `user_access_token` cookie.
 
-- **F2 — MEDIUM-LOW, fixed.** Provider state is seeded once
-  (`useState(() => new Set(initialLiked))`) and the `(user)` layout survives
-  client-side navigations, so later `initialLiked`/`initialSaved` props were
-  ignored: an in-tab login/account switch kept the previous viewer's sets
-  (repro: A likes X → log out → log in as B without a hard reload → X's heart
-  shows filled for B). `<ReactionsProvider>` now carries
-  `key={user?.username ?? "anon"}` — a viewer change remounts it and reseeds
-  from the fresh server props. Verified by construction + type gates; the
-  in-tab login flow itself is not CDP-driven (it needs the real login UI).
-- **F7 — LOW (test quality), fixed.** The list queries are now the only place
-  the hide-deleted rule lives (the DELETE side no longer probes existence), so
-  two new specs compile their SQL with `PgDialect` and pin
-  `"status" <> $n` (param `'deleted'`) and the `(createdAt, id)` desc
-  tie-break for both lists. Reactions suite: **14/14**.
-- **F3 — LOW, ticketed.** The pending guard reads render-time state; two
-  clicks delivered in one tick could compute the same `next`. Idempotent
-  server-side, React flushes discrete events between physical clicks, and the
-  house's `FollowButton` has the same shape — hardening with a `useRef`
-  in-flight set is the ticket if it is ever observed.
-- **F5 — LOW, ticketed.** A listing with zero photos renders no `PostImage`,
-  so its detail page shows no like control (cards still work). The right fix
-  is a design decision for a photo-less listing's detail, not a flag flip.
-- **F6 — LOW, ticketed.** The id-set read is unbounded, unfiltered, and
-  fetched on every signed-in page (+1 round trip per navigation). The
-  unfiltered read is _deliberate_ (a restored listing's like stays lit);
-  filtering on `status != 'deleted'` and/or a cap is a scale ticket.
-
-## Gate blockers (raised by the stage-4 reviewer; both cleared)
-
-- **B1 — 14 `listings.service.spec` failures.** The concurrent session's
-  `findFeed` gained `.leftJoin(users, …)` while that spec's mock chain stopped
-  at `from → where → orderBy → limit`. Not the reactions code. **Cleared on
-  that session's side while this ship was in review** (confirmed from both
-  sides).
-- **B2 — no backend suite could start** (`TypeError:
-this._moduleMocker.clearMocksOnScope is not a function`).
-  `testEnvironment: "node"` resolved `jest-environment-node` from the workspace
-  hoist, which an `apps/mobile` install had left on the 29.x line. **Cleared by
-  pinning `"jest-environment-node": "^30.4.1"` in `apps/backend`
-  devDependencies** (the reviewer's diagnosis) + `pnpm install`. This
-  package.json + lock touch is the ship's one workspace-level change.
-
-**Final gate on the settled tree:**
+Result on `http://localhost:3011/en/me/resume`:
 
 ```
-pnpm --filter backend test
-Test Suites: 32 passed, 32 total
-Tests:       373 passed, 373 total
+{"url":"http://localhost:3011/en/me/resume",
+ "hasErrorCard":true, "hasStartCard":false, "hasWizardStep":false,
+ "hasLogin":false, "h1":["Resume (CV)"]}
 ```
 
-Backend build/lint clean · reactions suite 14/14 · full `next build` + web `tsc --noEmit` + lint
-clean · migration applied after a ledger check · browser pass (like from a
-card — fills and survives reload; `/me/likes` lists it; detail count seeds and
-moves with toggles; Save/Unsave from the detail and the ⋮ menu; `/me/saved`
-add/drop; signed-out real-heart click bounces to `/en/login` with the toast;
-signed-out **mock**-heart click is inert (the UUID guard, by design); live
-row-drop).
+The page renders the breadcrumb + **"Couldn't load your resume. Refresh the page
+to try again."**, and neither the start card nor a blank Step 1 is rendered —
+the protection Decision 12 exists for. Acceptable to ship.
 
-## Checks performed (orchestrator)
+**Correction for the record:** the cheap method suggested in the brief — a
+second `next dev` on a **dead `API_URL`** — cannot exercise this branch at all.
+`getCurrentUser()` (`lib/auth/current-user.ts:51-75`) is fail-soft and returns
+`null` when the backend is unreachable, so `Resume.tsx:45` redirects to
+`/login` before the card can render. The card is only reachable when auth
+succeeds and `/resume` specifically fails (a 500, a route-level outage, a
+network blip between the two calls) — which is what I induced.
 
-- **Route registration:** every new route is 3-segment with literals distinct
-  from all existing `:id/...` routes on `listings` and `users` — registration
-  order cannot shadow them.
-- **Idempotency:** `POST` rides `onConflictDoNothing` on the unique pair;
-  `DELETE` never 404s; the only 404 is a missing listing row on POST —
-  mirroring `findById`, which serves any status. Unit tests lock each branch,
-  and compiled-SQL tests pin the list filters.
-- **FK semantics:** both FKs CASCADE (user and listing), honoring
-  `AccountPurgeService` exactly as `user_follows` does.
-- **Provider state machine:** seeded once, remounted per viewer (F2);
-  optimistic flip + rollback; per-kind pending; `toggledOff` invariant =
-  `!membership` for session-touched edges only; UUID guard short-circuits mock
-  ids first.
-- **Lists:** exact totals + id tie-break, `status != 'deleted'` (pinned by
-  compiled SQL), batched photo hydration (three queries per page), dedupe
-  across "Load more", error state distinct from empty.
+### 2b. A literal 100% — not walked, judged reachable
 
-## Follow-up tickets (small, non-blocking)
+The percent is `Math.round(filled / 20 * 100)` (`ResumePreview.tsx:429-430`)
+over 20 items, each a plain truthiness check on document data. Every item maps
+to a live control: photo/gender/dob/nationality/email/location/address/phone/
+marital/education/position/years (Step 1 dialog), summary, the five list
+sections, and the CV attachment. The Location item fills on **province alone**
+(`!!data?.place?.province`), so the 3-level picker does not have to be drilled
+to commune. No predicate is unsatisfiable (checked one by one), so 20/20 = 100
+is reachable; the tester verified the mechanics (chips dropping, the CV fill
+moving 50 → 55, the chip un-filling on removal). Residual risk is confined to
+"can all 20 editors hold values at once", which is UI state the tester
+exercised piecewise. Not a blocker; the captain's own walk settles it.
 
-1. **Like/save notifications for the seller** — deliberately excluded; the
-   follow feature's `follow.created` is the shape it would take.
-2. **Mock-card hearts could be removed outright** — currently inert by guard;
-   a design decision for the demo surface.
-3. **Cross-tab reaction sync** — accepted limitation; lists refresh on
-   navigation/reload.
-4. **Pending-guard hardening (F3)** — a `useRef` in-flight set if a
-   same-tick double-fire is ever observed.
-5. **Zero-photo listing detail (F5)** — a design decision for where the like
-   control lives when there is no gallery.
-6. **Id-set read scale (F6)** — filter/cap the per-page `GET /users/me/reactions`
-   if account histories grow large.
+## 3. Security — adversarial pass
 
-## What this review did not cover
+**Route scoping.** All 17 routes are JWT (no `@Public()`), every one takes
+`@CurrentUser()`, and every query inside is keyed on the caller's `user_id` →
+`resume_id`. I looked for a foreign-id read, overwrite or delete and found none:
 
-- Nothing pending from the reviewer: its closing section arrived and is folded
-  into the provenance note above (contract-change recording confirmed; the one
-  stale line it found in `changes.md` is fixed).
-- The in-tab login/account-switch flow as a browser test (fix F2 is the
-  standard remount idiom, verified by construction + type gates).
-- Anything outside the diff: the concurrent session's other changes and the
-  `apps/mobile` deps are flagged separately in `test-results.md` and the task
-  log.
+- `PUT` upserts carry `setWhere: eq(table.resumeId, resumeId)`. Postgres
+  semantics check out: `INSERT … ON CONFLICT (id) DO UPDATE … WHERE
+resume_id = <caller> RETURNING` updates **zero** rows when the id belongs to
+  someone else → `NotFoundException` (404). A foreign id is never updated and
+  its existence is only revealed as "not mine" — the same trade the spec
+  accepted for the create-attachment path.
+- `DELETE` matches the spec verbatim (`{ id, deleted: true }` for absent **and**
+  foreign ids, `resume_id` as the guard). The no-oracle reasoning holds: own,
+  foreign and absent ids are indistinguishable in the response, so the route
+  carries no information about another user's rows. It is not a 404-expectation
+  miss — the spec says the opposite and the implementation follows it.
+- `savePersonal` / `updateDocument` / `upsertJobPreference` target the caller's
+  own rows (PK / `where id = <caller's resume>`); there is no path to another
+  user's personal block.
+
+**The CV attachment stack.**
+
+- `create`/`reissue`: a foreign id answers `RESUME_ATTACHMENT_ID_TAKEN` (409) —
+  an oracle on a client-generated UUID only. The spec's unit-test target 9
+  prescribes exactly this ("the same id from another user is a conflict"); UUID
+  enumeration is infeasible, so it is acceptable.
+- `complete`: `findOwned` → 404 for a foreign id, and the conditional
+  `update … where id = $1 and user_id = $2 and status = 'pending'` cannot attach
+  someone else's row. The attach + replace is one transaction; replaced objects
+  are removed after commit.
+- `sign`: the caller's `attached` row only, `[]` otherwise — **account B can
+  never obtain a URL for A's CV**. Verified in code and by the tester live.
+- `deleteAttachment`: `user_id` + `status='attached'` predicate; idempotent
+  `{ deleted: true }`, never a cross-user delete.
+- The bucket is private with 5-minute signed URLs; the object key is
+  `{userId}/{id}/{safeName(fileName)}` with the name sanitised to
+  `[a-zA-Z0-9.\-_]`, so a crafted `fileName` cannot escape the caller's prefix
+  (and storage addresses objects by exact key, not by path resolution).
+
+**Orphan sweep.** `cleanupOrphans` targets only `resume_id is null` rows older
+than 24 h, removes objects first and keeps the rows if storage errors. A row is
+`resume_id`-null only while `pending`; `attached` always writes `resume_id` in
+the same statement, and the only way back to null is `ON DELETE SET NULL` after
+the owning resume is gone — which is the state it _should_ sweep. The one
+residual is a narrow race (cleanup's SELECT → delete window vs. a very late
+`complete`), unreachable through the UI because the upload URL lives 2 h and the
+sweep starts at 24 h; see follow-up 5.4.
+
+**Environmental, as reported:** the CV is plaintext in the private bucket and the
+photo lives in the public `listings`-style bucket (here: `product-images`) at an
+unguessable URL. Both are the spec's own, plainly stated choices.
+
+## 4. The coder's deviations — both are the right call
+
+1. **`code?: string` on `createResumeAttachment`'s failure branch.** Spec §4's
+   declared type omits it, but §4's prose ("the web helper reads that code as
+   'already uploaded'") and the edge-case list ("the web helper treats that code
+   as 'already uploaded' and calls `complete`") require the branch. The addition
+   is a strict superset of the declared type on a brand-new API, so no contract
+   is broken, and `ResumePreview.tsx:496` uses it. Keep it.
+   One honesty note: the stated justification ("a retried handshake whose
+   response was lost") is unreachable in the shipped UI — `handleCvPick` mints a
+   **fresh** `crypto.randomUUID()` on every pick (`ResumePreview.tsx:488`), so
+   `RESUME_ATTACHMENT_NOT_PENDING` can never come back to the card. The branch
+   is correct defensive code; it is not exercised by the UI.
+2. **`resumes.updated_at` not restamped by child writes.** The spec itself
+   records this as a known gap, and drizzle's `$onUpdate` would otherwise force
+   `updated_at` into every `do update` SET clause. The implementation pins it
+   (`set: { userId, updatedAt: resumes.updatedAt }`, `resume.service.ts:627-631`)
+   and a unit test compiles and asserts the clause; the tester's `stamp.js`
+   confirmed the behaviour (child writes leave it alone, `PATCH /resume` moves
+   it). Right call.
+
+No other deviation from the spec was found: 17 routes, 8 DTO files, the module's
+providers/exports, the fail-soft web mapping, the CV card's upload/replace/remove
+and hidden Download, the chip becoming `!!doc.attachment`, the dropped dead
+`n === 2 / n === 7` delete branches — all as specified.
+
+## 5. Findings, ranked (none blocking)
+
+1. **Impossible calendar dates are a 500, not a 400.** `DATE_ONLY_PATTERN`
+   (`/^\d{4}-\d{2}-\d{2}$/`) accepts `2026-02-31` and `0000-01-01`; the value
+   reaches the `date` column, Postgres rejects it, and `GlobalExceptionFilter`
+   answers 500. Affects `PUT /resume/personal` (`dob`) and both dated upserts.
+   Only a hand-crafted client can produce it (the calendar cannot), and the spec
+   accepted shape-only date validation, so this is hardening — a calendar check
+   or `@IsDateString` closes it. No test covers it.
+2. **Fresh-environment documentation (land-time, not code).** The bucket is
+   documented in `config.validation.ts`'s Zod comment, the spec (§5.7) and
+   `changes.md`; it is **not** in `CLAUDE.md`'s env table, whose neighbouring
+   `CHAT_FILES_BUCKET` row and dashboard note are how the chat bucket is
+   discoverable. Without the manual bucket all four attachment routes 502.
+   Same for the mock/real list: `CLAUDE.md` still lists `/me/resume` under
+   "still mock". The peer's widening of `resume-files.allowed_mime_types` is
+   adequately described (env change, not code) — that part is fine.
+3. **`tasks/todo.md` has no dated entry for this ship.** `CLAUDE.md`'s convention
+   ("append a dated entry per ship") is unmet in the working tree; the ship is
+   uncommitted, so this may simply be pending, but it should land with it.
+4. **Orphan-sweep hardening (very low).** `cleanupOrphans` selects and deletes on
+   `resume_id is null` + age alone; adding `status = 'pending'` (or re-checking
+   in the DELETE) would make it structurally unable to race a late `complete`.
+   Unreachable via the UI today.
+5. **Five failed CV uploads lock the picker (low, by design).** Each pick mints a
+   new id, so a failed PUT after a successful `create` leaves a new `pending`
+   row; at 5 the route 429s until the hourly sweep clears rows older than 24 h.
+   The spec chose the cap deliberately (chat has the same), so this is a note,
+   not a defect.
+6. **Dialog photo uses `next/image` while the preview uses `DbImage` (nit).**
+   Justified for the just-uploaded case, but in edit mode it also renders the
+   stored `photoUrl`, and the DTO accepts any string ≤ 500 chars — a foreign host
+   would throw at render in the dialog. Self-inflicted only (nothing renders
+   another user's resume), so a nit; `DbImage` would remove the class.
+7. **The "Phone" chip has no `FOCUS_LABELS` entry (nit).** `openEditField("phone")`
+   opens the dialog but never scrolls/highlights the phone field
+   (`ResumePersonalDetailsDialog.tsx:79-90` lacks `phone`). The chip is only
+   reachable in a state the UI cannot produce (a resume row with no personal
+   block), so it is dead-ish code, not user-visible.
+8. **Cosmetic phone formatting — acceptable, no ticket needed.** After a save the
+   preview shows the typed grouping (`012 345 678`); after a reload the compact
+   form, because the parent stores the dialog's payload verbatim and compaction
+   happens in the action. The DB is compact both times. A one-line fix (compact
+   in `savePersonal`'s state update) suffices if the captain cares; it does not
+   justify a ticket.
+
+## 6. Test quality
+
+Above average and not superficial: the suites compile the **real** Drizzle
+statements and pin the clauses that carry the security properties
+(`on conflict ("user_id") do update set`, the `resume_id` predicate on conflict
+updates, `updated_at = resumes.updated_at`, the scoped DELETE params), plus
+cross-user 404s, storage-trust on `complete`, the replace transaction, the
+sign/delete scoping and the orphan sweep's "keep rows when storage errors". The
+DB nuances that only real Postgres can prove (`setWhere` yielding zero rows) were
+covered live by the tester's cross-user run — the pair together is convincing.
+Gaps: the invalid-calendar-date path (5.1) and the "does anything write
+`resumes.updated_at` on child writes" property are not in the unit suite (the
+latter was proven live only). The Module-README convention deliberately does not
+apply (spec Non-goals) — noted, not a finding.
+
+## 7. Incident during review (disclosed)
+
+While cleaning up my own helper processes I extracted a PID from an unscoped
+`ss` pipeline and ran `kill -9` on PID 7313 — the wrong process. I cannot
+identify it retroactively (`/proc/7313` gone; no systemd unit failure recorded).
+Post-incident checks: postgres (5432), valkey (6379, `PING` → `PONG`),
+systemd-resolved, cupsd and the session's electron processes are all healthy;
+`systemctl --user list-units --state=failed` is empty. No repo, DB or pipeline
+artifact was affected, and all my helper processes (stub API, `next dev`,
+Chromium) were then killed by port-scoped PIDs.
+
+## 8. Bottom line
+
+The contract, ownership model and storage lifecycle match the spec; the
+ownership predicates are the right ones; the tests pin the clauses that matter;
+and the one UI branch nobody had exercised renders exactly the protective state
+it was written for. **Ship it**, carrying §5.1–5.3 as land-time housekeeping and
+5.4–5.8 as backlog notes.

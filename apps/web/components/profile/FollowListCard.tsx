@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
-import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { UserCheck } from "lucide-react";
+import UserAvatar from "@/components/common/UserAvatar";
 import { Link } from "@/i18n/routing";
 import type { FollowRowUser, FollowSide } from "@/lib/api/users";
 import { FollowButton } from "./FollowButton";
@@ -33,8 +34,8 @@ type FollowListCardProps = {
 );
 
 const TABS = [
-  { key: "following", label: "Following" },
-  { key: "followers", label: "Followers" },
+  { key: "following", labelKey: "following" },
+  { key: "followers", labelKey: "followers" },
 ] as const;
 
 /**
@@ -53,10 +54,11 @@ export default function FollowListCard({
   viewerId,
   hasMore,
 }: FollowListCardProps) {
-  const label = side === "following" ? "Following" : "Followers";
+  const t = useTranslations("Me.follows");
+  const label = t(side === "following" ? "following" : "followers");
 
   const tabClass = (active: boolean) =>
-    `relative pb-3 text-sm font-medium transition-colors ${
+    `relative pb-3 type-nav transition-colors ${
       active
         ? "text-[#00a0e9] after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:rounded-full after:bg-[#00a0e9]"
         : "text-muted-foreground hover:text-foreground"
@@ -65,7 +67,7 @@ export default function FollowListCard({
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
       <div className="rounded-lg bg-card p-6 shadow-sm">
-        <h2 className="text-2xl font-bold text-foreground">{label}</h2>
+        <h2 className="type-section-title text-foreground">{label}</h2>
 
         <div className="mt-2 flex items-center gap-6 border-b border-border">
           {TABS.map((tab) => {
@@ -77,7 +79,7 @@ export default function FollowListCard({
                 onClick={() => onSelectTab(tab.key)}
                 className={`cursor-pointer ${tabClass(active)}`}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             ) : (
               <Link
@@ -85,7 +87,7 @@ export default function FollowListCard({
                 href={hrefs[tab.key]}
                 className={tabClass(active)}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Link>
             );
           })}
@@ -107,19 +109,16 @@ export default function FollowListCard({
                   }}
                   className="flex min-w-0 flex-1 items-center gap-3"
                 >
-                  <Image
+                  <UserAvatar
                     src={u.avatar}
-                    alt={u.name}
-                    width={88}
-                    height={88}
-                    unoptimized
-                    className="h-11 w-11 shrink-0 rounded-full border border-border object-cover"
+                    name={u.name}
+                    className="h-11 w-11 border border-border text-sm"
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
+                    <p className="truncate type-nav text-foreground">
                       {u.name}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate type-meta text-muted-foreground">
                       @{u.username}
                     </p>
                   </div>
@@ -130,7 +129,7 @@ export default function FollowListCard({
                   initialFollowing={u.isFollowing}
                   viewerId={viewerId}
                   variant="profile"
-                  className="h-8 shrink-0 rounded-full px-4 text-xs font-semibold"
+                  className="h-8 shrink-0 rounded-full px-4 type-nav"
                 />
               </li>
             ))}
@@ -138,8 +137,8 @@ export default function FollowListCard({
         )}
 
         {hasMore && (
-          <p className="pt-4 text-center text-xs text-muted-foreground">
-            Showing the most recent {items.length}.
+          <p className="pt-4 text-center type-meta text-muted-foreground">
+            {t("showingRecent", { count: items.length })}
           </p>
         )}
       </div>
@@ -149,6 +148,7 @@ export default function FollowListCard({
 
 /** The house empty state: muted circle, bold heading, one muted sentence. */
 function EmptyFollowState({ side }: { side: "following" | "followers" }) {
+  const t = useTranslations("Me.follows");
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <div className="flex h-40 w-40 items-center justify-center rounded-full bg-muted">
@@ -157,13 +157,11 @@ function EmptyFollowState({ side }: { side: "following" | "followers" }) {
           strokeWidth={1.5}
         />
       </div>
-      <p className="mt-6 text-sm font-medium text-foreground">
-        {side === "following" ? "Not following anyone yet" : "No followers yet"}
+      <p className="mt-6 type-nav text-foreground">
+        {side === "following" ? t("notFollowingTitle") : t("noFollowersTitle")}
       </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {side === "following"
-          ? "Accounts you follow will show up here."
-          : "People who follow this account will show up here."}
+      <p className="mt-1 type-meta text-muted-foreground">
+        {side === "following" ? t("notFollowingBody") : t("noFollowersBody")}
       </p>
     </div>
   );

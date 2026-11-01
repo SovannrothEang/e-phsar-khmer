@@ -23,16 +23,20 @@ import {
 } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
-import type { DbClient } from '../db/drizzle.provider';
+import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import {
   conversations,
   messageEnvelopes,
   messages,
-  userE2eDevices,
   userE2eIdentities,
 } from '../db/schema/chat.schema';
 import type { ConversationRow, MessageRow } from '../db/schema/chat.schema';
-import { activeDeviceCondition, diffDevices } from './e2e/e2e-devices.util';
+import {
+  diffDevices,
+  loadTargetDevices,
+  lockE2eDeviceKeys,
+} from './e2e/e2e-devices.util';
+import type { ActiveDevice } from './e2e/e2e-devices.util';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
 import { isBlockedEitherWay } from './blocks.util';
@@ -43,6 +47,7 @@ import { ChatMetricsService } from './chat-metrics.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
+import type { E2eV2PayloadDto } from './dto/e2e-v2.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
 import type { QueryMessagesDto } from './dto/query-messages.dto';
 import type {
@@ -126,6 +131,65 @@ export class ChatService {
     }
   }
 
+  /**
+   * Active device rows for a send's two participants. Shared by the
+   * fast-fail read and the authoritative re-read inside the insert
+   * transaction, so both apply the exact same "active" rule — the one the
+   * devices endpoint hands senders (loadTargetDevices).
+   */
+  private loadParticipantActiveDevices(
+    executor: DbExecutor,
+    userIds: [string, string],
+  ): Promise<ActiveDevice[]> {
+    return loadTargetDevices(executor, userIds);
+  }
+
+  /**
+   * v2: envelopes must cover exactly the active device set. Checked
+   * server-side because the sender's device list goes stale the instant
+   * either user logs in or out anywhere else.
+   *
+   * Called twice: once on the fast-fail read (keeps the old error order and
+   * spares the conversation upsert for an obviously stale sender), and again
+   * on the locked re-read inside the insert transaction, where a device
+   * registering concurrently can no longer slip in between check and insert.
+   */
+  private assertEnvelopesCoverActiveDevices(
+    activeDevices: ActiveDevice[],
+    senderId: string,
+    recipientId: string,
+    e2e: E2eV2PayloadDto,
+  ): void {
+    const senderDeviceId = e2e.senderDeviceId;
+    if (
+      !activeDevices.some(
+        (d) => d.id === senderDeviceId && d.userId === senderId,
+      )
+    )
+      throw new ForbiddenException({
+        code: 'E2E_DEVICE_INACTIVE',
+        message: 'This device is not registered for encrypted chat',
+      });
+    const expected = activeDevices
+      .filter((d) => d.id !== senderDeviceId)
+      .map((d) => ({ userId: d.userId, deviceId: d.id }));
+    if (!expected.some((d) => d.userId === recipientId))
+      throw new NotFoundException({
+        code: 'E2E_NO_RECIPIENT_DEVICES',
+        message: 'Recipient has no devices registered for encrypted chat',
+      });
+    const { missing, stale } = diffDevices(
+      expected,
+      e2e.envelopes.map((e) => e.recipientDeviceId),
+    );
+    if (missing.length > 0 || stale.length > 0)
+      throw new ConflictException({
+        code: 'E2E_DEVICES_MISMATCH',
+        message: 'Device list changed',
+        details: { missing, stale },
+      });
+  }
+
   private async sendMessageInternal(
     senderId: string,
     dto: SendMessageDto,
@@ -197,15 +261,10 @@ export class ChatService {
               .then((rows) => rows[0])
           : Promise.resolve(undefined),
         dto.e2e
-          ? this.db
-              .select({ id: userE2eDevices.id, userId: userE2eDevices.userId })
-              .from(userE2eDevices)
-              .where(
-                and(
-                  inArray(userE2eDevices.userId, [senderId, dto.recipientId]),
-                  activeDeviceCondition(),
-                ),
-              )
+          ? this.loadParticipantActiveDevices(this.db, [
+              senderId,
+              dto.recipientId,
+            ])
           : Promise.resolve(undefined),
         dto.e2eHeader && dto.recipientIdentityKey
           ? this.db
@@ -242,39 +301,15 @@ export class ChatService {
         message: "Recipient's encryption keys changed",
       });
 
-    // v2: envelopes must cover exactly the active device set. Checked
-    // server-side because the sender's device list goes stale the instant
-    // either user logs in or out anywhere else.
-    if (dto.e2e && activeDevices) {
-      const senderDeviceId = dto.e2e.senderDeviceId;
-      if (
-        !activeDevices.some(
-          (d) => d.id === senderDeviceId && d.userId === senderId,
-        )
-      )
-        throw new ForbiddenException({
-          code: 'E2E_DEVICE_INACTIVE',
-          message: 'This device is not registered for encrypted chat',
-        });
-      const expected = activeDevices
-        .filter((d) => d.id !== senderDeviceId)
-        .map((d) => ({ userId: d.userId, deviceId: d.id }));
-      if (!expected.some((d) => d.userId === dto.recipientId))
-        throw new NotFoundException({
-          code: 'E2E_NO_RECIPIENT_DEVICES',
-          message: 'Recipient has no devices registered for encrypted chat',
-        });
-      const { missing, stale } = diffDevices(
-        expected,
-        dto.e2e.envelopes.map((e) => e.recipientDeviceId),
+    // v2: fast-fail set check. The authoritative one runs again inside the
+    // insert transaction, under the per-user device locks.
+    if (dto.e2e && activeDevices)
+      this.assertEnvelopesCoverActiveDevices(
+        activeDevices,
+        senderId,
+        dto.recipientId,
+        dto.e2e,
       );
-      if (missing.length > 0 || stale.length > 0)
-        throw new ConflictException({
-          code: 'E2E_DEVICES_MISMATCH',
-          message: 'Device list changed',
-          details: { missing, stale },
-        });
-    }
 
     // Race-safe find-or-create + recency bump in one statement.
     // The bump uses the DB clock (`now()` / the column default), never
@@ -325,6 +360,22 @@ export class ChatService {
         const attachmentIds = dto.attachmentIds ?? [];
         [message, envelopes, attached] = await this.db.transaction(
           async (tx) => {
+            // A device registering after the fast-fail read above would be
+            // missing from `e2e.envelopes` — it could never decrypt the
+            // message. The per-user advisory locks serialize us with
+            // registerDevice (same sorted keys, so no deadlock), and the
+            // re-read under them is the set that actually applies.
+            await lockE2eDeviceKeys(tx, [senderId, dto.recipientId]);
+            const lockedDevices = await this.loadParticipantActiveDevices(tx, [
+              senderId,
+              dto.recipientId,
+            ]);
+            this.assertEnvelopesCoverActiveDevices(
+              lockedDevices,
+              senderId,
+              dto.recipientId,
+              e2e,
+            );
             const [row] = await tx.insert(messages).values(values).returning();
             const rows = await tx
               .insert(messageEnvelopes)

@@ -1,4 +1,7 @@
+"use client";
+
 import { Link } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import type { ComponentProps } from "react";
 
 export interface ListingSpecsProps {
@@ -7,6 +10,8 @@ export interface ListingSpecsProps {
   brand?: { slug: string; name: string };
   model?: { slug: string; name: string };
   attributes?: Record<string, unknown> | null;
+  /** Km display value per attribute key (taxType, bodyType, color, …). */
+  valueLabels?: Record<string, string>;
   condition?: "new" | "used" | null;
 }
 
@@ -29,33 +34,33 @@ const toText = (v: unknown): string | undefined => {
 // then year, taxType, Condition (only for condition-carrying categories —
 // the same ones that show the Condition chip on the browse bar), bodyType,
 // engineType, transmission, color, then the remaining keys.
-const ATTR_KEYS: [key: string, label: string][] = [
-  ["year", "Year"],
-  ["taxType", "Tax Type"],
-  ["bodyType", "Body Type"],
-  ["vehicleType", "Vehicle Type"],
-  ["engineType", "Engine Type"],
-  ["transmission", "Transmission"],
-  ["color", "Color"],
-  ["jobType", "Job Type"],
-  ["experience", "Experience"],
+const ATTR_KEYS: [key: string, labelKey: string][] = [
+  ["year", "attributes.year"],
+  ["taxType", "attributes.taxType"],
+  ["bodyType", "attributes.bodyType"],
+  ["vehicleType", "attributes.vehicleType"],
+  ["engineType", "attributes.engineType"],
+  ["transmission", "attributes.transmission"],
+  ["color", "attributes.color"],
+  ["jobType", "attributes.jobType"],
+  ["experience", "attributes.experience"],
   // Home & Land sit before `type`: the property form reads Bedroom → Bathroom
   // → Facing → Size → Type, so the published grid has to as well. The keys are
   // the schema's own **singular** `bedroom`/`bathroom` — this list carried the
   // plural forms from before the family had a form, and a key that is not here
   // is invisible on the detail page even though the listing stores it.
-  ["bedroom", "Bedroom"],
-  ["bathroom", "Bathroom"],
-  ["facing", "Facing"],
-  ["size", "Size"],
-  ["type", "Type"],
-  ["accessory", "Accessory"],
-  ["screenSize", "Screen Size"],
-  ["storage", "Storage"],
-  ["ram", "RAM"],
-  ["cpu", "CPU"],
-  ["vga", "VGA"],
-  ["network", "Network"],
+  ["bedroom", "attributes.bedroom"],
+  ["bathroom", "attributes.bathroom"],
+  ["facing", "attributes.facing"],
+  ["size", "attributes.size"],
+  ["type", "attributes.type"],
+  ["accessory", "attributes.accessory"],
+  ["screenSize", "attributes.screenSize"],
+  ["storage", "attributes.storage"],
+  ["ram", "attributes.ram"],
+  ["cpu", "attributes.cpu"],
+  ["vga", "attributes.vga"],
+  ["network", "attributes.network"],
 ];
 
 // Subcategories whose listing forms carry a Condition field (mirrors the
@@ -95,7 +100,7 @@ const CONDITION_SUBCATEGORIES = new Set([
 // The parts-and-accessories form keys its "Type" picker (Cars/Bicycles/…) as
 // `vehicleType` — same key as the rentals' "Vehicle Type"; label per design.
 const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
-  "parts-and-accessories": { vehicleType: "Type" },
+  "parts-and-accessories": { vehicleType: "attributes.type" },
   // The `accessory` key prints "Accessory" on Phone Accessories and
   // "Accessory Type" on Fashion Accessories (captain, 2026-09-27). Both
   // subcategories read the SAME `accessories` set under the SAME key — only the
@@ -103,7 +108,7 @@ const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
   // `field_schema`, which is what the post form already reads via
   // `config.labels`. This map is the detail page's equivalent, and it exists so
   // the two surfaces cannot disagree about the same key.
-  "fashion-accessories": { accessory: "Accessory Type" },
+  "fashion-accessories": { accessory: "attributes.accessoryType" },
 };
 
 /**
@@ -118,6 +123,35 @@ const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
  * houses, commercial).
  */
 const VALUE_SUFFIX: Record<string, string> = { size: "m²" };
+
+/**
+ * The feed query a spec value applies when clicked. The filter bar owns a few
+ * dimensions (year range, condition, tax type, engine, color, transmission),
+ * so those use their shared URL params and show as applied controls; every
+ * other attribute key uses the multi-attribute `attrs` JSON object, which is
+ * exact for every family's own key and needs no slug lookup.
+ *
+ * `value` is the STORED English value (`attributes[key]`), never the
+ * `valueLabels` display text — on `/km` the grid prints Khmer while the feed
+ * still matches the English value the post form wrote.
+ */
+function filterQueryFor(key: string, value: string): Record<string, string> {
+  switch (key) {
+    case "year":
+      // An exact year is a range whose bounds are equal.
+      return { year_min: value, year_max: value };
+    case "taxType":
+      return { tax_type: value };
+    case "engineType":
+      return { engine: value };
+    case "color":
+      return { color: value };
+    case "transmission":
+      return { transmission: value };
+    default:
+      return { attrs: JSON.stringify({ [key]: value }) };
+  }
+}
 
 /**
  * Subcategories whose reference lists Storage before Condition, so Condition
@@ -144,8 +178,11 @@ export default function ListingSpecs({
   brand,
   model,
   attributes,
+  valueLabels,
   condition,
 }: ListingSpecsProps) {
+  const t = useTranslations("Specs");
+  const tCommon = useTranslations("Common");
   const browseHref: Href | undefined =
     cate && subcate
       ? {
@@ -156,6 +193,18 @@ export default function ListingSpecs({
           },
         }
       : undefined;
+  /** The same page with the value's filter applied. */
+  const browseHrefWith = (query: Record<string, string>): Href | undefined =>
+    cate && subcate
+      ? {
+          pathname: "/category/[categorySlug]/[subcategorySlug]",
+          params: {
+            categorySlug: cate.slug,
+            subcategorySlug: subcate.slug,
+          },
+          query,
+        }
+      : undefined;
 
   const conditionCarrier =
     !!subcate && CONDITION_SUBCATEGORIES.has(subcate.slug);
@@ -163,7 +212,7 @@ export default function ListingSpecs({
 
   const rows: Row[] = [
     {
-      label: "Main Category",
+      label: t("mainCategory"),
       value: cate?.name,
       href: cate
         ? {
@@ -173,7 +222,7 @@ export default function ListingSpecs({
         : undefined,
     },
     {
-      label: "Category",
+      label: t("category"),
       value: subcate?.name,
       href: subcate && cate ? browseHref : undefined,
     },
@@ -181,7 +230,7 @@ export default function ListingSpecs({
 
   if (brand?.name) {
     rows.push({
-      label: "Brand",
+      label: t("brand"),
       value: brand.name,
       href:
         brand && cate && subcate
@@ -199,7 +248,7 @@ export default function ListingSpecs({
 
   if (model?.name) {
     rows.push({
-      label: "Model",
+      label: t("model"),
       value: model.name,
       href:
         model && cate && subcate && brand?.slug
@@ -246,21 +295,25 @@ export default function ListingSpecs({
   const pushCondition = () => {
     if (!showCondition || conditionInserted) return;
     rows.push({
-      label: "Condition",
-      value: condition === "used" ? "Used" : "New",
-      href: browseHref,
+      label: t("condition"),
+      value: tCommon(condition === "used" ? "condition.used" : "condition.new"),
+      href: browseHrefWith({
+        condition: condition === "used" ? "used" : "new",
+      }),
     });
     conditionInserted = true;
   };
 
-  for (const [key, label] of ATTR_KEYS) {
+  for (const [key, labelKey] of ATTR_KEYS) {
     const value = toText(attributes?.[key]);
     if (!value) continue;
     if (!conditionPreKeys.has(key)) pushCondition();
+    const displayValue = valueLabels?.[key] ?? value;
     rows.push({
-      label: labelOverrides?.[key] ?? label,
-      value: `${value}${VALUE_SUFFIX[key] ?? ""}`,
-      href: browseHref,
+      label: t(labelOverrides?.[key] ?? labelKey),
+      value: `${displayValue}${VALUE_SUFFIX[key] ?? ""}`,
+      // The link uses the raw stored value, not the display text above.
+      href: browseHrefWith(filterQueryFor(key, value)),
     });
   }
   pushCondition();
@@ -271,16 +324,16 @@ export default function ListingSpecs({
     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 mb-5">
       {rows.map((row) => (
         <div key={row.label}>
-          <div className="text-xs text-muted-foreground">{row.label}</div>
+          <div className="type-body-sm text-muted-foreground">{row.label}</div>
           {row.href && row.value ? (
             <Link
               href={row.href}
-              className="text-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
+              className="type-body-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
             >
               {row.value}
             </Link>
           ) : (
-            <span className="text-sm text-[#00a0e9] break-words">
+            <span className="type-body-sm text-[#00a0e9] break-words">
               {row.value}
             </span>
           )}

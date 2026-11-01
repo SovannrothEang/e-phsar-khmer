@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Check, Plus, UserCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
@@ -37,6 +38,7 @@ export function FollowButton({
   variant = "profile",
   className,
 }: FollowButtonProps) {
+  const t = useTranslations("Common");
   const router = useRouter();
   const [following, setFollowing] = useState(initialFollowing);
   const [pending, setPending] = useState(false);
@@ -47,7 +49,7 @@ export function FollowButton({
 
   async function handleClick() {
     if (!viewerId) {
-      toast.error("Sign in to follow");
+      toast.error(t("signInToFollow"));
       router.push("/login");
       return;
     }
@@ -62,7 +64,7 @@ export function FollowButton({
 
     if (!res.success) {
       setFollowing(!next);
-      toast.error(res.error ?? "Something went wrong");
+      toast.error(res.error ?? t("genericError"));
       return;
     }
     // Re-render the server components so the header's counts stay in step.
@@ -91,9 +93,11 @@ export function FollowButton({
         <Plus className="mr-1 h-4 w-4" />
       )}
       {variant === "compact" ? (
-        <span className="text-xs">{following ? "Following" : "Follow"}</span>
+        <span className="type-meta">
+          {following ? t("following") : t("follow")}
+        </span>
       ) : (
-        <>{following ? "Following" : "Follow"}</>
+        <>{following ? t("following") : t("follow")}</>
       )}
     </Button>
   );

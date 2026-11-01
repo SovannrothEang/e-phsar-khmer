@@ -6,6 +6,7 @@
  * which authenticates as the admin dashboard's account.
  */
 
+import { getTranslations } from "next-intl/server";
 import { ApiError, userServerFetch } from "@/lib/api/user-client";
 import { normalizePhone } from "@/lib/phone";
 import type { BackendUser } from "@/lib/api/adapters";
@@ -20,42 +21,51 @@ export interface SettingsActionResult {
  * ("CONFLICT") and the domain string in `message` ("USERNAME_TAKEN"), so
  * anything worth phrasing for a human is matched on the message, not the code.
  */
-function describeApiError(err: ApiError): string {
+async function describeApiError(err: ApiError): Promise<string> {
+  const t = await getTranslations("Settings.errors");
   switch (err.message) {
     case "USERNAME_TAKEN":
-      return "That username is already taken.";
+      return t("usernameTaken");
     case "EMAIL_TAKEN":
-      return "That email address is already used by another account.";
+      return t("emailTaken");
     case "PHONE_TAKEN":
-      return "That phone number is already used by another account.";
+      return t("phoneTaken");
     case "PHONE_UNCHANGED":
-      return "That is already your active phone number.";
+      return t("phoneUnchanged");
     case "INVALID_PASSWORD":
-      return "That password does not match.";
+      return t("invalidPassword");
     case "PASSWORD_NOT_SET":
-      return "This account has no password yet — sign in with a phone code first.";
+      return t("passwordNotSet");
     case "INVALID_OTP":
-      return "That code is not valid or has expired.";
+      return t("invalidOtp");
     case "INVALID_LOCATION_HIERARCHY":
-      return "Pick the location from the top down: province, then district, then commune.";
+      return t("invalidLocationHierarchy");
     case "Validation failed":
-      return "Please check the values you entered.";
+      return t("validationFailed");
     default:
       return err.message;
   }
 }
 
-function toFailure(err: unknown): SettingsActionResult {
+async function toFailure(err: unknown): Promise<SettingsActionResult> {
   if (!(err instanceof ApiError)) {
-    return { success: false, error: "Network error" };
+    const t = await getTranslations("Settings.errors");
+    return { success: false, error: t("network") };
   }
-  return { success: false, error: describeApiError(err) };
+  return { success: false, error: await describeApiError(err) };
+}
+
+async function invalidPhoneError(): Promise<SettingsActionResult> {
+  const t = await getTranslations("Settings.errors");
+  return { success: false, error: t("invalidPhone") };
 }
 
 export interface ProfileInput {
   firstName?: string;
   lastName?: string;
   gender?: "male" | "female" | null;
+  /** ISO date (`YYYY-MM-DD`); the backend derives `yearOfBirth` from it. */
+  dateOfBirth?: string | null;
   yearOfBirth?: number | null;
   company?: string | null;
   email?: string | null;
@@ -63,6 +73,10 @@ export interface ProfileInput {
   districtId?: string | null;
   communeId?: string | null;
   address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Copy the contact trio to every non-deleted listing the user owns. */
+  updateAdsContact?: boolean;
 }
 
 /**
@@ -78,6 +92,7 @@ export async function updateMyProfile(
     "firstName",
     "lastName",
     "gender",
+    "dateOfBirth",
     "yearOfBirth",
     "company",
     "email",
@@ -85,6 +100,9 @@ export async function updateMyProfile(
     "districtId",
     "communeId",
     "address",
+    "latitude",
+    "longitude",
+    "updateAdsContact",
   ] as const;
 
   for (const key of keys) {
@@ -95,6 +113,118 @@ export async function updateMyProfile(
     await userServerFetch<BackendUser>("/users/me", {
       method: "PATCH",
       body: JSON.stringify(body),
+    });
+    return { success: true };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+const PRIVACY_KEYS = [
+  "discoverableByGender",
+  "discoverableByDateOfBirth",
+  "discoverableByPhone",
+  "discoverableByEmail",
+  "discoverableByLocation",
+] as const;
+
+export type PrivacyKey = (typeof PRIVACY_KEYS)[number];
+
+/**
+ * Flips one Settings → Privacy toggle. The backend DTO accepts all five, but
+ * sending only the changed key keeps concurrent toggles from overwriting
+ * each other.
+ */
+export async function updateMyPrivacy(
+  key: PrivacyKey,
+  isPublic: boolean,
+): Promise<SettingsActionResult> {
+  // A server action is a network endpoint: the TS union is erased at runtime,
+  // so reject anything outside the allow-list before it reaches the API.
+  if (!PRIVACY_KEYS.includes(key)) {
+    const t = await getTranslations("Settings.errors");
+    return { success: false, error: t("unknownPrivacy") };
+  }
+
+  try {
+    await userServerFetch<BackendUser>("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify({ [key]: isPublic }),
+    });
+    return { success: true };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/** Row of `GET /users/me/phones` — the edit-profile contact block's list. */
+export interface MyPhoneRow {
+  id: string;
+  phone: string;
+  isPrimary: boolean;
+}
+
+/**
+ * The user's saved phone numbers. Fail-soft: the profile form must still
+ * render when the phone read fails (it falls back to `primaryPhone`).
+ */
+export async function listMyPhones(): Promise<MyPhoneRow[]> {
+  try {
+    const { data } = await userServerFetch<MyPhoneRow[]>("/users/me/phones");
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export interface AddMyPhoneResult extends SettingsActionResult {
+  phone?: MyPhoneRow;
+}
+
+/** Adds a secondary contact number; the backend normalises nothing, so we do. */
+export async function addMyPhone(rawPhone: string): Promise<AddMyPhoneResult> {
+  const e164 = normalizePhone(rawPhone);
+  if (!e164) return invalidPhoneError();
+
+  try {
+    const { data } = await userServerFetch<MyPhoneRow>("/users/me/phones", {
+      method: "POST",
+      body: JSON.stringify({ phone: e164 }),
+    });
+    return { success: true, phone: data };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/**
+ * Edits one saved contact number. Deliberately does not touch the active
+ * (login) phone — that number only moves through the OTP change-phone flow.
+ */
+export async function updateMyPhone(
+  phoneId: string,
+  rawPhone: string,
+): Promise<SettingsActionResult> {
+  const e164 = normalizePhone(rawPhone);
+  if (!e164) return invalidPhoneError();
+
+  try {
+    await userServerFetch(`/users/me/phones/${phoneId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ phone: e164 }),
+    });
+    return { success: true };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+export async function removeMyPhone(
+  phoneId: string,
+): Promise<SettingsActionResult> {
+  try {
+    await userServerFetch(`/users/me/phones/${phoneId}`, {
+      method: "DELETE",
     });
     return { success: true };
   } catch (err) {
@@ -136,7 +266,7 @@ export async function requestPhoneChangeOtp(
   phone: string,
 ): Promise<SettingsActionResult> {
   const e164 = normalizePhone(phone);
-  if (!e164) return { success: false, error: "Enter a valid phone number." };
+  if (!e164) return invalidPhoneError();
 
   try {
     await userServerFetch("/users/me/phones/otp", {
@@ -154,7 +284,7 @@ export async function verifyPhoneChange(
   token: string,
 ): Promise<SettingsActionResult> {
   const e164 = normalizePhone(phone);
-  if (!e164) return { success: false, error: "Enter a valid phone number." };
+  if (!e164) return invalidPhoneError();
 
   try {
     await userServerFetch<BackendUser>("/users/me/phones/otp/verify", {

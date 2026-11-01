@@ -1,9 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import DbImage from "@/components/common/DbImage";
-import { Button } from "../ui/button";
-import { IconHeartPlus, IconShare3 } from "@tabler/icons-react";
-import { useReactions } from "@/components/reactions/reactions-provider";
+import { PostSocialActions } from "./PostSocialActions";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
 import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
 import Slideshow from "yet-another-react-lightbox/plugins/slideshow";
@@ -11,18 +9,28 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
-import { Post } from "@/lib/posts";
-import ShareModal from "@/components/share/ShareModel";
-import { toSlug } from "@/lib/utils";
+import type { Post } from "@/lib/posts";
 
 const MAX_THUMBS = 7;
 
 export default function PostImage({
   post,
+  showActions = true,
+  variant = "hero",
 }: {
   post: Pick<Post, "images" | "title" | "postId" | "likeCount">;
+  /** False when the host page renders the same controls elsewhere (a job
+   *  listing puts them beside the title) — never a second copy on screen. */
+  showActions?: boolean;
+  /**
+   * `hero` is the marketplace gallery (a large image with thumbnails under it).
+   * `thumbs` is the job ad's header layout instead (captain's mock, 2026-10-16):
+   * one narrow column of small images, so the job's logo never becomes a
+   * full-bleed banner and the title/price/Apply block sits beside it. Both use
+   * the same slides and lightbox — this is a layout, not a second gallery.
+   */
+  variant?: "hero" | "thumbs";
 }) {
-  const [shareOpen, setShareOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [, setSelectedImage] = useState(0);
@@ -35,56 +43,50 @@ export default function PostImage({
   const fullscreenRef = useRef<FullscreenRef>(null);
   const count = images.length;
 
-  const { isLiked, toggleLike, isPending, likeCount } = useReactions();
-  const listingId = String(post.postId);
-  // Seeded from the listing; each toggle response replaces it with the
-  // backend's fresh count, so the control never needs a refetch.
-  const likes = likeCount(listingId, post.likeCount ?? 0);
-
   const handleImageClick = (idx: number) => {
     setSelectedImage(idx);
     setLightboxIndex(idx);
     setOpen(true);
   };
 
-  // The like control — live count + toggle, shared by every gallery layout
-  // (the count===2 branch used to carry its own copy of this markup).
-  const likesButton = (
-    <Button
-      onClick={(e) => {
-        e.stopPropagation();
-        toggleLike(listingId);
-      }}
-      disabled={isPending(listingId)}
-      className="bg-card text-sm font-medium px-2 py-1.5 h-10 w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
-    >
-      <IconHeartPlus
-        className={`scale-145 ${
-          isLiked(listingId) ? "fill-red-500 text-red-500" : "text-foreground"
-        }`}
-        stroke={2}
-      />
-      <p className="text-foreground pl-1 pt-0.5">
-        {likes} {likes === 1 ? "Like" : "Likes"}
-      </p>
-    </Button>
-  );
+  // The like + share pair — one component, rendered as the photo overlay.
+  // `PostSocialActions` owns the markup and the share modal; the host page may
+  // have already placed them (see `showActions`).
+  const overlayButtons = showActions ? <PostSocialActions post={post} /> : null;
 
-  // Overlay buttons — shown on main image
-  const overlayButtons = (
-    <div className="absolute top-3 right-3 flex gap-2 z-10">
-      {likesButton}
-      <Button
-        onClick={(e) => {
-          e.stopPropagation();
-          setShareOpen(true);
-        }}
-        className="bg-card px-2 py-1.5 h-10 w-15 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
-      >
-        <IconShare3 className="scale-160 text-foreground" stroke={1.5} />
-      </Button>
-    </div>
-  );
+  // The job header's gallery: a narrow strip of small images. Nothing to show
+  // renders nothing at all — the details column then takes the whole width,
+  // which is what a job ad with no logo should look like.
+  const renderThumbs = () => {
+    const shown = images.filter(
+      (src) => typeof src === "string" && src.length > 0,
+    );
+    if (shown.length === 0) return null;
+
+    return (
+      <div className="flex w-full shrink-0 flex-row gap-1 self-start rounded-sm border bg-card p-1 sm:w-[155px] sm:flex-col">
+        {shown.map((src, idx) => (
+          <button
+            key={`${src}-${idx}`}
+            type="button"
+            onClick={() => handleImageClick(idx)}
+            className="relative h-[100px] w-[130px] shrink-0 cursor-pointer overflow-hidden rounded-xs bg-muted sm:w-full"
+            aria-label={`${post.title} photo ${idx + 1}`}
+          >
+            <DbImage
+              src={src}
+              alt={`post-${idx}`}
+              fill
+              sizes="155px"
+              className="object-cover"
+              unoptimized
+              loading={idx === 0 ? "eager" : "lazy"}
+            />
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   const renderGrid = () => {
     if (count === 0) return null;
@@ -111,19 +113,12 @@ export default function PostImage({
       return (
         <div className="relative flex gap-0.5 aspect-[15/10] rounded-t-xs overflow-hidden">
           {/* overlay buttons always top right */}
-          <div className="absolute top-3 right-3 flex gap-2 z-20">
-            {likesButton}
-
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShareOpen(true);
-              }}
-              className="bg-card px-2 py-1.5 h-10 w-15 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
-            >
-              <IconShare3 className="scale-160 text-foreground" stroke={1.5} />
-            </Button>
-          </div>
+          {showActions ? (
+            <PostSocialActions
+              post={post}
+              className="absolute top-3 right-3 flex gap-2 z-20"
+            />
+          ) : null}
           <div
             className="relative flex-1 cursor-pointer bg-muted"
             onClick={() => handleImageClick(0)}
@@ -416,7 +411,7 @@ export default function PostImage({
 
                 {showOverlay && (
                   <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
-                    <span className="text-white font-medium text-lg md:text-2xl">
+                    <span className="text-white type-section-title">
                       +{remaining}
                     </span>
                   </div>
@@ -430,7 +425,7 @@ export default function PostImage({
   };
   return (
     <>
-      {renderGrid()}
+      {variant === "thumbs" ? renderThumbs() : renderGrid()}
       <Lightbox
         open={open}
         close={() => setOpen(false)}
@@ -460,7 +455,7 @@ export default function PostImage({
         }}
         animation={{ fade: 300, zoom: 300 }}
         render={{
-          // "1 / 18" counter in top-left like Khmer24
+          // "1 / 18" counter in top-left like PhsarKhmer
           iconPrev: () => (
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -491,7 +486,7 @@ export default function PostImage({
           ),
           // Counter badge top-left
           slideHeader: () => (
-            <div className="absolute top-4 left-4 z-50 bg-black/50 text-white text-sm font-semibold px-3 py-1 rounded-full backdrop-blur-sm">
+            <div className="absolute top-4 left-4 z-50 bg-black/50 text-white type-photo-badge px-3 py-1 rounded-full backdrop-blur-sm">
               {lightboxIndex + 1} / {slides.length}
             </div>
           ),
@@ -524,11 +519,6 @@ export default function PostImage({
           opacity: 0.8 !important;
         }
       `}</style>
-      <ShareModal
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-        url={`https://psakhmer.online/${toSlug(post.title)}-adid-${post.postId}`}
-      />
     </>
   );
 }

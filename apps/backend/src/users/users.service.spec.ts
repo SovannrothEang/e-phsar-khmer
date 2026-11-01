@@ -5,7 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { validate } from 'class-validator';
+import { plainToInstance } from 'class-transformer';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 jest.mock('bcrypt');
 
@@ -114,12 +118,16 @@ describe('UsersService phone management', () => {
     });
 
     it('throws ConflictException when phone already in use', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve([{ id: 'existing' }]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: phone owner check
+        const rows = selectCall === 1 ? [] : [{ id: 'existing' }];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
+        };
       });
 
       await expect(
@@ -131,7 +139,9 @@ describe('UsersService phone management', () => {
       let selectCall = 0;
       db.select.mockImplementation(() => {
         selectCall++;
-        if (selectCall === 1) {
+        // 1: banned-phone lookup, 2: existing-phone check — both empty;
+        // 3: hasAny (this user already has a phone)
+        if (selectCall <= 2) {
           return {
             from: () => ({
               where: () => ({ limit: () => Promise.resolve([]) }),
@@ -162,6 +172,103 @@ describe('UsersService phone management', () => {
 
       await service.addPhone('u1', { phone: '+855999', isPrimary: true });
       expect(updateWhere).toHaveBeenCalled();
+    });
+  });
+
+  describe('updatePhone', () => {
+    const savedPhone = {
+      id: 'p1',
+      userId: 'u1',
+      phone: '+855111',
+      isPrimary: false,
+    };
+
+    it('edits the contact number without touching users.primaryPhone', async () => {
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned lookup; 2: ownership; 3: duplicate check
+        const rows = selectCall === 2 ? [savedPhone] : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      let updateSet: Record<string, unknown> | undefined;
+      db.update.mockReturnValue({
+        set: (arg: Record<string, unknown>) => {
+          updateSet = arg;
+          return {
+            where: () => ({
+              returning: () =>
+                Promise.resolve([{ ...savedPhone, phone: '+855222' }]),
+            }),
+          };
+        },
+      });
+
+      const result = await service.updatePhone('u1', 'p1', {
+        phone: '+855222',
+      });
+
+      expect(result.phone).toBe('+855222');
+      expect(updateSet).toEqual({ phone: '+855222' });
+      // Only the user_phones row is written — the login phone stays put.
+      expect(db.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the row unchanged when the number did not move', async () => {
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        const rows = selectCall === 2 ? [savedPhone] : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+
+      const result = await service.updatePhone('u1', 'p1', {
+        phone: '+855111',
+      });
+
+      expect(result).toEqual(savedPhone);
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the row is not the caller’s', async () => {
+      // Both the banned lookup and the ownership lookup come back empty.
+      db.select.mockImplementation(() => ({
+        from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+      }));
+
+      await expect(
+        service.updatePhone('u1', 'p-other', { phone: '+855222' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException when another row owns the number', async () => {
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        const rows =
+          selectCall === 1
+            ? []
+            : selectCall === 2
+              ? [savedPhone]
+              : [{ id: 'p-other' }];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+
+      await expect(
+        service.updatePhone('u1', 'p1', { phone: '+855222' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -301,6 +408,7 @@ const fakeUser = {
   firstName: null,
   lastName: null,
   gender: null,
+  dateOfBirth: null,
   yearOfBirth: null,
   company: null,
   coverPhotoUrl: null,
@@ -315,6 +423,11 @@ const fakeUser = {
   role: 'user' as const,
   status: 'active' as const,
   isBusiness: false,
+  discoverableByGender: false,
+  discoverableByDateOfBirth: false,
+  discoverableByPhone: true,
+  discoverableByEmail: true,
+  discoverableByLocation: true,
   lastSeenAt: null,
   emailVerifiedAt: null,
   phoneVerifiedAt: null,
@@ -502,6 +615,308 @@ describe('UsersService updateProfile location validation', () => {
       service.updateProfile('u1', { communeId: 'commune-wrong' }),
     ).rejects.toThrow(BadRequestException);
   });
+});
+
+describe('UsersService updateProfile ads contact sync', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  it('writes NULL (not the string "null") when the map pin is cleared', async () => {
+    let updateSet: Record<string, unknown> | undefined;
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        updateSet = arg;
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser }]),
+          }),
+        };
+      },
+    });
+
+    await service.updateProfile('u1', { latitude: null, longitude: null });
+
+    expect(updateSet?.latitude).toBeNull();
+    expect(updateSet?.longitude).toBeNull();
+  });
+
+  it('copies the contact block and location to the user listings when asked', async () => {
+    const user = {
+      ...fakeUser,
+      username: 'sokdara',
+      firstName: 'Sok',
+      lastName: 'Dara',
+      email: 'dara@example.com',
+      primaryPhone: '+855111',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
+    };
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([user]),
+          }),
+        };
+      },
+    });
+    db.select.mockReturnValue(
+      chain([
+        { phone: '+855222', isPrimary: false },
+        { phone: '+855111', isPrimary: true },
+      ]),
+    );
+
+    await service.updateProfile('u1', { updateAdsContact: true });
+
+    expect(sets).toHaveLength(2);
+    expect(sets[1]).toMatchObject({
+      contactName: 'Sok Dara',
+      contactPhones: ['+855111', '+855222'],
+      contactEmail: 'dara@example.com',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
+    });
+  });
+
+  it('leaves an ad pin alone when the profile has no pin', async () => {
+    const user = { ...fakeUser, username: 'sokdara', primaryPhone: '+855111' };
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([user]),
+          }),
+        };
+      },
+    });
+    db.select.mockReturnValue(chain([]));
+
+    await service.updateProfile('u1', { updateAdsContact: true });
+
+    // The cascade and address still mirror the profile (here: cleared), but a
+    // pinless account must never wipe the coordinate pair an ad carries.
+    expect(sets[1]).toMatchObject({ provinceId: null, address: null });
+    expect(sets[1]).not.toHaveProperty('latitude');
+    expect(sets[1]).not.toHaveProperty('longitude');
+  });
+
+  it('falls back to primaryPhone when the account has no phone rows', async () => {
+    const user = {
+      ...fakeUser,
+      username: 'sokdara',
+      primaryPhone: '+855111',
+    };
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([user]),
+          }),
+        };
+      },
+    });
+    db.select.mockReturnValue(chain([]));
+
+    await service.updateProfile('u1', { updateAdsContact: true });
+
+    expect(sets[1].contactPhones).toEqual(['+855111']);
+    expect(sets[1].contactName).toBe('sokdara');
+  });
+
+  it('does not touch listings when the checkbox is off', async () => {
+    db.update.mockReturnValue({
+      set: () => ({
+        where: () => ({
+          returning: () => Promise.resolve([{ ...fakeUser }]),
+        }),
+      }),
+    });
+
+    await service.updateProfile('u1', { company: 'X' });
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsersService updateProfile date of birth', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  function mockUpdate() {
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser }]),
+          }),
+        };
+      },
+    });
+    return sets;
+  }
+
+  it('stores the day and derives the legacy year', async () => {
+    const sets = mockUpdate();
+
+    await service.updateProfile('u1', { dateOfBirth: '1995-04-17' });
+
+    expect(sets[0].dateOfBirth).toBe('1995-04-17');
+    expect(sets[0].yearOfBirth).toBe(1995);
+  });
+
+  it('clears both representations when null', async () => {
+    const sets = mockUpdate();
+
+    await service.updateProfile('u1', {
+      dateOfBirth: null,
+      // The full date is authoritative, so an explicit stale year loses.
+      yearOfBirth: 1990,
+    });
+
+    expect(sets[0].dateOfBirth).toBeNull();
+    expect(sets[0].yearOfBirth).toBeNull();
+  });
+
+  it('rejects a future birthday', async () => {
+    mockUpdate();
+
+    await expect(
+      service.updateProfile('u1', { dateOfBirth: '2999-01-01' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsersService updateProfile privacy settings', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: UsersService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  function mockUpdate() {
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser, ...arg }]),
+          }),
+        };
+      },
+    });
+    return sets;
+  }
+
+  it('writes only the toggle carried by the patch', async () => {
+    const sets = mockUpdate();
+
+    const result = await service.updateProfile('u1', {
+      discoverableByEmail: false,
+    });
+
+    expect(sets[0]).toMatchObject({ discoverableByEmail: false });
+    expect(sets[0]).not.toHaveProperty('discoverableByPhone');
+    expect(sets[0]).not.toHaveProperty('discoverableByLocation');
+    expect(sets[0].updatedAt).toBeInstanceOf(Date);
+    expect(result.discoverableByEmail).toBe(false);
+  });
+
+  it('writes all five when all five are sent', async () => {
+    const sets = mockUpdate();
+
+    await service.updateProfile('u1', {
+      discoverableByGender: true,
+      discoverableByDateOfBirth: true,
+      discoverableByPhone: false,
+      discoverableByEmail: false,
+      discoverableByLocation: false,
+    });
+
+    expect(sets[0]).toMatchObject({
+      discoverableByGender: true,
+      discoverableByDateOfBirth: true,
+      discoverableByPhone: false,
+      discoverableByEmail: false,
+      discoverableByLocation: false,
+    });
+  });
+
+  it('does not pre-read the profile for a privacy-only patch', async () => {
+    mockUpdate();
+
+    await service.updateProfile('u1', { discoverableByPhone: false });
+
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('UpdateProfileDto privacy validation', () => {
+  it('rejects a non-boolean privacy value', async () => {
+    const errors = await validate(
+      plainToInstance(UpdateProfileDto, { discoverableByEmail: 'yes' }),
+    );
+
+    expect(errors.some((e) => e.property === 'discoverableByEmail')).toBe(true);
+  });
+
+  it('accepts booleans', async () => {
+    const errors = await validate(
+      plainToInstance(UpdateProfileDto, { discoverableByEmail: false }),
+    );
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it.each(['en', 'km'])('accepts preferredLanguage %s', async (language) => {
+    const errors = await validate(
+      plainToInstance(UpdateProfileDto, { preferredLanguage: language }),
+    );
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it.each(['zh', 'ko', 'id', 'vi'])(
+    'rejects preferredLanguage %s',
+    async (language) => {
+      const errors = await validate(
+        plainToInstance(UpdateProfileDto, { preferredLanguage: language }),
+      );
+
+      expect(errors.some((e) => e.property === 'preferredLanguage')).toBe(true);
+    },
+  );
 });
 
 describe('UsersService updateProfile username generation', () => {
@@ -1278,12 +1693,13 @@ describe('UsersService self-service account changes', () => {
       let selectCall = 0;
       db.select.mockImplementation(() => {
         selectCall++;
-        // 1: users.primaryPhone owner check, 2: user_phones owner check,
-        // 3: the current primary row, 4: findById after the transaction
+        // 1: banned-phone lookup, 2: users.primaryPhone owner check, 3:
+        // user_phones owner check, 4: the current primary row, 5: findById
+        // after the transaction
         const rows =
-          selectCall === 3
+          selectCall === 4
             ? [{ id: 'p1' }]
-            : selectCall === 4
+            : selectCall === 5
               ? [{ ...fakeUser, primaryPhone: PHONE }]
               : [];
         return {
@@ -1324,12 +1740,16 @@ describe('UsersService self-service account changes', () => {
     });
 
     it('refuses a number another account already owns', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve([{ id: 'someone-else' }]),
+      let selectCall = 0;
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: phone owner check
+        const rows = selectCall === 1 ? [] : [{ id: 'someone-else' }];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
           }),
-        }),
+        };
       });
 
       await expect(
@@ -1340,5 +1760,120 @@ describe('UsersService self-service account changes', () => {
       ).rejects.toThrow(ConflictException);
       expect(db.transaction).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('UsersService public profile visibility', () => {
+  it('does not expose a moderation-suspended account', async () => {
+    let where: unknown;
+    const db = makeDb();
+    db.select.mockImplementation(() => {
+      const c: Record<string, unknown> = {};
+      c.from = () => c;
+      c.where = (arg: unknown) => {
+        where = arg;
+        return c;
+      };
+      c.limit = () => Promise.resolve([]);
+      return c;
+    });
+    const service = makeService(db);
+
+    await expect(service.getPublicProfile('sokdara')).rejects.toThrow(
+      NotFoundException,
+    );
+
+    const { sql } = new PgDialect().sqlToQuery(where as never);
+    expect(sql).toContain('"status" = $');
+    expect(sql).toContain('"deleted_at" is null');
+  });
+});
+
+describe('UsersService verified account flag', () => {
+  it('marks a public profile with an active paid subscription', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      // 1: the user row, 2-3: follower/following counts, 4: subscription probe.
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([{ id: 'sub-1' }]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(true);
+  });
+
+  it('leaves a public profile without a paid subscription unverified', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(false);
+  });
+
+  it('carries the flag on the signed-in user read', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me.verifiedAccount).toBe(true);
+  });
+
+  it('omits linked providers unless the caller opts in', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me).not.toHaveProperty('authProviders');
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns the linked providers in a stable order when requested', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1
+          ? [fakeUser]
+          : call === 2
+            ? [{ id: 'sub-1' }]
+            : [{ provider: 'telegram' }, { provider: 'google' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1', true);
+
+    expect(me.authProviders).toEqual(['google', 'telegram']);
+    expect(db.select).toHaveBeenCalledTimes(3);
   });
 });

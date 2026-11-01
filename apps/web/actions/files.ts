@@ -12,12 +12,15 @@ export type UploadScope =
   | "cover"
   | "listing"
   | "chat"
+  | "resume"
   | "report"
   | "category"
   | "subcategory"
   | "brand"
   | "model"
-  | "attribute";
+  | "product"
+  | "attribute"
+  | "advertisement";
 
 export interface SignUploadResponse {
   signedUrl: string;
@@ -94,6 +97,29 @@ export async function deleteUploaded(
   if (paths.length === 0) return { success: true };
   try {
     await serverFetch("/files", {
+      method: "DELETE",
+      body: JSON.stringify({ paths }),
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Failed to delete files",
+    };
+  }
+}
+
+/**
+ * User-session twin of {@link deleteUploaded}. The admin-session version would
+ * fail (or, worse, act as the wrong principal) from a `/[locale]` surface —
+ * the resume photo picker cleans up an upload the user abandoned.
+ */
+export async function deleteUploadedUser(
+  paths: string[],
+): Promise<{ success: boolean; error?: string }> {
+  if (paths.length === 0) return { success: true };
+  try {
+    await userServerFetch("/files", {
       method: "DELETE",
       body: JSON.stringify({ paths }),
     });

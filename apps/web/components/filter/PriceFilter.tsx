@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { MAX_AD_PRICE_PARAM, MIN_AD_PRICE_PARAM } from "@/lib/search-params";
@@ -23,18 +24,9 @@ function formatChipValue(value: string) {
   return n.toLocaleString();
 }
 
-function PriceLabel(min: string, max: string, label = "Price") {
-  if (min && max) {
-    return `${label} :${formatChipValue(min)}-${formatChipValue(max)}`;
-  }
-  if (min) return `${label} :${formatChipValue(min)}+`;
-  if (max) return `${label} :up to ${formatChipValue(max)}`;
-  return label;
-}
-
-export default function PriceFilter({
-  label = "Price",
-}: { label?: string } = {}) {
+export default function PriceFilter({ label }: { label?: string } = {}) {
+  const t = useTranslations();
+  const resolvedLabel = label ?? t("Filters.price.label");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -50,7 +42,24 @@ export default function PriceFilter({
   const [max, setMax] = useState(maxParam);
 
   const hasActiveFilter = Boolean(minParam || maxParam);
-  const priceLabel = PriceLabel(minParam, maxParam, label);
+  const priceLabel =
+    minParam && maxParam
+      ? t("Filters.price.chipRange", {
+          label: resolvedLabel,
+          min: formatChipValue(minParam),
+          max: formatChipValue(maxParam),
+        })
+      : minParam
+        ? t("Filters.price.chipFrom", {
+            label: resolvedLabel,
+            min: formatChipValue(minParam),
+          })
+        : maxParam
+          ? t("Filters.price.chipUpTo", {
+              label: resolvedLabel,
+              max: formatChipValue(maxParam),
+            })
+          : resolvedLabel;
 
   function pushParams(nextMin: string, nextMax: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -111,7 +120,7 @@ export default function PriceFilter({
                   removeFilter(e as unknown as React.MouseEvent);
                 }
               }}
-              aria-label="Remove price filter"
+              aria-label={t("Filters.price.remove")}
             >
               <X className="size-4 text-foreground shrink-0" aria-hidden />
             </span>
@@ -120,19 +129,21 @@ export default function PriceFilter({
       </PopoverTrigger>
       <PopoverContent align="center" className="rounded-sm w-xs p-0 mt-3 pb-3">
         <div className="space-y-4 px-4">
-          <h3 className="text-center text-base mt-3">{label}</h3>
+          <h3 className="text-center type-card-heading mt-3">
+            {resolvedLabel}
+          </h3>
           <Separator />
           <div className="flex gap-3">
             <Input
               type="number"
-              placeholder="Minimum $"
+              placeholder={t("Filters.price.min")}
               value={min}
               onChange={(e) => setMin(e.target.value)}
               className="rounded-sm h-9"
             />
             <Input
               type="number"
-              placeholder="Maximum $"
+              placeholder={t("Filters.price.max")}
               value={max}
               onChange={(e) => setMax(e.target.value)}
               className="rounded-sm h-9"
@@ -142,7 +153,7 @@ export default function PriceFilter({
             className="rounded-sm h-9 w-full bg-orange-500 text-white hover:bg-orange-600 cursor-pointer"
             onClick={applyFilter}
           >
-            Apply Filter
+            {t("Common.applyFilter")}
           </Button>
         </div>
       </PopoverContent>
