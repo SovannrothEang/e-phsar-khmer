@@ -295,6 +295,10 @@ The admin dashboard originally lived at `apps/admin` and was renamed to `apps/we
 
 The `apps/web` Next.js 16 app is the admin dashboard. It runs on port **3001** and talks to the backend at `http://localhost:3000/api/v1` (configurable via `API_URL` env, default baked into `lib/api/client.ts`).
 
+### Navbar notification bell
+
+The navbar bell opens a recent-notifications panel (popover at `lg` and up, bottom drawer below `lg`; `components/web/NotificationBell.tsx`); its footer links to `/notifications`, which stays the full history. The panel reads `GET /notifications?pageSize=N` only while open (N = `notificationPreviewLimit`: 6 popover / 8 drawer) under `notificationKeys.recent()`, and shares `NotificationRow` with the page.
+
 ### Auth flow
 
 Admin and user auth are **split onto separate surfaces**:

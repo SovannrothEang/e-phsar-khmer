@@ -21,6 +21,15 @@ How to use this file:
 
 ### Added
 
+- **Navbar notification bell opens the newest notifications in place.** The bell no longer jumps
+  straight to `/notifications`: at `lg` and up it opens a popover (6 newest), below `lg` the bell
+  moves out of the hamburger sheet into the top bar and opens a bottom drawer (8 newest). Both
+  show a "Mark all as read" action, per-row mark/delete, and a **View all** footer to the full
+  `/notifications` history. The list loads only while the panel is open
+  (`GET /notifications?pageSize=N`, no backend change). The row markup is now a shared
+  `NotificationRow` used by the page and the panel; the page's mutations also invalidate the
+  panel's cache. Not built: per-type deep links (notifications carry no target), and a live
+  WebSocket refresh of an open panel (it still follows the 60 s badge poll).
 - **Linked social accounts on `/settings`.** The Facebook / Google / Telegram rows now read
   `Add` or `Linked` from the account's real provider links and carry the `>` chevron.
   `GET /users/me?includeAuthProviders=1` returns the linked providers (additive and opt-in, so
