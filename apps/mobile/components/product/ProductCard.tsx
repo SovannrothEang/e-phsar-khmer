@@ -1,18 +1,22 @@
 import { Product } from "@/types/product";
 import { useGridCardSize } from "@/hooks/useGridCardSize";
+import { useReactions } from "@/contexts/ReactionsContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 
 interface ProductCardProps {
   product: Product;
   viewMode: "list" | "grid";
+  /** Grid only: a fixed card width for horizontal strips (defaults to half-width). */
+  fixedWidth?: number;
 }
 
-const ProductCard = ({ product, viewMode }: ProductCardProps) => {
+const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
   const { total } = useGridCardSize();
-  const [isFav, setIsFav] = useState(product.isFavorite || false);
+  const { isLiked, toggleLike } = useReactions();
+  const liked = isLiked(product.id);
 
   const getImageSource = (img: any) => {
     if (!img) return null;
@@ -28,13 +32,13 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
         activeOpacity={0.7}
         onPress={(e) => {
           e.stopPropagation();
-          setIsFav(!isFav);
+          void toggleLike(product.id);
         }}
       >
         <Ionicons
-          name={isFav ? "heart" : "heart-outline"}
+          name={liked ? "heart" : "heart-outline"}
           size={15}
-          color={isFav ? "#EF4444" : "white"}
+          color={liked ? "#EF4444" : "white"}
         />
       </TouchableOpacity>
 
@@ -49,7 +53,7 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
       )}
 
       {/* Image Count Badge */}
-      {product.imageCount && product.imageCount > 0 && (
+      {(product.imageCount ?? 0) > 0 && (
         <View className="absolute bottom-2.5 right-2.5 flex-row items-center rounded-full bg-black/70 px-2 py-0.5 border border-white/20">
           <Ionicons name="camera" size={11} color="white" />
           <Text className="ml-1 text-[10px] font-bold text-white">
@@ -163,14 +167,16 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
             {/* Price */}
             <View className="flex-row items-center">
               <Text className="text-base font-black text-rose-600 dark:text-rose-400">
-                ${product.price.toLocaleString()}
-                {product.jobType ? "+" : ""}
+                {product.price === null
+                  ? "Negotiable"
+                  : `$${product.price.toLocaleString()}`}
+                {product.price !== null && product.jobType ? "+" : ""}
               </Text>
-              {product.oldPrice && (
+              {product.oldPrice ? (
                 <Text className="ml-2 text-xs text-gray-400 line-through">
                   ${product.oldPrice.toLocaleString()}
                 </Text>
-              )}
+              ) : null}
             </View>
           </View>
         </TouchableOpacity>
@@ -181,7 +187,8 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
   // GRID VIEW
   return (
     <TouchableOpacity
-      className="w-1/2 p-1.5"
+      className={`p-1.5 ${fixedWidth ? "" : "w-1/2"}`}
+      style={fixedWidth ? { width: fixedWidth } : undefined}
       onPress={() => router.push(`/product/${product.id}`)}
       activeOpacity={0.75}
     >
@@ -251,14 +258,16 @@ const ProductCard = ({ product, viewMode }: ProductCardProps) => {
           {/* Price */}
           <View className="flex-row items-center">
             <Text className="text-base font-black text-rose-600 dark:text-rose-400">
-              ${product.price.toLocaleString()}
-              {product.jobType ? "+" : ""}
+              {product.price === null
+                ? "Negotiable"
+                : `$${product.price.toLocaleString()}`}
+              {product.price !== null && product.jobType ? "+" : ""}
             </Text>
-            {product.oldPrice && (
+            {product.oldPrice ? (
               <Text className="ml-1.5 text-xs text-gray-400 line-through">
                 ${product.oldPrice.toLocaleString()}
               </Text>
-            )}
+            ) : null}
           </View>
         </View>
       </View>

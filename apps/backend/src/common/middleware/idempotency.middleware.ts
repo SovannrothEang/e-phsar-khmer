@@ -30,6 +30,15 @@ export class IdempotencyMiddleware implements NestMiddleware {
   }
 
   async use(req: Request, res: Response, next: NextFunction) {
+    // Registered with the string wildcard (the object-form `forRoutes` with a
+    // method filter never fired on Express 5), so this guard owns the methods
+    // the middleware is meant for.
+    const method = req.method.toUpperCase();
+    if (!['POST', 'PATCH', 'PUT'].includes(method)) {
+      next();
+      return;
+    }
+
     const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
 
     if (!idempotencyKey) {
@@ -48,7 +57,6 @@ export class IdempotencyMiddleware implements NestMiddleware {
       return;
     }
 
-    const method = req.method.toUpperCase();
     const path = req.path;
     const userId = this.extractUserId(req);
     const userScope = userId

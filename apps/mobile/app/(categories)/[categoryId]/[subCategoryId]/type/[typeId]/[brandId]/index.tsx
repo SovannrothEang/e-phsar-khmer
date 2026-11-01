@@ -1,17 +1,18 @@
+import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
+import ListingFeed from "@/components/category/ListingFeed";
 import ModelGrid from "@/components/category/ModelGrid";
 import Divider from "@/components/common/Divider";
 import SafeAreaView from "@/components/common/SafeAreaView";
-import PromoCard from "@/components/home/PromoCard";
-import ProductCard from "@/components/product/ProductCard";
-import { CATEGORIES } from "@/constants/data/categories";
-import { getFiltersForCategory } from "@/constants/data/filters";
-import { SAMPLE_PRODUCTS } from "@/constants/data/products";
+import { Colors } from "@/constants/Colors";
+import { fetchBrands, fetchModels, fetchSubcategory } from "@/lib/api/catalog";
+import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  ScrollView,
+  ActivityIndicator,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,60 +21,90 @@ import {
 
 type ViewMode = "list" | "grid";
 
-export default function TypeBrandScreen() {
-  const { categoryId, subCategoryId, typeId, brandId } = useLocalSearchParams<{
-    categoryId: string;
-    subCategoryId: string;
-    typeId: string;
-    brandId: string;
-  }>();
+function prettySlug(slug?: string): string {
+  if (!slug) return "";
+  return slug
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+export default function BrandTypeScreen() {
+  const params = useLocalSearchParams();
+  const pick = (key: string) => {
+    const value = params[key];
+    return Array.isArray(value) ? value[0] : value;
+  };
+
+  const categoryId = pick("categoryId");
+  const subCategoryId = pick("subCategoryId");
+  const brandId = pick("brandId");
+  const typeId = pick("typeId");
+  const attrKey = pick("attrKey");
+  const attrValue = pick("attrValue");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  const subQuery = useQuery({
+    queryKey: ["subcategory", categoryId, subCategoryId],
+    queryFn: () =>
+      fetchSubcategory(categoryId as string, subCategoryId as string),
+    enabled: !!categoryId && !!subCategoryId,
+  });
+  const subcategory = subQuery.data;
+
+  const brandsQuery = useQuery({
+    queryKey: ["brands", subCategoryId],
+    queryFn: () => fetchBrands(subCategoryId as string),
+    enabled: !!subCategoryId,
+  });
+  const brand = brandsQuery.data?.find((entry) => entry.slug === brandId);
+
+  const modelsQuery = useQuery({
+    queryKey: ["models", brand?.id, subCategoryId],
+    queryFn: () => fetchModels(brand!.id, subCategoryId as string),
+    enabled: !!brand?.id && !!subCategoryId,
+  });
+  const models = modelsQuery.data ?? [];
+
+  const brandName = brand?.name || prettySlug(brandId);
+  const typeName = attrValue || prettySlug(typeId);
+
+  const feedQuery = useMemo(
+    () => ({
+      subcategorySlug: subCategoryId,
+      ...(brand?.name ? { brand: brand.name } : {}),
+      ...(attrKey && attrValue ? { attrs: { [attrKey]: attrValue } } : {}),
+      ...feedQueryFromParams(params),
+    }),
+    [subCategoryId, brand?.name, attrKey, attrValue, params],
+  );
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "list" ? "grid" : "list");
   };
 
-  // Find all data
-  const data = useMemo(() => {
-    const category = CATEGORIES.find((c) => c.id === categoryId);
-    const subCategory = category?.subs?.find((s) => s.id === subCategoryId);
-    const type = subCategory?.types?.find((t) => t.id === typeId);
-    const brand = subCategory?.brands?.find((b) => b.id === brandId) as
-      | {
-          id: string;
-          name: string;
-          image: any;
-          models?: { id: string; name: string }[];
-        }
-      | undefined;
+  const openFilters = () =>
+    router.push({
+      pathname: "/filters",
+      params: {
+        categoryId,
+        subCategoryId,
+        ...pickFilterParams(params),
+      },
+    });
 
-    const typeName =
-      type?.name ||
-      typeId
-        ?.split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-
-    const brandName =
-      brand?.name ||
-      brandId
-        ?.split("-")
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(" ");
-
-    return {
-      category,
-      subCategory,
-      type,
-      brand,
-      typeName,
-      brandName,
-    };
-  }, [categoryId, subCategoryId, typeId, brandId]);
+  if (subQuery.isLoading) {
+    return (
+      <SafeAreaView className="bg-neutral-surface">
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={Colors.primary.DEFAULT} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      {/* Header */}
       <View className="bg-[#0EA5E9] px-4 pb-3 pt-3">
         <View className="flex-row items-center gap-3">
           <TouchableOpacity onPress={() => router.back()}>
@@ -88,29 +119,22 @@ export default function TypeBrandScreen() {
               editable={false}
             />
           </View>
-          <TouchableOpacity onPress={() => router.push("/filters")}>
+          <TouchableOpacity onPress={openFilters}>
             <Ionicons name="options-outline" size={28} color="white" />
           </TouchableOpacity>
         </View>
       </View>
 
       <View className="flex-1 bg-white">
-        {/* Title & View Toggle */}
         <View className="flex-row items-center justify-between px-4 py-4">
           <Text className="text-xl font-bold text-gray-900">
-            {data.typeName} • {data.brandName}
+            {subcategory?.name || subCategoryId} • {brandName} • {typeName}
           </Text>
 
           <View className="flex-row gap-4">
-            <TouchableOpacity>
-              <Text className="text-xl font-bold">%</Text>
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Ionicons name="bus-outline" size={24} color="black" />
-            </TouchableOpacity>
             <TouchableOpacity onPress={toggleViewMode}>
               <Ionicons
-                name={viewMode === "list" ? "list-outline" : "grid-outline"}
+                name={viewMode === "list" ? "grid-outline" : "list-outline"}
                 size={24}
                 color="black"
               />
@@ -118,56 +142,36 @@ export default function TypeBrandScreen() {
           </View>
         </View>
 
-        {/* Filters Row */}
         <FilterChips
-          filters={getFiltersForCategory(
-            categoryId as string,
-            subCategoryId as string,
-          )}
-          onLocationPress={() => {}}
-          onFiltersPress={() => router.push("/filters")}
-          selectedLocation={undefined}
+          categoryId={categoryId as string}
+          onLocationPress={openFilters}
+          onFiltersPress={openFilters}
         />
 
-        <ScrollView
+        <FeedScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Models Grid only - Both type and brand selected */}
-          {data.brand?.models && data.brand.models.length > 0 && (
-            <ModelGrid models={data.brand.models} showMore={true} />
+          {models.length > 0 && (
+            <ModelGrid
+              models={models.map((model) => ({
+                id: model.slug,
+                name: model.name,
+              }))}
+            />
           )}
 
           <Divider variant="thick" />
 
-          {/* Products Section */}
           <View className="mt-2">
-            {viewMode === "list" ? (
-              <View>
-                <PromoCard viewMode="list" />
-                {SAMPLE_PRODUCTS.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    viewMode="list"
-                  />
-                ))}
-              </View>
-            ) : (
-              <View className="flex-row flex-wrap px-1">
-                <PromoCard viewMode="grid" />
-                {SAMPLE_PRODUCTS.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    viewMode="grid"
-                  />
-                ))}
-              </View>
-            )}
+            <ListingFeed
+              query={feedQuery}
+              viewMode={viewMode}
+              emptyLabel="No ads match this selection yet."
+            />
           </View>
-        </ScrollView>
+        </FeedScrollView>
       </View>
     </SafeAreaView>
   );

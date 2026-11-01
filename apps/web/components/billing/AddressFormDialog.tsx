@@ -37,9 +37,12 @@ const CATEGORIES: { value: BillingAddressCategory; label: string }[] = [
 /**
  * Add / edit one billing address. `editing` null means a new row.
  *
- * The form body only exists while the dialog is open and is keyed by the row
- * being edited, so every open starts from that row's values without an effect
- * writing state back into the component.
+ * The form body is keyed by the row being edited, so every open starts from
+ * that row's values without an effect writing state back into the component.
+ * It is deliberately NOT gated on `open`: Radix unmounts the content after the
+ * close animation, and gating it stripped the form the moment X was pressed —
+ * the popup then faded and zoomed out as an empty shell, which read as a
+ * glitch before it actually closed.
  */
 export default function AddressFormDialog({
   open,
@@ -59,16 +62,14 @@ export default function AddressFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        {open && (
-          <AddressForm
-            key={editing?.id ?? "new"}
-            editing={editing}
-            defaultName={defaultName}
-            defaultPhone={defaultPhone}
-            onSaved={onSaved}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
+        <AddressForm
+          key={editing?.id ?? "new"}
+          editing={editing}
+          defaultName={defaultName}
+          defaultPhone={defaultPhone}
+          onSaved={onSaved}
+          onClose={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -107,7 +107,8 @@ const TabsLayout = () => {
         listeners={({ navigation }) => createProtectedTabListener(navigation)}
         options={{
           title: "Notification",
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadge:
+            isAuthenticated && unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: "#EF4444",
             color: "white",
@@ -156,32 +157,15 @@ const TabsLayout = () => {
       />
       <Tabs.Screen
         name="account"
+        listeners={({ navigation }) => createProtectedTabListener(navigation)}
         options={{
           title: t("account"),
           tabBarIcon: ({ color, focused }) => (
-            <View
-              style={
-                focused
-                  ? {
-                      backgroundColor: "#E0F2FE",
-                      width: 46,
-                      height: 26,
-                      borderRadius: 13,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }
-                  : {
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }
-              }
-            >
-              <Ionicons
-                name={focused ? "person" : "person-outline"}
-                size={19}
-                color={focused ? "#0284C7" : color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />

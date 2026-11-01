@@ -1,4 +1,3 @@
-import { Colors } from "@/constants/Colors";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";

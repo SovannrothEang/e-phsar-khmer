@@ -25,8 +25,9 @@ import { formatPhoneLocal } from "@/lib/phone";
 import {
   clearOtpRegistration,
   readOtpRegistration,
+  storeOtpRegistration,
 } from "@/lib/otp-registration";
-import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
+import { isServerRedirect } from "@/lib/next-redirect";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -84,36 +85,45 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
       }
       inFlightRef.current = true;
       setVerifying(true);
+      // Read the handoff before the call: a successful verify redirects FROM
+      // the action and this promise never settles (the route changes under
+      // it), so nothing below the await may be relied on for cleanup.
+      const registration = readOtpRegistration(phone);
+      const device = getDeviceIdentity();
       try {
-        const registration = readOtpRegistration(phone);
-        const device = getDeviceIdentity();
+        // Claim both done-guards up front: a remount while the redirect is in
+        // flight would otherwise find the handoff gone and bounce a
+        // just-signed-in user to /login.
+        doneRef.current = true;
+        verifiedPhone = phone;
+        clearOtpRegistration();
         const res = await verifyOtp(
           phone,
           token,
           registration ?? undefined,
           device ?? undefined,
         );
-        if (res.success) {
-          doneRef.current = true;
-          verifiedPhone = phone;
-          clearOtpRegistration();
-          // Covers both OTP login and registration: the new account gets its
-          // E2E device before any other page renders.
-          bootstrapE2eAfterAuth(res.user.id);
-          toast.success("Phone verified. Welcome!");
-          router.push("/me");
-        } else {
+        if (res && !res.success) {
+          doneRef.current = false;
+          verifiedPhone = null;
+          if (registration) storeOtpRegistration(registration);
           toast.error(res.error);
           setValue("");
         }
-      } catch {
+      } catch (error) {
+        // A successful verify rejects this call with the framework's redirect
+        // signal while it navigates — that is the happy path, not a failure.
+        if (isServerRedirect(error)) return;
+        doneRef.current = false;
+        verifiedPhone = null;
+        if (registration) storeOtpRegistration(registration);
         toast.error("Failed to verify. Please try again.");
       } finally {
         inFlightRef.current = false;
         setVerifying(false);
       }
     },
-    [phone, router],
+    [phone],
   );
 
   // Auto-submit as soon as the sixth digit lands.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CONTACT_EMAIL } from "@/lib/site";
+import { carrierIconPath } from "@/utils/telecom";
 import { Mail, Phone, Clock8 } from "lucide-react";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import {
@@ -14,19 +15,16 @@ const CONTACTS = [
   {
     label: "Cellcard",
     number: "092724724",
-    icon: "/contact/cellcard.png",
     color: "text-[#00a0e9]",
   },
   {
     label: "Smart",
     number: "081724724",
-    icon: "/contact/smart.png",
     color: "text-[#00a0e9]",
   },
   {
     label: "Smart",
     number: "093724724",
-    icon: "/contact/smart.png",
     color: "text-[#00a0e9]",
   },
 ];
@@ -57,29 +55,34 @@ export default function ContactUs() {
           <div className="p-6">
             <h1 className="type-page-title mb-6 text-foreground">Contact Us</h1>
             <div className="flex flex-wrap gap-6 mb-2">
-              {CONTACTS.map((contact, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="relative w-10 h-10 rounded-full overflow-hidden border border-gray-100 ">
-                    <Image
-                      src={contact.icon}
-                      alt={contact.label}
-                      fill
-                      className="object-cover"
-                    />
+              {CONTACTS.map((contact) => {
+                const icon = carrierIconPath(contact.number);
+                return (
+                  <div key={contact.number} className="flex items-center gap-2">
+                    {icon && (
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-gray-100 ">
+                        <Image
+                          src={icon}
+                          alt={contact.label}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="type-meta text-muted-foreground">
+                        {contact.label}
+                      </span>
+                      <Link
+                        href={`tel:${contact.number}`}
+                        className="text-[#00a0e9] type-nav cursor-pointer hover:underline"
+                      >
+                        {contact.number}
+                      </Link>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="type-meta text-muted-foreground">
-                      {contact.label}
-                    </span>
-                    <Link
-                      href={`tel:${contact.number}`}
-                      className="text-[#00a0e9] type-nav cursor-pointer hover:underline"
-                    >
-                      {contact.number}
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="border-t border-gray-200 dark:border-muted my-4" />
             <div className="flex items-center gap-3 mb-2">

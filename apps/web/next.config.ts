@@ -56,6 +56,24 @@ const nextConfig: NextConfig = {
     "phsar-backoffice.localhost:3001",
     "phsar-admin.localhost:3001",
   ],
+  // Billing addresses moved from the profile tabs to the settings surface
+  // (captain, 2026-11-02). Redirected here rather than in a page: the
+  // `[locale]/(user)` layout awaits the session first, so a page-level
+  // `redirect()` can only answer with a 200 + meta refresh.
+  async redirects() {
+    return [
+      {
+        source: "/:locale(en|km)/me/billing-addresses",
+        destination: "/:locale/settings/billing-addresses",
+        permanent: false,
+      },
+      {
+        source: "/:locale(en|km)/me/billing-addresses/add",
+        destination: "/:locale/settings/billing-addresses",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

@@ -19,4 +19,12 @@ export const Colors = {
     icon: "#6B7280",
   },
   danger: "#EF4444",
+  social: {
+    telegram: "#24A1DE",
+    telegramDark: "#0088cc",
+    google: "#4285F4",
+    googleDark: "#3367D6",
+    facebook: "#1877F2",
+    apple: "#000000",
+  },
 } as const;

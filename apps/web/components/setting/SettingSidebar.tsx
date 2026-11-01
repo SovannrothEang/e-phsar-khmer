@@ -161,7 +161,7 @@ export default function SettingSidebar({ me }: { me?: SettingsUser | null }) {
           </Link>
           <Separator />
           <Link
-            href={{ pathname: "/me/billing-addresses" }}
+            href={{ pathname: "/settings/billing-addresses" }}
             className="flex items-center justify-between p-3 bg-card hover:bg-background/50 rounded-b-sm border border-transparent hover:border-border"
           >
             <p className="px-1">Billing Address</p>

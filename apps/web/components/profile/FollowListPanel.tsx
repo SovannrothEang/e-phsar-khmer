@@ -19,7 +19,7 @@ interface FollowListPanelProps {
 /** The wrapper the shared card sits in, so a loading or error state does not
  *  change the page's shape while the list is on its way. */
 const Frame = ({ children }: { children: React.ReactNode }) => (
-  <div className="mx-auto w-full max-w-7xl px-6 py-8">
+  <div className="mx-auto w-full max-w-7xl px-6 pt-8 pb-10">
     <div className="rounded-lg bg-card p-6 shadow-sm">{children}</div>
   </div>
 );

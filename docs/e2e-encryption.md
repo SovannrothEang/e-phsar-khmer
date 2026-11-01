@@ -261,10 +261,12 @@ End-to-end encryption is unchanged and strict (decision #6: no plaintext fallbac
 body it can read). What changed is that an account that has signed in is always reachable, and the sender
 no longer sees "ask them to open Messages once".
 
-1. **Registration invariant.** Every successful sign-in registers this browser as a device straight away:
-   `bootstrapE2eAfterAuth` (`apps/web/lib/e2e/bootstrap-after-auth.ts`) runs after a password login and
-   after an OTP verify (login and registration). Measured in a fresh browser profile: the device row exists
-   ~0.75 s after submit, before the redirect, with no reload. `E2eBackupProvider` remains the safety net.
+1. **Registration invariant.** Every successful sign-in registers this browser as a device straight away.
+   Since the 2026-11-02 auth change this happens on the destination page: `login()` and `verifyOtp()` now
+   redirect to `/me` from the Server Action (a cookie-mutating action otherwise makes Next re-render the
+   page being left — 8.4 s of the OTP verify's 10.9 s), so the client no longer has the user id to call
+   `bootstrapE2eAfterAuth` with, and that helper is gone. `E2eBackupProvider`'s `useE2eEngine` bootstraps
+   the device as soon as `/me` renders — the safety net is now the only path, one page later.
 2. **Targetability rule** (`loadTargetDevices`, `apps/backend/src/chat/e2e/e2e-devices.util.ts`). Per user:
    the non-revoked devices seen within `DEVICE_STALE_DAYS` (30); if there are none, the
    `STALE_FALLBACK_DEVICES` (2) most recently seen non-revoked devices. The devices list, the bundle fetch

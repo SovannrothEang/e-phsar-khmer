@@ -1,50 +1,61 @@
-# Welcome to your Expo app 👋
+# PhsarKhmer mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 54 / React Native 0.81 client for PhsarKhmer — expo-router file-based routes, NativeWind 4 (Tailwind 3), React Query 5, Expo Go compatible.
 
-## Get started
+**Status: wired to the real backend** via the staged plan in `tasks/plan-mobile-backend.md`. Auth (phone OTP + password), browse/detail/search, reactions, follows, reports, notifications, the sell flow, manage-ads, profile settings and devices all call the existing NestJS API through `lib/api`.
 
-1. Install dependencies
+Chat is implemented end to end: the phone registers as a v2 multi-device E2E device (`lib/e2e/`), so it can exchange encrypted text with the web client and other phones. REST polling is the transport. History **restore** is implemented too — a thread's locked-messages banner opens a passcode prompt (the passcode set on the web), unlocks the account backup key and pulls the encrypted segments; once this phone holds the key the banner says the rows aren't in the backup instead of asking again. Still deferred: encrypted attachments, creating a backup from the phone, and the WebSocket; plus subscriptions/checkout, edit post, scan/QR, follower/following list screens, resume and insights (entry points hidden, mocks kept only where noted above). **Social sign-in (Telegram, Facebook, Google) is shown on the auth screens but not wired** — tapping a provider explains that it is unavailable; real OAuth needs a backend redirect allow-list change plus Supabase redirect URLs.
 
-   ```bash
-   npm install
-   ```
+## Setup
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+This app lives in the pnpm + Turborepo workspace at the repo root. Install from the **repo root**, never with npm inside this directory:
 
 ```bash
-npm run reset-project
+pnpm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+> Do not run `npm install` or `yarn` here. The workspace has no npm lockfile on purpose, and an npm tree would bypass pnpm's linking.
 
-## Learn more
+## Run
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+pnpm --filter phsarkhmer exec expo start --lan --go
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Install **Expo Go (SDK 54)** on a phone on the same Wi-Fi and open the `exp://<lan-ip>:8081` URL, or scan the QR from an interactive terminal.
 
-## Join the community
+The `start` script is `expo start --offline`; invoking the CLI directly (above) is preferred so Expo can do its version checks.
 
-Join our community of developers creating universal apps.
+### API URL
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+`lib/api/config.ts` uses `EXPO_PUBLIC_API_URL` when set; otherwise a dev build derives the host from Metro's `hostUri` (`http://<same-host>:3000/api/v1`), so Expo Go reaches the machine without a per-device env. Production must set `EXPO_PUBLIC_API_URL` at build time (it is inlined into the bundle).
+
+## Checks
+
+```bash
+pnpm --filter phsarkhmer lint               # expo lint — the only gate this app has
+pnpm --filter phsarkhmer exec tsc --noEmit  # type-check (there is no check-types script)
+```
+
+CI runs `expo lint` and the repo-wide `prettier --check`; it never type-checks this app, so run `tsc` by hand.
+
+## Layout
+
+| Path          | Contents                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| `app/`        | expo-router routes: `(auth)`, `(tabs)`, `(categories)`, `account/` (manage ads, devices, privacy, …) |
+| `lib/api/`    | `apiFetch` (envelope, bearer, 401 refresh) + one module per backend resource                         |
+| `lib/`        | phone/E.164, listing helpers, sell rules, feed params, card adapter                                  |
+| `components/` | UI grouped by domain (auth, category, home, product, common)                                         |
+| `contexts/`   | Auth (real session), Reactions, Notifications, Language, Theme                                       |
+| `hooks/`      | `useDeviceInfo` and friends                                                                          |
+| `services/`   | `authService` — legacy Google/Telegram demo, kept but inert (social sign-in is deferred)             |
+| `constants/`  | `AuthConfig`, `Colors`, and mock data used only by the deferred screens under `data/`                |
+| `types/`      | Shared types                                                                                         |
+
+## Notes
+
+- `react-native-css-interop` is a **direct** dependency on purpose: pnpm's isolated layout does not expose NativeWind's own copy to Metro, and removing it breaks the bundle.
+- `expo-secure-store` keeps the session (memory fallback on web); `expo-image-picker` supplies ad photos (iOS returns JPEG via `preferredAssetRepresentationMode`).
+- `android/` and `ios/` are generated by `expo prebuild` and are gitignored; do not commit them.
+- The `@types/react` pin is `~19.2.0` to match `apps/web`; Expo SDK 54 nominally expects `~19.1.x`, which would duplicate React types in the workspace and break `next build`. The warning `expo start` prints about this is expected.

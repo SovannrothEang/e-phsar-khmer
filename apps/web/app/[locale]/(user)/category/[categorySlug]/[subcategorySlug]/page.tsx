@@ -409,7 +409,9 @@ export default async function SubcategoryPage({
           TabsContent views below; the header is NOT wrapped in a short div —
           the bar inside it is sticky and needs the tall Tabs root as its
           containing block (same pattern as the category page). */}
-      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-2">
+      {/* pb-10, not pb-2: the feed's last row otherwise ends 8px above the
+          footer. Matches the detail page's gutter. */}
+      <Tabs defaultValue="grid" className="max-w-7xl mx-auto w-full pb-10">
         {/* Subcategory header */}
         <LSPCYEHeader
           title={subcategory.name}

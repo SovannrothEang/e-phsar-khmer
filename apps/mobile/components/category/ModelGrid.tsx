@@ -11,9 +11,14 @@ interface ModelItem {
 interface ModelGridProps {
   models: ModelItem[];
   showMore?: boolean;
+  onModelPress?: (model: ModelItem) => void;
 }
 
-const ModelGrid = ({ models, showMore = true }: ModelGridProps) => {
+const ModelGrid = ({
+  models,
+  showMore = true,
+  onModelPress,
+}: ModelGridProps) => {
   if (models.length === 0) return null;
 
   return (
@@ -26,7 +31,11 @@ const ModelGrid = ({ models, showMore = true }: ModelGridProps) => {
 
         {/* Model Items */}
         {models.map((model, index) => (
-          <TouchableOpacity key={model.id} className="w-1/3 mb-4">
+          <TouchableOpacity
+            key={model.id}
+            className="w-1/3 mb-4"
+            onPress={() => onModelPress?.(model)}
+          >
             <Text
               className={`text-base ${index === 0 ? "text-primary" : "text-neutral-text-main"}`}
             >

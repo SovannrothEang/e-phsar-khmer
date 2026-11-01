@@ -1,59 +1,79 @@
 import CategorySearchHeader from "@/components/category/CategorySearchHeader";
+import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
-import Divider from "@/components/common/Divider";
+import ListingFeed from "@/components/category/ListingFeed";
 import SafeAreaView from "@/components/common/SafeAreaView";
-import PromoCard from "@/components/home/PromoCard";
-import JobTypeQuickFilter from "@/components/job/JobTypeQuickFilter"; // Job type quick filter component
-import ProductCard from "@/components/product/ProductCard";
-import { CATEGORIES } from "@/constants/data/categories";
-import { SAMPLE_PRODUCTS } from "@/constants/data/products";
+import { Colors } from "@/constants/Colors";
+import { fetchCategory } from "@/lib/api/catalog";
+import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
-
-import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type ViewMode = "list" | "grid";
 
 export default function CategoryScreen() {
-  const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
+  const params = useLocalSearchParams();
+  const categoryId = Array.isArray(params.categoryId)
+    ? params.categoryId[0]
+    : params.categoryId;
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const { getCategoryName, t } = useLanguage();
+
+  const categoryQuery = useQuery({
+    queryKey: ["category", categoryId],
+    queryFn: () => fetchCategory(categoryId as string),
+    enabled: !!categoryId,
+  });
+  const category = categoryQuery.data;
+
+  const feedQuery = useMemo(
+    () => ({
+      categorySlug: categoryId,
+      ...feedQueryFromParams(params),
+    }),
+    [categoryId, params],
+  );
 
   const toggleViewMode = () => {
     setViewMode(viewMode === "list" ? "grid" : "list");
   };
 
-  const category = useMemo(() => {
-    return CATEGORIES.find((c) => c.id === categoryId);
-  }, [categoryId]);
+  const openFilters = () =>
+    router.push({
+      pathname: "/filters",
+      params: { categoryId, ...pickFilterParams(params) },
+    });
 
-  const rawName = category?.name || categoryId || "Category";
-  const categoryName = getCategoryName(categoryId as string, rawName);
+  const categoryName = category?.name || categoryId || "Category";
 
-  const handleSubCategoryPress = (subId: string) => {
-    router.push(`/(categories)/${categoryId}/${subId}`);
-  };
+  const subCategoryPages = useMemo(() => {
+    const subCategories = category?.subcategories ?? [];
+    const pages = [];
+    for (let i = 0; i < subCategories.length; i += 8) {
+      pages.push(subCategories.slice(i, i + 8));
+    }
+    return pages;
+  }, [category?.subcategories]);
 
   const [currentPage, setCurrentPage] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Group subcategories into pages of 8 items (4 cols x 2 rows)
-  const subCategoryPages = useMemo(() => {
-    if (!category?.subs) return [];
-    const pages = [];
-    const pageSize = 8;
-    for (let i = 0; i < category.subs.length; i += pageSize) {
-      pages.push(category.subs.slice(i, i + pageSize));
-    }
-    return pages;
-  }, [category]);
-
-  const handleScroll = (event: any) => {
+  const handleScroll = (event: {
+    nativeEvent: { contentOffset: { x: number } };
+  }) => {
     if (containerWidth <= 0) return;
-    const contentOffsetX = event.nativeEvent.contentOffset.x;
-    const pageIndex = Math.round(contentOffsetX / containerWidth);
+    const pageIndex = Math.round(
+      event.nativeEvent.contentOffset.x / containerWidth,
+    );
     if (
       pageIndex !== currentPage &&
       pageIndex >= 0 &&
@@ -63,18 +83,43 @@ export default function CategoryScreen() {
     }
   };
 
+  if (categoryQuery.isLoading) {
+    return (
+      <SafeAreaView className="bg-neutral-surface">
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={Colors.primary.DEFAULT} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!category) {
+    return (
+      <SafeAreaView className="bg-neutral-surface">
+        <View className="flex-1 items-center justify-center px-6">
+          <Ionicons name="alert-circle-outline" size={44} color="#9CA3AF" />
+          <Text className="mt-3 text-neutral-text-sub">Category not found</Text>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="mt-4 rounded-lg bg-primary px-6 py-2"
+          >
+            <Text className="font-bold text-white">Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      {/* Header */}
       <CategorySearchHeader
         placeholder={`Search in ${categoryName}...`}
-        onFiltersPress={() => router.push("/filters")}
+        onFiltersPress={openFilters}
       />
 
       <View className="flex-1 bg-white">
-        {/* Title & View Toggle */}
-        <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
-          <Text className="text-xl font-bold text-gray-900 capitalize">
+        <View className="flex-row items-center justify-between border-b border-gray-100 px-4 py-3">
+          <Text className="text-xl font-bold capitalize text-gray-900">
             {categoryName}
           </Text>
 
@@ -89,22 +134,20 @@ export default function CategoryScreen() {
           </View>
         </View>
 
-        {/* Filters Row */}
         <FilterChips
           categoryId={categoryId as string}
-          onLocationPress={() => {}}
-          onFiltersPress={() => router.push("/filters")}
+          onLocationPress={openFilters}
+          onFiltersPress={openFilters}
         />
 
-        <ScrollView
+        <FeedScrollView
           className="flex-1"
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Subcategories Grid matching user screenshot (4 cols x 2 rows paginated) */}
           {subCategoryPages.length > 0 && (
             <View
-              className="bg-white pt-2 pb-4 mb-2 border-b border-gray-100"
+              className="mb-2 border-b border-gray-100 bg-white pb-4 pt-2"
               onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
             >
               <ScrollView
@@ -128,30 +171,34 @@ export default function CategoryScreen() {
                     {pageSubs.map((sub, index) => (
                       <TouchableOpacity
                         key={`${sub.id}-${index}`}
-                        onPress={() => handleSubCategoryPress(sub.id)}
-                        className="w-[25%] items-center py-2.5 px-1"
+                        onPress={() =>
+                          router.push(
+                            `/(categories)/${categoryId}/${sub.slug}` as never,
+                          )
+                        }
+                        className="w-[25%] items-center px-1 py-2.5"
                         activeOpacity={0.7}
                       >
-                        <View className="w-14 h-14 mb-1.5 rounded-full bg-slate-100/90 dark:bg-gray-800 items-center justify-center p-2">
-                          {sub.image ? (
+                        <View className="mb-1.5 h-14 w-14 items-center justify-center rounded-full bg-slate-100/90 p-2 dark:bg-gray-800">
+                          {sub.icon ? (
                             <Image
-                              source={sub.image}
-                              className="w-10 h-10"
+                              source={{ uri: sub.icon }}
+                              className="h-10 w-10"
                               resizeMode="contain"
                             />
-                          ) : sub.icon ? (
+                          ) : (
                             <Ionicons
-                              name={sub.icon as any}
-                              size={27}
-                              color={sub.color || "#2563EB"}
+                              name="grid-outline"
+                              size={26}
+                              color="#2563EB"
                             />
-                          ) : null}
+                          )}
                         </View>
                         <Text
-                          className="text-[11px] font-medium text-gray-800 text-center leading-3.5"
+                          className="text-center text-[11px] font-medium leading-3.5 text-gray-800"
                           numberOfLines={2}
                         >
-                          {getCategoryName(sub.id, sub.name)}
+                          {sub.name}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -159,13 +206,12 @@ export default function CategoryScreen() {
                 ))}
               </ScrollView>
 
-              {/* Pagination Dots */}
               {subCategoryPages.length > 1 && (
-                <View className="flex-row items-center justify-center gap-1.5 mt-3">
+                <View className="mt-3 flex-row items-center justify-center gap-1.5">
                   {subCategoryPages.map((_, dotIdx) => (
                     <View
                       key={`dot-${dotIdx}`}
-                      className={`h-2 rounded-full transition-all ${
+                      className={`h-2 rounded-full ${
                         currentPage === dotIdx
                           ? "w-4 bg-orange-500"
                           : "w-2 bg-gray-300"
@@ -174,43 +220,17 @@ export default function CategoryScreen() {
                   ))}
                 </View>
               )}
-
-              {/* Job Schedule Types (Full-time, Part-time, Internship, Freelance, Show More) */}
-              {categoryId === "jobs" && (
-                <View className="border-t border-gray-100 mt-3 pt-1">
-                  <JobTypeQuickFilter />
-                </View>
-              )}
             </View>
           )}
 
-          {/* Products Section */}
           <View className="pt-2">
-            {viewMode === "list" ? (
-              <View>
-                <PromoCard viewMode="list" />
-                {SAMPLE_PRODUCTS.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    viewMode="list"
-                  />
-                ))}
-              </View>
-            ) : (
-              <View className="flex-row flex-wrap px-1">
-                <PromoCard viewMode="grid" />
-                {SAMPLE_PRODUCTS.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    viewMode="grid"
-                  />
-                ))}
-              </View>
-            )}
+            <ListingFeed
+              query={feedQuery}
+              viewMode={viewMode}
+              emptyLabel="No ads in this category yet."
+            />
           </View>
-        </ScrollView>
+        </FeedScrollView>
       </View>
     </SafeAreaView>
   );

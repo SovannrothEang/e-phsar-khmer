@@ -92,7 +92,7 @@ export default async function ProductPage({
   const fuelType = fuelTypeOf(product.specGroups);
 
   return (
-    <main className="product-type min-h-screen bg-muted pb-8">
+    <main className="product-type min-h-screen bg-muted pb-10">
       <div className="px-4 py-4">
         <Breadcrumbs
           className="mx-auto w-full max-w-7xl"

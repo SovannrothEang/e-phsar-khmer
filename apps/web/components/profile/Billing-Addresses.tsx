@@ -26,16 +26,18 @@ import {
   updateBillingAddress,
   type BillingAddress,
 } from "@/actions/billing-addresses";
-import { getUserProfile, type CurrentUser } from "@/actions/user";
+import type { SettingsUser } from "@/lib/auth/current-user";
 
 /**
  * Settings surface for saved billing addresses. Same backend as the checkout's
  * picker — this is the manage-anytime view, that one is the pick-one view.
+ *
+ * `me` arrives from the settings page like `/settings/devices` does it: the
+ * rail has to show the real identity, and a client-side read left it blank.
  */
-export default function BillingAddresses() {
+export default function BillingAddresses({ me }: { me?: SettingsUser | null }) {
   const t = useTranslations("Me.billing");
   const [addresses, setAddresses] = useState<BillingAddress[]>([]);
-  const [me, setMe] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<BillingAddress | null>(null);
@@ -57,11 +59,6 @@ export default function BillingAddresses() {
       .finally(() => {
         if (mounted) setLoading(false);
       });
-    getUserProfile()
-      .then((user) => {
-        if (mounted) setMe(user);
-      })
-      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -92,9 +89,11 @@ export default function BillingAddresses() {
 
   return (
     <div className="min-h-screen bg-muted pb-10 pt-4">
+      {/* The settings shell, identical to `/settings/devices` and the rest of
+          the settings family: `max-w-6xl` with the rail on the left. */}
       <div className="mx-auto max-w-6xl">
         <div className="flex gap-5">
-          <SettingSidebar />
+          <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="mb-4 flex items-center justify-between gap-4">
               <h1 className="type-page-title text-foreground">{t("title")}</h1>

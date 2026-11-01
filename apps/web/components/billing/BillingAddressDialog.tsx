@@ -57,7 +57,10 @@ export default function BillingAddressDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader className="flex-row items-center justify-between">
+          {/* `pr-8` reserves the DialogContent's absolutely-positioned close
+              button (top-2 right-2, size-8) so the Add Address pill does not
+              sit underneath it. */}
+          <DialogHeader className="flex-row items-center justify-between pr-8">
             <DialogTitle className="text-center">Billing Address</DialogTitle>
             <Button
               className="h-9 rounded-full bg-orange-500 px-4 text-sm font-medium text-white hover:bg-orange-600"
@@ -70,23 +73,24 @@ export default function BillingAddressDialog({
             </Button>
           </DialogHeader>
 
-          {open && (
-            <AddressPicker
-              key={selectedId ?? "none"}
-              addresses={addresses}
-              selectedId={selectedId}
-              onEdit={(address) => {
-                setEditing(address);
-                setFormOpen(true);
-              }}
-              onChanged={onChanged}
-              onApply={(id) => {
-                onApply(id);
-                onOpenChange(false);
-              }}
-              onCancel={() => onOpenChange(false)}
-            />
-          )}
+          {/* Not gated on `open` — Radix unmounts the content after the close
+              animation, and gating here made the popup fade out with only the
+              header left (same defect as AddressFormDialog). */}
+          <AddressPicker
+            key={selectedId ?? "none"}
+            addresses={addresses}
+            selectedId={selectedId}
+            onEdit={(address) => {
+              setEditing(address);
+              setFormOpen(true);
+            }}
+            onChanged={onChanged}
+            onApply={(id) => {
+              onApply(id);
+              onOpenChange(false);
+            }}
+            onCancel={() => onOpenChange(false)}
+          />
         </DialogContent>
       </Dialog>
 

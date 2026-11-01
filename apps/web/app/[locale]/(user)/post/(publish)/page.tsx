@@ -1303,7 +1303,7 @@ export default function PostPage() {
 
   return (
     <div className="min-h-screen bg-muted">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 pt-8 pb-10">
         <Breadcrumbs
           className="mb-6"
           items={[

@@ -78,6 +78,8 @@ export const routing = defineRouting({
     "/settings/passkeys": {},
     "/settings/privacy": {},
     "/settings/devices": {},
+    "/settings/billing-addresses": {},
+    "/settings/billing-addresses/add": {},
     "/billing-addresses": {},
     "/billing-addresses/add": {},
     "/notifications": {},

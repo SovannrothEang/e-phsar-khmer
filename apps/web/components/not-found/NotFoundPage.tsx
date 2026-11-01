@@ -29,7 +29,7 @@ export default async function NotFoundPage() {
   const categories = (await getAllCategories(locale)) ?? [];
 
   return (
-    <main className="min-h-screen bg-muted py-6">
+    <main className="min-h-screen bg-muted pt-6 pb-10">
       <NotFoundTitle />
       <div className="mx-auto w-full max-w-7xl border bg-card">
         <div className="flex flex-col items-center px-4 pt-10 pb-12 text-center">

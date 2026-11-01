@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
+import { setApiLocale } from "@/lib/api/client";
 
 export type LanguageCode = "en" | "km" | "zh" | "ko";
 
@@ -75,6 +76,7 @@ const translations: Record<string, Record<string, string>> = {
     accountProfile: "Account Profile",
     nearbyListings: "Nearby Listings",
     latestAds: "Latest Ads",
+    trending: "Trending",
     seeAll: "See All",
     more: "More",
     less: "Less",
@@ -116,6 +118,7 @@ const translations: Record<string, Record<string, string>> = {
     accountProfile: "គណនីរបស់ខ្ញុំ",
     nearbyListings: "ទំនិញនៅជិតអ្នក",
     latestAds: "ទំនិញថ្មីៗ",
+    trending: "កំពុងពេញនិយម",
     seeAll: "មើលទាំងអស់",
     more: "បន្ថែម",
     less: "តិចជាង",
@@ -149,6 +152,7 @@ const translations: Record<string, Record<string, string>> = {
     accountProfile: "个人中心",
     nearbyListings: "附近商品",
     latestAds: "最新商品",
+    trending: "热门",
     seeAll: "查看全部",
     more: "更多",
     less: "收起",
@@ -182,6 +186,7 @@ const translations: Record<string, Record<string, string>> = {
     accountProfile: "계정 프로필",
     nearbyListings: "주변 상품",
     latestAds: "최신 상품",
+    trending: "인기",
     seeAll: "모두 보기",
     more: "더보기",
     less: "접기",
@@ -528,7 +533,13 @@ const LanguageContext = createContext<LanguageContextType>({
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [language, setLanguage] = useState<LanguageCode>("en");
+  const [language, setLanguageState] = useState<LanguageCode>("en");
+
+  // Keep `Accept-Language` on every API call in step with the app locale.
+  const setLanguage = (lang: LanguageCode): void => {
+    setLanguageState(lang);
+    setApiLocale(lang);
+  };
 
   const t = (key: string): string => {
     return translations[language]?.[key] || translations.en[key] || key;

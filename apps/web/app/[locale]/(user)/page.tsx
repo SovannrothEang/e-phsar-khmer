@@ -53,15 +53,13 @@ export default async function HomePage() {
                 <GridCardPost key={post.postId} post={post} />
               ))}
             </div>
+            <Link
+              href="/all-ads"
+              className="mx-auto block w-[90%] px-6 py-2.5 bg-[#00a7e1] hover:bg-[#0095ca] type-nav text-white text-center rounded transition-colors"
+            >
+              {t("viewall")}
+            </Link>
           </div>
-        </div>
-        <div className="flex justify-center">
-          <Link
-            href="/all-ads"
-            className="max-w-5xl px-6 py-2.5 bg-[#00a7e1] hover:bg-[#0095ca] type-nav text-white text-center rounded transition-colors"
-          >
-            {t("viewall")}
-          </Link>
         </div>
         <div className="flex justify-center py-6 pb-30">
           <div className="w-full max-w-7xl">

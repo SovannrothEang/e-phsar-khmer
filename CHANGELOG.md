@@ -263,6 +263,42 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   user first opens a conversation (once per browser session); the per-message "Restore chat history" link was
   removed, and the undecryptable-message note now points at the backup passcode instead of another device.
 
+### Fixed
+
+- **The `/otp` page no longer collapses the footer while it loads.** The page read `?phone=` with
+  `useSearchParams()` inside a `<Suspense>` that had no fallback, so on a slow client-side navigation the page
+  segment rendered empty: the footer rode up directly under the navbar and dropped back down when the card
+  mounted. The phone is now read from `searchParams` on the server (a missing or implausible number redirects to
+  `/register` instead of rendering `null` and redirecting from an effect) and passed to `OtpVerifyForm` as a
+  prop, so the card is part of the segment. The `[locale]/(user)` layout also became a `min-h-svh` column with a
+  `flex-1` content cell, so a short page keeps its footer on the bottom edge instead of letting it float
+  mid-viewport — measured on `/en/otp` at a 720 px viewport: document 817 → 720, footer bottom flush at 720.
+- **Every page now leaves a 40 px gutter above the footer (captain, 2026-11-02).** Content used to stop wherever
+  each page's own padding ended, so the clearance ranged from 8 px to 120 px: `/all-ads` and the two category
+  pages closed with `pb-2` (8 px), `/post`, `/search` and the product page with `pb-8` (32 px), `/notifications`,
+  the 404 page and the follow lists with `py-6`/`py-8` (24–32 px), and `Account-Deletion` with `pb-2`. All of them
+  — plus Manage Ads' list wrapper — now carry a `pb-10` bottom gutter, matching the listing detail page. Measured
+  in the browser after the change: `/en/search` 32 → 40, `/en/account-deletion` 8 → 40, `/en/product/apple/iphone-16`
+  32 → 40, `/en/all-ads` and both category feeds 8 → 40. The login-gated surfaces (`/post`, `/me`, `/notifications`,
+  follower lists) were changed the same way but could not be measured without a session.
+- **Billing addresses are a settings page, not a profile tab (captain, 2026-11-02).** The page lived at
+  `/me/billing-addresses` inside `me/(profile)`, so it rendered under the profile header and tab bar even though it
+  is a settings surface. It now lives at `/settings/billing-addresses` (plus `/settings/billing-addresses/add`),
+  renders in the same shell as `/settings/devices` — `max-w-6xl` with the `SettingSidebar` rail — and takes its
+  identity from `getSettingsUser()` on the server like the other settings pages, so the rail shows the real name,
+  handle and phone instead of a blank `?`. The old URLs answer with a real 307
+  (`next.config.ts` `redirects()`, locale-preserving): a page-level `redirect()` could only answer 200 + meta
+  refresh because the `[locale]/(user)` layout awaits the session before the redirect can set a status. The retired
+  full-page `Add-Address` component is deleted; adding an address stays a dialog on the list page.
+- **The billing-address dialogs no longer blank out while closing.** `AddressFormDialog` and the checkout's
+  `BillingAddressDialog` gated their body on the controlled `open` prop (`{open && <Form/>}`), so pressing X
+  unmounted the form instantly — the popup then spent its 100 ms `fade-out`/`zoom-out` animating an empty shell,
+  which read as a glitch before it closed. Radix already unmounts `DialogContent` when the close animation ends,
+  so the gate was redundant and is gone; each open still starts from the edited row because the body stays keyed by
+  `editing.id`. Measured with the dialog open on a throwaway public route: after the click the content remained
+  mounted with `data-state="closed"` and all five inputs for ~190 ms, then unmounted (previously that window was
+  empty).
+
 ### Known issues
 
 - **Bakong polling has not run against a live Bakong or a booted app.** The new poller, the throttled read and the

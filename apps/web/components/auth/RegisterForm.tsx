@@ -403,7 +403,7 @@ export function RegisterForm() {
             </form.AppField>
             <Button
               type="submit"
-              className="bg-orange-500 text-white w-full hover:bg-orange-600 hover:text-white cursor-pointer"
+              className="h-10 w-full rounded-sm bg-orange-500 text-white hover:bg-orange-600 hover:text-white cursor-pointer"
             >
               Submit
             </Button>
@@ -411,7 +411,7 @@ export function RegisterForm() {
             <FieldSeparator>Or</FieldSeparator>
             <Button
               type="button"
-              className="bg-sky-600 text-white w-full hover:bg-sky-600 hover:text-white cursor-pointer flex items-center gap-2"
+              className="h-10 w-full rounded-sm bg-sky-600 text-white hover:bg-sky-600 hover:text-white cursor-pointer flex items-center gap-2"
             >
               <FaTelegramPlane className="text-white text-2xl" />
               Sign in or register with Telegram
