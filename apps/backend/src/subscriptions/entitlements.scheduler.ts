@@ -27,19 +27,25 @@ export class EntitlementsScheduler implements OnModuleInit {
 
   constructor(@InjectQueue(ENTITLEMENTS_QUEUE) private readonly queue: Queue) {}
 
-  async onModuleInit(): Promise<void> {
-    try {
-      await this.queue.upsertJobScheduler(
+  onModuleInit(): void {
+    // Never await this: the shared BullMQ client runs with
+    // maxRetriesPerRequest: null, so with Redis unreachable the upsert never
+    // settles and this catch never fires — awaiting it would hold
+    // NestFactory.create past a serverless startup deadline and the app would
+    // never call listen (Vercel, 2026-11-01). Fire and forget: a registration
+    // that lands once Redis is reachable still applies.
+    void this.queue
+      .upsertJobScheduler(
         LISTING_SWEEP_JOB,
         { every: SWEEP_EVERY_MS },
         { name: LISTING_SWEEP_JOB },
-      );
-    } catch (err) {
-      // Never block boot on housekeeping: the recurring sweep is a backstop.
-      this.logger.warn(
-        `Could not schedule ${LISTING_SWEEP_JOB}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+      )
+      .catch((err: unknown) => {
+        // Never block boot on housekeeping: the recurring sweep is a backstop.
+        this.logger.warn(
+          `Could not schedule ${LISTING_SWEEP_JOB}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   }
 
   /**

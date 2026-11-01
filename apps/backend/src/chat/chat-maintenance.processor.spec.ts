@@ -35,7 +35,7 @@ describe('ChatMaintenanceProcessor', () => {
 });
 
 describe('ChatMaintenanceScheduler', () => {
-  it('upserts one hourly scheduler and never throws on boot', async () => {
+  it('upserts one hourly scheduler and never blocks or throws on boot', async () => {
     const upsertJobScheduler = jest
       .fn()
       .mockRejectedValueOnce(new Error('redis down'));
@@ -43,7 +43,10 @@ describe('ChatMaintenanceScheduler', () => {
       upsertJobScheduler,
     } as never);
 
-    await expect(scheduler.onModuleInit()).resolves.toBeUndefined();
+    // Boot must not await the upsert: the shared BullMQ client never rejects
+    // while Redis is unreachable, so an await would hang startup forever.
+    expect(() => scheduler.onModuleInit()).not.toThrow();
+    await new Promise(setImmediate);
     expect(upsertJobScheduler).toHaveBeenCalledWith(
       ATTACHMENTS_CLEANUP_JOB,
       { every: 3_600_000 },
