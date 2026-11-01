@@ -21,20 +21,26 @@ export class ListingExpiryScheduler implements OnModuleInit {
     @InjectQueue(LISTING_EXPIRY_QUEUE) private readonly queue: Queue,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    try {
-      await this.queue.upsertJobScheduler(
+  onModuleInit(): void {
+    // Never await this: the shared BullMQ client runs with
+    // maxRetriesPerRequest: null, so with Redis unreachable the upsert never
+    // settles and this catch never fires — awaiting it would hold
+    // NestFactory.create past a serverless startup deadline and the app would
+    // never call listen (Vercel, 2026-11-01). Fire and forget: a registration
+    // that lands once Redis is reachable still applies.
+    void this.queue
+      .upsertJobScheduler(
         LISTING_EXPIRY_SWEEP_JOB,
         { every: LISTING_EXPIRY_SWEEP_EVERY_MS },
         { name: LISTING_EXPIRY_SWEEP_JOB },
-      );
-    } catch (err) {
-      // Housekeeping: never block boot on it. The next successful
-      // registration restores the schedule.
-      this.logger.warn(
-        `Could not schedule ${LISTING_EXPIRY_SWEEP_JOB}: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+      )
+      .catch((err: unknown) => {
+        // Housekeeping: never block boot on it. The next successful
+        // registration restores the schedule.
+        this.logger.warn(
+          `Could not schedule ${LISTING_EXPIRY_SWEEP_JOB}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
   }
 }
 
