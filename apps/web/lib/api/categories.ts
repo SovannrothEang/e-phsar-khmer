@@ -94,11 +94,15 @@ export async function buildRealDetailData(
   id: string,
   locale: string,
 ): Promise<RealDetailData | null> {
-  const [listing, allCategories] = await Promise.all([
-    getListingById(id, locale),
-    getAllCategories(locale),
-  ]);
+  // The category tree does not depend on the listing, so it starts with it; the
+  // seller lookup only needs the listing, so it starts the moment that lands
+  // instead of queueing behind the (slower) category tree.
+  const listingRequest = getListingById(id, locale);
+  const categoriesRequest = getAllCategories(locale);
+  const listing = await listingRequest;
   if (!listing) return null;
+  const sellerRequest = toSellerView(listing);
+  const allCategories = await categoriesRequest;
 
   const cate = allCategories?.find((c) => c.id === listing.categoryId);
   const sub = cate?.subcategories.find((s) => s.id === listing.subcategoryId);
@@ -158,7 +162,7 @@ export async function buildRealDetailData(
     subcate: sub ? { slug: sub.slug, name: sub.name } : undefined,
     brand: toBreadcrumb("brand"),
     model: toBreadcrumb("model"),
-    seller: await toSellerView(listing),
+    seller: await sellerRequest,
     product: listing.product ?? null,
   };
 }
