@@ -7056,3 +7056,22 @@ Supersedes the unchecked "Mobile auth flow: dedicated login/register screens" pl
 - **Icons** — no sharing with web: web draws them with `react-icons` DOM components, mobile with `@expo/vector-icons`. A shared SVG package would need `react-native-svg` declared on mobile — a new dependency for three glyphs.
 - **Verified** — `pnpm --filter phsarkhmer exec tsc --noEmit` exit 0; `pnpm --filter phsarkhmer lint` (`expo lint`) exit 0 with no warnings; prettier clean on all ten touched files; `expo export --platform android` bundles (5.51 MB) to a temp dir, so every import resolves at bundle time.
 - **Still to check** — the on-device walk: tab gating, phone login vs username login, phone-only register → OTP → create, social alerts, logout landing, feed/detail guards.
+
+## 2026-11-02 — Jobs nav tab on `/me/applied-jobs`
+
+Captain: "when i click applied, it show active tabs 'manage ads' instead of jobs".
+
+- **Cause** — `MyProfileHeader` derived the active tab from an exact `href === pathname` match against `PROFILE_TABS`. The Jobs tab owns two routes (`/me/job-applications` and its "Applied" sub-tab at `/me/applied-jobs`), so the second missed every tab and hit the deliberate `"manage-ads"` fallback for non-tab `/me/*` pages.
+- **Fix** — added a `TAB_SECTION_ROUTES` map (`/me/applied-jobs` → `jobs`), checked between the exact match and the fallback; the fallback still lights Manage Ads on genuinely non-tab pages (followers, membership).
+- **Verified** — headless Chromium (logged-in dev-OTP session, hydrated): `/en/me/applied-jobs` → Jobs, `/en/me/job-applications` → Jobs, `/en/me` → Manage Ads, `/en/me/followers` → Manage Ads. Gates: `web` eslint clean, `next build` exit 0.
+
+## 2026-11-02 — Forgot password is real (SMS-OTP reset)
+
+Captain: "forget password seems not work, check it".
+
+- **Cause** — `Forgot-PassowordForm` was a stub: it validated the identifier format and `console.log`ged it; the only password write in the API (`PATCH /users/me/password`) requires being signed in and knowing the current password.
+- **Backend** — three public endpoints. `POST /auth/password/reset/request` (`@Throttle(SMS_LIMIT)`) resolves phone / username / email (`lower(email)` with a bound parameter, `normalizeUsername`), requires an active account with a usable phone, normalizes the stored number to E.164 and texts the code; it **always** answers `{ otpSent: true }` — unknown / inactive / banned / phone-less identifiers are indistinguishable. `POST /auth/password/reset/verify` (`CREDENTIAL_LIMIT`) checks the single-use code and returns a 10-minute JWT carrying `typ: password_reset`; it writes nothing. `POST /auth/password/reset/confirm` (`CREDENTIAL_LIMIT`) validates that proof, then in one `db.transaction` hashes bcrypt(10), updates `passwordHash` with `returning()` (zero rows → 401) and revokes every session via the new `LoginDevicesService.revokeAll`. No tokens are issued; `JwtStrategy` rejects the reset proof as a bearer (the same guard as chat WS tickets).
+- **Security fix (ship-blocking)** — `DEV_OTP_TOKEN` is now a config-validation error when `NODE_ENV=production`. The reset turns the fixed dev code into an account-takeover primitive if it ever ships set.
+- **Web** — `actions/password-reset.ts` (normalizes only local `0…` phones; strips spaces/dashes only from phone-shaped input) and a three-step `Forgot-PassowordForm` (captain follow-up: the OTP and the new password must not share a screen): identifier → code only (Verify Code button + 60 s resend) → new/confirm password (masked) after the code verified. Success → toast + `/login`. The identifier and reset token never enter the URL.
+- **Verified** — backend jest `auth.service|config.validation` 73/73 + `jwt.strategy` 2/2, `nest build` + eslint; web eslint + `next build`; live API walk (verify returns a proof that `/auth/me` rejects as a bearer, the password is unchanged until confirm, old password 401 / new password 201, an access token is rejected as a reset proof, device-bound token 200 → 401 after reset); headless Chromium walk of all three steps (`step 2` has 0 password inputs, `step 3` has 2 and no code input) ending at `/en/login` with the success toast.
+- **Known gaps** — sid-less legacy tokens survive a reset (revocation is per device row; the web/mobile flows send device headers and are revoked); social-only accounts with no phone cannot reset; the mobile forgot-password screen stays a stub; the public `@Throttle` is IP-keyed, so all web server actions share one bucket (pre-existing for every OTP route).

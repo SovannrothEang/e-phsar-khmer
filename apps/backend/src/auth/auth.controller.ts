@@ -24,6 +24,9 @@ import { LoginDto } from './dto/login.dto';
 import { LoginOtpDto } from './dto/login-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
@@ -90,6 +93,35 @@ export class AuthController {
     @ClientDevice() device: ClientDeviceInfo | null,
   ) {
     return this.authService.verifyPhoneOtp(dto, device);
+  }
+
+  @Post('password/reset/request')
+  @Throttle(SMS_LIMIT)
+  @Public()
+  @ApiOperation({
+    summary:
+      'Request a password-reset code (texted to the phone on the account)',
+  })
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  @Post('password/reset/verify')
+  @Throttle(CREDENTIAL_LIMIT)
+  @Public()
+  @ApiOperation({
+    summary: 'Verify the reset code and get a short-lived reset token',
+  })
+  verifyResetCode(@Body() dto: VerifyResetCodeDto) {
+    return this.authService.verifyResetCode(dto);
+  }
+
+  @Post('password/reset/confirm')
+  @Throttle(CREDENTIAL_LIMIT)
+  @Public()
+  @ApiOperation({ summary: 'Set the new password with the reset token' })
+  confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    return this.authService.confirmPasswordReset(dto);
   }
 
   @Get('social/:provider/url')

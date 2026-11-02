@@ -9,6 +9,7 @@ import { users } from '../../db/schema/users.schema';
 import { userLoginDevices } from '../../db/schema/login-devices.schema';
 import type { RequestUser } from '../../common/types/api-response.types';
 import { WS_TICKET_TYP } from '../../chat/ws-ticket';
+import { PASSWORD_RESET_TYP } from '../password-reset-token';
 
 interface JwtPayload {
   sub: string;
@@ -37,6 +38,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload): Promise<RequestUser> {
     // Chat WS tickets share JWT_SECRET but are single-purpose — never a bearer.
     if (payload.typ === WS_TICKET_TYP) {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    // A password-reset proof shares JWT_SECRET too. It is a one-shot grant
+    // for the confirm step, never a session.
+    if (payload.typ === PASSWORD_RESET_TYP) {
       throw new UnauthorizedException('Invalid token type');
     }
 

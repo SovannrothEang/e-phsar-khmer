@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import { and, count, desc, eq, isNull, ne, sql, type SQL } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
-import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
+import {
+  DRIZZLE,
+  type DbClient,
+  type DbExecutor,
+} from '../db/drizzle.provider';
 import { userLoginDevices } from '../db/schema/login-devices.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
@@ -311,6 +315,26 @@ export class LoginDevicesService {
     return { revoked };
   }
 
+  /**
+   * Revoke every active session for an account. The password-reset path has
+   * no "current device" to keep, so it uses this instead of `revokeOthers`.
+   * Takes an executor so the revoke commits in the caller's transaction with
+   * the password change that triggered it.
+   */
+  async revokeAll(
+    userId: string,
+    executor: DbExecutor = this.db,
+  ): Promise<RevokeResult> {
+    const revoked = await this.revokeWhere(
+      and(
+        eq(userLoginDevices.userId, userId),
+        isNull(userLoginDevices.revokedAt),
+      ),
+      executor,
+    );
+    return { revoked };
+  }
+
   /** Logout: revoke the caller's session. Idempotent and never throws. */
   async revokeSession(
     userId: string,
@@ -464,8 +488,11 @@ export class LoginDevicesService {
    * cached token that somehow skipped the revocation check cannot match.
    * `gen_random_uuid()` is evaluated per row, keeping the unique index happy.
    */
-  private async revokeWhere(where: SQL | undefined): Promise<number> {
-    const rows = await this.db
+  private async revokeWhere(
+    where: SQL | undefined,
+    executor: DbExecutor = this.db,
+  ): Promise<number> {
+    const rows = await executor
       .update(userLoginDevices)
       .set({
         revokedAt: new Date(),
