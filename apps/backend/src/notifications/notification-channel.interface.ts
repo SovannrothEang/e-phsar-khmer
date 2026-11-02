@@ -12,12 +12,16 @@ export interface NotificationPayload {
 
 /**
  * One delivery channel. `InAppNotificationChannel` (the `notifications`
- * table + REST feed) is the only one implemented today and is the durable
- * record every notification gets. Adding email/SMS/push later is adding
- * another class implementing this interface and listing it in
+ * table + REST feed) is the durable record every notification gets and
+ * `RealtimeNotificationChannel` is the best-effort WebSocket push — those two
+ * are the array's contents today. Adding email or push later is adding another
+ * class implementing this interface and listing it in
  * `NOTIFICATION_CHANNELS`' factory in `notifications.module.ts` — nothing
  * else in this module, or any caller of `NotificationsService.notify()`,
- * needs to change.
+ * needs to change. SMS deliberately does NOT belong here: it is opt-in
+ * (`data.sendSms`) and is delivered out-of-band through the transactional
+ * outbox (`notifications/sms/SmsOutboxHandler`), never inline — see the
+ * notifications section of ARCHITECTURE.md.
  */
 export interface NotificationChannel {
   send(payload: NotificationPayload): Promise<void>;

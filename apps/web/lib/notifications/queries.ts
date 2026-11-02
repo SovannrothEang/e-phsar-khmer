@@ -6,4 +6,6 @@
 export const notificationKeys = {
   all: ["user", "notifications"] as const,
   unread: () => [...notificationKeys.all, "unread"] as const,
+  /** The navbar bell panel's newest-N list. */
+  recent: () => [...notificationKeys.all, "recent"] as const,
 };

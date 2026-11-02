@@ -13,7 +13,7 @@ import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
 import PostImage from "./PostImage";
 import { PostSocialActions } from "./PostSocialActions";
-import { ApplyJobButton } from "./ApplyJobButton";
+import { JobApplySlot } from "./DetailSlots";
 import type { ApplyResumeSummary } from "./ApplyJobDialog";
 import ListingSpecs from "./ListingSpecs";
 import type { BackendListing, BackendProductRef } from "@/lib/api/categories";
@@ -133,10 +133,12 @@ export default function PostDetail({
   /** Signed-in viewer's id, if any — lets the sidebar tell "your ad" apart
    *  from a stranger's and hide seller-contact actions accordingly. */
   viewerId?: string | null;
-  /** Whether that viewer already follows the seller — seeds the sidebar toggle. */
-  sellerFollowing?: boolean;
-  /** Present only when this viewer may apply to *this* job listing. */
-  jobApply?: JobApplyState | null;
+  /** Whether that viewer already follows the seller — seeds the sidebar toggle.
+   *  A promise while the lookup is still running; the page does not wait for it. */
+  sellerFollowing?: boolean | Promise<boolean>;
+  /** Present only when this viewer may apply to *this* job listing. A promise
+   *  while the résumé/application lookup is still running. */
+  jobApply?: JobApplyState | null | Promise<JobApplyState | null>;
   /** The `listing_detail` banners — fetched by the server page above this one. */
   banners?: AdvertisementCard[];
 }) {
@@ -359,16 +361,13 @@ export default function PostDetail({
                         </span>
                       )}
                     </div>
-                    {jobApply && (
-                      <ApplyJobButton
-                        listingId={real.listing.id}
-                        listingTitle={real.listing.title}
-                        viewerId={viewerId ?? null}
-                        posterId={real.listing.userId}
-                        resume={jobApply.resume}
-                        appliedApplicationId={jobApply.appliedApplicationId}
-                      />
-                    )}
+                    <JobApplySlot
+                      jobApply={jobApply}
+                      listingId={real.listing.id}
+                      listingTitle={real.listing.title}
+                      viewerId={viewerId ?? null}
+                      posterId={real.listing.userId}
+                    />
                   </div>
                 </div>
               </div>

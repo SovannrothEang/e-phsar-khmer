@@ -381,10 +381,17 @@ export class UsersService {
 
         if (makePrimary) {
           // Same rule as setPrimaryPhone: the primary row and the login
-          // identifier must never disagree.
+          // identifier must never disagree. `phoneVerifiedAt` is cleared in
+          // the same write — it only ever means "OTP-verified the CURRENT
+          // primaryPhone", and this number never went through that flow
+          // (only `verifyPhoneChangeOtp` sets it).
           await tx
             .update(users)
-            .set({ primaryPhone: dto.phone, updatedAt: new Date() })
+            .set({
+              primaryPhone: dto.phone,
+              phoneVerifiedAt: null,
+              updatedAt: new Date(),
+            })
             .where(eq(users.id, userId));
         }
         return created;
@@ -471,9 +478,15 @@ export class UsersService {
           .update(userPhones)
           .set({ isPrimary: true })
           .where(eq(userPhones.id, next.id));
+        // See addPhone's comment: the promoted number was never OTP-verified
+        // as the login identifier, so any stale verification goes with it.
         await tx
           .update(users)
-          .set({ primaryPhone: next.phone, updatedAt: new Date() })
+          .set({
+            primaryPhone: next.phone,
+            phoneVerifiedAt: null,
+            updatedAt: new Date(),
+          })
           .where(eq(users.id, userId));
       }
       return { removed: true as const };
@@ -506,9 +519,16 @@ export class UsersService {
       // `users.primaryPhone` is the login identifier (login and both OTP
       // flows look the user up by it), so a primary row that disagrees with
       // it locks the user out of the number their settings page shows.
+      // `phoneVerifiedAt` only ever means "OTP-verified the CURRENT
+      // primaryPhone" (only `verifyPhoneChangeOtp` sets it) — switching the
+      // primary without that flow clears it, same as `addPhone`/`removePhone`.
       await tx
         .update(users)
-        .set({ primaryPhone: target.phone, updatedAt: new Date() })
+        .set({
+          primaryPhone: target.phone,
+          phoneVerifiedAt: null,
+          updatedAt: new Date(),
+        })
         .where(eq(users.id, userId));
 
       return updated;
@@ -1251,7 +1271,7 @@ export class UsersService {
 
   private toPublicUser(user: UserRow): PublicUser {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _ph, ...publicUser } = user;
+    const { passwordHash: _ph, tokensValidAfter: _tva, ...publicUser } = user;
     return publicUser;
   }
 }

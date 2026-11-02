@@ -11,6 +11,27 @@ import type { ApplyResumeSummary } from "./ApplyJobDialog";
 import { trackEvent } from "@/lib/insights/queue";
 
 /**
+ * Stand-in for the Apply button while the résumé/application lookup is still
+ * running: the same height, padding and label (hidden), so it occupies the
+ * button's exact box. Only an already-applied viewer sees the shorter "Applied"
+ * label swap in.
+ */
+export function ApplyJobButtonPlaceholder() {
+  const t = useTranslations("Post.apply");
+  return (
+    <Button
+      type="button"
+      disabled
+      aria-hidden
+      tabIndex={-1}
+      className="bg-muted h-10 px-5 rounded-sm animate-pulse"
+    >
+      <span className="text-transparent">{t("button")}</span>
+    </Button>
+  );
+}
+
+/**
  * "Apply For This Job" — the job detail page's one orange call to action.
  *
  * Four states, all decided by the host page so this component never guesses:

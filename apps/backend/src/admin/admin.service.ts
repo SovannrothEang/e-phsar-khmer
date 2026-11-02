@@ -46,7 +46,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Cambodia is ICT (UTC+7) with no daylight saving — a fixed offset is exact.
 const ICT_OFFSET_MS = 7 * 60 * 60 * 1000;
 
-export type PublicUser = Omit<UserRow, 'passwordHash'>;
+export type PublicUser = Omit<UserRow, 'passwordHash' | 'tokensValidAfter'>;
 export type PublicUserWithAccount = PublicUser & {
   accountType: 'Premium' | 'Normal';
 };
@@ -76,7 +76,7 @@ export class AdminService {
 
   private toPublic(user: UserRow): PublicUser {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _ph, ...rest } = user;
+    const { passwordHash: _ph, tokensValidAfter: _tva, ...rest } = user;
     return rest;
   }
 

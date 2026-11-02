@@ -588,6 +588,10 @@
     "couldNotMarkAll": "Could not mark all as read",
     "couldNotDeleteAll": "Could not delete notifications",
     "couldNotLoadMore": "Could not load more notifications",
+    "viewAll": "View all notifications",
+    "recentDescription": "Your newest notifications.",
+    "loadFailed": "Could not load notifications.",
+    "retry": "Try again",
     "noMore": "No more result!",
     "unreadAria": "{count, plural, =0 {No unread notifications} one {# unread notification} other {# unread notifications}}"
   },

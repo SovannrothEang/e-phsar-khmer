@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { API_URL } from "@/lib/api/client";
 import { displayName, getPublicProfile } from "@/lib/api/users";
 import type { RealDetailData } from "@/components/post/Post-Detail";
@@ -93,11 +94,15 @@ export async function buildRealDetailData(
   id: string,
   locale: string,
 ): Promise<RealDetailData | null> {
-  const [listing, allCategories] = await Promise.all([
-    getListingById(id, locale),
-    getAllCategories(locale),
-  ]);
+  // The category tree does not depend on the listing, so it starts with it; the
+  // seller lookup only needs the listing, so it starts the moment that lands
+  // instead of queueing behind the (slower) category tree.
+  const listingRequest = getListingById(id, locale);
+  const categoriesRequest = getAllCategories(locale);
+  const listing = await listingRequest;
   if (!listing) return null;
+  const sellerRequest = toSellerView(listing);
+  const allCategories = await categoriesRequest;
 
   const cate = allCategories?.find((c) => c.id === listing.categoryId);
   const sub = cate?.subcategories.find((s) => s.id === listing.subcategoryId);
@@ -157,7 +162,7 @@ export async function buildRealDetailData(
     subcate: sub ? { slug: sub.slug, name: sub.name } : undefined,
     brand: toBreadcrumb("brand"),
     model: toBreadcrumb("model"),
-    seller: await toSellerView(listing),
+    seller: await sellerRequest,
     product: listing.product ?? null,
   };
 }
@@ -379,12 +384,15 @@ export async function getModelsForBrand(
   );
 }
 
-export async function getListingById(
-  id: string,
-  locale: string,
-): Promise<BackendListing | null> {
-  return getJson<BackendListing>(`/listings/${id}`, locale);
-}
+/**
+ * Memoised per request (`React.cache`): a detail page asks for the same listing
+ * from `generateMetadata` and from the page body, and both now share one call.
+ * Still `no-store` across requests, so a listing edit shows on the next load.
+ */
+export const getListingById = cache(
+  async (id: string, locale: string): Promise<BackendListing | null> =>
+    getJson<BackendListing>(`/listings/${id}`, locale),
+);
 
 /**
  * The whole active category tree — or, with `userId`, only the categories that

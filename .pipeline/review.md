@@ -226,3 +226,202 @@ ownership predicates are the right ones; the tests pin the clauses that matter;
 and the one UI branch nobody had exercised renders exactly the protective state
 it was written for. **Ship it**, carrying §5.1–5.3 as land-time housekeeping and
 5.4–5.8 as backlog notes.
+
+---
+
+# Review — Reliable SMS delivery + own phone-OTP service (uncommitted backend diff)
+
+Reviewer: independent senior-review pass, 2026-11-02, on branch `feat/refine`.
+Scope: the whole uncommitted state of `apps/backend` vs HEAD — 18 modified files
+plus every untracked new file (`src/otp/`, `src/notifications/sms/`, the two
+auth DTOs, `password-reset.spec.ts`, `token-cutoff.util(.spec)`,
+`stable-stringify.util(.spec)`, both new schemas, migrations `0050`–`0052` +
+snapshots + `_journal.json`) — all read in full, plus `ARCHITECTURE.md`,
+`CHANGELOG.md`, `CLAUDE.md`, `Plans.md` and `src/otp/README.md` as written.
+`AGENTS.md` Review rules and `CLAUDE.md` invariants were the rubric. I did not
+run the suite (the orchestrator ran lint/build/test in parallel: **lint clean,
+`nest build` clean, 93 suites / 1325 tests green** — taken as evidence, not as a
+substitute for reading).
+
+**VERDICT: REQUEST_CHANGES.**
+
+One **major** finding drives the verdict (§3.1 — a deterministic account-
+enumeration oracle on the new `POST /auth/password/reset`, against the plan's
+explicit no-enumeration DoD; the fix is ~3 lines plus a test). Everything else
+is minor/nit, all six previously-reported fixes are confirmed fixed (§2), the
+schema↔migration↔snapshot chain is verified drift-free (§1), and the diff is
+otherwise ship-quality.
+
+## 1. What I verified independently
+
+| Check                                                                                                         | Result                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Isolated `drizzle-kit generate` (temp copy of `apps/backend`, node_modules junctioned, never ran in the repo) | **`No schema changes, nothing to migrate`** → schema ↔ migrations ↔ snapshots consistent, no drift gate to trip                                                                                                                                                                                    |
+| Migration snapshots 0050/0051/0052 vs the SQL                                                                 | match: 0050 creates `sms_deliveries` with `user_id`/`outbox_event_id` NOT NULL + `sms_delivery_status`; 0051 drops both NOT NULLs, adds `purpose`, creates `phone_otps` + `otp_purpose`; 0052 adds `users.tokens_valid_after`. All three additive; `_journal.json` idx/`when` monotonic after 0049 |
+| Final snapshot (0052) table/enum inventory                                                                    | `phone_otps`, `sms_deliveries`, both enums present; `tokens_valid_after` present                                                                                                                                                                                                                   |
+| Module graph                                                                                                  | `OtpModule → NotificationsModule → OutboxModule`; no cycle (`OutboxModule` imports nothing feature-level); `SmsOutboxHandler` self-registers in `onModuleInit`                                                                                                                                     |
+| Orchestration gates (relayed)                                                                                 | lint clean, build clean, 93/1325 tests green; the `ECONNREFUSED` log line is the fail-closed spec exercising the real limiter                                                                                                                                                                      |
+| Test-runner hygiene                                                                                           | repo untouched except this file; temp copy removed (junction with `rmdir`, target verified intact)                                                                                                                                                                                                 |
+
+**Incident, disclosed (precedent §7):** the isolated-copy step used `robocopy`
+and copied `apps/backend/.env` and `.env.prod` into the temp directory before I
+noticed. I deleted both **without reading them** and removed the whole temp tree
+afterwards. No secret entered this review, the repo, or the pipeline.
+
+## 2. Status of the six previously-reported fixes — all verified against current code
+
+| #   | Previous finding                                                  | Status                   | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Enqueue + audit row not in one transaction                        | **Fixed**                | `notifications.service.ts:56-90` — `enqueue` and the `sms_deliveries` insert run inside one `db.transaction`; spec _"queues the event and the audit row in one transaction"_                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2   | Enqueue failure could break `notify()` / duplicate the in-app row | **Fixed**                | channels run first, then `enqueueSms` in try/catch that only logs (`notifications.service.ts:51-62`); spec _"does not reject notify() when queuing the SMS fails, so the caller never re-writes the in-app row"_                                                                                                                                                                                                                                                                                                                                                    |
+| 3   | Redis client not closed on shutdown                               | **Fixed**                | `sms-rate-limiter.ts:57-64` `onModuleDestroy` → `quit()` with `disconnect()` fallback; factory attaches an `error` listener (`notifications.module.ts:74-79`) so a dead client can't crash the process; fail-fast options documented                                                                                                                                                                                                                                                                                                                                |
+| 4   | `maskedPhone` missing on sent/failed rows                         | **Fixed**                | `sms-outbox-handler.ts:143` (sent) and `:157` (failed) both set `maskPhone(...)`; skip/bump paths too                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 5   | Two utils without specs                                           | **Fixed**                | `common/stable-stringify.util.spec.ts` (key order, nesting, array order) and `auth/token-cutoff.util.spec.ts` (second-precision boundary, missing `iat`) — substantive, not boilerplate                                                                                                                                                                                                                                                                                                                                                                             |
+| 6   | Docs missing                                                      | **Fixed, with two gaps** | `ARCHITECTURE.md` gained both the auth (OTP/forgot/revocation) and notifications (full SMS flow) sections; `CHANGELOG.md` two entries; `CLAUDE.md` stale "phoneVerifiedAt is never written" gap corrected + new gap; `src/otp/README.md` added (honest, follows the module convention). **Gaps:** `.env.example` still lacks `OTP_PROVIDER`/`OTP_HMAC_SECRET` though plan 1.8's DoD names them (see minor 3.2.1), and there is still no `notifications/README.md` (plan SMS 1.6 asked for "the notifications README" — none exists; ARCHITECTURE covers it instead) |
+
+## 3. Findings
+
+### 3.1 **major — account-enumeration oracle on `POST /auth/password/reset`** (`apps/backend/src/auth/auth.service.ts:297-305`)
+
+`resetPassword` returns the distinct body `{code: 'OTP_TOO_MANY_ATTEMPTS',
+message: 'Invalid or expired OTP'}` when `OtpService.verify` answers
+`too_many_attempts`, and the plain 401 (`{code: 'UNAUTHORIZED', message: 'Invalid
+or expired OTP'}` through `GlobalExceptionFilter`) for every other failure. The
+filter preserves `code` (`global-exception.filter.ts:71-81`), so the two are
+observably different over HTTP.
+
+`too_many_attempts` requires an open `password_reset` row in `phone_otps`, and
+such a row is created **only** by `issueAndSendDetached`, which only runs when
+`findResettableUser` found an eligible account — `reserveOnly` (the unknown-
+number path) stores nothing. An unknown number therefore _can never_ produce the
+distinct body.
+
+**Probe (all within the configured throttles: forgot 5/min, reset 10/min, one
+IP):** `POST /password/forgot {phone}` → six `POST /password/reset {phone,
+code:'000000', …}`. Known number → 6th answer carries
+`OTP_TOO_MANY_ATTEMPTS`; unknown number → six identical plain 401s. That is a
+deterministic account-existence oracle on exactly the property plan 1.5 / assumption
+A3 demand ("same response whether or not the number has an account"; DoD
+"unknown number returns the same body … as a known one"). The spec only pins
+one wrong code (`password-reset.spec.ts:536`), which is why the suite is green.
+
+The same-shaped new oracle exists on `/auth/otp/verify`
+(`auth.service.ts:403-408`) for passwordless/legacy accounts (for password
+accounts an `INVALID_CREDENTIALS`-vs-`Invalid or expired OTP` divergence already
+exists at HEAD — pre-existing, noted not charged to this diff). Both are behind
+`OTP_PROVIDER=plasgate`, so **default-config behaviour is unaffected**; the flag
+flip is precisely task 1.7, which requires an APPROVE verdict.
+
+**Fix:** make the response independent of row state where the DoD demands it —
+drop the `code:` from the `too_many_attempts` throw in `resetPassword` (the web's
+`parseOtpFailure` then degrades gracefully to `invalid_code`, since `message`
+stays `'Invalid or expired OTP'`), and decide the same for `verifyPhoneOtp`.
+If the distinct body is wanted for UX, the only enumeration-safe way is to make
+unknown numbers answer it too, which needs a row for every number — not
+recommended. Add the missing test: identical response bodies for known vs
+unknown across a full 5-attempt exhaustion.
+
+### 3.2 Minor findings
+
+1. **`.env.example` omits `OTP_PROVIDER`/`OTP_HMAC_SECRET`, and `CHANGELOG.md` misstates what it contains** (`.env.example:66-70`; `CHANGELOG.md` SMS entry). Plan 1.8's DoD explicitly lists both OTP vars for `.env.example`; the CHANGELOG claims `SMS_RATE_LIMIT_PER_MINUTE`, `SMS_USER_COOLDOWN_SECONDS`, `SMS_USER_DAILY_CAP` were added there — only `SMS_BASE_URL/PRIVATE_KEY/SECRET/SENDER` are. Fresh-environment setup for the OTP flag (the plan's own rollout lever) is undocumented where operators look. _Why it matters:_ the rollout task 1.7 flips `OTP_PROVIDER` in an environment; an operator reading `.env.example` finds no trace of it.
+2. **New column `users.tokensValidAfter` leaks into user payloads outside `AuthService.toPublicUser`** — `users/users.service.ts:1272-1276` and `admin/admin.service.ts:49,79` still strip only `passwordHash`, so `GET /users/:id`, `/me` and admin user payloads now carry it, while `auth.service.ts:84`'s `PublicUser` type says it is excluded (the type compiles only because a spread isn't an excess-property check). Not a secret, but it exposes "when this user last reset their password" cross-user, and the type now lies about two of three serialization sites. Strip it in both `toPublicUser`s or narrow the shared type.
+3. **`SmsOutboxHandler.bumpAttempt` doesn't bump `attempts`** (`sms-outbox-handler.ts:216-224`) — it only backfills `maskedPhone`. `sms_deliveries.attempts` is written solely on the PlasGate-retry path (`:173`), so limiter-retried-then-abandoned rows read `0`, first-try `sent` rows read `0`, and `ARCHITECTURE.md`'s "every attempt outcome updates … `attempts`" is inaccurate. Either write `event.attempts` on every retry exit or rename the helper and fix the doc — an audit field that silently means "last PlasGate retry only" will mislead whoever reads it during an incident.
+4. **Limiter slot leaks when `otp.issue` throws** (`otp-sms-sender.ts:69-74`) — the slot (cooldown key + daily count) is acquired before `issue`, and only `deliver`/`abandon` ever releases it. A DB error inside `issue` leaves the phone locked out of codes for 5 minutes and one daily slot burned, with no code issued. Wrap `issue` in try/catch → `releaseSubject` → rethrow (or acquire after a successful issue — but then the "over-limit must not supersede the delivered code" property is lost, so release-on-error is the right shape).
+5. **Unbounded audit inserts on blocked OTP requests** (`otp-sms-sender.ts:180-197`) — every cooldown/daily-cap/limiter-down answer inserts a `skipped` row. The per-IP throttle is in-memory and per instance (the otp README says so), so distributed probes grow `sms_deliveries` without bound for a pure rate-limit rejection that carries no new information. Sample, drop, or dedupe these rows (the limiter already knows the state; the row adds little beyond the first).
+6. **`OtpSmsSender.send()` has no production caller** (`otp-sms-sender.ts:144-164`, spec at `:284`) — the "lower-level form for an already-issued code" exists only for its own test. AGENTS: no future-proof abstraction without a current use case. Delete it with its spec, or wire the caller it was written for.
+7. **Stale docs contradicting the new design** (cross-file): `notifications/notification-channel.interface.ts:22-27` still tells the next engineer that "adding SMS later is adding another class implementing this interface" — the module doc comment now says the exact opposite ("deliberately NOT a NotificationChannel"); `payment/README.md:364` still says "Email/SMS/push are unbuilt"; `ARCHITECTURE.md`'s SMS gate order lists the verified-phone gate (2) before the allowed-type gate (2b) while the code checks allowed types first (`sms-outbox-handler.ts:71` vs `:88` — no behavioural difference, both terminal, but the doc is a sequence claim).
+
+### 3.3 Nit findings
+
+1. **Permanent `failed` keeps the per-user slot** (`sms-outbox-handler.ts:152-166`) while `OtpSmsSender.deliver` releases it on failure (`otp-sms-sender.ts:250-254`): a permanently failing provider (bad sender id) still counts against the user's cooldown and daily cap with zero delivered SMS. Pick one rule and apply it to both paths.
+2. **`providerReply` is stored raw** (`plasgate-client.ts:71-82` → `sms-deliveries.provider_reply`, outbox `last_error`). The schema comment claims `maskedPhone` "is the only phone-shaped value here", but a provider error that echoes `to` (or, per Plans' open 1.7 check, key material) defeats that. The OTP path scrubs only the exact code substring (`otp-sms-sender.ts:288-291`); the outbox path does no content scrub at all. Resolve during the 1.7 provider-behaviour check.
+3. **`stableStringify` maps `Date` to `{}`** (`common/stable-stringify.util.ts:12-18`) — two different dates hash identically, and `undefined` becomes the invalid-JSON token `undefined`. Latent (no producer passes Dates today), but it is the dedupe hash's input; add a `Date.toISOString()` branch or a test that pins the intended behaviour.
+4. **Dedupe hashes _all_ of `data`** (`notifications.service.ts:96-110`) — a future SMS producer with constant `data` gets every resend after the first suppressed until outbox retention (7 d) purges the key; one with a volatile field never dedupes at all. The plan asked for "a stable id from `data`" — when plan SMS 1.9 wires the auth flows to this path, require a unique id in `data` and say so in the comment.
+5. **Clock-skew misclassification** (`otp.repository.ts:80,97` use DB `now()`; `otp.service.ts:93` uses the app clock): with the DB ahead, an expired code is rejected by the SQL guard and reported `too_many_attempts` instead of `expired` — a wrong state _and_ a second instance of finding 3.1's distinct body.
+6. **`toInternational` prepends `855` to any ≥8-digit non-`0` non-`855` number** (`plasgate-client.ts:93-98`) — a valid non-KH E.164 accepted by the DTO regex is misaddressed. Fine for a Cambodia-only platform; note it if the DTO regex is ever widened.
+7. **Two-step NOT NULL dance** (`0050` creates `user_id`/`outbox_event_id` NOT NULL, `0051` drops it) — harmless regeneration artifact since both ship together, but a reader of 0050 alone gets a wrong picture.
+8. **`CHANGELOG.md` test numbers stale** — "88 suites / 1228 tests" is the pre-OTP count; the tree now reports 93/1325.
+9. **`sms_deliveries.user_id` is `onDelete: cascade`** (`sms-deliveries.schema.ts:42-44`) — a user purge silently deletes that user's notification-SMS audit rows (OTP rows survive because `user_id` is NULL). Decide whether the audit trail should outlive the subject, as `outboxEventId` deliberately does.
+10. **Reset password rules are stricter than register's** (`reset-password.dto.ts:26-31` caps at 72; `verify-otp.dto.ts` doesn't) — plan 1.5 DoD says "password rules same as register". Stricter is defensible (bcrypt truncates at 72) but it is a divergence; align or note it.
+11. **`Plans.md` task tables still mark shipped work `cc:TODO`** and the SMS run log says "Not done: 1.9 (cooldown / daily cap)" although `SmsUserLimiter` + `SMS_ALLOWED_TYPES` + all of 1.9's DoD tests are in this diff. Documentation hygiene only; the run log predates the later commits to the same tree.
+
+## 4. Areas examined and found correct (recorded so the next reviewer needn't re-derive)
+
+- **OTP atomicity.** Attempt spent _before_ the compare (`reserveAttempt`'s conditional `UPDATE … WHERE consumed_at IS NULL AND expires_at > now() AND attempts < 5`), single use via conditional `consume`, exactly-one-winner under concurrency (pinned by the fake-repo concurrency specs, which mirror the SQL statement-for-statement). `replaceOpen`'s transaction can technically leave two open rows under a READ COMMITTED race, but `findLatestOpen` returns the newest and the hash is purpose+row-bound, so the older code can never verify — benign.
+- **Limiter Lua scripts.** `ACQUIRE_SCRIPT`/`RELEASE_SCRIPT`/sliding-window are each a single atomic script (no interleaving), same-event retries are idempotent via the event-id holder, a daily-cap refusal DECRs before returning so it burns no cooldown, and both limiters fail **closed** (`unavailable` → handler `retry`; Redis down → no code issued, no HTTP call — spec'd both in the handler and the sender).
+- **Forgot-password symmetry.** Same two lookups for every number (spec-counted), same limiter slot, identical 429 body for known/unknown (spec-compared), send detached so PlasGate latency can't distinguish, `reserveOnly` stores and sends nothing, banned/suspended/passwordless/deleted all take the phantom path with identical answers. The residual timing delta (one DB insert) is documented in code, ARCHITECTURE and the otp README with a measure-it-in-1.7 note — acceptable.
+- **Session revocation.** Password reset sets `tokensValidAfter` and revokes every device row (sid rotation included); `JwtStrategy` checks the cutoff on **both** the sid and sid-less paths, `refresh` checks it before touching the device row, and the same-second window is a documented, tested trade-off (`token-cutoff.util.ts`). `DEV_OTP_TOKEN` is refused in production with an error log and stores nothing.
+- **Outbox classification.** 2xx→published, network/timeout/429/5xx→retry, other 4xx→failed, `onAbandoned`→row failed, `redact` applied on **every** terminal path by the dispatcher (published _and_ failed _and_ abandoned), `maxAttempts` raised to 20 with the claim-time-attempt rationale documented, content never logged (specs assert key/secret/code/phone absence).
+- **Provider switch.** Under the default `supabase`, register/resend/login-OTP/verify are byte-for-byte the old Supabase path (spec asserts `OtpService`/`OtpSmsSender` are never touched), forgot/reset answer 503 `OTP_PROVIDER_UNSUPPORTED`, and `phoneVerifiedAt` is stamped on all three verify branches without widening `mirrorSupabaseUser`'s conflict lock — while `addPhone`/`setPrimaryPhone`/`removePhone` now clear it (each with a spec), keeping the column's meaning coherent for the verified-phone gate.
+
+## 5. Test quality
+
+Above the repo's usual bar: the OTP suites pin the security properties
+(single-use, attempt-before-compare, `timingSafeEqual` call shapes, HMAC-not-
+plaintext, dev-bypass refused in production), the sender/limiter suites mirror
+the real Lua/SQL atomics in fakes and say so in comments, `password-reset.spec`
+runs a real `OtpService` + real bcrypt + real JWTs end-to-end through
+`AuthService` and `JwtStrategy`, and the forgot-password suite asserts response
+equality (bodies, 429 shapes, query counts) rather than just happy paths.
+
+Gaps this review would have caught with one more test each: **(a)** known vs
+unknown response bodies across a full attempt exhaustion on `/password/reset`
+(finding 3.1); **(b)** `sms_deliveries.attempts` bookkeeping on limiter retries
+(3.2.3); **(c)** slot release when `otp.issue` throws (3.2.4); **(d)**
+`stableStringify` with a `Date` (3.3.3). The burst spec drives the limiter with
+its own retry loop rather than the real dispatcher — fine as a limiter test, but
+it should not be read as end-to-end proof of "300 queued SMS all delivered".
+
+## 6. Bottom line
+
+Fix 3.1 (plus its test) before the `OTP_PROVIDER=plasgate` flag is flipped
+anywhere; fold 3.2.1–3.2.2 into the same pass since they are two-line changes;
+the rest can ride as follow-up tickets. The six prior fixes are all genuinely
+fixed, the migrations are additive and drift-free, the concurrency and
+fail-closed properties hold up under adversarial reading, and the docs — bar the
+staleness list in 3.2.7/3.3.8 — describe the system as it actually behaves.
+
+### Re-review (2026-11-02)
+
+Re-review of the fixes committed as `9423161` (SMS delivery), `036086c`
+(OTP + forgot-password) and `b8e2d7f` (docs), on `feat/refine`. Only the
+findings below were re-checked, against the committed code (files re-read in
+full; `git show --stat` for both commits); the suite was not re-run (orchestrator
+reports 93 suites / 1328 tests green, eslint and `nest build clean — 3 more tests
+than this review's 1325 baseline, which is exactly the three new specs named
+below).
+
+| #     | Finding                                                             | Verdict                 | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----- | ------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 3.1   | enumeration oracle on `POST /auth/password/reset` (major)           | **Fixed**               | `auth.service.ts:300-302` — `resetPassword` throws one plain `UnauthorizedException('Invalid or expired OTP')` for `verified.status !== 'ok' \|\| !user`, so exhaustion takes the identical branch as any other failure; `auth.service.ts:403-404` same rule in `verifyPhoneOtp` for `/auth/otp/verify`. `grep OTP_TOO_MANY_ATTEMPTS` over `apps/backend` → **zero matches**; through `global-exception.filter.ts:71-81` both paths render `code: 'UNAUTHORIZED'` + the same message. `password-reset.spec.ts:507-533` pins known-vs-unknown equality across a full **6**-attempt run, asserts `repo.rows[0].attempts === 5` (the exhaustion branch really ran) and `response` has **no** `code` property; `auth.service.spec.ts:1990-2005` pins `invalid`/`expired`/`too_many_attempts` → the same 401 on verify. |
+| 3.2.1 | `.env.example` vars + CHANGELOG counts                              | **Fixed**               | `.env.example:73-75` (`SMS_RATE_LIMIT_PER_MINUTE`, `SMS_USER_COOLDOWN_SECONDS`, `SMS_USER_DAILY_CAP`), `:80` (`OTP_PROVIDER`), `:84` (`OTP_HMAC_SECRET`) — CHANGELOG SMS entry's `.env.example` claim (`CHANGELOG.md:58-59`) is now materially true; `CHANGELOG.md:60` reads 93 suites / 1328 tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 3.2.2 | `tokensValidAfter` leaking out of user/admin payloads               | **Fixed**               | `users.service.ts:1274` and `admin.service.ts:79` both destructure it out; `PublicUser` narrowed at `auth.service.ts:84` and `admin.service.ts:49`; every user-returning path found goes through a `toPublicUser`/`toPublic` (grep: all sites covered).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 3.2.3 | `sms_deliveries.attempts` never written off the PlasGate-retry path | **Fixed**               | `attempts: event.attempts` on **all six** exits: sent `:147`, failed `:161`, PlasGate-retry `:175`, `onAbandoned` `:193`, `markSkipped` `:222`, `bumpAttempt` `:233`. Specs assert sent/failed/abandoned (`sms-outbox-handler.spec.ts:379,438,463`) and the limiter-retry exit with `attempts: 7` (`:484-489`); `markSkipped` and the PlasGate-retry exits write it but are not asserted (nit below).                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 3.2.4 | limiter slot leaks when `otp.issue` throws                          | **Fixed**               | `otp-sms-sender.ts:144-157` `issueReleasingSlot` (release, then rethrow; best-effort release) is called from **both** entry points — `issueAndSend:73` and `issueAndSendDetached:106`; behavioural spec `otp-sms-sender.spec.ts:284-292` (throw → follow-up request gets `sent`, not cooldown).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 3.2.6 | dead `OtpSmsSender.send()`                                          | **Fixed**               | No `send()` method in `otp-sms-sender.ts`, no `sender.send(`/`async send(` anywhere under `src/otp/`; the spec block went with it (remaining tests: issue/detached/reserveOnly only).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 3.2.7 | three stale docs                                                    | **Fixed, one residual** | `notification-channel.interface.ts:13-24` now says "SMS deliberately does NOT belong here"; `payment/README.md:364` says SMS _is_ built but deliberately not a channel; `ARCHITECTURE.md:321-326` gate order is now 1 unconfigured → 2 allowed-type → 2b verified-phone → 2c per-user → 3 rate limiter, matching `sms-outbox-handler.ts:66-133` exactly. **Residual:** `payment/README.md:405-407` still tells the reader "adding email/SMS/push is adding a class implementing `NotificationChannel`" (and "currently just `InAppNotificationChannel`", omitting realtime) — the same stale claim the interface comment fix corrected, in the same file (nit below).                                                                                                                                              |
+| 3.3.3 | `stableStringify` maps `Date` to `{}`                               | **Fixed**               | `stable-stringify.util.ts:15-17` Date branch; spec `:26-34` pins ISO output and two distinct dates not colliding. The `undefined` → invalid-JSON-token half of the nit is unchanged (pre-existing, not regressed).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+**Regression spot-checks (previously "correct" areas): all intact.** Attempt
+spent before compare (`otp.service.ts:98-104`, `otp.repository.ts:75-81`);
+forgot-password symmetry (same two lookups for every number,
+`findResettableUser` + `reserveOnly`, cooldown 429 equality spec'd at
+`password-reset.spec.ts:376-395`, query-count parity at `:404-408`); outbox
+classification (2xx → published, 429/5xx/network → retry, other 4xx → failed,
+`onAbandoned` → failed, `redact` on terminal paths) — unchanged by the fix
+commits.
+
+**New issues introduced by the fixes: none blocking.**
+
+- **minor — `.env.example:80` samples `OTP_PROVIDER=plasgate` while the shipped default and the review-gated rollout lever is `supabase`.** A fresh environment built by copying the example flips task 1.7's flag before its APPROVE; and `:84`'s placeholder (`<at least 16 random chars>`, 25 chars) satisfies `OTP_HMAC_SECRET: z.string().min(16).optional()` (`config.validation.ts:62`), so a forgotten replacement passes validation and silently becomes the code-hash pepper (the unset branch that warns never runs). Prefer `OTP_PROVIDER=supabase` with `plasgate` documented in the comment, and a clearly non-runnable secret placeholder.
+- **nit — `otp-sms-sender.ts:154`**: a failed `releaseSubject` inside `issueReleasingSlot` is swallowed with `.catch(() => undefined)` and no log line, so if release itself fails the lockout this fix targets persists without a trace. One `logger.warn` would close it.
+- **nit (test gap) — 3.2.2 has no spec assertion.** `Omit<UserRow, 'tokensValidAfter'>` does not stop a future `return user` from type-checking (excess-property checks don't apply to non-literals), so the payload strip is unguarded at runtime. One `not.toHaveProperty('tokensValidAfter')` on `/users/:id`/admin output would pin it.
+- **nit (test gap) — 3.2.3 partial coverage**: `attempts` is written but not asserted on the `markSkipped` (`sms-outbox-handler.ts:222`) and PlasGate-retry (`:175`) exits; the skip paths were the "row reads 0" cases in the original finding.
+- **nit (doc) — `CHANGELOG.md:58`** lists `SMS_BASE_URL` under "New env (`apps/backend/.env.example`)", but the file only mentions it in a comment (no `SMS_BASE_URL=` line). The three limit vars it was chided for missing are now present, so the claim is materially true; this is the last wording wrinkle.
+- **pre-existing, not from these fixes** (recorded in passing): `users.service.ts:162` `findByUsernameOrPhone` has no callers — dead code per AGENTS.md.
+
+**Re-review verdict: APPROVE WITH NOTES.** Every finding, including the major,
+is correctly fixed in `9423161`/`036086c`/`b8e2d7f`, and no previously-verified
+property regressed. The notes are the `.env.example` example-value hazard above
+(worth a one-line fix before task 1.7 flips the flag anywhere) and the four
+nits; none warrants holding the diff.

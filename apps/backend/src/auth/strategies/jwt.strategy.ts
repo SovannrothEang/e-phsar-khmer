@@ -10,6 +10,7 @@ import { userLoginDevices } from '../../db/schema/login-devices.schema';
 import type { RequestUser } from '../../common/types/api-response.types';
 import { WS_TICKET_TYP } from '../../chat/ws-ticket';
 import { PASSWORD_RESET_TYP } from '../password-reset-token';
+import { isIssuedBeforeCutoff } from '../token-cutoff.util';
 
 interface JwtPayload {
   sub: string;
@@ -17,6 +18,8 @@ interface JwtPayload {
   typ?: string;
   /** Device row revocation epoch (`null`/absent on legacy/admin tokens). */
   sid?: string;
+  /** Issued-at, seconds (added by the JWT library). */
+  iat?: number;
 }
 
 const SESSION_ID_PATTERN =
@@ -63,6 +66,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           role: users.role,
           status: users.status,
           deletedAt: users.deletedAt,
+          tokensValidAfter: users.tokensValidAfter,
           revokedAt: userLoginDevices.revokedAt,
         })
         .from(users)
@@ -79,6 +83,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (!row || row.status !== 'active' || row.deletedAt || row.revokedAt) {
         throw new UnauthorizedException('Session revoked');
       }
+      if (isIssuedBeforeCutoff(payload.iat, row.tokensValidAfter)) {
+        throw new UnauthorizedException('Session revoked');
+      }
 
       return { id: row.id, role: row.role, sessionId: payload.sid };
     }
@@ -89,6 +96,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         role: users.role,
         status: users.status,
         deletedAt: users.deletedAt,
+        tokensValidAfter: users.tokensValidAfter,
       })
       .from(users)
       .where(eq(users.id, payload.sub))
@@ -96,6 +104,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (!user || user.status !== 'active' || user.deletedAt) {
       throw new UnauthorizedException('User not found or suspended');
+    }
+    if (isIssuedBeforeCutoff(payload.iat, user.tokensValidAfter)) {
+      throw new UnauthorizedException('Session revoked');
     }
 
     return { id: user.id, role: user.role, sessionId: null };
