@@ -14,6 +14,8 @@ import { seedAttributes } from '../attributes/seeds/attributes.seed';
 import { seedAdmin } from './seeds/admin.seed';
 import { seedReports } from './seeds/reports.seed';
 import { seedListings } from '../listings/seeds/listings.seed';
+import { seedListingPhotos } from '../listings/seeds/photos.seed';
+import { seedProducts } from '../products/seeds/products.seed';
 import { seedSubscriptions } from '../subscriptions/seeds/subscriptions.seed';
 import * as schema from './schema';
 
@@ -114,8 +116,14 @@ async function seed() {
   console.log('Seeding subscriptions...');
   await seedSubscriptions(db);
 
+  console.log('Seeding product spec pages...');
+  await seedProducts(db);
+
   console.log('Seeding demo listings...');
   await seedListings(db);
+
+  console.log('Attaching listing photos...');
+  await seedListingPhotos(db);
 
   console.log('Seed complete.');
   await client.end();
