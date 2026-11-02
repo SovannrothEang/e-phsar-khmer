@@ -4,6 +4,16 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 type AnySupabaseClient = SupabaseClient;
 
+export interface OtpCallOptions {
+  /**
+   * Honour the DEV_OTP_TOKEN bypass. Defaults to `true` for the register /
+   * OTP-login flows, which rely on it in development. The password-reset flow
+   * passes `false` so it always talks to the real provider — that is what
+   * makes it production-ready regardless of the environment.
+   */
+  devBypass?: boolean;
+}
+
 @Injectable()
 export class SupabaseService {
   private readonly adminClient: AnySupabaseClient;
@@ -42,14 +52,20 @@ export class SupabaseService {
     return this.adminClient.auth.signInWithPassword({ email, password });
   }
 
-  async signInWithOtp(phone: string) {
-    const devToken = this.configService.get<string>('devOtpToken');
+  async signInWithOtp(phone: string, options: OtpCallOptions = {}) {
+    const devToken =
+      options.devBypass === false
+        ? undefined
+        : this.configService.get<string>('devOtpToken');
     if (devToken) return { data: {}, error: null };
     return this.adminClient.auth.signInWithOtp({ phone });
   }
 
-  async verifyOtp(phone: string, token: string) {
-    const devToken = this.configService.get<string>('devOtpToken');
+  async verifyOtp(phone: string, token: string, options: OtpCallOptions = {}) {
+    const devToken =
+      options.devBypass === false
+        ? undefined
+        : this.configService.get<string>('devOtpToken');
     if (devToken) {
       if (token !== devToken)
         return { data: { user: null }, error: { message: 'Invalid OTP' } };

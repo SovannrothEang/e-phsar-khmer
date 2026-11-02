@@ -21,6 +21,39 @@ How to use this file:
 
 ### Added
 
+- **OTP verification now leaves a durable notification.** A successful
+  `POST /auth/otp/verify` creates a `security.otp_verified` in-app notification for the
+  verifying account — `data = { phone, method: 'sms', verifiedAt }` — so the feed keeps a
+  record of phone verification (previously only `security.new_login` did). The write is
+  best-effort after the login is minted: a feed failure logs and never fails the sign-in.
+  No notification on a rejected/expired code. `register` and `otp/login` only _send_ codes,
+  so they stay silent; the password-reset verify is a separate flow (a future
+  `security.password_reset` type rather than `otp_verified`). Verified: `auth.service`
+  69/69 (new success + rejection tests), `nest build`, eslint; live walk — OTP verify then
+  `GET /notifications` shows the row with the structured `data`.
+
+- **Forgot password works (SMS-OTP reset).** `/forgot-password` was a stub that
+  `console.log`ged the identifier; the API had no reset path. Three public endpoints:
+  `POST /auth/password/reset/request` (`SMS_LIMIT`) texts a code to the account's
+  E.164-normalized `primaryPhone` and always answers `{ otpSent: true }` (no account
+  enumeration; only the account's own phone is ever texted); `POST
+/auth/password/reset/verify` (`CREDENTIAL_LIMIT`) checks the single-use code and returns a
+  10-minute `typ: password_reset` JWT; `POST /auth/password/reset/confirm` trades that proof
+  for the new bcrypt(10) hash and revokes every device-bound session with a new
+  `LoginDevicesService.revokeAll` in one transaction. No tokens are minted, and `JwtStrategy`
+  refuses the reset proof as a bearer. The web form is now three sequential steps —
+  identifier → code (verify button + 60 s resend) → new/confirm password — and ends at
+  `/login` with a success toast. `DEV_OTP_TOKEN` is rejected at boot when
+  `NODE_ENV=production`, and the reset flow never honours it even in development: both its
+  send and verify calls pass `devBypass: false` to `SupabaseService`, so the feature always
+  exercises the real provider (register / OTP login keep the dev convenience). Accounts with
+  no usable phone (social-only) cannot reset;
+  sid-less legacy tokens survive the revoke (revocation is per device row). Verified: backend
+  `auth.service|config.validation` 73/73 + `jwt.strategy` 2/2, `nest build`, eslint; web
+  eslint + `next build`; live API walk (the proof is rejected as a bearer, the password is
+  unchanged until confirm, old password 401 / new 201, an access token is rejected as a reset
+  proof); headless-Chromium walk of all three steps to `/en/login`.
+
 - **Linked social accounts on `/settings`.** The Facebook / Google / Telegram rows now read
   `Add` or `Linked` from the account's real provider links and carry the `>` chevron.
   `GET /users/me?includeAuthProviders=1` returns the linked providers (additive and opt-in, so
@@ -265,6 +298,16 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Fixed
 
+- **Image uploads accept every advertised format, and failures say why.** The `product-images` bucket now allows
+  `image/jpeg | image/jpg | image/png | image/gif | image/webp | image/heic | image/heif | image/x-adobe-dng | image/dng`
+  at a 50 MB cap (Supabase bucket settings, 2026-11-02; previously jpeg/png/webp at 5 MB). The web's listing-photo
+  and report-evidence pickers share `apps/web/lib/upload.ts`, which maps the file extension to the canonical
+  Content-Type for the signed PUT (`.dng` often arrives as `application/octet-stream`) and pre-validates the bucket's
+  formats and cap, so an unsupported file toasts "This image format isn't supported." and an oversize file names the
+  maximum instead of both collapsing into "Failed to upload a photo". Contract and verification recipe:
+  `apps/backend/src/files/README.md`. Caveat: Chromium cannot render HEIC/HEIF/DNG, so those uploads show the no-image state
+  there (Safari renders HEIC).
+
 - **The `/otp` page no longer collapses the footer while it loads.** The page read `?phone=` with
   `useSearchParams()` inside a `<Suspense>` that had no fallback, so on a slow client-side navigation the page
   segment rendered empty: the footer rode up directly under the navbar and dropped back down when the card
@@ -298,6 +341,12 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   `editing.id`. Measured with the dialog open on a throwaway public route: after the click the content remained
   mounted with `data-state="closed"` and all five inputs for ~190 ms, then unmounted (previously that window was
   empty).
+- **The profile nav lights Jobs on `/me/applied-jobs`.** The header derived the active tab from an exact pathname
+  match, and the Jobs tab's "Applied" sub-tab is a second route, so it fell through to the Manage Ads fallback. A
+  `TAB_SECTION_ROUTES` map now maps `/me/applied-jobs` to the Jobs tab; the fallback for genuinely non-tab pages
+  (followers, membership) is unchanged. Verified in headless Chromium on `/en/me/applied-jobs` (Jobs),
+  `/en/me/job-applications` (Jobs), `/en/me` and `/en/me/followers` (Manage Ads); `web` eslint clean, `next build`
+  exit 0.
 
 ### Known issues
 

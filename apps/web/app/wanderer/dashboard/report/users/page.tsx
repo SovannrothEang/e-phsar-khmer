@@ -223,7 +223,6 @@ export default function ReportUsersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- updateStatus only calls stable setters + the action
     [locale, router],
   );
-
   return (
     <AdminPage
       title="Report Users"

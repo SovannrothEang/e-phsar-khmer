@@ -21,3 +21,25 @@ describe('outbox worker configuration', () => {
     );
   });
 });
+
+describe('DEV_OTP_TOKEN', () => {
+  it('is rejected in production — it would be an account-takeover bypass', () => {
+    expect(() =>
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'production',
+        DEV_OTP_TOKEN: '000000',
+      }),
+    ).toThrow('DEV_OTP_TOKEN');
+  });
+
+  it('is allowed outside production', () => {
+    expect(
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'development',
+        DEV_OTP_TOKEN: '000000',
+      }),
+    ).toMatchObject({ DEV_OTP_TOKEN: '000000' });
+  });
+});

@@ -3,6 +3,11 @@ import { useTranslations } from "next-intl";
 import { Upload, X } from "lucide-react";
 import { signUpload, type UploadSignFn } from "@/actions/files";
 import { toast } from "@/components/ui/sonner";
+import {
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+  resolveUploadMime,
+} from "@/lib/upload";
 
 /**
  * Drag/drop + click photo picker. Signs a Supabase upload via a
@@ -42,6 +47,8 @@ export default function ImageUpload({
   // resulting public URL (+ storage path). The parent collects URLs for the
   // eventual submit; removal reconciliation is a tracked follow-up.
   const uploadOne = async (file: File) => {
+    const mime = resolveUploadMime(file);
+    if (!mime) return;
     const signed = await signFn(file.name, "listing");
     if (!signed.success) {
       toast.error(signed.error);
@@ -50,7 +57,7 @@ export default function ImageUpload({
     const res = await fetch(signed.data.signedUrl, {
       method: "PUT",
       body: file,
-      headers: { "Content-Type": file.type },
+      headers: { "Content-Type": mime },
     });
     if (res.ok) {
       onUploaded?.(signed.data.publicUrl);
@@ -58,23 +65,30 @@ export default function ImageUpload({
     } else toast.error(t("uploadFailed"));
   };
 
+  const addFiles = (picked: File[]) => {
+    if (picked.some((f) => resolveUploadMime(f) === null)) {
+      toast.error(t("unsupportedType"));
+    }
+    if (picked.some((f) => f.size > MAX_UPLOAD_BYTES)) {
+      toast.error(t("fileTooLarge", { max: MAX_UPLOAD_BYTES / (1024 * 1024) }));
+    }
+    const room = Math.max(0, max - images.length);
+    const accepted = picked
+      .filter(
+        (f) => resolveUploadMime(f) !== null && f.size <= MAX_UPLOAD_BYTES,
+      )
+      .slice(0, room);
+    onChange([...images, ...accepted].slice(0, max));
+    void Promise.all(accepted.map(uploadOne));
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    const room = Math.max(0, max - images.length);
-    const newFiles = files.slice(0, room);
-    onChange([...images, ...newFiles].slice(0, max));
-    void Promise.all(newFiles.map(uploadOne));
+    addFiles(Array.from(e.dataTransfer.files));
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    const room = Math.max(0, max - images.length);
-    const newFiles = files.slice(0, room);
-    onChange([...images, ...newFiles].slice(0, max));
-    void Promise.all(newFiles.map(uploadOne));
+    addFiles(Array.from(e.target.files ?? []));
   };
 
   const remove = (i: number) => onChange(images.filter((_, idx) => idx !== i));
@@ -147,7 +161,7 @@ export default function ImageUpload({
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept={UPLOAD_ACCEPT}
         className="hidden"
         onChange={handleFile}
       />

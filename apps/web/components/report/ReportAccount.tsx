@@ -30,12 +30,17 @@ import { toast } from "@/components/ui/sonner";
 import type { User } from "@/lib/user";
 import { signUploadUser } from "@/actions/files";
 import { reportUser } from "@/actions/reports";
+import {
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+  resolveUploadMime,
+} from "@/lib/upload";
 import { REAL_ID, useReportReasons } from "./use-report-reasons";
 
-// Mirrors the backend: REPORT_MAX_IMAGES and the 5 MB image cap.
+// Mirrors the backend: REPORT_MAX_IMAGES and the bucket's object cap.
 const MAX_FILES = 6;
-const MAX_BYTES = 5 * 1024 * 1024;
-const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/avif";
+const MAX_BYTES = MAX_UPLOAD_BYTES;
+const ACCEPT = UPLOAD_ACCEPT;
 
 interface ReportAccountProps {
   user: User;
@@ -68,8 +73,12 @@ export function ReportAccount({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
     if (selected.some((f) => f.size > MAX_BYTES))
-      toast.error("Each photo must be 5 MB or smaller");
-    const ok = selected.filter((f) => f.size <= MAX_BYTES);
+      toast.error("Each photo must be 50 MB or smaller");
+    if (selected.some((f) => resolveUploadMime(f) === null))
+      toast.error("This image format isn't supported");
+    const ok = selected.filter(
+      (f) => f.size <= MAX_BYTES && resolveUploadMime(f) !== null,
+    );
     setFiles((prev) => [...prev, ...ok].slice(0, MAX_FILES));
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -88,6 +97,8 @@ export function ReportAccount({
   const uploadAll = async (): Promise<string[] | null> => {
     const paths: string[] = [];
     for (const file of files) {
+      const mime = resolveUploadMime(file);
+      if (!mime) return null;
       const signed = await signUploadUser(file.name, "report");
       if (!signed.success) {
         toast.error(signed.error);
@@ -96,7 +107,7 @@ export function ReportAccount({
       const res = await fetch(signed.data.signedUrl, {
         method: "PUT",
         body: file,
-        headers: { "Content-Type": file.type },
+        headers: { "Content-Type": mime },
       });
       if (!res.ok) {
         toast.error("Failed to upload a photo");

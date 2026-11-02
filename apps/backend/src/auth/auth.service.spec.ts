@@ -80,6 +80,10 @@ function makeLoginDevices() {
   };
 }
 
+function makeNotifications() {
+  return { notify: jest.fn().mockResolvedValue(undefined) };
+}
+
 function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
   return {
     getUser: jest.fn(),
@@ -94,6 +98,7 @@ function makeService(
   configService: ReturnType<typeof makeConfigService>,
   loginDevices = makeLoginDevices(),
   supabaseService = makeSupabase(),
+  notifications = makeNotifications(),
 ) {
   return new AuthService(
     db as never,
@@ -101,6 +106,7 @@ function makeService(
     configService as never,
     supabaseService as never,
     loginDevices as never,
+    notifications as never,
   );
 }
 
@@ -418,6 +424,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
     db: ReturnType<typeof makeDb>,
     supabase: ReturnType<typeof makeSupabase>,
     loginDevices = makeLoginDevices(),
+    notifications = makeNotifications(),
   ) {
     return new AuthService(
       db as never,
@@ -425,6 +432,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeConfigService() as never,
       supabase as never,
       loginDevices as never,
+      notifications as never,
     );
   }
 
@@ -630,6 +638,81 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       ).rejects.toThrow('INVALID_CREDENTIALS');
       expect(supabase.verifyOtp).not.toHaveBeenCalled();
       expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    describe('security.otp_verified notification', () => {
+      it('notifies the verifying user with phone, method and timestamp', async () => {
+        (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+        const db = makeDb();
+        db.select.mockImplementation(() => ({
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve([]) }),
+          }),
+        }));
+        const supabase = makeSupabase();
+        const notifications = makeNotifications();
+        const service = makeAuthService(
+          db,
+          supabase,
+          makeLoginDevices(),
+          notifications,
+        );
+        mockInsert(db, makeUser({ username: 'sokdara' }));
+
+        await service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '000000',
+          password: 'password123',
+          firstName: 'Sok',
+          lastName: 'Dara',
+        });
+
+        expect(notifications.notify).toHaveBeenCalledTimes(1);
+        expect(notifications.notify).toHaveBeenCalledWith({
+          userId: 'user-uuid',
+          type: 'security.otp_verified',
+          title: 'Phone verified',
+          body: `Your phone number ${PHONE} was verified with a one-time code.`,
+          data: {
+            phone: PHONE,
+            method: 'sms',
+            // Any ISO timestamp; the matcher is `any` by design.
+            verifiedAt: expect.any(String) as unknown as string,
+          },
+        });
+      });
+
+      it('raises no notification when the OTP is rejected', async () => {
+        const db = makeDb();
+        db.select.mockImplementation(() => ({
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve([]) }),
+          }),
+        }));
+        const supabase = makeSupabase();
+        supabase.verifyOtp.mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Invalid OTP' },
+        });
+        const notifications = makeNotifications();
+        const service = makeAuthService(
+          db,
+          supabase,
+          makeLoginDevices(),
+          notifications,
+        );
+
+        await expect(
+          service.verifyPhoneOtp({
+            phone: PHONE,
+            token: '000000',
+            password: 'password123',
+          }),
+        ).rejects.toThrow('Invalid or expired OTP');
+
+        expect(notifications.notify).not.toHaveBeenCalled();
+        expect(db.insert).not.toHaveBeenCalled();
+      });
     });
 
     it('legacy bare user is completed in place — password set, username generated, insert never called', async () => {
@@ -1663,5 +1746,326 @@ describe('AuthService linked providers', () => {
     await expect(
       service.unlinkSocialProvider('user-uuid', 'github'),
     ).rejects.toThrow('Unsupported provider');
+  });
+});
+
+describe('AuthService password reset', () => {
+  const PHONE = '+85512345678';
+  const STORED_PHONE_WITHOUT_PLUS = '85512345678';
+
+  function makeResetSupabase() {
+    return {
+      signInWithOtp: jest.fn().mockResolvedValue({ data: {}, error: null }),
+      verifyOtp: jest.fn().mockResolvedValue({
+        data: { user: { id: 'dev', phone: PHONE } },
+        error: null,
+      }),
+    };
+  }
+
+  function makeResetService(
+    db: ReturnType<typeof makeDb>,
+    supabase: ReturnType<typeof makeResetSupabase>,
+    loginDevices = {
+      ...makeLoginDevices(),
+      revokeAll: jest.fn().mockResolvedValue({ revoked: 1 }),
+    },
+    jwt = makeJwtService(),
+    notifications = makeNotifications(),
+  ) {
+    return new AuthService(
+      db as never,
+      jwt as never,
+      makeConfigService() as never,
+      supabase as never,
+      loginDevices as never,
+      notifications as never,
+    );
+  }
+
+  /**
+   * resolveResetTarget runs one user lookup, then isPhoneBanned runs one ban
+   * lookup — answer them in that order.
+   */
+  function mockLookups(
+    db: ReturnType<typeof makeDb>,
+    users: UserRow[],
+    banned: { id: string }[] = [],
+  ) {
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows = call === 1 ? users : banned;
+      return {
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve(rows) }),
+        }),
+      };
+    });
+  }
+
+  function mockTransaction(
+    db: ReturnType<typeof makeDb>,
+    returnedRows: { id: string }[],
+  ) {
+    const capture: { set?: Record<string, unknown> } = {};
+    const tx = {
+      update: jest.fn(() => ({
+        set: (values: Record<string, unknown>) => {
+          capture.set = values;
+          return {
+            where: () => ({ returning: () => Promise.resolve(returnedRows) }),
+          };
+        },
+      })),
+    };
+    const transaction = jest.fn((cb: (t: typeof tx) => unknown) => cb(tx));
+    Object.assign(db, { transaction });
+    return { capture, transaction };
+  }
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('requestPasswordReset', () => {
+    it('answers identically for an unknown identifier and sends nothing', async () => {
+      const db = makeDb();
+      mockLookups(db, []);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'ghost' }),
+      ).resolves.toEqual({ otpSent: true });
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('sends to the normalized E.164 phone of the resolved account', async () => {
+      const db = makeDb();
+      mockLookups(db, [
+        makeUser({
+          username: 'sokdara',
+          primaryPhone: STORED_PHONE_WITHOUT_PLUS,
+        }),
+      ]);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await service.requestPasswordReset({ identifier: 'SokDara' });
+
+      expect(supabase.signInWithOtp).toHaveBeenCalledWith(PHONE, {
+        devBypass: false,
+      });
+    });
+
+    it('sends nothing for a suspended account but still answers success', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ status: 'suspended', primaryPhone: PHONE })]);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'sokdara' }),
+      ).resolves.toEqual({ otpSent: true });
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for an account with no phone', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: null })]);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await service.requestPasswordReset({ identifier: 'sokdara' });
+
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for a banned number', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: PHONE })], [{ id: 'ban-1' }]);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await service.requestPasswordReset({ identifier: 'sokdara' });
+
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('still answers success when the SMS provider throws', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: PHONE })]);
+      const supabase = makeResetSupabase();
+      supabase.signInWithOtp.mockRejectedValue(new Error('SMS is down'));
+      const service = makeResetService(db, supabase);
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'sokdara' }),
+      ).resolves.toEqual({ otpSent: true });
+    });
+  });
+
+  describe('verifyResetCode', () => {
+    it('returns a purpose-tagged reset token after a valid code and does not touch the password', async () => {
+      const user = makeUser({ primaryPhone: PHONE });
+      const db = makeDb();
+      mockLookups(db, [user]);
+      const supabase = makeResetSupabase();
+      const jwt = makeJwtService();
+      const service = makeResetService(db, supabase, undefined, jwt);
+
+      await expect(
+        service.verifyResetCode({ identifier: 'sokdara', token: '654321' }),
+      ).resolves.toEqual({ resetToken: 'signed-token' });
+
+      expect(supabase.verifyOtp).toHaveBeenCalledWith(PHONE, '654321', {
+        devBypass: false,
+      });
+      expect(jwt.sign).toHaveBeenCalledWith(
+        { sub: user.id, typ: 'password_reset' },
+        { expiresIn: 600 },
+      );
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a bad OTP without minting a token', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: PHONE })]);
+      const supabase = makeResetSupabase();
+      supabase.verifyOtp.mockResolvedValue({
+        data: { user: null },
+        error: { message: 'Invalid OTP' },
+      });
+      const jwt = makeJwtService();
+      const service = makeResetService(db, supabase, undefined, jwt);
+
+      await expect(
+        service.verifyResetCode({ identifier: 'sokdara', token: '000000' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(jwt.sign).not.toHaveBeenCalled();
+    });
+
+    it('answers uniformly for an unknown identifier without burning an OTP', async () => {
+      const db = makeDb();
+      mockLookups(db, []);
+      const supabase = makeResetSupabase();
+      const service = makeResetService(db, supabase);
+
+      await expect(
+        service.verifyResetCode({ identifier: 'ghost', token: '654321' }),
+      ).rejects.toThrow('INVALID_OR_EXPIRED_OTP');
+
+      expect(supabase.verifyOtp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmPasswordReset', () => {
+    function makeValidJwt(userId = 'user-uuid') {
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockResolvedValue({
+        sub: userId,
+        typ: 'password_reset',
+      });
+      return jwt;
+    }
+
+    it('stores the new hash and revokes every session in one transaction', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const user = makeUser({ primaryPhone: PHONE });
+      const db = makeDb();
+      const { capture, transaction } = mockTransaction(db, [{ id: user.id }]);
+      const jwt = makeValidJwt(user.id);
+      const loginDevices = {
+        ...makeLoginDevices(),
+        revokeAll: jest.fn().mockResolvedValue({ revoked: 2 }),
+      };
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        loginDevices,
+        jwt,
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).resolves.toEqual({ reset: true });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('newpass123', 10);
+      expect(capture.set).toMatchObject({ passwordHash: 'new-hash' });
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(loginDevices.revokeAll).toHaveBeenCalledWith(
+        user.id,
+        expect.anything(),
+      );
+    });
+
+    it('refuses an access-token payload — only a reset proof is accepted', async () => {
+      const db = makeDb();
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockResolvedValue({ sub: 'user-uuid', role: 'user' });
+      const loginDevices = { ...makeLoginDevices(), revokeAll: jest.fn() };
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        loginDevices,
+        jwt,
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'access-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(loginDevices.revokeAll).not.toHaveBeenCalled();
+    });
+
+    it('refuses an expired or tampered token', async () => {
+      const db = makeDb();
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockRejectedValue(new Error('jwt expired'));
+      const service = makeResetService(db, makeResetSupabase(), undefined, jwt);
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'stale-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+    });
+
+    it('refuses a zero-row update (concurrent delete) instead of reporting success', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const db = makeDb();
+      mockTransaction(db, []);
+      const jwt = makeValidJwt();
+      const loginDevices = { ...makeLoginDevices(), revokeAll: jest.fn() };
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        loginDevices,
+        jwt,
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(loginDevices.revokeAll).not.toHaveBeenCalled();
+    });
   });
 });

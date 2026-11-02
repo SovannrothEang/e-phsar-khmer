@@ -1009,6 +1009,8 @@
     "browse": "Click to Browse",
     "supported": "Supports: jpg, png, gif, jpeg, heic, heif, dng, webp",
     "uploadFailed": "Failed to upload a photo",
+    "unsupportedType": "This image format isn't supported.",
+    "fileTooLarge": "The photo is too large. Maximum size is {max} MB.",
     "addPhone": "Add phone number",
     "removePhone": "Remove phone number",
     "yes": "Yes",

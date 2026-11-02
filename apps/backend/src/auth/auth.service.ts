@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -23,6 +24,13 @@ import type { UserRow } from '../db/schema/users.schema';
 import { SupabaseService } from '../common/supabase/supabase.service';
 import type { LoginDto } from './dto/login.dto';
 import type { LoginOtpDto } from './dto/login-otp.dto';
+import type { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import type { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
+import type { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
+import {
+  PASSWORD_RESET_TTL_SECONDS,
+  PASSWORD_RESET_TYP,
+} from './password-reset-token';
 import type { RegisterDto } from './dto/register.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { RefreshDto } from './dto/refresh.dto';
@@ -33,10 +41,11 @@ import {
   generateUniqueUsername,
   normalizeUsername,
 } from '../users/username.util';
-import { isPhoneBanned } from '../reports/phone-ban.util';
+import { isPhoneBanned, normalizePhoneE164 } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 
 export interface AuthTokens {
@@ -51,6 +60,9 @@ const PASSWORD_SALT_ROUNDS = 10;
 /** A `sid` is a row UUID; reject anything else before it reaches Postgres. */
 const SESSION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** What Supabase will accept as a phone; a stored value that fails it is unusable. */
+const RESET_PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
 
 /** postgres.js exposes the SQLSTATE on the error object. */
 function isUniqueViolation(error: unknown): boolean {
@@ -83,12 +95,15 @@ export interface TelegramAuthPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
     private readonly loginDevices: LoginDevicesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async loginWithPassword(
@@ -213,7 +228,7 @@ export class AuthService {
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
-      return this.finishLogin(revived, device);
+      return this.completeVerifiedLogin(revived, device, dto.phone);
     }
 
     if (completingBareAccount) {
@@ -239,7 +254,7 @@ export class AuthService {
         .where(and(eq(users.id, existing.id), isNull(users.deletedAt)))
         .returning();
 
-      return this.finishLogin(row, device);
+      return this.completeVerifiedLogin(row, device, dto.phone);
     }
 
     // Extras land ONLY in the INSERT values — the conflict path (existing
@@ -265,7 +280,42 @@ export class AuthService {
       insertExtras,
     );
     this.assertAccountActive(user);
-    return this.finishLogin(user, device);
+    return this.completeVerifiedLogin(user, device, dto.phone);
+  }
+
+  /**
+   * Finishes a successful OTP verification and records it in the durable
+   * notification feed. The notification is best-effort: the caller is
+   * already signed in, so a feed failure must not fail the login (the same
+   * policy `security.new_login` uses). Only `verifyPhoneOtp` comes through
+   * here — `register` and `otp/login` send a code but never consume one.
+   */
+  private async completeVerifiedLogin(
+    user: UserRow,
+    device: ClientDeviceInfo | null,
+    phone: string,
+  ): Promise<AuthResult> {
+    const result = await this.finishLogin(user, device);
+    try {
+      await this.notifications.notify({
+        userId: user.id,
+        type: 'security.otp_verified',
+        title: 'Phone verified',
+        body: `Your phone number ${phone} was verified with a one-time code.`,
+        data: {
+          phone,
+          method: 'sms',
+          verifiedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not create the OTP-verified notification for user ${user.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    return result;
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
@@ -294,6 +344,177 @@ export class AuthService {
 
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
+  }
+
+  /**
+   * Forgot-password step 1: text a code to the phone registered on the
+   * account. The answer is ALWAYS `{ otpSent: true }` — whether the
+   * identifier matches anything is exactly what a reset form must not
+   * reveal. Only the account's own phone is ever texted, so this cannot be
+   * used to pump SMS at arbitrary numbers.
+   */
+  async requestPasswordReset(
+    dto: RequestPasswordResetDto,
+  ): Promise<{ otpSent: true }> {
+    const target = await this.resolveResetTarget(dto.identifier);
+    if (target) {
+      try {
+        // `devBypass: false` — the reset flow never honours DEV_OTP_TOKEN,
+        // even in development: it must exercise the real provider so a
+        // production deploy cannot inherit a test-only path.
+        await this.supabaseService.signInWithOtp(target.phone, {
+          devBypass: false,
+        });
+      } catch (err) {
+        // Swallowed on purpose: a failure here must not tell the caller the
+        // account exists. Never log the identifier or the phone.
+        this.logger.warn(
+          `Password-reset OTP send failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+    return { otpSent: true };
+  }
+
+  /**
+   * Forgot-password step 2: verify the SMS code and hand back a short-lived
+   * proof for the password step. Supabase OTPs are single-use, so the code is
+   * consumed here — the password is set by `confirmPasswordReset`.
+   */
+  async verifyResetCode(
+    dto: VerifyResetCodeDto,
+  ): Promise<{ resetToken: string }> {
+    const target = await this.resolveResetTarget(dto.identifier);
+    if (!target) throw this.invalidResetOtp();
+
+    const { data, error } = await this.supabaseService.verifyOtp(
+      target.phone,
+      dto.token,
+      // Never accept the dev token on the reset path (see requestPasswordReset).
+      { devBypass: false },
+    );
+    if (error || !data.user) throw this.invalidResetOtp();
+
+    const resetToken = this.jwtService.sign(
+      { sub: target.userId, typ: PASSWORD_RESET_TYP },
+      { expiresIn: PASSWORD_RESET_TTL_SECONDS },
+    );
+    return { resetToken };
+  }
+
+  /**
+   * Forgot-password step 3: the proof from `verifyResetCode` buys one
+   * password change. The password and the session revoke are one transaction
+   * — a half-applied reset would leave old sessions alive against a changed
+   * password.
+   */
+  async confirmPasswordReset(
+    dto: ConfirmPasswordResetDto,
+  ): Promise<{ reset: true }> {
+    const payload = await this.verifyResetToken(dto.resetToken);
+    if (!payload) throw this.invalidResetSession();
+
+    const passwordHash = await bcrypt.hash(
+      dto.newPassword,
+      PASSWORD_SALT_ROUNDS,
+    );
+
+    const updated = await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(
+          and(
+            eq(users.id, payload.sub),
+            eq(users.status, 'active'),
+            isNull(users.deletedAt),
+          ),
+        )
+        .returning({ id: users.id });
+      if (row) await this.loginDevices.revokeAll(payload.sub, tx);
+      return row;
+    });
+    // A concurrent delete/suspend between verify and confirm must not report
+    // a successful reset.
+    if (!updated) throw this.invalidResetSession();
+
+    return { reset: true };
+  }
+
+  /** Validates the proof minted by `verifyResetCode`; null on any failure. */
+  private async verifyResetToken(
+    token: string,
+  ): Promise<{ sub: string } | null> {
+    try {
+      const payload = await this.jwtService.verifyAsync<{
+        sub?: unknown;
+        typ?: unknown;
+      }>(token);
+      if (
+        payload.typ !== PASSWORD_RESET_TYP ||
+        typeof payload.sub !== 'string'
+      ) {
+        return null;
+      }
+      return { sub: payload.sub };
+    } catch {
+      // Expired, tampered with, or signed with another key.
+      return null;
+    }
+  }
+
+  /**
+   * The account a reset may act on: active, not deleted, with a usable phone
+   * and not banned. The E.164 phone is what Supabase must receive — rows are
+   * stored as submitted, so older/admin ones may lack the `+`.
+   */
+  private async resolveResetTarget(
+    rawIdentifier: string,
+  ): Promise<{ userId: string; phone: string } | null> {
+    const identifier = rawIdentifier.trim();
+    if (identifier.length === 0) return null;
+
+    // The old form accepted spaces/dashes in phone numbers; the column stores
+    // the bare digits.
+    const phoneCandidate = /^[+\d][\d\s-]{5,}$/.test(identifier)
+      ? identifier.replace(/[\s-]/g, '')
+      : identifier;
+
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(
+        and(
+          or(
+            eq(users.username, identifier),
+            eq(users.username, normalizeUsername(identifier)),
+            eq(users.primaryPhone, identifier),
+            eq(users.primaryPhone, phoneCandidate),
+            // Case-insensitive email; the identifier is bound as a parameter.
+            sql`lower(${users.email}) = ${identifier.toLowerCase()}`,
+          ),
+          isNull(users.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!user || user.status !== 'active' || !user.primaryPhone) return null;
+
+    const phone = normalizePhoneE164(user.primaryPhone.replace(/[\s-]/g, ''));
+    if (!RESET_PHONE_PATTERN.test(phone)) return null;
+    if (await isPhoneBanned(this.db, phone)) return null;
+
+    return { userId: user.id, phone };
+  }
+
+  private invalidResetOtp(): UnauthorizedException {
+    return new UnauthorizedException('INVALID_OR_EXPIRED_OTP');
+  }
+
+  private invalidResetSession(): UnauthorizedException {
+    return new UnauthorizedException('INVALID_RESET_TOKEN');
   }
 
   async getSocialAuthUrl(

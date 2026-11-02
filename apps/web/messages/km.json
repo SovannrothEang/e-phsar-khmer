@@ -1009,6 +1009,8 @@
     "browse": "ចុចដើម្បីជ្រើសរើស",
     "supported": "អាចដាក់បានប្រភេទ: jpg,png,gif,jpeg,heic,heif,dng,webp",
     "uploadFailed": "ការផ្ទុករូបថតបានបរាជ័យ",
+    "unsupportedType": "ប្រភេទរូបភាពនេះមិនគាំទ្រទេ។",
+    "fileTooLarge": "រូបថតធំពេក។ ទំហំអតិបរមាគឺ {max} MB។",
     "addPhone": "បន្ថែមលេខទូរស័ព្ទ",
     "removePhone": "លុបលេខទូរស័ព្ទ",
     "yes": "មាន",

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const envSchema = z.object({
+const baseEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
@@ -183,6 +183,20 @@ const envSchema = z.object({
   // expired — bakong-khqr requires an expirationTimestamp for any KHQR that
   // carries an amount (a "dynamic" QR), so this always applies here.
   BAKONG_QR_EXPIRY_SECONDS: z.coerce.number().default(300),
+});
+
+const envSchema = baseEnvSchema.superRefine((env, ctx) => {
+  // A fixed OTP accepted for every phone is a dev convenience, but the
+  // password-reset flow turns it into an account-takeover primitive: anyone
+  // who knows an identifier could verify with the static token and set a new
+  // password. Fail the boot instead of shipping the bypass.
+  if (env.NODE_ENV === 'production' && env.DEV_OTP_TOKEN) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['DEV_OTP_TOKEN'],
+      message: 'DEV_OTP_TOKEN must not be set in production',
+    });
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
