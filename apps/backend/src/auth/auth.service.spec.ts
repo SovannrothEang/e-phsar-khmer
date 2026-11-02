@@ -1,4 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  HttpException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -40,6 +44,7 @@ function makeUser(overrides: Partial<UserRow> = {}): UserRow {
     discoverableByLocation: true,
     lastSeenAt: null,
     emailVerifiedAt: null,
+    tokensValidAfter: null,
     phoneVerifiedAt: null,
     deletedAt: null,
     createdAt: new Date(),
@@ -52,7 +57,13 @@ function makeDb() {
   return {
     select: jest.fn(),
     insert: jest.fn(),
-    update: jest.fn(),
+    // Default no-op chain so a call this test doesn't care about (e.g.
+    // `stampPhoneVerified`'s own UPDATE) never throws on an un-mocked
+    // `.set()`/`.where()`; tests asserting a specific UPDATE still override
+    // this with their own `mockImplementation`.
+    update: jest.fn().mockImplementation(() => ({
+      set: () => ({ where: () => Promise.resolve([]) }),
+    })),
     delete: jest.fn(),
   };
 }
@@ -80,6 +91,14 @@ function makeLoginDevices() {
   };
 }
 
+function makeOtpService() {
+  return { verify: jest.fn() };
+}
+
+function makeOtpSender() {
+  return { issueAndSend: jest.fn() };
+}
+
 function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
   return {
     getUser: jest.fn(),
@@ -101,6 +120,9 @@ function makeService(
     configService as never,
     supabaseService as never,
     loginDevices as never,
+    makeOtpService() as never,
+    makeOtpSender() as never,
+    { notify: jest.fn() } as never,
   );
 }
 
@@ -425,6 +447,9 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeConfigService() as never,
       supabase as never,
       loginDevices as never,
+      makeOtpService() as never,
+      makeOtpSender() as never,
+      { notify: jest.fn() } as never,
     );
   }
 
@@ -558,6 +583,48 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       });
       expect(bcrypt.hash).not.toHaveBeenCalled();
       expect(selectCall).toBe(3); // no username probes
+    });
+
+    it('stamps phoneVerifiedAt on a successful login OTP (CLAUDE.md known gap, fixed here)', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const existing = makeUser({
+        primaryPhone: PHONE,
+        passwordHash: '$2b$10$hash',
+        phoneVerifiedAt: null,
+      });
+      let selectCall = 0;
+      const db = makeDb();
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup → not banned; 2: existing-user fetch;
+        // 3: the mirror's own ban re-check → not banned
+        const rows = selectCall === 2 ? [existing] : [];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      const supabase = makeSupabase();
+      const service = makeAuthService(db, supabase);
+      mockInsert(db, existing);
+      const updateSets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          updateSets.push(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }));
+
+      await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '000000',
+        password: 'password123',
+      });
+
+      expect(updateSets).toContainEqual({
+        phoneVerifiedAt: expect.any(Date) as unknown as Date,
+      });
     });
 
     it('propagates newDevice from the device recorder', async () => {
@@ -1663,5 +1730,397 @@ describe('AuthService linked providers', () => {
     await expect(
       service.unlinkSocialProvider('user-uuid', 'github'),
     ).rejects.toThrow('Unsupported provider');
+  });
+});
+
+describe('AuthService phone OTP (provider switch)', () => {
+  const PHONE = '+85512345678';
+
+  function selects(
+    db: ReturnType<typeof makeDb>,
+    rowsFor: (n: number) => UserRow[],
+  ) {
+    let n = 0;
+    db.select.mockImplementation(() => {
+      n++;
+      const rows = rowsFor(n);
+      return {
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve(rows) }),
+        }),
+      };
+    });
+  }
+
+  function build(provider: 'plasgate' | 'supabase') {
+    const db = makeDb();
+    const otpService = makeOtpService();
+    const otpSender = makeOtpSender();
+    const supabase = {
+      verifyOtp: jest.fn().mockResolvedValue({
+        data: { user: { id: 'sb', phone: PHONE } },
+        error: null,
+      }),
+      signInWithOtp: jest.fn().mockResolvedValue({ data: {}, error: null }),
+    };
+    const service = new AuthService(
+      db as never,
+      { sign: jest.fn().mockReturnValue('signed-token') } as never,
+      makeConfigService({ 'otp.provider': provider }) as never,
+      supabase as never,
+      makeLoginDevices() as never,
+      otpService as never,
+      otpSender as never,
+      { notify: jest.fn() } as never,
+    );
+    return { db, service, otpService, otpSender, supabase };
+  }
+
+  function mockInsert(db: ReturnType<typeof makeDb>, row: UserRow) {
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({ returning: () => Promise.resolve([row]) }),
+        onConflictDoNothing: () => Promise.resolve(),
+      }),
+    }));
+  }
+
+  function captureUpdates(db: ReturnType<typeof makeDb>) {
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockImplementation(() => ({
+      set: (v: Record<string, unknown>) => {
+        sets.push(v);
+        return {
+          where: () => {
+            const p = Promise.resolve([]) as Promise<unknown[]> & {
+              returning?: () => Promise<UserRow[]>;
+            };
+            p.returning = () =>
+              Promise.resolve([makeUser({ primaryPhone: PHONE })]);
+            return p;
+          },
+        };
+      },
+    }));
+    return sets;
+  }
+
+  function bannedDb(db: ReturnType<typeof makeDb>) {
+    db.select.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([{ id: 'ban' }]) }),
+      }),
+    }));
+  }
+
+  afterEach(() => jest.clearAllMocks());
+
+  describe('plasgate: sending', () => {
+    it('register issues+sends and returns retryAfterSeconds (with client ip)', async () => {
+      const { db, service, otpSender, supabase } = build('plasgate');
+      selects(db, () => []);
+      otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+
+      await expect(
+        service.registerWithPhone(
+          { phone: PHONE, password: 'x' } as never,
+          '1.2.3.4',
+        ),
+      ).resolves.toEqual({ otpSent: true, retryAfterSeconds: 300 });
+      expect(otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'register',
+        '1.2.3.4',
+      );
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('cooldown -> 429 OTP_COOLDOWN with retryAfterSeconds', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      selects(db, () => []);
+      otpSender.issueAndSend.mockResolvedValue({
+        status: 'cooldown',
+        retryAfterSeconds: 42,
+      });
+
+      const err = await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(HttpException);
+      const http = err as HttpException;
+      expect(http.getStatus()).toBe(429);
+      expect(http.getResponse()).toMatchObject({
+        code: 'OTP_COOLDOWN',
+        retryAfterSeconds: 42,
+      });
+      expect(otpSender.issueAndSend).toHaveBeenCalledTimes(1);
+    });
+
+    it('daily cap -> 429 OTP_DAILY_CAP', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      selects(db, () => []);
+      otpSender.issueAndSend.mockResolvedValue({ status: 'daily_cap' });
+      const err = (await service
+        .requestPhoneOtp(PHONE)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err.getStatus()).toBe(429);
+      expect(err.getResponse()).toMatchObject({ code: 'OTP_DAILY_CAP' });
+    });
+
+    it.each(['provider_rejected', 'unavailable'])(
+      '%s -> 503 OTP_SEND_FAILED without provider text',
+      async (status) => {
+        const { db, service, otpSender } = build('plasgate');
+        selects(db, () => []);
+        otpSender.issueAndSend.mockResolvedValue({ status });
+        const err = await service
+          .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+          .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect((err as HttpException).getResponse()).toMatchObject({
+          code: 'OTP_SEND_FAILED',
+        });
+      },
+    );
+
+    it('banned number gets no SMS and no code', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      bannedDb(db);
+      await expect(
+        service.registerWithPhone({ phone: PHONE, password: 'x' } as never),
+      ).rejects.toBeDefined();
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('resend infers login for an active account and register otherwise', async () => {
+      const a = build('plasgate');
+      // 1: ban lookup (none), 2: active user lookup (found)
+      selects(a.db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE })] : [],
+      );
+      a.otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+      await a.service.requestPhoneOtp(PHONE, 'ip');
+      expect(a.otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'login',
+        'ip',
+      );
+
+      const b = build('plasgate');
+      selects(b.db, () => []);
+      b.otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+      await b.service.requestPhoneOtp(PHONE, 'ip');
+      expect(b.otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'register',
+        'ip',
+      );
+    });
+
+    it('login OTP: wrong password sends nothing; right password sends a login code', async () => {
+      const user = makeUser({ primaryPhone: PHONE, passwordHash: 'h' });
+      const bad = build('plasgate');
+      selects(bad.db, () => [user]);
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
+      await expect(
+        bad.service.requestLoginOtp({ phone: PHONE, password: 'no' } as never),
+      ).rejects.toThrow('INVALID_CREDENTIALS');
+      expect(bad.otpSender.issueAndSend).not.toHaveBeenCalled();
+
+      const good = build('plasgate');
+      selects(good.db, (n) => (n === 1 ? [user] : []));
+      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
+      good.otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+      await expect(
+        good.service.requestLoginOtp(
+          { phone: PHONE, password: 'ok' } as never,
+          'ip',
+        ),
+      ).resolves.toEqual({ otpSent: true, retryAfterSeconds: 300 });
+      expect(good.otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'login',
+        'ip',
+      );
+    });
+  });
+
+  describe('plasgate: verify', () => {
+    it('right code creates the account and stamps phoneVerifiedAt', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      const { db, service, otpService, supabase } = build('plasgate');
+      selects(db, () => []);
+      mockInsert(db, makeUser({ primaryPhone: PHONE }));
+      const sets = captureUpdates(db);
+      otpService.verify.mockResolvedValue({
+        status: 'ok',
+        purpose: 'register',
+      });
+
+      const res = await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+      });
+
+      expect(res.accessToken).toBe('signed-token');
+      expect(otpService.verify).toHaveBeenCalledWith(
+        PHONE,
+        ['register', 'login'],
+        '123456',
+      );
+      expect(supabase.verifyOtp).not.toHaveBeenCalled();
+      expect(sets).toContainEqual({
+        phoneVerifiedAt: expect.any(Date) as unknown as Date,
+      });
+    });
+
+    it.each(['invalid', 'expired', 'too_many_attempts'])(
+      '%s code -> 401 Invalid or expired OTP, no distinct body (enumeration)',
+      async (status) => {
+        const { db, service, otpService } = build('plasgate');
+        selects(db, () => []);
+        otpService.verify.mockResolvedValue({ status });
+        await expect(
+          service.verifyPhoneOtp({
+            phone: PHONE,
+            token: '000000',
+            password: 'password123',
+          }),
+        ).rejects.toThrow(new UnauthorizedException('Invalid or expired OTP'));
+        expect(db.insert).not.toHaveBeenCalled();
+      },
+    );
+
+    it('wrong password never calls OtpService.verify (no attempt burnt)', async () => {
+      const { db, service, otpService } = build('plasgate');
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: 'h' })] : [],
+      );
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      await expect(
+        service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '123456',
+          password: 'bad',
+        }),
+      ).rejects.toThrow('INVALID_CREDENTIALS');
+      expect(otpService.verify).not.toHaveBeenCalled();
+    });
+
+    it('banned number never reaches OtpService.verify', async () => {
+      const { db, service, otpService } = build('plasgate');
+      bannedDb(db);
+      await expect(
+        service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '123456',
+          password: 'password123',
+        }),
+      ).rejects.toBeDefined();
+      expect(otpService.verify).not.toHaveBeenCalled();
+    });
+
+    it('revives a deleted account after a valid code', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const recoverable = makeUser({
+        primaryPhone: PHONE,
+        deletedAt: new Date(),
+        status: 'deleted',
+      });
+      const { db, service, otpService } = build('plasgate');
+      selects(db, (n) => (n <= 2 ? [] : [recoverable]));
+      const sets = captureUpdates(db);
+      otpService.verify.mockResolvedValue({ status: 'ok', purpose: 'login' });
+      const res = await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+      });
+      expect(res.accessToken).toBe('signed-token');
+      expect(sets).toContainEqual({ status: 'active', deletedAt: null });
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('completes a bare account in place after a valid code', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      const { db, service, otpService } = build('plasgate');
+      selects(db, (n) =>
+        n === 2
+          ? [
+              makeUser({
+                primaryPhone: PHONE,
+                passwordHash: null,
+                username: null,
+              }),
+            ]
+          : [],
+      );
+      const sets = captureUpdates(db);
+      otpService.verify.mockResolvedValue({ status: 'ok', purpose: 'login' });
+      await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+      });
+      expect(sets[0]).toMatchObject({ passwordHash: 'hashed' });
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('login-OTP end to end: existing user, right password and code', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const existing = makeUser({ primaryPhone: PHONE, passwordHash: 'h' });
+      const { db, service, otpService } = build('plasgate');
+      selects(db, (n) => (n === 2 ? [existing] : []));
+      mockInsert(db, existing);
+      captureUpdates(db);
+      otpService.verify.mockResolvedValue({ status: 'ok', purpose: 'login' });
+      const res = await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+      });
+      expect(res.user.id).toBe(existing.id);
+    });
+  });
+
+  describe('supabase provider', () => {
+    it('never touches OtpService / OtpSmsSender', async () => {
+      const { db, service, otpService, otpSender, supabase } =
+        build('supabase');
+      selects(db, () => []);
+      mockInsert(db, makeUser({ primaryPhone: PHONE }));
+      captureUpdates(db);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+
+      await expect(
+        service.registerWithPhone({ phone: PHONE, password: 'x' } as never),
+      ).resolves.toEqual({ otpSent: true });
+      await expect(service.requestPhoneOtp(PHONE)).resolves.toEqual({
+        otpSent: true,
+      });
+      await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+      });
+
+      expect(supabase.signInWithOtp).toHaveBeenCalledTimes(2);
+      expect(supabase.verifyOtp).toHaveBeenCalledTimes(1);
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+      expect(otpService.verify).not.toHaveBeenCalled();
+    });
   });
 });

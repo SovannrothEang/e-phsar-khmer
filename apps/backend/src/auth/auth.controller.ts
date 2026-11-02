@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,6 +25,8 @@ import { LoginDto } from './dto/login.dto';
 import { LoginOtpDto } from './dto/login-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RequestOtpDto } from './dto/request-otp.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { SocialLoginDto } from './dto/social-login.dto';
@@ -59,16 +62,16 @@ export class AuthController {
   @Throttle(SMS_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Register with phone number (sends OTP)' })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.registerWithPhone(dto);
+  register(@Body() dto: RegisterDto, @Ip() ip: string) {
+    return this.authService.registerWithPhone(dto, ip);
   }
 
   @Post('otp/request')
   @Throttle(SMS_LIMIT)
   @Public()
   @ApiOperation({ summary: 'Request OTP for phone' })
-  requestOtp(@Body() dto: RequestOtpDto) {
-    return this.authService.requestPhoneOtp(dto.phone);
+  requestOtp(@Body() dto: RequestOtpDto, @Ip() ip: string) {
+    return this.authService.requestPhoneOtp(dto.phone, ip);
   }
 
   @Post('otp/login')
@@ -77,8 +80,8 @@ export class AuthController {
   @ApiOperation({
     summary: 'Login with phone + password (validates password, then sends OTP)',
   })
-  requestLoginOtp(@Body() dto: LoginOtpDto) {
-    return this.authService.requestLoginOtp(dto);
+  requestLoginOtp(@Body() dto: LoginOtpDto, @Ip() ip: string) {
+    return this.authService.requestLoginOtp(dto, ip);
   }
 
   @Post('otp/verify')
@@ -90,6 +93,29 @@ export class AuthController {
     @ClientDevice() device: ClientDeviceInfo | null,
   ) {
     return this.authService.verifyPhoneOtp(dto, device);
+  }
+
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(SMS_LIMIT)
+  @Public()
+  @ApiOperation({
+    summary:
+      'Send a password-reset code (same answer whether or not the number has an account)',
+  })
+  forgotPassword(@Body() dto: ForgotPasswordDto, @Ip() ip: string) {
+    return this.authService.requestPasswordReset(dto, ip);
+  }
+
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(CREDENTIAL_LIMIT)
+  @Public()
+  @ApiOperation({
+    summary: 'Reset the password with the SMS code; signs out every session',
+  })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Get('social/:provider/url')

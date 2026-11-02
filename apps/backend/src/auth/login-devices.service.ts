@@ -288,6 +288,20 @@ export class LoginDevicesService {
     return { revoked };
   }
 
+  /**
+   * Revoke every active row of the user (password reset). Rows only cover
+   * tokens that carry a `sid`; `users.tokensValidAfter` covers the rest.
+   */
+  async revokeAllForUser(userId: string): Promise<RevokeResult> {
+    const revoked = await this.revokeWhere(
+      and(
+        eq(userLoginDevices.userId, userId),
+        isNull(userLoginDevices.revokedAt),
+      ),
+    );
+    return { revoked };
+  }
+
   /** Revoke every active row except the caller's current one. */
   async revokeOthers(
     userId: string,
