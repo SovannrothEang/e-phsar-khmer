@@ -247,6 +247,7 @@ describe('AuthService', () => {
 
       expect(result.newDevice).toBe(true);
       expect(result.user).not.toHaveProperty('passwordHash');
+      expect(result.user).not.toHaveProperty('tokensValidAfter');
       expect(loginDevices.recordLogin).toHaveBeenCalledWith(user.id, device);
     });
 

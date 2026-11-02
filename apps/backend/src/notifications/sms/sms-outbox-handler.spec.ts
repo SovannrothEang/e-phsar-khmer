@@ -283,6 +283,7 @@ describe('SmsOutboxHandler', () => {
       expect.objectContaining({
         status: 'skipped',
         skipReason: 'phone_not_verified',
+        attempts: 1,
       }),
     );
   });
@@ -382,7 +383,7 @@ describe('SmsOutboxHandler', () => {
   });
 
   it('retries on a PlasGate network/timeout error', async () => {
-    const { db } = makeDb(verifiedUser);
+    const { db, updateSets } = makeDb(verifiedUser);
     const plasGate = makePlasGate({
       send: jest
         .fn()
@@ -404,6 +405,7 @@ describe('SmsOutboxHandler', () => {
       }),
     );
     expect(result.status).toBe('retry');
+    expect(updateSets).toContainEqual(expect.objectContaining({ attempts: 1 }));
   });
 
   it('fails permanently on a 400 Invalid Sender', async () => {

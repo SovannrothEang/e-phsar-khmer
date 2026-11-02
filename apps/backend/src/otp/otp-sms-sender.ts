@@ -150,8 +150,15 @@ export class OtpSmsSender {
     try {
       return await this.otp.issue(phone, purpose, ip);
     } catch (err) {
-      // Best-effort: releasing must not mask the original failure.
-      await this.userLimiter.releaseSubject(slot).catch(() => undefined);
+      // Best-effort: releasing must not mask the original failure, but a
+      // failed release means the lockout persists — log it so it is traceable.
+      await this.userLimiter
+        .releaseSubject(slot)
+        .catch((releaseErr: unknown) =>
+          this.logger.warn(
+            `Could not release the OTP limiter slot: ${releaseErr instanceof Error ? releaseErr.message : String(releaseErr)}`,
+          ),
+        );
       throw err;
     }
   }
