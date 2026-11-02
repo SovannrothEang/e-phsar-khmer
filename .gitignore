@@ -51,4 +51,5 @@ yarn-error.log*
 .claude/
 docs/
 .harness/
+# Isolated worker worktrees created by the harness (full repo copies)
 .harness-worktrees/
