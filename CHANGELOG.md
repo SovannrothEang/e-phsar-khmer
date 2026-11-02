@@ -21,6 +21,25 @@ How to use this file:
 
 ### Added
 
+- **Users can edit their own ads (web).** Manage Ads now offers **Edit ad** on the Active,
+  Expired and Hidden tabs; `/post/edit/[id]` reuses the real post form with every value
+  prefilled (photos, attributes, place cascade, contact, product link). Saving PATCHes the
+  listing and keeps the original publish date, 30-day expiry and feed position — an edit is a
+  correction, not a renewal. Backend: `GET /listings/me/:id` powers the owner prefill;
+  `PATCH /listings/:id` now honors `categoryId`/`subcategoryId` as a validated pair (category
+  ownership, target plan scope for live ads, product-spec family, attributes required on a
+  move), re-checks photos against the target scope, and turns explicit nulls for NOT NULL
+  columns plus inconsistent discount pairs into 400s. The form sends photos only when they
+  changed and explicit nulls only for fields the user cleared; existing photos can be removed
+  in place, and removing a just-uploaded file now drops its signed object from the payload.
+  Verified: backend 87 suites / 1,260 tests + `nest build`; web `next build` + eslint +
+  prettier; live API create → owner read → edit/clear → cross-category move → guard walk; and a
+  headless-Chromium edit → save → detail walk with dates unchanged. Known gaps: mobile has no
+  edit screen yet. Follow-up (same day): staff-inactive ads stay in the **Active** tab with an
+  Inactive row flag and staff reason instead of a separate tab; the owner query DTO accepts
+  `inactive` and the Active filter includes it, and Manage Ads was re-verified in the browser
+  (Active/Expired only, no validation error).
+
 - **OTP verification now leaves a durable notification.** A successful
   `POST /auth/otp/verify` creates a `security.otp_verified` in-app notification for the
   verifying account — `data = { phone, method: 'sms', verifiedAt }` — so the feed keeps a
@@ -44,15 +63,28 @@ How to use this file:
   refuses the reset proof as a bearer. The web form is now three sequential steps —
   identifier → code (verify button + 60 s resend) → new/confirm password — and ends at
   `/login` with a success toast. `DEV_OTP_TOKEN` is rejected at boot when
-  `NODE_ENV=production`, and the reset flow never honours it even in development: both its
-  send and verify calls pass `devBypass: false` to `SupabaseService`, so the feature always
-  exercises the real provider (register / OTP login keep the dev convenience). Accounts with
-  no usable phone (social-only) cannot reset;
-  sid-less legacy tokens survive the revoke (revocation is per device row). Verified: backend
+  `NODE_ENV=production`, and the reset flow never honours it even in development: both
+  providers get `devBypass: false`, so the feature always exercises the real provider
+  (register / OTP login keep the dev convenience). Accounts with no usable phone
+  (social-only) cannot reset. Verified: backend
   `auth.service|config.validation` 73/73 + `jwt.strategy` 2/2, `nest build`, eslint; web
   eslint + `next build`; live API walk (the proof is rejected as a bearer, the password is
   unchanged until confirm, old password 401 / new 201, an access token is rejected as a reset
   proof); headless-Chromium walk of all three steps to `/en/login`.
+
+- **Forgot-password codes use the own OTP service when `OTP_PROVIDER=plasgate`.** The
+  three-step reset keeps its API and web form; only the provider changes. The request step
+  issues a hashed, single-use `password_reset` code through `OtpSmsSender` (detached send,
+  per-phone cooldown/daily cap) instead of calling Supabase, and the verify step checks it
+  with `OtpService`. Limiter outcomes are swallowed so the request still answers
+  `{ otpSent: true }` for every identifier — a returned 429 would be an account-existence
+  oracle — and both steps opt out of `DEV_OTP_TOKEN` (`devBypass: false`, added as a
+  per-call option on `OtpService`/`OtpSmsSender`). Confirm now sets
+  `users.tokensValidAfter` in the password-change transaction, so sid-less legacy tokens
+  die together with every device session, and writes a best-effort
+  `security.password_changed` notification. Under the default `supabase` provider the flow
+  is unchanged. Verified: backend 97 suites / 1,390 tests, `nest build`, eslint; the web
+  form is unchanged.
 
 - **Own phone-OTP service on PlasGate (tasks 1.1-1.4 of the "Own phone-OTP service" plan).**
   `OTP_PROVIDER=plasgate` (default `supabase`, flip back with no code change) makes `OtpService`

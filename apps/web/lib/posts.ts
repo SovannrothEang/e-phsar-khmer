@@ -72,4 +72,14 @@ export type Post = {
    * read the clock). Negative once the ad has lapsed.
    */
   expiresInDays?: number;
+  /**
+   * Staff "set inactive" reason — Manage Ads shows it so the owner knows what
+   * to fix before republishing. Null/absent on every public feed row.
+   */
+  inactiveReason?: string | null;
+  /**
+   * Staff "set inactive" — the ad stays in the Active tab, flagged on the row;
+   * the owner's fix is to edit and republish it.
+   */
+  inactive?: boolean;
 };

@@ -26,6 +26,8 @@ import {
 } from "@/lib/api/categories";
 import type { Post } from "@/lib/posts";
 import type { ProductSummary } from "@/types/product";
+import type { PlaceSelection } from "@/components/post/LocationPicker";
+import type { MapCoords } from "@/components/post/location-map.constants";
 import { getProducts } from "@/lib/api/products";
 import { familyForSubcategory } from "@/lib/product-spec-families";
 import type { BackendUser } from "@/lib/api/adapters";
@@ -36,6 +38,7 @@ import { getMyEntitlements } from "@/actions/subscriptions";
 import type { PlanEntitlements } from "@/types/subscription";
 import { TEXT_TILE_SETS_BY_CATEGORY } from "@/lib/attribute-types";
 import { ALL_ADS_PAGE_SIZE, type AllAdsFilters } from "@/lib/all-ads";
+import type { FeedQuery } from "@/lib/search-params";
 
 /** Row of `GET /users/me/phones` — only `phone` is read here. */
 interface UserPhoneRow {
@@ -277,6 +280,7 @@ export async function getListingFormConfig(
   categorySlug: string,
   subcategorySlug: string,
   locale: string,
+  opts: { skipProfilePrefill?: boolean } = {},
 ): Promise<ListingFormConfig | null> {
   const category = await getCategoryWithSubcategories(categorySlug, locale);
   const sub = category?.subcategories.find((s) => s.slug === subcategorySlug);
@@ -311,7 +315,14 @@ export async function getListingFormConfig(
     has("color") ? getColors() : [],
     has("year") ? getYears() : [],
     getProvinces(),
-    getUserProfilePrefill(),
+    // The edit screen must never inherit the profile's contact/location: an
+    // empty value saved on the ad is a deliberate clear, not a blank to fill.
+    opts.skipProfilePrefill
+      ? Promise.resolve({
+          contact: { name: "", phones: [], email: null },
+          location: EMPTY_LOCATION_PREFILL,
+        })
+      : getUserProfilePrefill(),
     Promise.all(pickerTypes.map((t) => getAttributeOptions(t))),
     has("productSpec")
       ? getProducts(
@@ -682,16 +693,26 @@ export async function getAllAdsBatch(
  * category or subcategory is picked (no navigation, no remount).
  *
  * Same contract as `getAllAdsBatch`; the seller is the scope, and the two
- * slugs are the drill levels. The backend feed is active-only, so a draft of
- * theirs can never surface here.
+ * slugs are the drill levels. `filters` is the profile's search/filter bar —
+ * the same URL vocabulary every other feed page uses — so a keyword, price
+ * range or location narrows this seller rather than the whole catalogue: the
+ * backend ANDs `userId` with every other feed condition.
+ *
+ * The backend feed is active-only, so a draft of theirs can never surface here.
  */
 export async function getSellerAdsBatch(
-  params: { userId: string; categorySlug?: string; subcategorySlug?: string },
+  params: {
+    userId: string;
+    categorySlug?: string;
+    subcategorySlug?: string;
+    filters?: FeedQuery;
+  },
   cursor: string | undefined,
   locale: string,
 ): Promise<AllAdsBatch> {
+  const { filters, ...scope } = params;
   const feed = await getListingsFeed(
-    { ...params, cursor, limit: ALL_ADS_PAGE_SIZE },
+    { ...filters, ...scope, cursor, limit: ALL_ADS_PAGE_SIZE },
     locale,
   );
   return {
@@ -787,6 +808,81 @@ export async function createListing(
     return {
       success: false,
       error: err instanceof ApiError ? err.message : "Failed to create listing",
+    };
+  }
+}
+
+/** Every create-able field plus the update form's explicit clears. */
+export interface UpdateListingPayload {
+  categoryId: string;
+  subcategoryId: string;
+  title: string;
+  description?: string | null;
+  price?: number | null;
+  discountValue?: number | null;
+  discountType?: "percent" | "amount" | null;
+  condition?: "new" | "used" | null;
+  photos?: { url: string; path: string; sort: number }[];
+  attributes: Record<string, unknown>;
+  location?: string | null;
+  address?: string | null;
+  provinceId?: string | null;
+  districtId?: string | null;
+  communeId?: string | null;
+  productModelId?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  deliveryFree?: boolean;
+  contactName?: string | null;
+  contactPhones?: string[];
+  contactEmail?: string | null;
+}
+
+export type UpdateListingResult =
+  | { success: true }
+  | { success: false; error: string; code?: string };
+
+/** The initial state the edit screen hydrates `ListingPostForm` from. */
+export interface ListingInitialValues {
+  categoryId: string;
+  subcategoryId: string;
+  title: string;
+  description: string;
+  price: string;
+  discountValue: string;
+  discountType: "percent" | "amount";
+  condition: "New" | "Used" | "";
+  attributes: Record<string, unknown>;
+  place: PlaceSelection;
+  address: string;
+  coords: MapCoords | null;
+  deliveryFree: boolean;
+  contactName: string;
+  contactPhones: string[];
+  contactEmail: string;
+  productModelId: string;
+  photos: { url: string; path: string }[];
+}
+
+/**
+ * Saves an edit. The backend owns ownership, moderation, the category pair,
+ * the product family and the plan checks; this only reports its verdict.
+ */
+export async function updateListing(
+  id: string,
+  payload: UpdateListingPayload,
+): Promise<UpdateListingResult> {
+  try {
+    await userServerFetch(`/listings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Failed to update listing",
+      code: err instanceof ApiError ? err.code : undefined,
     };
   }
 }

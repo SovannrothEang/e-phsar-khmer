@@ -808,12 +808,22 @@
       "expiresInDays": "Expires in {days} days",
       "expiresWithinDay": "Expires within a day",
       "noResult": "No Result!",
+      "noMatch": "No ads match your search and filters.",
       "noActive": "Oops! You don't have any active ads.",
       "sell": "Sell your stuff",
       "noExpired": "You don't have any expired ads yet.",
       "actions": "Ad actions",
       "view": "View ad",
+      "edit": "Edit ad",
+      "inactive": "Inactive",
+      "inactiveBadge": "Inactive — staff action",
+      "inactiveReason": "Staff reason: {reason}",
+      "noInactive": "You don't have any ads set inactive by staff.",
       "renew": "Renew ad",
+      "republish": "Republish ad",
+      "republishTitle": "Republish this ad?",
+      "republishBody": "If your 30-day window is still open, the ad goes live again for free. Once it has lapsed, republishing uses one renewal from your plan.",
+      "republished": "Ad republished.",
       "share": "Share",
       "delete": "Delete ad",
       "cancel": "Cancel",
@@ -996,6 +1006,18 @@
     "chooseSubcategory": "Select a subcategory",
     "hoverHint": "Hover a category to see options"
   },
+  "EditAd": {
+    "title": "Edit ad",
+    "breadcrumb": "Edit ad",
+    "backToManageAds": "Back to Manage Ads",
+    "keepDates": "Edits keep the original publish date and 30-day expiry.",
+    "changeCategoryTitle": "Change category",
+    "changeCategoryHint": "Changing the category reloads the form and clears fields the new category does not use. Your title, photos, contact and location are kept.",
+    "categoryUnsupported": "This category cannot be edited on the web yet.",
+    "loadError": "This ad could not be loaded.",
+    "removedByAdmin": "This ad was removed by an administrator and can no longer be edited.",
+    "notAvailable": "This ad is not available for editing."
+  },
   "PostForm": {
     "reset": "Reset",
     "postDetails": "Post Details",
@@ -1026,6 +1048,9 @@
     "noModel": "No model found.",
     "noProduct": "No published product spec yet.",
     "published": "Your ad was published",
+    "save": "Save changes",
+    "saving": "Saving...",
+    "saved": "Your ad was updated.",
     "labels": {
       "photos": "Photos",
       "logo": "Logo",
@@ -1112,6 +1137,8 @@
     },
     "errors": {
       "formNotLoaded": "Form data is not loaded yet",
+      "photosRequired": "Add at least one photo",
+      "removedByAdmin": "This ad was removed by an administrator and can no longer be edited.",
       "titleRequired": "Title is required",
       "priceInvalid": "Enter a price greater than 0",
       "typeRequired": "Choose a type",
@@ -1200,6 +1227,7 @@
     "noPostsSub": "No posts in this subcategory.",
     "noPostsCat": "No posts in this category.",
     "noPosts": "No posts yet.",
+    "noPostsFiltered": "No posts match your search and filters.",
     "loadingMore": "Loading more ads…",
     "metaDescription": "View profile of {name}"
   },
@@ -1450,5 +1478,20 @@
       "deleteFailed": "Couldn't delete"
     },
     "accountBreadcrumb": "Account"
+  },
+  "Moderation": {
+    "setInactive": "Set inactive",
+    "deletePost": "Delete post",
+    "inactiveTitle": "Set listing inactive",
+    "inactiveBody": "\"{title}\" will be hidden from the marketplace. The seller is notified with your reason and can fix it and publish again.",
+    "removeTitle": "Delete post",
+    "removeBody": "\"{title}\" will be hidden everywhere and the seller will not be able to republish it until staff restores it.",
+    "reasonPlaceholder": "Reason (shown to the seller)",
+    "cancel": "Cancel",
+    "confirmInactive": "Set inactive",
+    "confirmRemove": "Delete",
+    "saving": "Saving…",
+    "inactiveDone": "Listing set inactive",
+    "removeDone": "Listing deleted"
   }
 }

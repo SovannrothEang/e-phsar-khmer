@@ -55,9 +55,10 @@ export class OtpService implements OnModuleInit {
     phone: string,
     purpose: OtpPurpose,
     ip?: string | null,
+    opts?: { devBypass?: boolean },
   ): Promise<IssuedOtp> {
     const expiresAt = new Date(Date.now() + OTP_TTL_MS);
-    const devToken = this.resolveDevToken();
+    const devToken = this.devTokenFor(opts);
     if (devToken) return { id: null, code: devToken, expiresAt };
 
     const code = this.generateCode();
@@ -80,10 +81,11 @@ export class OtpService implements OnModuleInit {
     phone: string,
     purpose: OtpPurpose | OtpPurpose[],
     code: string,
+    opts?: { devBypass?: boolean },
   ): Promise<OtpVerifyResult> {
     const purposes = Array.isArray(purpose) ? purpose : [purpose];
 
-    const devToken = this.resolveDevToken();
+    const devToken = this.devTokenFor(opts);
     if (devToken && this.safeEqual(code, devToken)) {
       return { status: 'ok', purpose: purposes[0] };
     }
@@ -143,6 +145,15 @@ export class OtpService implements OnModuleInit {
         .digest();
     }
     return this.secret;
+  }
+
+  /**
+   * `devBypass: false` is the password-reset path: it must exercise the real
+   * provider even in development, the same rule the Supabase reset calls
+   * follow. Every other caller keeps the convenience token.
+   */
+  private devTokenFor(opts?: { devBypass?: boolean }): string | null {
+    return opts?.devBypass === false ? null : this.resolveDevToken();
   }
 
   private resolveDevToken(): string | null {

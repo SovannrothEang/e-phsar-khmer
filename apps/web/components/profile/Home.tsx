@@ -2,12 +2,22 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { SearchIcon, MapPin, LayoutGrid, List } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { SearchIcon, LayoutGrid, List } from "lucide-react";
 import { IconFilterSearch, IconBasketSearch } from "@tabler/icons-react";
+import MoreFilters from "@/components/filter/MoreFilters";
+import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
+import {
+  MAX_QUERY_LENGTH,
+  Q_PARAM,
+  normalizeQuery,
+  type FeedQuery,
+} from "@/lib/search-params";
 import { Field } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Button } from "@/components/ui/button";
@@ -33,8 +43,17 @@ interface HomeProfileProps {
   initialPosts: Post[];
   /** Where the next screen starts; null = no more ads under this selection. */
   initialCursor: string | null;
+  /** The bar's keyword/price/location/sort filters, parsed by the page. */
+  filters: FeedQuery;
   locale: string;
 }
+
+/**
+ * The profile's filter dialog keeps the narrow affordances a visitor actually
+ * uses on one seller — search, sort, date, location and price. Condition,
+ * discount and free delivery belong to the browse surfaces, not here.
+ */
+const PROFILE_HIDDEN_FILTERS = ["condition", "discount", "delivery"] as const;
 
 /** Identifies a query — everything a response must still match to be rendered. */
 function sellerQueryKey(userId: string, selection: StripSelection): string {
@@ -66,8 +85,12 @@ function sellerQueryKey(userId: string, selection: StripSelection): string {
  * `data === null`, which wipes that entry's state and leaves Back doing
  * nothing.
  *
- * The bar's search box, Filter and Location are still mock controls — wiring
- * them is a separate, larger job than showing the posts was.
+ * The bar's search, Filter and Location rows write the shared feed vocabulary
+ * (`q`, `loc_pro`/`loc_dis`/`loc_com`, price, date, sort, …) to the URL and let
+ * the page refetch — the same contract every other feed page follows, so a
+ * filtered profile view is linkable and the Back arrow undoes it. Only the
+ * category drill stays client-side, because there the whole point is *not* to
+ * remount the grid.
  */
 export default function HomeProfile({
   userId,
@@ -75,9 +98,14 @@ export default function HomeProfile({
   initialSelection,
   initialPosts,
   initialCursor,
+  filters,
   locale,
 }: HomeProfileProps) {
   const t = useTranslations("Profile");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [keyword, setKeyword] = React.useState(filters.q ?? "");
   const [selection, setSelection] =
     React.useState<StripSelection>(initialSelection);
   const [posts, setPosts] = React.useState(initialPosts);
@@ -86,6 +114,34 @@ export default function HomeProfile({
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
 
   const { category, subcategory } = selection;
+
+  // `parseFeedParams` drops every absent key, so anything left is an active
+  // filter — that is what decides which empty message to show.
+  const hasFilters = Object.keys(filters).length > 0;
+
+  /**
+   * The keyword is the one filter the bar edits in place: it writes `q` and
+   * leaves everything else (the drill's `category`/`subcategory` included)
+   * untouched. Blank clears it, so an empty submit is the way back to the
+   * seller's whole feed.
+   */
+  const submitSearch = React.useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const q = normalizeQuery(keyword);
+    if (q) params.set(Q_PARAM, q);
+    else params.delete(Q_PARAM);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }, [keyword, pathname, router, searchParams]);
+
+  // The page owns the applied keyword, so Clear filters (and a Back to an
+  // unfiltered view) must empty the box too rather than leave stale text.
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setKeyword(filters.q ?? "");
+  }, [filters.q]);
 
   // The query the grid is currently allowed to show. Both fetch sites check it
   // when their response lands, so neither a slow drill-down nor a pagination
@@ -136,6 +192,8 @@ export default function HomeProfile({
             userId,
             categorySlug: next.category,
             subcategorySlug: next.subcategory,
+            // A drill narrows the filtered feed — it never clears it.
+            filters,
           },
           undefined,
           locale,
@@ -149,7 +207,7 @@ export default function HomeProfile({
         if (queryKeyRef.current === nextKey) setLoading(false);
       }
     },
-    [userId, locale],
+    [userId, locale, filters],
   );
 
   const applySelection = React.useCallback(
@@ -191,7 +249,12 @@ export default function HomeProfile({
           setLoading(true);
           try {
             const batch = await getSellerAdsBatch(
-              { userId, categorySlug: category, subcategorySlug: subcategory },
+              {
+                userId,
+                categorySlug: category,
+                subcategorySlug: subcategory,
+                filters,
+              },
               cursor,
               locale,
             );
@@ -225,16 +288,18 @@ export default function HomeProfile({
       cancelled = true;
       observer.disconnect();
     };
-  }, [cursor, userId, category, subcategory, locale]);
+  }, [cursor, userId, category, subcategory, filters, locale]);
 
   // The mock card said "You don't have any post right now" — wrong in the
   // second person on someone else's profile, and wrong whenever the empty
-  // result is the drill-down's doing rather than the seller's.
-  const emptyMessage = subcategory
-    ? t("noPostsSub")
-    : category
-      ? t("noPostsCat")
-      : t("noPosts");
+  // result is the drill-down's or a filter's doing rather than the seller's.
+  const emptyMessage = hasFilters
+    ? t("noPostsFiltered")
+    : subcategory
+      ? t("noPostsSub")
+      : category
+        ? t("noPostsCat")
+        : t("noPosts");
 
   const emptyState = (
     <div className="mt-8">
@@ -269,32 +334,61 @@ export default function HomeProfile({
                 full-bleed, so only the first two rows take the padding. */}
             <div className="bg-card rounded-sm shadow-sm">
               <div className="p-4">
-                <div className="flex items-center gap-3">
+                <form
+                  role="search"
+                  className="flex items-center gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    submitSearch();
+                  }}
+                >
                   <Field className="flex-1">
                     <InputGroup className="h-10 rounded-sm">
                       <InputGroupInput
-                        id="inline-start-input"
+                        type="search"
+                        value={keyword}
+                        maxLength={MAX_QUERY_LENGTH}
+                        onChange={(e) => setKeyword(e.target.value)}
                         placeholder={t("search")}
+                        aria-label={t("search")}
                         className="h-10 border-gray-200 focus:ring-0"
                       />
                       <InputGroupAddon align="inline-end">
-                        <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
+                        <InputGroupButton
+                          type="submit"
+                          variant="ghost"
+                          aria-label={t("search")}
+                          className="cursor-pointer"
+                        >
+                          <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
+                        </InputGroupButton>
                       </InputGroupAddon>
                     </InputGroup>
                   </Field>
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-sm px-5 border-muted-foreground/30 text-foreground hover:text-foreground font-medium"
-                  >
-                    <IconFilterSearch className="scale-120" />
-                    {t("filter")}
-                  </Button>
-                </div>
+                  {/* The same dialog every other feed page uses — the profile
+                      just supplies its own trigger (the mock's "Filter"). */}
+                  <MoreFilters
+                    hide={PROFILE_HIDDEN_FILTERS}
+                    trigger={
+                      // `type="button"`: inside the search form, a bare
+                      // Button would default to submit and fire the search
+                      // when all the visitor wanted was the dialog.
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-sm px-5 border-muted-foreground/30 text-foreground hover:text-foreground font-medium cursor-pointer"
+                      >
+                        <IconFilterSearch className="scale-120" />
+                        {t("filter")}
+                      </Button>
+                    }
+                  />
+                </form>
                 <div className="flex items-center justify-between mt-6 px-1">
-                  <div className="flex items-center gap-2 text-[#00a0e9] type-nav cursor-pointer">
-                    <MapPin className="w-4 h-4" />
-                    <span>{t("location")}</span>
-                  </div>
+                  {/* Province only: on a seller's profile the useful question
+                      is "which city are they in", and the drill's extra two
+                      taps were never the point here. */}
+                  <LocationSelectorFilter variant="inline" depth="province" />
                   {/* Named because the profile header renders its own
                       Home/About tablist — an unnamed second one on the page is
                       ambiguous, and both triggers here are icon-only. */}

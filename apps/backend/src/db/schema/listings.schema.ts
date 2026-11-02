@@ -26,6 +26,11 @@ export const listingStatusEnum = pgEnum('listing_status', [
   // limit (e.g. the subscription lapsed). Reversible: reconciliation flips it
   // back to 'active' once the owner's allowance covers it again.
   'restricted',
+  // Hidden by staff ("set inactive"): still the owner's ad, never a plan
+  // decision. The owner is notified with the reason, may edit it, and
+  // republishes it (free while its 30-day window is still open). Permanent
+  // removal keeps `moderatedAt` and `status='deleted'`.
+  'inactive',
 ]);
 export const discountTypeEnum = pgEnum('discount_type', ['percent', 'amount']);
 export const listingConditionEnum = pgEnum('listing_condition', [
@@ -122,6 +127,16 @@ export const listings = pgTable(
       onDelete: 'set null',
     }),
     moderationReason: varchar('moderation_reason', { length: 500 }),
+    // Staff "set inactive" — hidden from the marketplace but owned by the
+    // seller again: they are notified with the reason, can edit the ad, and
+    // republish it. Deliberately separate from the moderation trio above,
+    // which stays the permanent-removal lock (owner cannot edit or republish
+    // until staff restore). The two states never coexist.
+    inactiveAt: timestamp('inactive_at', { withTimezone: true }),
+    inactiveById: uuid('inactive_by_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    inactiveReason: varchar('inactive_reason', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

@@ -4,11 +4,26 @@ import { Field } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import {
+  usePathname,
+  useRouter as useNavigationRouter,
+  useSearchParams,
+} from "next/navigation";
 import { Button } from "@/components/ui/button";
+import MoreFilters from "@/components/filter/MoreFilters";
+import {
+  MAX_QUERY_LENGTH,
+  Q_PARAM,
+  feedQueryKey,
+  normalizeQuery,
+  parseFeedParams,
+  type FeedQuery,
+} from "@/lib/search-params";
 import { Link, useRouter } from "@/i18n/routing";
 import { ProfileListingRow } from "@/components/profile/ProfileListingRow";
 import { ManageAdActions } from "@/components/profile/ManageAdActions";
@@ -18,6 +33,8 @@ import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
 
 interface TabState {
+  /** `${tab}|${filters}` — a result for another query is not "current". */
+  key: string;
   tab: MyAdsTab;
   items: Post[];
   page: number;
@@ -31,6 +48,23 @@ export default function ManageAds() {
   const t = useTranslations("Me.manageAds");
   const tCommon = useTranslations("Common");
   const router = useRouter();
+  const navigationRouter = useNavigationRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // The URL is the only source of truth for the bar's filters. Read here, not
+  // inherited from the page: this panel is a client component and the list is
+  // fetched client-side, so deriving them in the same place the fetch happens
+  // keeps a cold load and a client navigation identical.
+  //
+  // Keyed on the query STRING, never on the `useSearchParams()` object: that
+  // object's identity is not guaranteed stable across renders, and an unstable
+  // `filters` would re-run the load effect on every render, cancelling each
+  // fetch before it lands (the panel then sits on "Loading…" forever).
+  const filterParams = searchParams.toString();
+  const filters = useMemo<FeedQuery>(
+    () => parseFeedParams(new URLSearchParams(filterParams)),
+    [filterParams],
+  );
   const [activeTab, setActiveTab] = useState<MyAdsTab>("active");
   // What the last fetch returned, tagged with the tab it belongs to. A result
   // for another tab counts as "still loading" — derived at render, so the
@@ -41,8 +75,15 @@ export default function ManageAds() {
   const [counts, setCounts] = useState<Partial<Record<MyAdsTab, number>>>({});
   /** Bumped after a row action (renew/delete) to reload the current tab. */
   const [reloadKey, setReloadKey] = useState(0);
+  /** The keyword box — applied on submit, like every other search bar. */
+  const [keyword, setKeyword] = useState(filters.q ?? "");
 
-  const current = loaded?.tab === activeTab ? loaded : null;
+  // A result is current only when it was fetched for this tab AND this filter
+  // set; anything else is still loading, so the grid never paints the previous
+  // query's rows as if they answered the new one.
+  const filterKey = feedQueryKey(filters);
+  const queryKey = `${activeTab}|${filterKey}`;
+  const current = loaded?.key === queryKey ? loaded : null;
   const items = current?.items ?? null;
   const error = current?.error ?? null;
   const hasMore = current?.hasMore ?? false;
@@ -62,14 +103,17 @@ export default function ManageAds() {
    * card never reads "13/5".
    */
   const activeAds = plan ? Math.max(0, plan.usage.ads - plan.usage.hidden) : 0;
+  /** `parseFeedParams` drops absent keys, so anything left is a live filter. */
+  const hasFilters = Object.keys(filters).length > 0;
 
   useEffect(() => {
     let cancelled = false;
 
     void (async () => {
-      const result = await loadMyAds(activeTab, 1);
+      const result = await loadMyAds(activeTab, 1, filters);
       if (cancelled) return;
       setLoaded({
+        key: queryKey,
         tab: activeTab,
         items: result.items,
         page: 1,
@@ -83,7 +127,25 @@ export default function ManageAds() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, reloadKey]);
+  }, [activeTab, reloadKey, queryKey, filters]);
+
+  // The URL owns the applied keyword, so Clear (or Back to an unfiltered view)
+  // must empty the box rather than leave stale text behind.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setKeyword(filters.q ?? "");
+  }, [filters.q]);
+
+  const submitSearch = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    const q = normalizeQuery(keyword);
+    if (q) params.set(Q_PARAM, q);
+    else params.delete(Q_PARAM);
+    const query = params.toString();
+    navigationRouter.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  };
 
   const loadMore = () => {
     if (loadingMore || !current) return;
@@ -92,7 +154,7 @@ export default function ManageAds() {
     const next = current.page + 1;
 
     void (async () => {
-      const result = await loadMyAds(tab, next);
+      const result = await loadMyAds(tab, next, filters);
       setLoadingMore(false);
       setLoaded((prev) => {
         // The user switched tabs while this page was in flight.
@@ -113,7 +175,8 @@ export default function ManageAds() {
   };
 
   /**
-   * Row badge: the Hidden chip on that tab, the Expired chip on its own, and —
+   * Row badge: staff-inactive first (they live in the Active tab but are not
+   * live), then the Hidden chip on that tab, the Expired chip on its own, and —
    * on Active — a warning once the 30-day window is within three days, so the
    * owner sees it coming before the ad leaves the feed (and gets the matching
    * notification).
@@ -124,6 +187,7 @@ export default function ManageAds() {
         {label}
       </span>
     );
+    if (post.inactive) return chip(t("inactiveBadge"));
     if (activeTab === "hidden") return chip(t("hiddenBadge"));
     if (activeTab === "expired") return chip(t("expired"));
     const days = post.expiresInDays;
@@ -144,27 +208,53 @@ export default function ManageAds() {
               {t("title")}
             </h1>
             <hr />
-            <div className="flex items-center justify-end gap-3 py-2 pt-6 px-6">
+            <form
+              role="search"
+              className="flex items-center justify-end gap-3 py-2 pt-6 px-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                submitSearch();
+              }}
+            >
               <Field className="flex-1">
                 <InputGroup>
                   <InputGroupInput
-                    id="inline-start-input"
+                    type="search"
+                    value={keyword}
+                    maxLength={MAX_QUERY_LENGTH}
+                    onChange={(e) => setKeyword(e.target.value)}
                     placeholder={t("searchPlaceholder")}
+                    aria-label={t("searchPlaceholder")}
                     className="h-11 border-gray-200 focus:ring-0"
                   />
                   <InputGroupAddon align="inline-end">
-                    <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
+                    <InputGroupButton
+                      type="submit"
+                      variant="ghost"
+                      aria-label={t("searchPlaceholder")}
+                      className="cursor-pointer"
+                    >
+                      <SearchIcon className="text-muted-foreground w-5 h-5 mr-2" />
+                    </InputGroupButton>
                   </InputGroupAddon>
                 </InputGroup>
               </Field>
-              <Button
-                variant="outline"
-                className="h-10 rounded-sm px-5 border-muted-foreground text-foreground hover:text-foreground font-medium"
-              >
-                <Funnel className="scale-120" />
-                {t("filter")}
-              </Button>
-            </div>
+              {/* The shared dialog — the owner feed honours the same filter
+                  vocabulary as the marketplace feed. `type="button"`: inside
+                  the search form a bare Button would submit the search. */}
+              <MoreFilters
+                trigger={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-sm px-5 border-muted-foreground text-foreground hover:text-foreground font-medium cursor-pointer"
+                  >
+                    <Funnel className="scale-120" />
+                    {t("filter")}
+                  </Button>
+                }
+              />
+            </form>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 px-4">
             <div className="bg-muted h-20 w-full rounded-md p-6 text-center text-primary font-medium cursor-pointer hover:bg-muted/80 transition-colors flex flex-col justify-center gap-1">
@@ -247,11 +337,19 @@ export default function ManageAds() {
                     key={post.postId}
                     post={post}
                     badge={rowBadge(post)}
-                    linkable={activeTab !== "hidden"}
+                    linkable={activeTab !== "hidden" && !post.inactive}
+                    note={
+                      post.inactive && post.inactiveReason
+                        ? t("inactiveReason", {
+                            reason: post.inactiveReason,
+                          })
+                        : undefined
+                    }
                     action={
                       <ManageAdActions
                         post={post}
                         hidden={activeTab === "hidden"}
+                        inactive={post.inactive ?? false}
                         onChanged={() => setReloadKey((key) => key + 1)}
                       />
                     }
@@ -281,7 +379,11 @@ export default function ManageAds() {
                 {t("noResult")}
               </h2>
 
-              {activeTab === "active" ? (
+              {hasFilters ? (
+                // A filtered-empty list is not "you have no ads" — the seller
+                // may well have many, just none matching what they typed.
+                <p className="text-muted-foreground text-sm">{t("noMatch")}</p>
+              ) : activeTab === "active" ? (
                 <div className="flex flex-col items-center gap-8">
                   <p className="text-muted-foreground text-sm">
                     {t("noActive")}

@@ -15,6 +15,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
 import { AdminListingsService } from './admin-listings.service';
 import {
+  InactivateListingDto,
   ListAdminListingsDto,
   ModerateListingDto,
 } from './dto/list-admin-listings.dto';
@@ -46,8 +47,21 @@ export class AdminListingsController {
     return this.service.remove(id, user.id, dto.reason);
   }
 
+  @Post(':id/inactivate')
+  @ApiOperation({
+    summary:
+      'Hide a listing until its owner fixes and republishes it (the seller is notified)',
+  })
+  inactivate(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: InactivateListingDto,
+  ) {
+    return this.service.inactivate(id, user.id, dto.reason);
+  }
+
   @Post(':id/restore')
-  @ApiOperation({ summary: 'Undo a take-down' })
+  @ApiOperation({ summary: 'Undo a take-down or an inactivation' })
   restore(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.restore(id);
   }

@@ -497,16 +497,31 @@ export class AuthService {
    */
   async requestPasswordReset(
     dto: RequestPasswordResetDto,
+    ip?: string | null,
   ): Promise<{ otpSent: true }> {
     const target = await this.resolveResetTarget(dto.identifier);
     if (target) {
       try {
-        // `devBypass: false` — the reset flow never honours DEV_OTP_TOKEN,
-        // even in development: it must exercise the real provider so a
-        // production deploy cannot inherit a test-only path.
-        await this.supabaseService.signInWithOtp(target.phone, {
-          devBypass: false,
-        });
+        // `devBypass: false` on both providers: the reset flow never honours
+        // DEV_OTP_TOKEN, even in development, so the feature always exercises
+        // the real provider and a production deploy cannot inherit a
+        // test-only path.
+        if (this.usesOwnOtp) {
+          // The own-OTP path stores a hashed, single-use code and sends it
+          // detached, so PlasGate latency/failure cannot distinguish a real
+          // account from an unknown identifier. Limiter outcomes are
+          // swallowed too: the answer is always `{ otpSent: true }`.
+          await this.otpSender.issueAndSendDetached(
+            target.phone,
+            'password_reset',
+            ip,
+            { devBypass: false },
+          );
+        } else {
+          await this.supabaseService.signInWithOtp(target.phone, {
+            devBypass: false,
+          });
+        }
       } catch (err) {
         // Swallowed on purpose: a failure here must not tell the caller the
         // account exists. Never log the identifier or the phone.
@@ -531,13 +546,26 @@ export class AuthService {
     const target = await this.resolveResetTarget(dto.identifier);
     if (!target) throw this.invalidResetOtp();
 
-    const { data, error } = await this.supabaseService.verifyOtp(
-      target.phone,
-      dto.token,
-      // Never accept the dev token on the reset path (see requestPasswordReset).
-      { devBypass: false },
-    );
-    if (error || !data.user) throw this.invalidResetOtp();
+    if (this.usesOwnOtp) {
+      // Same rule as the request step: the real code only, never
+      // DEV_OTP_TOKEN. Every failure (wrong, expired, reused, exhausted) is
+      // the same 401, so attempt exhaustion is not an existence oracle.
+      const verified = await this.otpService.verify(
+        target.phone,
+        'password_reset',
+        dto.token,
+        { devBypass: false },
+      );
+      if (verified.status !== 'ok') throw this.invalidResetOtp();
+    } else {
+      const { data, error } = await this.supabaseService.verifyOtp(
+        target.phone,
+        dto.token,
+        // Never accept the dev token on the reset path.
+        { devBypass: false },
+      );
+      if (error || !data.user) throw this.invalidResetOtp();
+    }
 
     const resetToken = this.jwtService.sign(
       { sub: target.userId, typ: PASSWORD_RESET_TYP },
@@ -562,11 +590,19 @@ export class AuthService {
       dto.newPassword,
       PASSWORD_SALT_ROUNDS,
     );
+    const changedAt = new Date();
 
     const updated = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .update(users)
-        .set({ passwordHash, updatedAt: new Date() })
+        .set({
+          passwordHash,
+          // Covers tokens minted before this reset, including legacy tokens
+          // with no `sid` — the device-row revoke below only reaches sid-bound
+          // sessions.
+          tokensValidAfter: changedAt,
+          updatedAt: changedAt,
+        })
         .where(
           and(
             eq(users.id, payload.sub),
@@ -581,6 +617,24 @@ export class AuthService {
     // A concurrent delete/suspend between verify and confirm must not report
     // a successful reset.
     if (!updated) throw this.invalidResetSession();
+
+    // Best-effort, like every other security notification: the password is
+    // already changed, so a feed failure must not fail the reset.
+    try {
+      await this.notifications.notify({
+        userId: updated.id,
+        type: 'security.password_changed',
+        title: 'Password changed',
+        body: "Your password was reset and you were signed out everywhere. If this wasn't you, contact support.",
+        data: { changedAt: changedAt.toISOString() },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not create the password-changed notification for user ${updated.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
 
     return { reset: true };
   }

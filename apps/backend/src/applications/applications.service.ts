@@ -13,6 +13,7 @@ import { jobApplications } from '../db/schema/applications.schema';
 import type { JobApplicationRow } from '../db/schema/applications.schema';
 import { categories } from '../db/schema/categories.schema';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
+import type { ListingRow } from '../db/schema/listings.schema';
 import { users } from '../db/schema/users.schema';
 import { ChatService } from '../chat/chat.service';
 import type { ChatUserSummary } from '../chat/chat.types';
@@ -614,7 +615,7 @@ type JobRow = {
   title: string;
   price: string | null;
   currency: string;
-  status: 'draft' | 'active' | 'expired' | 'deleted' | 'restricted';
+  status: ListingRow['status'];
   company: string | null;
 };
 

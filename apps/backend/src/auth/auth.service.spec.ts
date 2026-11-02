@@ -100,7 +100,13 @@ function makeOtpService() {
 }
 
 function makeOtpSender() {
-  return { issueAndSend: jest.fn() };
+  return {
+    issueAndSend: jest.fn(),
+    issueAndSendDetached: jest.fn().mockResolvedValue({
+      result: { status: 'sent', retryAfterSeconds: 300 },
+      delivery: Promise.resolve(),
+    }),
+  };
 }
 
 function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
@@ -1838,15 +1844,22 @@ describe('AuthService password reset', () => {
     },
     jwt = makeJwtService(),
     notifications = makeNotifications(),
+    otp: {
+      provider?: 'supabase' | 'plasgate';
+      service?: ReturnType<typeof makeOtpService>;
+      sender?: ReturnType<typeof makeOtpSender>;
+    } = {},
   ) {
     return new AuthService(
       db as never,
       jwt as never,
-      makeConfigService() as never,
+      makeConfigService(
+        otp.provider ? { 'otp.provider': otp.provider } : {},
+      ) as never,
       supabase as never,
       loginDevices as never,
-      makeOtpService() as never,
-      makeOtpSender() as never,
+      (otp.service ?? makeOtpService()) as never,
+      (otp.sender ?? makeOtpSender()) as never,
       notifications as never,
     );
   }
@@ -2040,7 +2053,7 @@ describe('AuthService password reset', () => {
       return jwt;
     }
 
-    it('stores the new hash and revokes every session in one transaction', async () => {
+    it('stores the new hash, sets the token cutoff and revokes every session', async () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
       const user = makeUser({ primaryPhone: PHONE });
       const db = makeDb();
@@ -2050,11 +2063,13 @@ describe('AuthService password reset', () => {
         ...makeLoginDevices(),
         revokeAll: jest.fn().mockResolvedValue({ revoked: 2 }),
       };
+      const notifications = makeNotifications();
       const service = makeResetService(
         db,
         makeResetSupabase(),
         loginDevices,
         jwt,
+        notifications,
       );
 
       await expect(
@@ -2065,11 +2080,17 @@ describe('AuthService password reset', () => {
       ).resolves.toEqual({ reset: true });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('newpass123', 10);
-      expect(capture.set).toMatchObject({ passwordHash: 'new-hash' });
+      expect(capture.set).toMatchObject({
+        passwordHash: 'new-hash',
+        tokensValidAfter: expect.any(Date) as unknown as Date,
+      });
       expect(transaction).toHaveBeenCalledTimes(1);
       expect(loginDevices.revokeAll).toHaveBeenCalledWith(
         user.id,
         expect.anything(),
+      );
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'security.password_changed' }),
       );
     });
 
@@ -2134,6 +2155,147 @@ describe('AuthService password reset', () => {
       ).rejects.toThrow('INVALID_RESET_TOKEN');
 
       expect(loginDevices.revokeAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('plasgate provider', () => {
+    function providerReset() {
+      const supabase = makeResetSupabase();
+      const otpService = makeOtpService();
+      const otpSender = makeOtpSender();
+      return { supabase, otpService, otpSender };
+    }
+
+    it('issues and sends a password_reset code for a resolved account', async () => {
+      const db = makeDb();
+      mockLookups(db, [
+        makeUser({
+          username: 'sokdara',
+          primaryPhone: STORED_PHONE_WITHOUT_PLUS,
+        }),
+      ]);
+      const { supabase, otpService, otpSender } = providerReset();
+      const service = makeResetService(
+        db,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'SokDara' }, '1.2.3.4'),
+      ).resolves.toEqual({ otpSent: true });
+
+      expect(otpSender.issueAndSendDetached).toHaveBeenCalledWith(
+        PHONE,
+        'password_reset',
+        '1.2.3.4',
+        { devBypass: false },
+      );
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('answers identically for an unknown identifier and never touches the OTP path', async () => {
+      const db = makeDb();
+      mockLookups(db, []);
+      const { supabase, otpService, otpSender } = providerReset();
+      const service = makeResetService(
+        db,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'ghost' }),
+      ).resolves.toEqual({ otpSent: true });
+
+      expect(otpSender.issueAndSendDetached).not.toHaveBeenCalled();
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
+    });
+
+    it('swallows a limiter/provider failure so the answer cannot reveal the account', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: PHONE })]);
+      const { supabase, otpService, otpSender } = providerReset();
+      otpSender.issueAndSendDetached.mockRejectedValue(
+        new Error('limiter down'),
+      );
+      const service = makeResetService(
+        db,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      await expect(
+        service.requestPasswordReset({ identifier: 'sokdara' }),
+      ).resolves.toEqual({ otpSent: true });
+    });
+
+    it('verifies the code through OtpService and mints the reset proof', async () => {
+      const user = makeUser({ primaryPhone: PHONE });
+      const db = makeDb();
+      mockLookups(db, [user]);
+      const { supabase, otpService, otpSender } = providerReset();
+      otpService.verify.mockResolvedValue({
+        status: 'ok',
+        purpose: 'password_reset',
+      });
+      const jwt = makeJwtService();
+      const service = makeResetService(
+        db,
+        supabase,
+        undefined,
+        jwt,
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      await expect(
+        service.verifyResetCode({ identifier: 'sokdara', token: '654321' }),
+      ).resolves.toEqual({ resetToken: 'signed-token' });
+
+      expect(otpService.verify).toHaveBeenCalledWith(
+        PHONE,
+        'password_reset',
+        '654321',
+        { devBypass: false },
+      );
+      expect(supabase.verifyOtp).not.toHaveBeenCalled();
+      expect(jwt.sign).toHaveBeenCalledWith(
+        { sub: user.id, typ: 'password_reset' },
+        { expiresIn: 600 },
+      );
+    });
+
+    it('maps every failed code — including exhaustion — to the same 401', async () => {
+      const db = makeDb();
+      mockLookups(db, [makeUser({ primaryPhone: PHONE })]);
+      const { supabase, otpService, otpSender } = providerReset();
+      otpService.verify.mockResolvedValue({ status: 'too_many_attempts' });
+      const jwt = makeJwtService();
+      const service = makeResetService(
+        db,
+        supabase,
+        undefined,
+        jwt,
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      await expect(
+        service.verifyResetCode({ identifier: 'sokdara', token: '000000' }),
+      ).rejects.toThrow('INVALID_OR_EXPIRED_OTP');
+
+      expect(jwt.sign).not.toHaveBeenCalled();
+      expect(supabase.verifyOtp).not.toHaveBeenCalled();
     });
   });
 });

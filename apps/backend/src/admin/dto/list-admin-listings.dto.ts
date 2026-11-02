@@ -9,6 +9,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 
 export class ListAdminListingsDto {
@@ -18,8 +19,14 @@ export class ListAdminListingsDto {
   q?: string;
 
   @IsOptional()
-  @IsIn(['draft', 'active', 'expired', 'deleted', 'restricted'])
-  status?: 'draft' | 'active' | 'expired' | 'deleted' | 'restricted';
+  @IsIn(['draft', 'active', 'expired', 'deleted', 'restricted', 'inactive'])
+  status?:
+    | 'draft'
+    | 'active'
+    | 'expired'
+    | 'deleted'
+    | 'restricted'
+    | 'inactive';
 
   /** true → only staff-removed ads; false → only ads that were not. */
   @IsOptional()
@@ -59,9 +66,27 @@ export class ListAdminListingsDto {
   pageSize?: number = 20;
 }
 
+/**
+ * The reason is now read by the seller (it rides the take-down notification),
+ * not just by staff — so it is required and whitespace-trimmed. `remove` and
+ * `inactivate` share it.
+ */
 export class ModerateListingDto {
-  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @MinLength(1)
   @MaxLength(500)
-  reason?: string;
+  reason: string;
+}
+
+export class InactivateListingDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  reason: string;
 }

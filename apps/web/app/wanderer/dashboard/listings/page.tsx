@@ -51,6 +51,7 @@ const TABS: Record<
   all: {},
   active: { status: "active", moderated: false },
   restricted: { status: "restricted" },
+  inactive: { status: "inactive" },
   removed: { moderated: true },
 };
 
@@ -62,6 +63,7 @@ const STATUS_TONE: Record<string, string> = {
   draft: "border-slate-400 bg-slate-100 text-slate-600",
   expired: "border-amber-500 bg-amber-50 text-amber-700",
   restricted: "border-orange-500 bg-orange-50 text-orange-700",
+  inactive: "border-sky-500 bg-sky-50 text-sky-700",
   deleted: "border-red-500 bg-red-50 text-red-700",
   removed: "border-red-500 bg-red-50 text-red-700",
 };
@@ -236,6 +238,11 @@ export default function AdminListingsPage() {
                   Removed
                   {row.moderationReason ? `: ${row.moderationReason}` : ""}
                 </div>
+              ) : row.inactiveAt ? (
+                <div className="max-w-[240px] truncate type-meta text-sky-600">
+                  Inactive
+                  {row.inactiveReason ? `: ${row.inactiveReason}` : ""}
+                </div>
               ) : null}
             </div>
           </div>
@@ -336,24 +343,39 @@ export default function AdminListingsPage() {
                       onSelect: () => void restore(row),
                     },
                   ]
-                : [
-                    {
-                      label: "View listing",
-                      icon: <Eye className="mr-2 size-4" />,
-                      onSelect: () =>
-                        window.open(
-                          viewHref(row),
-                          "_blank",
-                          "noopener,noreferrer",
-                        ),
-                    },
-                    {
-                      label: "Remove",
-                      icon: <ShieldOff className="mr-2 size-4" />,
-                      tone: "danger",
-                      onSelect: () => setRemoving(row),
-                    },
-                  ]
+                : row.status === "inactive"
+                  ? [
+                      {
+                        label: "Restore",
+                        icon: <RotateCcw className="mr-2 size-4" />,
+                        tone: "success",
+                        onSelect: () => void restore(row),
+                      },
+                      {
+                        label: "Remove",
+                        icon: <ShieldOff className="mr-2 size-4" />,
+                        tone: "danger",
+                        onSelect: () => setRemoving(row),
+                      },
+                    ]
+                  : [
+                      {
+                        label: "View listing",
+                        icon: <Eye className="mr-2 size-4" />,
+                        onSelect: () =>
+                          window.open(
+                            viewHref(row),
+                            "_blank",
+                            "noopener,noreferrer",
+                          ),
+                      },
+                      {
+                        label: "Remove",
+                        icon: <ShieldOff className="mr-2 size-4" />,
+                        tone: "danger",
+                        onSelect: () => setRemoving(row),
+                      },
+                    ]
             }
           />
         ),
@@ -418,6 +440,7 @@ export default function AdminListingsPage() {
               { value: "all", label: "All" },
               { value: "active", label: "Active" },
               { value: "restricted", label: "Over plan limit" },
+              { value: "inactive", label: "Inactive" },
               { value: "removed", label: "Removed" },
             ].map((item) => (
               <TabsTrigger
@@ -470,7 +493,7 @@ export default function AdminListingsPage() {
             </DialogDescription>
           </DialogHeader>
           <Textarea
-            placeholder="Reason (optional, visible to staff)"
+            placeholder="Reason (sent to the seller)"
             maxLength={500}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -484,7 +507,7 @@ export default function AdminListingsPage() {
               Cancel
             </Button>
             <Button
-              disabled={busy}
+              disabled={busy || !reason.trim()}
               className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 cursor-pointer"
               onClick={confirmRemove}
             >

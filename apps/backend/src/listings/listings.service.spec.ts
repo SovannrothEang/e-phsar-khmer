@@ -1,5 +1,9 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ListingsService } from './listings.service';
 import { FilesService } from '../files/files.service';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
@@ -1275,6 +1279,16 @@ describe('ListingsService expiry', () => {
     expect(text).toContain('"expires_at" > now()');
   });
 
+  it('keeps staff-inactive ads in the Active tab, flagged on the row', async () => {
+    const recs = queue([{ count: 0 }], []);
+
+    await service.findMine('u1', { status: 'active' });
+
+    const { sql: text, params } = whereOf(recs[1]);
+    expect(text).toContain('"expires_at" > now()');
+    expect(params).toEqual(expect.arrayContaining(['active', 'inactive']));
+  });
+
   it('reports a lapsed ad as expired to its owner', async () => {
     const recs = queue([{ count: 1 }], [listingRow()], []);
 
@@ -1501,5 +1515,388 @@ describe('ListingsService plan-aware create', () => {
     ).rejects.toMatchObject({ response: { code: 'PLAN_LIMIT_ADS' } });
     // Nothing was ever inserted: no invisible draft can be left behind.
     expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('ListingsService update rules', () => {
+  function setup(existing: Record<string, unknown> = {}) {
+    const returning = jest.fn().mockResolvedValue([{ id: 'l1' }]);
+    const set = jest.fn(() => ({ where: () => ({ returning }) }));
+    const tx = {
+      update: () => ({ set }),
+      delete: () => ({ where: () => Promise.resolve() }),
+      select: () => ({
+        from: () => ({
+          where: () =>
+            Object.assign(Promise.resolve([]), {
+              orderBy: () => Promise.resolve([]),
+            }),
+        }),
+      }),
+    };
+    const db = {
+      ...makeDb(),
+      transaction: jest.fn((fn: (txArg: unknown) => unknown) => fn(tx)),
+    };
+    const entitlements = {
+      assertPhotos: jest.fn().mockResolvedValue(undefined),
+      assertCanHoldAnotherAd: jest.fn().mockResolvedValue(undefined),
+      reconcileListingsSafely: jest.fn().mockResolvedValue(undefined),
+    };
+    const products = {
+      assertPublishedModel: jest.fn().mockResolvedValue(undefined),
+      getPublishedRefByModelId: jest.fn().mockResolvedValue(null),
+    };
+    const files = {
+      removeOwnedByPublicUrl: jest.fn().mockResolvedValue(undefined),
+      isOwnedPath: () => true,
+      publicUrlFor: (path: string) => path,
+    };
+    const service = new ListingsService(
+      db as never,
+      files as never,
+      {} as never,
+      entitlements as never,
+      products as never,
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+      status: 'active',
+      publishedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      renewCount: 0,
+      discountValue: null,
+      discountType: null,
+      productModelId: null,
+      photos: [],
+      moderatedAt: null,
+      ...existing,
+    } as never);
+    return { service, db, entitlements, products, set };
+  }
+
+  function mockCategoryPair(
+    db: ReturnType<typeof makeDb>,
+    cat: object[],
+    sub: object[],
+  ) {
+    db.select
+      .mockReturnValueOnce(slugLookup(cat))
+      .mockReturnValueOnce(slugLookup(sub));
+  }
+
+  it('is owner-only', async () => {
+    const { service, db } = setup({ userId: 'u2' });
+
+    await expect(
+      service.update('u1', 'l1', {} as never),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('refuses to edit an admin-moderated ad', async () => {
+    const { service, db } = setup({ moderatedAt: new Date() });
+
+    await expect(
+      service.update('u1', 'l1', { title: 'new' } as never),
+    ).rejects.toMatchObject({
+      response: { code: 'LISTING_REMOVED_BY_ADMIN' },
+    });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('treats the unchanged category pair as a no-op', async () => {
+    const { service, db, entitlements, set } = setup();
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+    } as never);
+
+    expect(db.select).not.toHaveBeenCalled();
+    expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
+    const updates = set.mock.calls[0][0] as Record<string, unknown>;
+    expect(updates).not.toHaveProperty('categoryId');
+    expect(updates).not.toHaveProperty('subcategoryId');
+  });
+
+  it('rejects a one-sided category pair', async () => {
+    const { service, db } = setup();
+
+    await expect(
+      service.update('u1', 'l1', { categoryId: 'cat-2' } as never),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_CATEGORY_PAIR' } });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a subcategory outside the given category', async () => {
+    const { service, db } = setup();
+    mockCategoryPair(db, [{ id: 'cat-2' }], []);
+
+    await expect(
+      service.update('u1', 'l1', {
+        categoryId: 'cat-2',
+        subcategoryId: 'sub-2',
+        attributes: {},
+      } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('moves a live ad and re-checks the target plan scope', async () => {
+    const { service, db, entitlements, set } = setup();
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: { type: 'service' },
+    } as never);
+
+    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalledWith('u1', {
+      id: 'l1',
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+    });
+    expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+    const updates = set.mock.calls[0][0] as Record<string, unknown>;
+    expect(updates).toMatchObject({
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: { type: 'service' },
+    });
+  });
+
+  it('requires attributes when the category changes', async () => {
+    const { service, db } = setup();
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await expect(
+      service.update('u1', 'l1', {
+        categoryId: 'cat-2',
+        subcategoryId: 'sub-2',
+      } as never),
+    ).rejects.toMatchObject({
+      response: { code: 'ATTRIBUTES_REQUIRED_FOR_CATEGORY_CHANGE' },
+    });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('skips the plan scope check for an expired category move', async () => {
+    const { service, db, entitlements } = setup({
+      expiresAt: new Date(Date.now() - 1_000),
+    });
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: {},
+    } as never);
+
+    expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
+    expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+  });
+
+  it('validates a supplied product against the target subcategory', async () => {
+    const { service, db, products } = setup();
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: {},
+      productModelId: 'm1',
+    } as never);
+
+    expect(products.assertPublishedModel).toHaveBeenCalledWith('m1', 'sub-2');
+  });
+
+  it('re-validates a carried product link when the category changes', async () => {
+    const { service, db, products } = setup({ productModelId: 'm1' });
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: {},
+    } as never);
+
+    expect(products.assertPublishedModel).toHaveBeenCalledWith('m1', 'sub-2');
+  });
+
+  it('does not re-check an unchanged product on a text-only edit', async () => {
+    const { service, products } = setup({ productModelId: 'm1' });
+
+    await service.update('u1', 'l1', { title: 'typo fix' } as never);
+
+    expect(products.assertPublishedModel).not.toHaveBeenCalled();
+  });
+
+  it('uses the target scope for the photo allowance', async () => {
+    const { service, db, entitlements } = setup();
+    mockCategoryPair(db, [{ id: 'cat-2' }], [{ id: 'sub-2' }]);
+
+    await service.update('u1', 'l1', {
+      categoryId: 'cat-2',
+      subcategoryId: 'sub-2',
+      attributes: {},
+      photos: [],
+    } as never);
+
+    expect(entitlements.assertPhotos).toHaveBeenCalledWith(
+      'u1',
+      { categoryId: 'cat-2', subcategoryId: 'sub-2' },
+      0,
+      0,
+    );
+  });
+
+  it('stores explicit clears and accepts an empty phone list', async () => {
+    const { service, set } = setup({
+      description: 'old',
+      contactEmail: 'old@example.com',
+      price: '5',
+      discountValue: '10',
+      discountType: 'percent',
+    });
+
+    await service.update('u1', 'l1', {
+      description: null,
+      contactEmail: null,
+      price: null,
+      discountValue: null,
+      discountType: null,
+      contactPhones: [],
+    } as never);
+
+    const updates = set.mock.calls[0][0] as Record<string, unknown>;
+    expect(updates).toMatchObject({
+      description: null,
+      contactEmail: null,
+      price: null,
+      discountValue: null,
+      discountType: null,
+      contactPhones: [],
+    });
+  });
+
+  it('rejects a one-sided discount patch', async () => {
+    const { service, db } = setup();
+
+    await expect(
+      service.update('u1', 'l1', { discountValue: 10 } as never),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_DISCOUNT' } });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects a percentage discount above 100', async () => {
+    const { service, db } = setup();
+
+    await expect(
+      service.update('u1', 'l1', {
+        discountValue: 150,
+        discountType: 'percent',
+      } as never),
+    ).rejects.toMatchObject({ response: { code: 'INVALID_DISCOUNT' } });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['title', 'attributes', 'contactPhones', 'deliveryFree'])(
+    'rejects an explicit null %s',
+    async (field) => {
+      const { service, db } = setup();
+
+      await expect(
+        service.update('u1', 'l1', { [field]: null } as never),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(db.transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('never writes lifecycle columns from a patch', async () => {
+    const { service, set } = setup();
+
+    await service.update('u1', 'l1', { title: 'new title' } as never);
+
+    const updates = set.mock.calls[0][0] as Record<string, unknown>;
+    for (const key of [
+      'status',
+      'publishedAt',
+      'expiresAt',
+      'renewCount',
+      'createdAt',
+    ]) {
+      expect(updates).not.toHaveProperty(key);
+    }
+  });
+});
+
+describe('ListingsService.findMineById', () => {
+  function setup(userId = 'u1') {
+    const db = makeDb();
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId,
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+      status: 'active',
+      expiresAt: null,
+      photos: [],
+    } as never);
+    return { service, db };
+  }
+
+  it('returns the owner row with category slugs and derived status', async () => {
+    const { service, db } = setup();
+    db.select
+      .mockReturnValueOnce(slugLookup([{ slug: 'cars' }]))
+      .mockReturnValueOnce(slugLookup([{ slug: 'sedan' }]));
+
+    const result = await service.findMineById('u1', 'l1');
+
+    expect(result.categorySlug).toBe('cars');
+    expect(result.subcategorySlug).toBe('sedan');
+    expect(result.status).toBe('active');
+    expect(result.effectiveStatus).toBe('active');
+  });
+
+  it('reports a lapsed active ad as expired without rewriting status', async () => {
+    const { service, db } = setup();
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+      status: 'active',
+      expiresAt: new Date(Date.now() - 1_000),
+      photos: [],
+    } as never);
+    db.select
+      .mockReturnValueOnce(slugLookup([{ slug: 'cars' }]))
+      .mockReturnValueOnce(slugLookup([{ slug: 'sedan' }]));
+
+    const result = await service.findMineById('u1', 'l1');
+
+    expect(result.status).toBe('active');
+    expect(result.effectiveStatus).toBe('expired');
+  });
+
+  it('404s for another user’s listing', async () => {
+    const { service } = setup('u2');
+
+    await expect(service.findMineById('u1', 'l1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

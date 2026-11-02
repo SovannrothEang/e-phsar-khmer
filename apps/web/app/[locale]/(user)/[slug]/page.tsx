@@ -8,6 +8,7 @@ import {
   toCardPost,
 } from "@/lib/api/categories";
 import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
+import { parseFeedParams } from "@/lib/search-params";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { loadPostDetailProps } from "@/lib/api/post-detail-props";
@@ -132,11 +133,20 @@ export default async function SlugPage({
         ?.subcategories.find((s) => s.slug === rawSubcategory)?.slug
     : undefined;
 
+  // The profile's search/filter bar, read off the URL with the same vocabulary
+  // every other feed page uses. `parseFeedParams` is called WITHOUT
+  // `withCategory`, so it never touches this page's own `category` /
+  // `subcategory` params — those are the drill, not the browse filter.
+  const filters = parseFeedParams(sp);
+
   // The seller's post history, first screen only — `HomeProfile` fetches the
   // next slice itself as the visitor drills. The feed is active-only and
-  // anonymous, so this needs no session and can never show a draft.
+  // anonymous, so this needs no session and can never show a draft. The
+  // filters narrow *this seller*: the backend ANDs `userId` with every other
+  // feed condition.
   const feed = await getListingsFeed(
     {
+      ...filters,
       userId: profile.id,
       categorySlug: category,
       subcategorySlug: subcategory,
@@ -162,6 +172,7 @@ export default async function SlugPage({
         initialSelection={{ category, subcategory }}
         initialPosts={(feed?.items ?? []).map(toCardPost)}
         initialCursor={feed?.nextCursor ?? null}
+        filters={filters}
         locale={locale}
       />
     </>

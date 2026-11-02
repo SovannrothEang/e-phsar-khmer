@@ -45,6 +45,23 @@ const pick = (p: Place): Pick => ({ slug: p.slug, name: p.name });
 // ─── Component ────────────────────────────────────────────────────────────────
 interface LocationSelectorProps {
   placeholder?: string;
+  /**
+   * `"button"` (the default) is the browse bar's outlined chip. `"inline"` is
+   * the public profile's plain blue row — same popover, same URL params, only
+   * the opener differs.
+   */
+  variant?: "button" | "inline";
+  /**
+   * How deep the drill goes. `"full"` (the default) is
+   * province → district → commune, committing only at the end; `"province"`
+   * commits the moment a province is picked and never offers a district — the
+   * public profile's Location row, where one province is the whole choice.
+   *
+   * Orthogonal to `variant`: this changes the steps, not the look. Both write
+   * the same `loc_pro`/`loc_dis`/`loc_com` params, so a province-only pick is
+   * indistinguishable downstream from a full drill stopped at the top.
+   */
+  depth?: "full" | "province";
 }
 /**
  * Province → district → commune drill-down over the real geography
@@ -52,7 +69,11 @@ interface LocationSelectorProps {
  * — the same slugs the feed's `provinceSlug`/`districtSlug`/`communeSlug`
  * filters resolve.
  */
-export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
+export function LocationSelectorFilter({
+  placeholder,
+  variant = "button",
+  depth = "full",
+}: LocationSelectorProps) {
   const t = useTranslations();
   const resolvedPlaceholder = placeholder ?? t("Filters.location.label");
   const router = useRouter();
@@ -110,7 +131,11 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
     setOpen(o);
     if (o) {
       setDraft(selection);
-      setStep(selection.province ? "district" : "province");
+      // A province-only picker never has a deeper step to resume into, even
+      // when the URL already carries a province.
+      setStep(
+        depth === "province" || !selection.province ? "province" : "district",
+      );
     }
   };
   // ── Write to URL ─────────────────────────────────────────────────────────────
@@ -128,6 +153,14 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
   }
   // ── Step handlers ─────────────────────────────────────────────────────────────
   const selectProvince = (province: Place) => {
+    // Province-only: the pick IS the answer — commit and close. The other two
+    // levels are written as null so a district left in the URL from a previous
+    // full-drill view cannot survive underneath the new province.
+    if (depth === "province") {
+      pushLocation({ province: pick(province), district: null, commune: null });
+      setOpen(false);
+      return;
+    }
     setDraft({ province: pick(province), district: null, commune: null });
     setStep("district");
   };
@@ -191,23 +224,42 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
     <div className="relative inline-flex items-center">
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "flex items-center bg-muted rounded-sm gap-2 h-12 py-1.5 type-nav cursor-pointer whitespace-nowrap",
-              hasSelection ? "text-foreground border-muted pr-7 pl-3" : "px-3",
-            )}
-          >
-            <MapPin
+          {variant === "inline" ? (
+            <button
+              type="button"
               className={cn(
-                "h-4 w-4 shrink-0",
-                hasSelection ? "text-sky-500" : "text-foreground",
+                "flex items-center gap-2 type-nav text-[#00a0e9] cursor-pointer",
+                // Room for the clear (X) button the wrapper overlays: it is
+                // 18px wide and sits 8px in from the right, so anything less
+                // than pr-7 lets the label run underneath it. Matches the
+                // button variant's own clearance.
+                hasSelection && "pr-7",
               )}
-            />
-            <span className={hasSelection ? "text-sky-500" : ""}>
-              {locationLabel}
-            </span>
-          </Button>
+            >
+              <MapPin className="h-4 w-4 shrink-0" />
+              <span>{locationLabel}</span>
+            </button>
+          ) : (
+            <Button
+              variant="outline"
+              className={cn(
+                "flex items-center bg-muted rounded-sm gap-2 h-12 py-1.5 type-nav cursor-pointer whitespace-nowrap",
+                hasSelection
+                  ? "text-foreground border-muted pr-7 pl-3"
+                  : "px-3",
+              )}
+            >
+              <MapPin
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  hasSelection ? "text-sky-500" : "text-foreground",
+                )}
+              />
+              <span className={hasSelection ? "text-sky-500" : ""}>
+                {locationLabel}
+              </span>
+            </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent
           className="rounded-sm w-70 p-0 gap-0 mt-3"

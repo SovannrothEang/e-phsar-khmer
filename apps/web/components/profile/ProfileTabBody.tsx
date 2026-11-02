@@ -6,6 +6,7 @@ import HomeProfile from "./Home";
 import FollowListPanel from "./FollowListPanel";
 import { pushProfileTab, readProfileTab } from "@/lib/profile-tab";
 import type { ProfileTab } from "@/lib/profile-tab";
+import { feedQueryKey, type FeedQuery } from "@/lib/search-params";
 import type { StripCategory, StripSelection } from "./SellerCategoryStrip";
 import type { Post } from "@/lib/posts";
 
@@ -19,6 +20,8 @@ interface ProfileTabBodyProps {
   initialSelection: StripSelection;
   initialPosts: Post[];
   initialCursor: string | null;
+  /** The profile bar's keyword/price/location/sort filters, parsed by the page. */
+  filters: FeedQuery;
   locale: string;
 }
 
@@ -37,6 +40,7 @@ export default function ProfileTabBody({
   initialSelection,
   initialPosts,
   initialCursor,
+  filters,
   locale,
 }: ProfileTabBodyProps) {
   const tab = readProfileTab(useSearchParams());
@@ -59,14 +63,19 @@ export default function ProfileTabBody({
     );
   }
 
+  // Keyed on the filter set as well as the seller: a search or filter change
+  // re-renders this page with a new first screen, and the key resets the
+  // accumulated screens and the drill-down state with it (the drill itself is
+  // re-seeded from `initialSelection`, which the URL still carries).
   return (
     <HomeProfile
-      key={userId}
+      key={`${userId}|${feedQueryKey(filters)}`}
       userId={userId}
       categories={categories}
       initialSelection={initialSelection}
       initialPosts={initialPosts}
       initialCursor={initialCursor}
+      filters={filters}
       locale={locale}
     />
   );

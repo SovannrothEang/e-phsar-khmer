@@ -36,6 +36,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Toggle } from "@/components/ui/toggle";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useStaffListingActions } from "@/components/moderation/admin-listing-actions";
+import { useHiddenListing } from "@/components/moderation/moderator-provider";
 import { useListingImpression } from "@/hooks/use-listing-impression";
 
 export function ListCardPost({ post }: { post: Post }) {
@@ -47,6 +49,8 @@ export function ListCardPost({ post }: { post: Post }) {
     post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
 
   const reactions = useReactions();
+  const staff = useStaffListingActions(post);
+  const hiddenByModerator = useHiddenListing(post.postId);
   const impressionRef = useListingImpression(post.postId);
   const listingId = String(post.postId);
   // No photo at all, or a stored photo missing from storage → empty area (the
@@ -59,6 +63,10 @@ export function ListCardPost({ post }: { post: Post }) {
   );
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  // An admin just hid this ad on the page — drop the row immediately (the
+  // server refresh is asynchronous, and a profile feed holds its rows in
+  // client state).
+  if (hiddenByModerator) return null;
 
   return (
     <>
@@ -178,6 +186,7 @@ export function ListCardPost({ post }: { post: Post }) {
                   <AlertTriangle size={15} />
                   <span>{t("Common.report")}</span>
                 </DropdownMenuItem>
+                {staff.menuItems}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -295,6 +304,7 @@ export function ListCardPost({ post }: { post: Post }) {
       </Dialog>
 
       <ReportPost post={post} open={reportOpen} onOpenChange={setReportOpen} />
+      {staff.dialog}
     </>
   );
 }

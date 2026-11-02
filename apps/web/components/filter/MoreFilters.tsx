@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   useParams,
   usePathname,
@@ -265,7 +265,30 @@ const ATTRIBUTE_LABEL_KEYS = new Set([
 ]);
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
+/** A dialog row a caller can turn off; everything else always renders. */
+export type MoreFilterSection = "condition" | "discount" | "delivery";
+
+export default function MoreFilters({
+  priceLabel,
+  trigger,
+  hide,
+}: {
+  priceLabel?: string;
+  /**
+   * Replaces the default "More Filters" button — for a page whose bar already
+   * has its own filter control of a different shape (the public profile's
+   * "Filter"). The dialog, its drafts, Apply and Clear are unchanged; only the
+   * opener is the caller's. The active-filter badge lives on the default
+   * trigger, so a custom one carries its own affordance.
+   */
+  trigger?: ReactNode;
+  /**
+   * Rows this caller has no use for. Hidden rows keep their URL params — the
+   * draft is seeded from the URL, so Apply writes back whatever was already
+   * there instead of silently clearing a filter the visitor cannot see.
+   */
+  hide?: readonly MoreFilterSection[];
+}) {
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -277,6 +300,7 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
   }>();
   const categorySlug = params.categorySlug;
   const subcategorySlug = params.subcategorySlug;
+  const isHidden = (section: MoreFilterSection) => hide?.includes(section);
 
   const [open, setOpen] = useState(false);
 
@@ -492,18 +516,20 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       {/* ── Trigger ─────────────────────────────────────────────────────── */}
       <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="relative bg-muted rounded-sm h-12 px-3 type-nav cursor-pointer gap-2"
-        >
-          <IconFilterCog className="h-4 w-4 shrink-0" />
-          <span>{t("Filters.more.title")}</span>
-          {activeCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 type-photo-badge text-white">
-              {activeCount}
-            </span>
-          )}
-        </Button>
+        {trigger ?? (
+          <Button
+            variant="outline"
+            className="relative bg-muted rounded-sm h-12 px-3 type-nav cursor-pointer gap-2"
+          >
+            <IconFilterCog className="h-4 w-4 shrink-0" />
+            <span>{t("Filters.more.title")}</span>
+            {activeCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 type-photo-badge text-white">
+                {activeCount}
+              </span>
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       {/* ── Dialog ──────────────────────────────────────────────────────── */}
       <DialogContent
@@ -607,7 +633,7 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
           {/* Condition — contexts with no subcategory (search/all-ads) keep
               this plain select; a subcategory's own block renders it as the
               mock's segmented All | Used | New, next to its other fields. */}
-          {!subcategorySlug && (
+          {!subcategorySlug && !isHidden("condition") && (
             <SelectField
               label={t("Filters.condition.label")}
               value={condition}
@@ -644,17 +670,21 @@ export default function MoreFilters({ priceLabel }: { priceLabel?: string }) {
             </div>
           </div>
           {/* Discount */}
-          <ToggleField
-            label={t("Filters.more.discount")}
-            checked={discount}
-            onChange={setDiscount}
-          />
+          {!isHidden("discount") && (
+            <ToggleField
+              label={t("Filters.more.discount")}
+              checked={discount}
+              onChange={setDiscount}
+            />
+          )}
           {/* Free delivery */}
-          <ToggleField
-            label={t("Filters.more.freeDelivery")}
-            checked={delivery}
-            onChange={setDelivery}
-          />
+          {!isHidden("delivery") && (
+            <ToggleField
+              label={t("Filters.more.freeDelivery")}
+              checked={delivery}
+              onChange={setDelivery}
+            />
+          )}
 
           {/* ── Schema block — every field is gated on the subcategory's own
                  `field_schema`, for every family: vehicles get Year/Tax/Color/

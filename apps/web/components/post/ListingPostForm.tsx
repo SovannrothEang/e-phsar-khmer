@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { useRouter } from "@/i18n/routing";
@@ -18,10 +18,13 @@ import type { MapCoords } from "@/components/post/location-map.constants";
 import { signUploadUser } from "@/actions/files";
 import {
   createListing,
+  updateListing,
   getBrandModels,
   getListingFormConfig,
   type CreateListingPayload,
   type ListingFormConfig,
+  type ListingInitialValues,
+  type UpdateListingPayload,
 } from "@/actions/listings";
 import type { BackendModel } from "@/lib/api/categories";
 import { describeBucket } from "@/lib/subscription-pricing";
@@ -458,12 +461,22 @@ export default function ListingPostForm({
   categoryName,
   subName,
   onBack,
+  mode = "create",
+  listingId,
+  initialValues,
+  onSaved,
 }: {
   categorySlug: string;
   subcategorySlug: string;
   categoryName: string;
   subName: string;
   onBack: () => void;
+  /** `edit` hydrates from `initialValues` and PATCHes instead of creating. */
+  mode?: "create" | "edit";
+  listingId?: string;
+  initialValues?: ListingInitialValues;
+  /** Called after a successful edit save (the shell owns navigation). */
+  onSaved?: () => void;
 }) {
   const locale = useLocale();
   const t = useTranslations("PostForm");
@@ -475,6 +488,11 @@ export default function ListingPostForm({
 
   const [files, setFiles] = useState<File[]>([]);
   const [photos, setPhotos] = useState<{ url: string; path: string }[]>([]);
+  // Photos already on the listing (edit mode). Kept apart from `photos`,
+  // which only holds files uploaded in this session.
+  const [serverPhotos, setServerPhotos] = useState<
+    { url: string; path: string }[]
+  >(initialValues?.photos ?? []);
 
   const [brandId, setBrandId] = useState("");
   const [models, setModels] = useState<BackendModel[]>([]);
@@ -530,55 +548,232 @@ export default function ListingPostForm({
 
   const [submitting, setSubmitting] = useState(false);
 
+  // One-shot hydration guard: a category change re-runs the config effect but
+  // must keep the user's edits, not reload the saved values over them.
+  const hydrated = useRef(false);
+  // Read inside the config effect without making state a dependency (which
+  // would re-run the effect right after hydration sets it).
+  const brandIdRef = useRef("");
+  const productModelIdRef = useRef("");
+  const initialAttributes = useRef<Record<string, unknown>>(
+    initialValues?.attributes ?? {},
+  );
+  const initialPhotos = useRef(initialValues?.photos ?? []);
+  const initialContactEmail = useRef(initialValues?.contactEmail ?? "");
+
+  useEffect(() => {
+    brandIdRef.current = brandId;
+    productModelIdRef.current = productModelId;
+  }, [brandId, productModelId]);
+
   /** Does this subcategory's field schema declare `key`? */
   const has = (key: string) => !!config?.fields.includes(key);
 
-  // Runs once per mount: the page unmounts this form on "Change"/"Reset"
-  // (step goes back to 1), so a different subcategory always gets a fresh
-  // instance and `configLoading` never needs resetting mid-life.
+  // Runs once per subcategory. In create mode the page unmounts this form on
+  // "Change"/"Reset"; in edit mode the category dialog changes the slug props
+  // while this component stays mounted, so the first load hydrates from the
+  // saved listing and later loads only adapt schema-dependent state — the
+  // user's unsaved edits carry over.
   useEffect(() => {
     let cancelled = false;
-    getListingFormConfig(categorySlug, subcategorySlug, locale).then((cfg) => {
+    (async () => {
+      const cfg = await getListingFormConfig(
+        categorySlug,
+        subcategorySlug,
+        locale,
+        { skipProfilePrefill: mode === "edit" },
+      );
       if (cancelled) return;
       if (!cfg) {
         setConfigError(true);
+        setConfigLoading(false);
         toast.error(t("loadErrorToast"));
-      } else {
-        setConfig(cfg);
-        // Prefill the contact section from the logged-in user's profile.
-        if (cfg.contact.name) setContactName(cfg.contact.name);
-        const prefilled = [
-          cfg.contact.phones[0] ?? "",
-          cfg.contact.phones[1] ?? "",
-          cfg.contact.phones[2] ?? "",
-        ];
-        setContactPhones(prefilled);
-        setPhoneRows(
-          Math.min(3, Math.max(1, prefilled.filter((x) => x.trim()).length)),
-        );
-        setContactEmail(cfg.contact.email ?? "");
-        // Location + Address start from the profile too, but only where the
-        // subcategory's schema declares the block — the same gate that decides
-        // whether it renders at all. Read `cfg.fields`, not `has()`: `config`
-        // state is not set yet inside this callback.
-        const declares = (key: string) => cfg.fields.includes(key);
-        if (declares("location")) {
-          setPlace({
-            province: cfg.location.province,
-            district: cfg.location.district,
-            commune: cfg.location.commune,
-          });
+        return;
+      }
+      setConfig(cfg);
+
+      if (mode === "edit" && initialValues) {
+        if (!hydrated.current) {
+          hydrated.current = true;
+          const attrs = initialValues.attributes;
+          const str = (key: string) =>
+            typeof attrs[key] === "string"
+              ? (attrs[key] as string)
+              : attrs[key] != null
+                ? String(attrs[key])
+                : "";
+          setTitle(initialValues.title);
+          setDescription(initialValues.description);
+          setPrice(initialValues.price);
+          setDiscountValue(initialValues.discountValue);
+          setDiscountType(initialValues.discountType);
+          setCondition(initialValues.condition);
+          setYear(str("year"));
+          setVehicleType(str("vehicleType"));
+          setBodyType(str("bodyType"));
+          setEngineType(str("engineType"));
+          setTransmission(str("transmission"));
+          setTaxType(str("taxType"));
+          setColor(str("color"));
+          setTypeValue(str("type"));
+          setScreenSize(str("screenSize"));
+          setStorage(str("storage"));
+          setRam(str("ram"));
+          setCpu(str("cpu"));
+          setVga(str("vga"));
+          setAccessory(str("accessory"));
+          setNetwork(str("network"));
+          setJobType(str("jobType"));
+          setExperience(str("experience"));
+          setCompany(str("company"));
+          setBedroom(str("bedroom"));
+          setBathroom(str("bathroom"));
+          setFacing(str("facing"));
+          setSize(str("size"));
+
+          setPlace(initialValues.place);
+          setAddress(initialValues.address);
+          setCoords(initialValues.coords);
+          setDeliveryFree(initialValues.deliveryFree);
+          setContactName(initialValues.contactName);
+          const phones = [0, 1, 2].map(
+            (i) => initialValues.contactPhones[i] ?? "",
+          );
+          setContactPhones(phones);
+          setPhoneRows(
+            Math.min(
+              3,
+              Math.max(
+                1,
+                initialValues.contactPhones.filter((p) => p.trim()).length,
+              ),
+            ),
+          );
+          setContactEmail(initialValues.contactEmail);
+
+          // `attributes.brand` stores the display name; the picker needs the
+          // brand UUID, and its model list must load before the stored model
+          // can be shown.
+          if (cfg.fields.includes("brand")) {
+            const storedBrand = str("brand");
+            const brand = cfg.brands.find(
+              (b) => b.name === storedBrand || b.id === storedBrand,
+            );
+            if (brand) {
+              setBrandId(brand.id);
+              try {
+                const list = await getBrandModels(brand.id, subcategorySlug);
+                if (cancelled) return;
+                setModels(list);
+                const storedModel = str("model");
+                setModel(
+                  list.some((m) => m.name === storedModel) ? storedModel : "",
+                );
+              } catch {
+                setModels([]);
+                setModel("");
+              }
+            } else {
+              setBrandId("");
+              setModel("");
+              setModels([]);
+            }
+          } else {
+            setModel(str("model"));
+          }
+
+          // A product link the picker cannot show would be re-sent blindly;
+          // start the edit from "no link" so the user can pick again.
+          if (
+            cfg.fields.includes("productSpec") &&
+            initialValues.productModelId &&
+            !cfg.products.some(
+              (p) => p.modelId === initialValues.productModelId,
+            )
+          ) {
+            setProductModelId("");
+          } else {
+            setProductModelId(initialValues.productModelId);
+          }
+          setConfigLoading(false);
+          return;
         }
-        if (declares("address") && cfg.location.address) {
-          setAddress(cfg.location.address);
+
+        // Category change: keep every common value, drop only what the new
+        // schema can no longer display.
+        if (cfg.fields.includes("brand")) {
+          const currentBrand = brandIdRef.current;
+          if (currentBrand && cfg.brands.some((b) => b.id === currentBrand)) {
+            try {
+              const list = await getBrandModels(currentBrand, subcategorySlug);
+              if (cancelled) return;
+              setModels(list);
+              setModel((prev) =>
+                list.some((m) => m.name === prev) ? prev : "",
+              );
+            } catch {
+              setModels([]);
+              setModel("");
+            }
+          } else {
+            setBrandId("");
+            setModel("");
+            setModels([]);
+          }
+        } else {
+          setModels([]);
         }
+        if (!cfg.fields.includes("productSpec")) {
+          setProductModelId("");
+        } else if (
+          productModelIdRef.current &&
+          !cfg.products.some((p) => p.modelId === productModelIdRef.current)
+        ) {
+          setProductModelId("");
+        }
+        setConfigLoading(false);
+        return;
+      }
+
+      // Create mode: prefill the contact section from the logged-in user.
+      if (cfg.contact.name) setContactName(cfg.contact.name);
+      const prefilled = [
+        cfg.contact.phones[0] ?? "",
+        cfg.contact.phones[1] ?? "",
+        cfg.contact.phones[2] ?? "",
+      ];
+      setContactPhones(prefilled);
+      setPhoneRows(
+        Math.min(3, Math.max(1, prefilled.filter((x) => x.trim()).length)),
+      );
+      setContactEmail(cfg.contact.email ?? "");
+      // Location + Address start from the profile too, but only where the
+      // subcategory's schema declares the block — the same gate that decides
+      // whether it renders at all. Read `cfg.fields`, not `has()`: `config`
+      // state is not set yet inside this callback.
+      const declares = (key: string) => cfg.fields.includes(key);
+      if (declares("location")) {
+        setPlace({
+          province: cfg.location.province,
+          district: cfg.location.district,
+          commune: cfg.location.commune,
+        });
+      }
+      if (declares("address") && cfg.location.address) {
+        setAddress(cfg.location.address);
       }
       setConfigLoading(false);
+    })().catch(() => {
+      if (!cancelled) {
+        setConfigError(true);
+        setConfigLoading(false);
+        toast.error(t("loadErrorToast"));
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [categorySlug, subcategorySlug, locale, t]);
+  }, [categorySlug, subcategorySlug, locale, t, mode, initialValues]);
 
   const onBrandChange = async (id: string) => {
     setBrandId(id);
@@ -791,36 +986,158 @@ export default function ListingPostForm({
       return;
     }
 
-    const attributes: Record<string, unknown> = {};
-    if (has("brand"))
-      attributes.brand =
+    // Edit mode keeps unknown legacy attribute keys on a same-category save; a
+    // category move starts clean because the old schema's keys no longer
+    // describe the ad.
+    const categoryChanged =
+      mode === "edit" &&
+      !!initialValues &&
+      (config.categoryId !== initialValues.categoryId ||
+        config.subcategoryId !== initialValues.subcategoryId);
+    const attributes: Record<string, unknown> = categoryChanged
+      ? {}
+      : { ...initialAttributes.current };
+    /** Declared keys follow the form; undeclared legacy keys are preserved. */
+    const putAttr = (key: string, value: string) => {
+      if (!has(key)) return;
+      if (value) attributes[key] = value;
+      else delete attributes[key];
+    };
+    if (has("brand")) {
+      const brandName =
         config.brands.find((b) => b.id === brandId)?.name ?? brandId;
-    if (has("year") && year) attributes.year = year;
-    if (has("model") && model) attributes.model = model;
-    if (has("vehicleType") && vehicleType) attributes.vehicleType = vehicleType;
-    if (has("bodyType") && bodyType) attributes.bodyType = bodyType;
-    if (has("engineType") && engineType) attributes.engineType = engineType;
-    if (has("transmission") && transmission)
-      attributes.transmission = transmission;
-    if (has("taxType") && taxType) attributes.taxType = taxType;
-    if (has("color") && color) attributes.color = color;
-    if (has("type") && typeValue) attributes.type = typeValue;
-    if (has("jobType") && jobType) attributes.jobType = jobType;
-    if (has("experience") && experience) attributes.experience = experience;
-    if (has("company") && company.trim()) attributes.company = company.trim();
+      if (brandName) attributes.brand = brandName;
+      else delete attributes.brand;
+    }
+    putAttr("model", model);
+    putAttr("year", year);
+    putAttr("vehicleType", vehicleType);
+    putAttr("bodyType", bodyType);
+    putAttr("engineType", engineType);
+    putAttr("transmission", transmission);
+    putAttr("taxType", taxType);
+    putAttr("color", color);
+    putAttr("type", typeValue);
+    putAttr("jobType", jobType);
+    putAttr("experience", experience);
+    putAttr("company", company.trim());
     // Keys are the schema's own — singular `bedroom`/`bathroom`, which is what
     // the seeded `field_schema` declares and what `ListingSpecs` reads back.
-    if (has("bedroom") && bedroom) attributes.bedroom = bedroom;
-    if (has("bathroom") && bathroom) attributes.bathroom = bathroom;
-    if (has("facing") && facing) attributes.facing = facing;
-    if (has("size") && size) attributes.size = size;
-    if (has("screenSize") && screenSize) attributes.screenSize = screenSize;
-    if (has("storage") && storage) attributes.storage = storage;
-    if (has("ram") && ram) attributes.ram = ram;
-    if (has("cpu") && cpu) attributes.cpu = cpu;
-    if (has("vga") && vga) attributes.vga = vga;
-    if (has("accessory") && accessory) attributes.accessory = accessory;
-    if (has("network") && network) attributes.network = network;
+    putAttr("bedroom", bedroom);
+    putAttr("bathroom", bathroom);
+    putAttr("facing", facing);
+    putAttr("size", size);
+    putAttr("screenSize", screenSize);
+    putAttr("storage", storage);
+    putAttr("ram", ram);
+    putAttr("cpu", cpu);
+    putAttr("vga", vga);
+    putAttr("accessory", accessory);
+    putAttr("network", network);
+
+    const phoneValues = contactPhones
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+
+    if (mode === "edit" && listingId) {
+      if (serverPhotos.length + files.length === 0) {
+        toast.error(t("errors.photosRequired"));
+        return;
+      }
+      const payload: UpdateListingPayload = {
+        categoryId: config.categoryId,
+        subcategoryId: config.subcategoryId,
+        title: title.trim(),
+        attributes,
+        contactName: contactName.trim() || null,
+        contactPhones: phoneValues,
+        // The map pin is not schema-gated in the form; null clears it.
+        latitude: coords?.lat ?? null,
+        longitude: coords?.lng ?? null,
+      };
+      if (has("description")) payload.description = description.trim() || null;
+      else if (categoryChanged) payload.description = null;
+      if (has("price")) payload.price = priceNum;
+      else if (categoryChanged) payload.price = null;
+      if (has("discount")) {
+        if (Number(discountValue) > 0) {
+          payload.discountValue = Number(discountValue);
+          payload.discountType = discountType;
+        } else {
+          payload.discountValue = null;
+          payload.discountType = null;
+        }
+      } else if (categoryChanged) {
+        payload.discountValue = null;
+        payload.discountType = null;
+      }
+      if (has("condition")) {
+        payload.condition = condition === "New" ? "new" : "used";
+      } else if (categoryChanged) {
+        payload.condition = null;
+      }
+      if (has("deliveryFree")) payload.deliveryFree = deliveryFree;
+      else if (categoryChanged) payload.deliveryFree = false;
+      if (has("location")) {
+        payload.location = placeLabel(place) || null;
+        payload.provinceId = place.province?.id ?? null;
+        payload.districtId = place.district?.id ?? null;
+        payload.communeId = place.commune?.id ?? null;
+      } else if (categoryChanged) {
+        payload.location = null;
+        payload.provinceId = null;
+        payload.districtId = null;
+        payload.communeId = null;
+      }
+      if (has("address")) payload.address = address.trim() || null;
+      else if (categoryChanged) payload.address = null;
+      // An unchanged legacy email may be invalid; only a real change is sent.
+      if (contactEmail.trim() !== initialContactEmail.current.trim()) {
+        payload.contactEmail = contactEmail.trim() || null;
+      }
+      if (has("productSpec")) {
+        const currentProduct = productModelId || null;
+        if (
+          categoryChanged ||
+          currentProduct !== (initialValues?.productModelId ?? null)
+        ) {
+          payload.productModelId = currentProduct;
+        }
+      } else if (categoryChanged) {
+        payload.productModelId = null;
+      }
+      // Resending every photo on a text edit would re-run ownership checks and
+      // can fail on legacy URL drift; send them only when they really changed.
+      const photosDirty =
+        files.length > 0 ||
+        serverPhotos.length !== initialPhotos.current.length ||
+        serverPhotos.some(
+          (p, i) =>
+            p.url !== initialPhotos.current[i]?.url ||
+            p.path !== initialPhotos.current[i]?.path,
+        );
+      if (photosDirty) {
+        payload.photos = [...serverPhotos, ...photos].map((p, sort) => ({
+          ...p,
+          sort,
+        }));
+      }
+
+      setSubmitting(true);
+      const result = await updateListing(listingId, payload);
+      setSubmitting(false);
+      if (!result.success) {
+        toast.error(
+          result.code === "LISTING_REMOVED_BY_ADMIN"
+            ? t("errors.removedByAdmin")
+            : result.error,
+        );
+        return;
+      }
+      toast.success(t("saved"));
+      onSaved?.();
+      return;
+    }
 
     const payload: CreateListingPayload = {
       categoryId: config.categoryId,
@@ -836,9 +1153,7 @@ export default function ListingPostForm({
       longitude: coords?.lng,
       deliveryFree,
       contactName: contactName.trim(),
-      contactPhones: contactPhones
-        .map((p) => p.trim())
-        .filter((p) => p.length > 0),
+      contactPhones: phoneValues,
       contactEmail: contactEmail.trim() || undefined,
       description: description.trim() || undefined,
     };
@@ -937,15 +1252,17 @@ export default function ListingPostForm({
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div />
-        <button
-          onClick={onBack}
-          className="type-nav text-[#00a0e9] hover:underline cursor-pointer"
-        >
-          {t("reset")}
-        </button>
-      </div>
+      {mode !== "edit" && (
+        <div className="flex justify-between items-center">
+          <div />
+          <button
+            onClick={onBack}
+            className="type-nav text-[#00a0e9] hover:underline cursor-pointer"
+          >
+            {t("reset")}
+          </button>
+        </div>
+      )}
 
       {config.plan && (
         <div
@@ -981,6 +1298,13 @@ export default function ListingPostForm({
         onChange={setFiles}
         signFn={signUploadUser}
         onSigned={(p) => setPhotos((prev) => [...prev, p])}
+        onSignedRemoved={(p) =>
+          setPhotos((prev) => prev.filter((x) => x.path !== p.path))
+        }
+        existing={serverPhotos}
+        onRemoveExisting={(url) =>
+          setServerPhotos((prev) => prev.filter((p) => p.url !== url))
+        }
         title={labelFor("photos", "Photos")}
         max={config.photoMax}
       />
@@ -1599,7 +1923,13 @@ export default function ListingPostForm({
           disabled={submitting}
           className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
         >
-          {submitting ? t("publishing") : t("submit")}
+          {submitting
+            ? mode === "edit"
+              ? t("saving")
+              : t("publishing")
+            : mode === "edit"
+              ? t("save")
+              : t("submit")}
         </button>
       </div>
     </div>

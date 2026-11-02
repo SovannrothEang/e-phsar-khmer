@@ -49,7 +49,7 @@ Uses neither, deliberately. The outbox is skipped for the secret-in-payload and 
 
 ## Lifecycle, end to end
 
-> **Status:** the forgot-password flow below is the designed use of the `password_reset` purpose, but it is **not wired** after the captain's 2026-11-03 deferral — the shipped reset surface is `POST /auth/password/reset/request|verify|confirm` in `AuthService`. The diagram is kept as the reference for that planned work.
+The shipped reset flow is the three-step `POST /auth/password/reset/request|verify|confirm` surface in `AuthService`; under `OTP_PROVIDER=plasgate` its request and verify steps use this module. The plan's two-endpoint `/auth/password/forgot|reset` design is not exposed.
 
 ```mermaid
 sequenceDiagram
@@ -58,22 +58,22 @@ sequenceDiagram
   participant S as OtpSmsSender
   participant O as OtpService
   participant P as PlasGate
-  W->>A: POST /auth/password/forgot {phone}
-  A->>A: look up account + ban (always both)
+  W->>A: POST /auth/password/reset/request {identifier}
+  A->>A: resolve account + ban
   alt eligible account
     A->>S: issueAndSendDetached(phone, password_reset)
     S->>S: take per-phone slot (cooldown / daily cap)
     S->>O: issue -> code (hash stored)
-    S-->>A: sent, retryAfterSeconds
     S--)P: send SMS (not awaited)
-  else unknown / banned / suspended
-    A->>S: reserveOnly(phone, password_reset)
-    S-->>A: sent, retryAfterSeconds (same slot, no SMS)
+  else unknown / banned / suspended / phone-less
+    Note over A: nothing is issued
   end
-  A-->>W: { otpSent: true, retryAfterSeconds }
-  W->>A: POST /auth/password/reset {phone, code, newPassword}
-  A->>O: verify(phone, password_reset, code)
+  A-->>W: { otpSent: true } (always)
+  W->>A: POST /auth/password/reset/verify {identifier, token}
+  A->>O: verify(phone, password_reset, token)
   O-->>A: ok | invalid | expired | too_many_attempts
+  A-->>W: { resetToken } or the same 401
+  W->>A: POST /auth/password/reset/confirm {resetToken, newPassword}
   A->>A: set passwordHash + tokensValidAfter, revoke device rows
   A-->>W: { reset: true } (no tokens)
 ```
@@ -83,21 +83,22 @@ Key properties this gives us:
 - The attempt is spent before the compare, so parallel guesses cannot exceed 5; `consume` is a conditional update, so two correct submissions let exactly one through.
 - A limiter slot is taken before a code is issued, so a request over the limit cannot replace the code the user already received.
 - A send that fails (PlasGate rejects, not configured, global budget) releases the slot and invalidates the code, so the user can retry at once.
-- Forgot-password answers the same for every number: same lookups, same slot, same 429 answers, and the PlasGate call is not awaited. The remaining difference is one DB insert on the real path.
+- The reset request answers the same for every identifier: same lookups, the PlasGate call is not awaited, and limiter outcomes (cooldown/cap) are swallowed rather than returned — a 429 would reveal that the identifier resolves to an account. Trade-off: a user over the cooldown sees success but gets no SMS.
+- The reset flow opts out of `DEV_OTP_TOKEN` (`devBypass: false`), so it always issues and checks a real code; register/resend/login keep the dev convenience.
 - Register, resend and login-OTP use `issueAndSend` (awaited) and map failures to 429 `OTP_COOLDOWN` / `OTP_DAILY_CAP` or 503 `OTP_SEND_FAILED`.
 
 ## Current state
 
-| Piece                                                          | Status                                                                                    |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `OtpService` (issue / verify, hashing, attempts, single use)   | Done                                                                                      |
-| `OtpSmsSender` (limits, PlasGate send, audit row)              | Done                                                                                      |
-| Register / resend / login-OTP / verify on `plasgate`           | Done, behind `OTP_PROVIDER` (default `supabase`)                                          |
-| Forgot password + reset + session revocation                   | Deferred 2026-11-03 — routes not wired; `password_reset` purpose kept for the future plan |
-| Phone-change OTP                                               | Not started: still `SupabaseService` in `users.service.ts`                                |
-| Web: countdown from `retryAfterSeconds`, forgot-password pages | Not started (plan task 1.6)                                                               |
-| Real-SMS rollout and brute-force pass                          | Not started (plan task 1.7)                                                               |
-| Expired-row cleanup                                            | Not started                                                                               |
+| Piece                                                        | Status                                                                     |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `OtpService` (issue / verify, hashing, attempts, single use) | Done                                                                       |
+| `OtpSmsSender` (limits, PlasGate send, audit row)            | Done                                                                       |
+| Register / resend / login-OTP / verify on `plasgate`         | Done, behind `OTP_PROVIDER` (default `supabase`)                           |
+| Forgot password + reset + session revocation                 | Wired into the three-step reset on `plasgate`; Supabase path unchanged     |
+| Phone-change OTP                                             | Not started: still `SupabaseService` in `users.service.ts`                 |
+| Web: forgot-password pages                                   | Done; the resend timer is local (this flow returns no `retryAfterSeconds`) |
+| Real-SMS rollout and brute-force pass                        | Not started (plan task 1.7)                                                |
+| Expired-row cleanup                                          | Not started                                                                |
 
 ## Open items
 
