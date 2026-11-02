@@ -3,6 +3,10 @@ import type { DbClient } from '../../db/drizzle.provider';
 import { listings, listingPhotos } from '../../db/schema/listings.schema';
 import { users, provinces, districts } from '../../db/schema/users.schema';
 import { categories, subcategories } from '../../db/schema/categories.schema';
+import { brands, models } from '../../db/schema/brands.schema';
+import { modelSlug } from '../../products/seeds/products.seed';
+import { buildCatalogListings } from './catalog-listings';
+import { DEMO_PEOPLE, demoPhone } from './demo-people';
 
 /**
  * Demo listings seed ("seed data properly for now", 2026-08-31): a curated
@@ -14,10 +18,20 @@ import { categories, subcategories } from '../../db/schema/categories.schema';
  * junk rows are removed.
  */
 
-interface DemoListing {
+export interface DemoListing {
   title: string;
   description: string;
-  price: string;
+  /** Omitted for families that declare no price (Services read "Negotiable"). */
+  price?: string;
+  /**
+   * Index into the demo-seller pool that owns this ad. Omitted = the admin
+   * demo owner. The catalogue spreads its ads so no seller exceeds the free
+   * plan's caps (5 live ads, 2 in cars-for-sale) — over a cap the listing
+   * sweep flips the extras to `restricted` and hides them from every feed.
+   */
+  ownerIndex?: number;
+  /** Trusted spec page to link (resolved to `models.id` at insert time). */
+  productModel?: { brandSlug: string; modelName: string };
   discountValue?: string;
   /** Omitted when the category's form has no Condition field (e.g. rentals). */
   condition?: 'new' | 'used';
@@ -474,6 +488,83 @@ const JUNK_TITLES = [
   'Smoke Test Corolla 2023',
 ];
 
+/**
+ * The people who own the demo ads (see demo-people.ts): real accounts with a
+ * name and a phone number to sign in with. Idempotent by username (an existing
+ * account is left untouched); returns their ids in DEMO_PEOPLE order.
+ */
+async function ensureDemoPeople(
+  db: DbClient,
+  provBySlug: Map<string, string>,
+): Promise<string[]> {
+  await db
+    .insert(users)
+    .values(
+      DEMO_PEOPLE.map((p, i) => ({
+        username: p.username,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        gender: p.gender,
+        primaryPhone: demoPhone(i),
+        provinceId: provBySlug.get(p.province),
+        address: p.location,
+      })),
+    )
+    .onConflictDoNothing();
+  const rows = await db
+    .select({ id: users.id, username: users.username })
+    .from(users)
+    .where(
+      inArray(
+        users.username,
+        DEMO_PEOPLE.map((p) => p.username),
+      ),
+    );
+  const idByName = new Map(rows.map((r) => [r.username, r.id]));
+  return DEMO_PEOPLE.map((p) => idByName.get(p.username)!);
+}
+
+/** Originals 24..29 owners (the catalogue takes 0..23): ≤4 ads each. */
+const ORIGINAL_OWNER_BASE = 24;
+const ORIGINAL_OWNER_COUNT = 6;
+
+/** The four original cars and two phones also link a spec page. */
+const ORIGINAL_SPEC_LINKS: Record<string, DemoListing['productModel']> = {
+  'Toyota Camry 2019 Full Option': { brandSlug: 'toyota', modelName: 'Camry' },
+  'MG ZS 2022 Low Mileage': { brandSlug: 'mg', modelName: 'ZS' },
+  'Lexus RX 350 2021 Luxury': { brandSlug: 'lexus', modelName: 'RX 350' },
+  'Honda Civic 2018 One Owner': { brandSlug: 'honda', modelName: 'Civic' },
+  'iPhone 16 Pro Max 256GB': {
+    brandSlug: 'apple',
+    modelName: 'iPhone 16 Pro Max',
+  },
+  'Samsung Galaxy S25 Ultra 512GB': {
+    brandSlug: 'samsung',
+    modelName: 'Galaxy S25 Ultra',
+  },
+};
+
+/**
+ * Every demo listing, each owned by a person (never the admin). The original
+ * 23 keep their copy and location but take their owner's name and number, link
+ * a spec page where one exists, and drop their old bundled-asset photos (those
+ * files no longer ship; the photo seed attaches real pictures).
+ */
+export function buildDemoListings(): DemoListing[] {
+  const originals = DEMO_LISTINGS.map((demo, n): DemoListing => {
+    const ownerIndex = ORIGINAL_OWNER_BASE + (n % ORIGINAL_OWNER_COUNT);
+    return {
+      ...demo,
+      ownerIndex,
+      contactName: `${DEMO_PEOPLE[ownerIndex].firstName} ${DEMO_PEOPLE[ownerIndex].lastName}`,
+      contactPhones: [demoPhone(ownerIndex)],
+      productModel: ORIGINAL_SPEC_LINKS[demo.title],
+      photos: undefined,
+    };
+  });
+  return [...originals, ...buildCatalogListings()];
+}
+
 export async function seedListings(db: DbClient): Promise<void> {
   // Remove the pre-existing test/E2E junk rows (their photos cascade).
   const removed = await db
@@ -507,8 +598,41 @@ export async function seedListings(db: DbClient): Promise<void> {
   const provBySlug = new Map(provs.map((p) => [p.slug, p.id]));
   const distBySlug = new Map(dists.map((d) => [d.slug, d.id]));
 
+  // `${brandSlug}:${modelSlug}` → models.id, for the spec-page links.
+  const modelRows = await db
+    .select({ id: models.id, brandSlug: brands.slug, slug: models.slug })
+    .from(models)
+    .innerJoin(brands, eq(brands.id, models.brandId));
+  const modelByKey = new Map(
+    modelRows.map((m) => [`${m.brandSlug}:${m.slug}`, m.id]),
+  );
+
+  const demos = buildDemoListings();
+
+  // Demo ads belong to people, never to the admin: drop the copies an earlier
+  // seed put under the admin account (photos cascade). Matched by exact title
+  // AND admin ownership, so nothing a real user posted is touched.
+  const retired = await db
+    .delete(listings)
+    .where(
+      and(
+        eq(listings.userId, adminUser.id),
+        inArray(
+          listings.title,
+          demos.map((d) => d.title),
+        ),
+      ),
+    )
+    .returning({ id: listings.id });
+  if (retired.length > 0) {
+    console.log(`  ✓ removed ${retired.length} demo listings owned by admin`);
+  }
+
+  const personIds = await ensureDemoPeople(db, provBySlug);
+
   let inserted = 0;
-  for (const demo of DEMO_LISTINGS) {
+  for (const demo of demos) {
+    const ownerId = personIds[demo.ownerIndex ?? 0];
     const [existing] = await db
       .select({ id: listings.id })
       .from(listings)
@@ -528,12 +652,17 @@ export async function seedListings(db: DbClient): Promise<void> {
     const [row] = await db
       .insert(listings)
       .values({
-        userId: adminUser.id,
+        userId: ownerId,
         categoryId,
         subcategoryId,
         title: demo.title,
         description: demo.description,
         price: demo.price,
+        productModelId: demo.productModel
+          ? modelByKey.get(
+              `${demo.productModel.brandSlug}:${modelSlug(demo.productModel.modelName)}`,
+            )
+          : undefined,
         discountValue: demo.discountValue,
         discountType: demo.discountValue ? 'amount' : undefined,
         currency: 'USD',

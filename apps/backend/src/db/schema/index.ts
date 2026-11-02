@@ -19,4 +19,6 @@ export * from './applications.schema';
 export * from './insights.schema';
 export * from './login-devices.schema';
 export * from './billing-addresses.schema';
+export * from './sms-deliveries.schema';
+export * from './phone-otps.schema';
 export * from '../../payment/entity';

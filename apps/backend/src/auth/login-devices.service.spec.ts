@@ -423,6 +423,24 @@ describe('LoginDevicesService', () => {
       expect(db.update).not.toHaveBeenCalled();
     });
 
+    it('revokes every active device of the user and rotates their sids', async () => {
+      const { db, service } = makeService();
+      let setData: Row = {};
+      db.update.mockReturnValue(
+        updateChain([{ id: 'a' }, { id: 'b' }, { id: 'c' }], (data) => {
+          setData = data;
+        }),
+      );
+
+      await expect(service.revokeAll('user-1')).resolves.toEqual({
+        revoked: 3,
+      });
+      expect(setData).toMatchObject({
+        revokedAt: expect.any(Date) as unknown as Date,
+      });
+      expect(setData).toHaveProperty('sessionId');
+    });
+
     it('requires a current row to revoke others', async () => {
       const { db, service } = makeService();
       db.select.mockReturnValue(selectChain([]));
