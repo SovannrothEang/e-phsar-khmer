@@ -380,3 +380,48 @@ the rest can ride as follow-up tickets. The six prior fixes are all genuinely
 fixed, the migrations are additive and drift-free, the concurrency and
 fail-closed properties hold up under adversarial reading, and the docs — bar the
 staleness list in 3.2.7/3.3.8 — describe the system as it actually behaves.
+
+### Re-review (2026-11-02)
+
+Re-review of the fixes committed as `9423161` (SMS delivery), `036086c`
+(OTP + forgot-password) and `b8e2d7f` (docs), on `feat/refine`. Only the
+findings below were re-checked, against the committed code (files re-read in
+full; `git show --stat` for both commits); the suite was not re-run (orchestrator
+reports 93 suites / 1328 tests green, eslint and `nest build clean — 3 more tests
+than this review's 1325 baseline, which is exactly the three new specs named
+below).
+
+| # | Finding | Verdict | Evidence |
+| --- | --- | --- | --- |
+| 3.1 | enumeration oracle on `POST /auth/password/reset` (major) | **Fixed** | `auth.service.ts:300-302` — `resetPassword` throws one plain `UnauthorizedException('Invalid or expired OTP')` for `verified.status !== 'ok' \|\| !user`, so exhaustion takes the identical branch as any other failure; `auth.service.ts:403-404` same rule in `verifyPhoneOtp` for `/auth/otp/verify`. `grep OTP_TOO_MANY_ATTEMPTS` over `apps/backend` → **zero matches**; through `global-exception.filter.ts:71-81` both paths render `code: 'UNAUTHORIZED'` + the same message. `password-reset.spec.ts:507-533` pins known-vs-unknown equality across a full **6**-attempt run, asserts `repo.rows[0].attempts === 5` (the exhaustion branch really ran) and `response` has **no** `code` property; `auth.service.spec.ts:1990-2005` pins `invalid`/`expired`/`too_many_attempts` → the same 401 on verify. |
+| 3.2.1 | `.env.example` vars + CHANGELOG counts | **Fixed** | `.env.example:73-75` (`SMS_RATE_LIMIT_PER_MINUTE`, `SMS_USER_COOLDOWN_SECONDS`, `SMS_USER_DAILY_CAP`), `:80` (`OTP_PROVIDER`), `:84` (`OTP_HMAC_SECRET`) — CHANGELOG SMS entry's `.env.example` claim (`CHANGELOG.md:58-59`) is now materially true; `CHANGELOG.md:60` reads 93 suites / 1328 tests. |
+| 3.2.2 | `tokensValidAfter` leaking out of user/admin payloads | **Fixed** | `users.service.ts:1274` and `admin.service.ts:79` both destructure it out; `PublicUser` narrowed at `auth.service.ts:84` and `admin.service.ts:49`; every user-returning path found goes through a `toPublicUser`/`toPublic` (grep: all sites covered). |
+| 3.2.3 | `sms_deliveries.attempts` never written off the PlasGate-retry path | **Fixed** | `attempts: event.attempts` on **all six** exits: sent `:147`, failed `:161`, PlasGate-retry `:175`, `onAbandoned` `:193`, `markSkipped` `:222`, `bumpAttempt` `:233`. Specs assert sent/failed/abandoned (`sms-outbox-handler.spec.ts:379,438,463`) and the limiter-retry exit with `attempts: 7` (`:484-489`); `markSkipped` and the PlasGate-retry exits write it but are not asserted (nit below). |
+| 3.2.4 | limiter slot leaks when `otp.issue` throws | **Fixed** | `otp-sms-sender.ts:144-157` `issueReleasingSlot` (release, then rethrow; best-effort release) is called from **both** entry points — `issueAndSend:73` and `issueAndSendDetached:106`; behavioural spec `otp-sms-sender.spec.ts:284-292` (throw → follow-up request gets `sent`, not cooldown). |
+| 3.2.6 | dead `OtpSmsSender.send()` | **Fixed** | No `send()` method in `otp-sms-sender.ts`, no `sender.send(`/`async send(` anywhere under `src/otp/`; the spec block went with it (remaining tests: issue/detached/reserveOnly only). |
+| 3.2.7 | three stale docs | **Fixed, one residual** | `notification-channel.interface.ts:13-24` now says "SMS deliberately does NOT belong here"; `payment/README.md:364` says SMS *is* built but deliberately not a channel; `ARCHITECTURE.md:321-326` gate order is now 1 unconfigured → 2 allowed-type → 2b verified-phone → 2c per-user → 3 rate limiter, matching `sms-outbox-handler.ts:66-133` exactly. **Residual:** `payment/README.md:405-407` still tells the reader "adding email/SMS/push is adding a class implementing `NotificationChannel`" (and "currently just `InAppNotificationChannel`", omitting realtime) — the same stale claim the interface comment fix corrected, in the same file (nit below). |
+| 3.3.3 | `stableStringify` maps `Date` to `{}` | **Fixed** | `stable-stringify.util.ts:15-17` Date branch; spec `:26-34` pins ISO output and two distinct dates not colliding. The `undefined` → invalid-JSON-token half of the nit is unchanged (pre-existing, not regressed). |
+
+**Regression spot-checks (previously "correct" areas): all intact.** Attempt
+spent before compare (`otp.service.ts:98-104`, `otp.repository.ts:75-81`);
+forgot-password symmetry (same two lookups for every number,
+`findResettableUser` + `reserveOnly`, cooldown 429 equality spec'd at
+`password-reset.spec.ts:376-395`, query-count parity at `:404-408`); outbox
+classification (2xx → published, 429/5xx/network → retry, other 4xx → failed,
+`onAbandoned` → failed, `redact` on terminal paths) — unchanged by the fix
+commits.
+
+**New issues introduced by the fixes: none blocking.**
+
+- **minor — `.env.example:80` samples `OTP_PROVIDER=plasgate` while the shipped default and the review-gated rollout lever is `supabase`.** A fresh environment built by copying the example flips task 1.7's flag before its APPROVE; and `:84`'s placeholder (`<at least 16 random chars>`, 25 chars) satisfies `OTP_HMAC_SECRET: z.string().min(16).optional()` (`config.validation.ts:62`), so a forgotten replacement passes validation and silently becomes the code-hash pepper (the unset branch that warns never runs). Prefer `OTP_PROVIDER=supabase` with `plasgate` documented in the comment, and a clearly non-runnable secret placeholder.
+- **nit — `otp-sms-sender.ts:154`**: a failed `releaseSubject` inside `issueReleasingSlot` is swallowed with `.catch(() => undefined)` and no log line, so if release itself fails the lockout this fix targets persists without a trace. One `logger.warn` would close it.
+- **nit (test gap) — 3.2.2 has no spec assertion.** `Omit<UserRow, 'tokensValidAfter'>` does not stop a future `return user` from type-checking (excess-property checks don't apply to non-literals), so the payload strip is unguarded at runtime. One `not.toHaveProperty('tokensValidAfter')` on `/users/:id`/admin output would pin it.
+- **nit (test gap) — 3.2.3 partial coverage**: `attempts` is written but not asserted on the `markSkipped` (`sms-outbox-handler.ts:222`) and PlasGate-retry (`:175`) exits; the skip paths were the "row reads 0" cases in the original finding.
+- **nit (doc) — `CHANGELOG.md:58`** lists `SMS_BASE_URL` under "New env (`apps/backend/.env.example`)", but the file only mentions it in a comment (no `SMS_BASE_URL=` line). The three limit vars it was chided for missing are now present, so the claim is materially true; this is the last wording wrinkle.
+- **pre-existing, not from these fixes** (recorded in passing): `users.service.ts:162` `findByUsernameOrPhone` has no callers — dead code per AGENTS.md.
+
+**Re-review verdict: APPROVE WITH NOTES.** Every finding, including the major,
+is correctly fixed in `9423161`/`036086c`/`b8e2d7f`, and no previously-verified
+property regressed. The notes are the `.env.example` example-value hazard above
+(worth a one-line fix before task 1.7 flips the flag anywhere) and the four
+nits; none warrants holding the diff.

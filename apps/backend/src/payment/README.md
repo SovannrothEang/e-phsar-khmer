@@ -400,12 +400,15 @@ Key properties this gives us:
   `OutboxHandler` that calls the new `NotificationsModule`
   (`src/notifications/`) directly — no BullMQ hop, since notifying has no
   gateway call worth isolating behind a worker pool. `NotificationsService`
-  fans out to a `NotificationChannel[]` (currently just
+  fans out to a `NotificationChannel[]` (in-app plus realtime; the in-app channel is
   `InAppNotificationChannel`, persisting to the new `notifications` table —
-  see its own module for the REST surface); adding email/SMS/push is adding
+  see its own module for the REST surface); adding email or push is adding
   a class implementing `NotificationChannel` and listing it in
   `notifications.module.ts`'s `NOTIFICATION_CHANNELS` factory, not a new
-  design decision. The terminal-failure path still has no equivalent — no
+  design decision. SMS deliberately does NOT belong here: it is opt-in
+  (`data.sendSms`) and goes out of band through the transactional outbox
+  (`src/notifications/sms/`), and only the auth phone/password types may
+  be texted today. The terminal-failure path still has no equivalent — no
   outbox row to key off (a failed attempt/transaction is never announced),
   so it can't simply reuse this same consumer; it needs its own producer
   first.
