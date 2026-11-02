@@ -12,15 +12,19 @@ const POLL_MS = 60_000;
  * Nav badge for unread notifications. The /notifications page invalidates
  * this key after every mark-read/delete, so the number updates immediately
  * there; elsewhere the 60 s poll picks up notifications created by another
- * tab or device. A failed/expired session hides the badge rather than
- * flashing an error.
+ * tab or device. A rejected session hides the badge (the action resolves
+ * `null`) and stops the poll, rather than flashing an error — see
+ * `getUnreadNotificationCount`.
  */
 export function NotificationUnreadBadge() {
   const t = useTranslations("Notifications");
   const { data } = useQuery({
     queryKey: notificationKeys.unread(),
     queryFn: getUnreadNotificationCount,
-    refetchInterval: POLL_MS,
+    // `null` is the action's "session rejected" answer. Keep polling only
+    // while the session is still good, or a signed-out tab would re-run the
+    // failing server action (and log it) forever.
+    refetchInterval: (query) => (query.state.data === null ? false : POLL_MS),
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30 * 1000,
