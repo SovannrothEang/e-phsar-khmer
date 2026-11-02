@@ -100,7 +100,7 @@ export default function ShareModal({
           <Input
             value={url}
             readOnly
-            className="bg-muted/30 rounded-sm p-5 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="bg-muted/30 rounded-sm p-5 pr-12 truncate focus-visible:ring-0 focus-visible:ring-offset-0"
           />
           <Button
             size="icon"

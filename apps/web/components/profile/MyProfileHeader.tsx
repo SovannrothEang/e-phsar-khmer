@@ -66,6 +66,18 @@ const PROFILE_TABS = [
   },
 ] as const;
 
+/**
+ * Routes that belong to a tab's section without being the tab's own link. The
+ * Jobs tab has two: /me/job-applications (the tab) and /me/applied-jobs (its
+ * "Applied" sub-tab) — both must light the Jobs trigger.
+ */
+const TAB_SECTION_ROUTES: Record<
+  string,
+  (typeof PROFILE_TABS)[number]["value"]
+> = {
+  "/me/applied-jobs": "jobs",
+};
+
 export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
@@ -88,6 +100,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const pathname = usePathname();
   const activeTab =
     PROFILE_TABS.find(({ href }) => href === pathname)?.value ??
+    TAB_SECTION_ROUTES[pathname] ??
     // /me/* pages that are not tabs (followers, membership, ...) keep the
     // default section lit instead of dropping the highlight entirely.
     "manage-ads";
