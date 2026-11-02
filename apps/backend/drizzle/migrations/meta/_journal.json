@@ -351,6 +351,27 @@
       "when": 1793450156745,
       "tag": "0049_bizarre_psynapse",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793610771221,
+      "tag": "0050_ambiguous_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793613364685,
+      "tag": "0051_open_colleen_wing",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793623949506,
+      "tag": "0052_brown_stranger",
+      "breakpoints": true
     }
   ]
 }

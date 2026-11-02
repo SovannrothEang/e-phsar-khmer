@@ -173,6 +173,35 @@ describe('UsersService phone management', () => {
       await service.addPhone('u1', { phone: '+855999', isPrimary: true });
       expect(updateWhere).toHaveBeenCalled();
     });
+
+    it('clears phoneVerifiedAt when the new phone becomes primary (not OTP-verified)', async () => {
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([]) }),
+        }),
+      }));
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return { where: () => Promise.resolve([]) };
+        },
+      }));
+      db.insert.mockReturnValue({
+        values: () => ({
+          returning: () =>
+            Promise.resolve([
+              { id: 'p1', userId: 'u1', phone: '+855123', isPrimary: true },
+            ]),
+        }),
+      });
+
+      await service.addPhone('u1', { phone: '+855123' });
+
+      const usersSet = sets.find((s) => 'primaryPhone' in s);
+      expect(usersSet).toMatchObject({ primaryPhone: '+855123' });
+      expect(usersSet?.phoneVerifiedAt).toBeNull();
+    });
   });
 
   describe('updatePhone', () => {
@@ -317,6 +346,36 @@ describe('UsersService phone management', () => {
       const result = await service.setPrimaryPhone('u1', 'p1');
       expect(result.isPrimary).toBe(true);
     });
+
+    it('clears phoneVerifiedAt on the users row (the new primary was never OTP-verified)', async () => {
+      const target = {
+        id: 'p1',
+        userId: 'u1',
+        phone: '+855123',
+        isPrimary: false,
+      };
+      db.select.mockReturnValue({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([target]) }),
+        }),
+      });
+
+      const sets: Record<string, unknown>[] = [];
+      db.update.mockImplementation(() => ({
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return {
+            where: () => ({ returning: () => Promise.resolve([target]) }),
+          };
+        },
+      }));
+
+      await service.setPrimaryPhone('u1', 'p1');
+
+      const usersSet = sets.find((s) => 'primaryPhone' in s);
+      expect(usersSet).toMatchObject({ primaryPhone: '+855123' });
+      expect(usersSet?.phoneVerifiedAt).toBeNull();
+    });
   });
 
   describe('removePhone', () => {
@@ -374,6 +433,8 @@ describe('UsersService phone management', () => {
       await service.removePhone('u1', 'p1');
       expect(sets[0]).toEqual({ isPrimary: true });
       expect(sets[1]).toMatchObject({ primaryPhone: '+855p2' });
+      // The promoted phone was never OTP-verified as the login identifier.
+      expect((sets[1] as Record<string, unknown>).phoneVerifiedAt).toBeNull();
     });
   });
 
@@ -430,6 +491,7 @@ const fakeUser = {
   discoverableByLocation: true,
   lastSeenAt: null,
   emailVerifiedAt: null,
+  tokensValidAfter: null,
   phoneVerifiedAt: null,
   deletedAt: null,
   createdAt: new Date(),

@@ -39,7 +39,27 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  // PlasGate SMS — all optional; SmsOutboxHandler no-ops (records a
+  // `skipped` row) unless the private key, secret and sender are all set.
+  // SMS_BASE_URL defaults to PlasGate's own endpoint.
+  SMS_BASE_URL: z.string().url().optional(),
+  SMS_PRIVATE_KEY: z.string().optional(),
+  SMS_SECRET: z.string().optional(),
+  SMS_SENDER: z.string().optional(),
+  // Shared PlasGate budget enforced across every instance via
+  // SmsRateLimiter (Redis-backed). PlasGate's own ceiling is 200/minute;
+  // this leaves headroom.
+  SMS_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(150),
+  // Per-user spam limits (SmsUserLimiter): one SMS per user per notification
+  // type per cooldown window, and a daily cap per user.
+  SMS_USER_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(300),
+  SMS_USER_DAILY_CAP: z.coerce.number().int().positive().default(10),
   DEV_OTP_TOKEN: z.string().optional(),
+  // Which backend issues/verifies phone OTPs: Supabase (today's behaviour) or
+  // our own `OtpService` over PlasGate. `OTP_HMAC_SECRET` keys the code
+  // hash; unset, `OtpService` derives one from JWT_SECRET and warns once.
+  OTP_PROVIDER: z.enum(['supabase', 'plasgate']).default('supabase'),
+  OTP_HMAC_SECRET: z.string().min(16).optional(),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().default(24),
   THROTTLE_TTL: z.coerce.number().default(60),
   THROTTLE_LIMIT: z.coerce.number().default(100),

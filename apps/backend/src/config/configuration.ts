@@ -37,7 +37,20 @@ export default () => {
     telegram: {
       botToken: env.TELEGRAM_BOT_TOKEN,
     },
+    sms: {
+      baseUrl: env.SMS_BASE_URL,
+      privateKey: env.SMS_PRIVATE_KEY,
+      secret: env.SMS_SECRET,
+      sender: env.SMS_SENDER,
+      rateLimitPerMinute: env.SMS_RATE_LIMIT_PER_MINUTE,
+      userCooldownSeconds: env.SMS_USER_COOLDOWN_SECONDS,
+      userDailyCap: env.SMS_USER_DAILY_CAP,
+    },
     devOtpToken: env.DEV_OTP_TOKEN,
+    otp: {
+      provider: env.OTP_PROVIDER,
+      hmacSecret: env.OTP_HMAC_SECRET,
+    },
     idempotency: {
       ttlHours: env.IDEMPOTENCY_TTL_HOURS,
     },
