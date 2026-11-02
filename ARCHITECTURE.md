@@ -243,7 +243,7 @@ Send rejections: self (400), missing E2E envelope (400 `Encrypted messages are r
 
 ### Files
 
-`FilesModule` (`src/files/`) handles file uploads to Supabase Storage. Signed upload URLs are generated server-side; the client uploads directly to Supabase. Public URLs are returned for confirmed uploads. Bucket name is configured via `SUPABASE_STORAGE_BUCKET` (default: `listings`).
+`FilesModule` (`src/files/`) handles file uploads to Supabase Storage. Signed upload URLs are generated server-side; the client uploads directly to Supabase. Public URLs are returned for confirmed uploads. Bucket name is configured via `SUPABASE_STORAGE_BUCKET` (default: `listings`). Bucket limits and the client upload contract are owned by `apps/backend/src/files/README.md`.
 
 **Upload scopes** (`POST /files/sign`, `SignUploadDto.scope`): `avatar | cover | listing | chat | category | subcategory | brand | model | attribute` — `chat` paths are per-user (`chat/{userId}/…`); the scope is now legacy — the web no longer signs chat uploads, since new sends reject `imagePath`. `DELETE /files` takes `{ paths: string[] }` for path-based deletion.
 

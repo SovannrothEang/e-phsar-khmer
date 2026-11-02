@@ -45,6 +45,7 @@ import { isPhoneBanned, normalizePhoneE164 } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 
 export interface AuthTokens {
@@ -102,6 +103,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
     private readonly loginDevices: LoginDevicesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async loginWithPassword(
@@ -226,7 +228,7 @@ export class AuthService {
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
-      return this.finishLogin(revived, device);
+      return this.completeVerifiedLogin(revived, device, dto.phone);
     }
 
     if (completingBareAccount) {
@@ -252,7 +254,7 @@ export class AuthService {
         .where(and(eq(users.id, existing.id), isNull(users.deletedAt)))
         .returning();
 
-      return this.finishLogin(row, device);
+      return this.completeVerifiedLogin(row, device, dto.phone);
     }
 
     // Extras land ONLY in the INSERT values — the conflict path (existing
@@ -278,7 +280,42 @@ export class AuthService {
       insertExtras,
     );
     this.assertAccountActive(user);
-    return this.finishLogin(user, device);
+    return this.completeVerifiedLogin(user, device, dto.phone);
+  }
+
+  /**
+   * Finishes a successful OTP verification and records it in the durable
+   * notification feed. The notification is best-effort: the caller is
+   * already signed in, so a feed failure must not fail the login (the same
+   * policy `security.new_login` uses). Only `verifyPhoneOtp` comes through
+   * here — `register` and `otp/login` send a code but never consume one.
+   */
+  private async completeVerifiedLogin(
+    user: UserRow,
+    device: ClientDeviceInfo | null,
+    phone: string,
+  ): Promise<AuthResult> {
+    const result = await this.finishLogin(user, device);
+    try {
+      await this.notifications.notify({
+        userId: user.id,
+        type: 'security.otp_verified',
+        title: 'Phone verified',
+        body: `Your phone number ${phone} was verified with a one-time code.`,
+        data: {
+          phone,
+          method: 'sms',
+          verifiedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not create the OTP-verified notification for user ${user.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    return result;
   }
 
   async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
@@ -322,7 +359,12 @@ export class AuthService {
     const target = await this.resolveResetTarget(dto.identifier);
     if (target) {
       try {
-        await this.supabaseService.signInWithOtp(target.phone);
+        // `devBypass: false` — the reset flow never honours DEV_OTP_TOKEN,
+        // even in development: it must exercise the real provider so a
+        // production deploy cannot inherit a test-only path.
+        await this.supabaseService.signInWithOtp(target.phone, {
+          devBypass: false,
+        });
       } catch (err) {
         // Swallowed on purpose: a failure here must not tell the caller the
         // account exists. Never log the identifier or the phone.
@@ -350,6 +392,8 @@ export class AuthService {
     const { data, error } = await this.supabaseService.verifyOtp(
       target.phone,
       dto.token,
+      // Never accept the dev token on the reset path (see requestPasswordReset).
+      { devBypass: false },
     );
     if (error || !data.user) throw this.invalidResetOtp();
 

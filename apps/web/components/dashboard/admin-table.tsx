@@ -511,6 +511,7 @@ export function RowActions({
         {id ? (
           <>
             <DropdownMenuSeparator />
+
             <DropdownMenuItem onClick={copyId} className="cursor-pointer">
               <Copy className="mr-2 size-4" />
               Copy ID

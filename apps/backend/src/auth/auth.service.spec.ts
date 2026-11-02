@@ -80,6 +80,10 @@ function makeLoginDevices() {
   };
 }
 
+function makeNotifications() {
+  return { notify: jest.fn().mockResolvedValue(undefined) };
+}
+
 function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
   return {
     getUser: jest.fn(),
@@ -94,6 +98,7 @@ function makeService(
   configService: ReturnType<typeof makeConfigService>,
   loginDevices = makeLoginDevices(),
   supabaseService = makeSupabase(),
+  notifications = makeNotifications(),
 ) {
   return new AuthService(
     db as never,
@@ -101,6 +106,7 @@ function makeService(
     configService as never,
     supabaseService as never,
     loginDevices as never,
+    notifications as never,
   );
 }
 
@@ -418,6 +424,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
     db: ReturnType<typeof makeDb>,
     supabase: ReturnType<typeof makeSupabase>,
     loginDevices = makeLoginDevices(),
+    notifications = makeNotifications(),
   ) {
     return new AuthService(
       db as never,
@@ -425,6 +432,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeConfigService() as never,
       supabase as never,
       loginDevices as never,
+      notifications as never,
     );
   }
 
@@ -630,6 +638,81 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       ).rejects.toThrow('INVALID_CREDENTIALS');
       expect(supabase.verifyOtp).not.toHaveBeenCalled();
       expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    describe('security.otp_verified notification', () => {
+      it('notifies the verifying user with phone, method and timestamp', async () => {
+        (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+        const db = makeDb();
+        db.select.mockImplementation(() => ({
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve([]) }),
+          }),
+        }));
+        const supabase = makeSupabase();
+        const notifications = makeNotifications();
+        const service = makeAuthService(
+          db,
+          supabase,
+          makeLoginDevices(),
+          notifications,
+        );
+        mockInsert(db, makeUser({ username: 'sokdara' }));
+
+        await service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '000000',
+          password: 'password123',
+          firstName: 'Sok',
+          lastName: 'Dara',
+        });
+
+        expect(notifications.notify).toHaveBeenCalledTimes(1);
+        expect(notifications.notify).toHaveBeenCalledWith({
+          userId: 'user-uuid',
+          type: 'security.otp_verified',
+          title: 'Phone verified',
+          body: `Your phone number ${PHONE} was verified with a one-time code.`,
+          data: {
+            phone: PHONE,
+            method: 'sms',
+            // Any ISO timestamp; the matcher is `any` by design.
+            verifiedAt: expect.any(String) as unknown as string,
+          },
+        });
+      });
+
+      it('raises no notification when the OTP is rejected', async () => {
+        const db = makeDb();
+        db.select.mockImplementation(() => ({
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve([]) }),
+          }),
+        }));
+        const supabase = makeSupabase();
+        supabase.verifyOtp.mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Invalid OTP' },
+        });
+        const notifications = makeNotifications();
+        const service = makeAuthService(
+          db,
+          supabase,
+          makeLoginDevices(),
+          notifications,
+        );
+
+        await expect(
+          service.verifyPhoneOtp({
+            phone: PHONE,
+            token: '000000',
+            password: 'password123',
+          }),
+        ).rejects.toThrow('Invalid or expired OTP');
+
+        expect(notifications.notify).not.toHaveBeenCalled();
+        expect(db.insert).not.toHaveBeenCalled();
+      });
     });
 
     it('legacy bare user is completed in place — password set, username generated, insert never called', async () => {
@@ -1688,6 +1771,7 @@ describe('AuthService password reset', () => {
       revokeAll: jest.fn().mockResolvedValue({ revoked: 1 }),
     },
     jwt = makeJwtService(),
+    notifications = makeNotifications(),
   ) {
     return new AuthService(
       db as never,
@@ -1695,6 +1779,7 @@ describe('AuthService password reset', () => {
       makeConfigService() as never,
       supabase as never,
       loginDevices as never,
+      notifications as never,
     );
   }
 
@@ -1769,7 +1854,9 @@ describe('AuthService password reset', () => {
 
       await service.requestPasswordReset({ identifier: 'SokDara' });
 
-      expect(supabase.signInWithOtp).toHaveBeenCalledWith(PHONE);
+      expect(supabase.signInWithOtp).toHaveBeenCalledWith(PHONE, {
+        devBypass: false,
+      });
     });
 
     it('sends nothing for a suspended account but still answers success', async () => {
@@ -1832,7 +1919,9 @@ describe('AuthService password reset', () => {
         service.verifyResetCode({ identifier: 'sokdara', token: '654321' }),
       ).resolves.toEqual({ resetToken: 'signed-token' });
 
-      expect(supabase.verifyOtp).toHaveBeenCalledWith(PHONE, '654321');
+      expect(supabase.verifyOtp).toHaveBeenCalledWith(PHONE, '654321', {
+        devBypass: false,
+      });
       expect(jwt.sign).toHaveBeenCalledWith(
         { sub: user.id, typ: 'password_reset' },
         { expiresIn: 600 },
