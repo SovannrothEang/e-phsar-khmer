@@ -395,11 +395,13 @@ export function RegisterForm() {
             </form.AppField>
 
             <form.AppField name="password">
-              {(field) => <field.Input label="Password" />}
+              {(field) => <field.Input label="Password" type="password" />}
             </form.AppField>
 
             <form.AppField name="confirmPassword">
-              {(field) => <field.Input label="Confirm Password" />}
+              {(field) => (
+                <field.Input label="Confirm Password" type="password" />
+              )}
             </form.AppField>
             <Button
               type="submit"

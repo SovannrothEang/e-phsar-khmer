@@ -43,11 +43,17 @@ export default function PostImage({
   const fullscreenRef = useRef<FullscreenRef>(null);
   const count = images.length;
 
-  const handleImageClick = (idx: number) => {
-    setSelectedImage(idx);
-    setLightboxIndex(idx);
-    setOpen(true);
-  };
+  // Only a click that actually landed on the image opens the lightbox. The
+  // share dialog lives in this container but renders through a portal, and
+  // React bubbles a portal's clicks up the component tree — so clicking the
+  // dialog (e.g. its close button) must not count as "view photo".
+  const handleImageClick =
+    (idx: number) => (e: React.MouseEvent<HTMLElement>) => {
+      if (!e.currentTarget.contains(e.target as Node)) return;
+      setSelectedImage(idx);
+      setLightboxIndex(idx);
+      setOpen(true);
+    };
 
   // The like + share pair — one component, rendered as the photo overlay.
   // `PostSocialActions` owns the markup and the share modal; the host page may
@@ -69,7 +75,7 @@ export default function PostImage({
           <button
             key={`${src}-${idx}`}
             type="button"
-            onClick={() => handleImageClick(idx)}
+            onClick={handleImageClick(idx)}
             className="relative h-[100px] w-[130px] shrink-0 cursor-pointer overflow-hidden rounded-xs bg-muted sm:w-full"
             aria-label={`${post.title} photo ${idx + 1}`}
           >
@@ -95,7 +101,7 @@ export default function PostImage({
       return (
         <div
           className="relative w-full aspect-[15/10] cursor-pointer overflow-hidden rounded-t-xs bg-muted"
-          onClick={() => handleImageClick(0)}
+          onClick={handleImageClick(0)}
         >
           <DbImage
             src={images[0]}
@@ -121,7 +127,7 @@ export default function PostImage({
           ) : null}
           <div
             className="relative flex-1 cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -134,7 +140,7 @@ export default function PostImage({
           </div>
           <div
             className="relative flex-1 cursor-pointer bg-muted"
-            onClick={() => handleImageClick(1)}
+            onClick={handleImageClick(1)}
           >
             <DbImage
               src={images[1]}
@@ -152,7 +158,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[13/10] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[2] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -169,7 +175,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -189,7 +195,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[13/10] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[3] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -206,7 +212,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -226,7 +232,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[12/9] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[4] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -243,7 +249,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -263,7 +269,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[11/8] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[5] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -280,7 +286,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -300,7 +306,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[11/8] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[5] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -317,7 +323,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -337,7 +343,7 @@ export default function PostImage({
         <div className="flex flex-col gap-1 aspect-[11/8] rounded-t-xs overflow-hidden">
           <div
             className="relative flex-[6] cursor-pointer bg-muted"
-            onClick={() => handleImageClick(0)}
+            onClick={handleImageClick(0)}
           >
             <DbImage
               src={images[0]}
@@ -354,7 +360,7 @@ export default function PostImage({
               <div
                 key={i}
                 className="relative flex-1 cursor-pointer bg-muted"
-                onClick={() => handleImageClick(i)}
+                onClick={handleImageClick(i)}
               >
                 <DbImage
                   src={images[i]}
@@ -377,7 +383,7 @@ export default function PostImage({
       <div className="flex flex-col gap-1 aspect-[11/8] rounded-t-xs overflow-hidden">
         <div
           className="relative flex-[6] cursor-pointer bg-muted"
-          onClick={() => handleImageClick(0)}
+          onClick={handleImageClick(0)}
         >
           <DbImage
             src={images[0]}
@@ -398,7 +404,7 @@ export default function PostImage({
               <div
                 key={idx}
                 className="relative flex-1 cursor-pointer overflow-hidden bg-muted h-[60px] md:h-[100px]"
-                onClick={() => handleImageClick(idx + 1)}
+                onClick={handleImageClick(idx + 1)}
               >
                 <DbImage
                   src={img}
