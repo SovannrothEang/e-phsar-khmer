@@ -4,6 +4,7 @@ import {
   getMyApplicationForListing,
 } from "@/actions/applications";
 import type { JobApplyState } from "@/components/post/Post-Detail";
+import { isJobApplyCandidate } from "./job-apply-candidate";
 
 /**
  * The Apply control's state for one listing, or null when there is nothing to
@@ -22,10 +23,7 @@ export async function loadJobApplyState(input: {
   posterId: string;
   viewerId: string | null | undefined;
 }): Promise<JobApplyState | null> {
-  const isJob =
-    input.categorySlug === "jobs" && input.listingStatus === "active";
-  if (!isJob || !input.viewerId || input.viewerId === input.posterId)
-    return null;
+  if (!isJobApplyCandidate(input)) return null;
 
   const [applied, resume] = await Promise.all([
     getMyApplicationForListing(input.listingId),

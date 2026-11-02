@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { API_URL } from "@/lib/api/client";
 import { displayName, getPublicProfile } from "@/lib/api/users";
 import type { RealDetailData } from "@/components/post/Post-Detail";
@@ -379,12 +380,15 @@ export async function getModelsForBrand(
   );
 }
 
-export async function getListingById(
-  id: string,
-  locale: string,
-): Promise<BackendListing | null> {
-  return getJson<BackendListing>(`/listings/${id}`, locale);
-}
+/**
+ * Memoised per request (`React.cache`): a detail page asks for the same listing
+ * from `generateMetadata` and from the page body, and both now share one call.
+ * Still `no-store` across requests, so a listing edit shows on the next load.
+ */
+export const getListingById = cache(
+  async (id: string, locale: string): Promise<BackendListing | null> =>
+    getJson<BackendListing>(`/listings/${id}`, locale),
+);
 
 /**
  * The whole active category tree — or, with `userId`, only the categories that

@@ -15,7 +15,7 @@ import {
 } from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
 import { ContactSellerButton } from "@/components/chat/contact-seller-button";
-import { FollowButton } from "@/components/profile/FollowButton";
+import { FollowSlot } from "./DetailSlots";
 import type { ListingContext } from "@/types/chat";
 import { trackEvent } from "@/lib/insights/queue";
 import { maskPhone } from "@/lib/phone";
@@ -49,8 +49,9 @@ export default function ProfileSidebar({
   /** Signed-in viewer's id, if any — when it matches `userId` this is the
    *  viewer's own ad, so follow/message actions don't make sense. */
   viewerId?: string | null;
-  /** Whether `viewerId` already follows the seller. */
-  initialFollowing?: boolean;
+  /** Whether `viewerId` already follows the seller (a promise while the lookup
+   *  is still running — the Follow control shows a placeholder until it lands). */
+  initialFollowing?: boolean | Promise<boolean>;
 }) {
   const t = useTranslations("Post");
   const format = useFormatter();
@@ -172,7 +173,7 @@ export default function ProfileSidebar({
               to told the visitor a fact they could not act on, and it sat
               where every other listing offers a Follow. */}
           {!isOwnAd && (
-            <FollowButton
+            <FollowSlot
               key={userId}
               userId={userId}
               initialFollowing={initialFollowing}
