@@ -103,8 +103,8 @@ export class AuthController {
     summary:
       'Request a password-reset code (texted to the phone on the account)',
   })
-  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
-    return this.authService.requestPasswordReset(dto);
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto, @Ip() ip: string) {
+    return this.authService.requestPasswordReset(dto, ip);
   }
 
   @Post('password/reset/verify')

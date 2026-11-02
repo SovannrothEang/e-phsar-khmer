@@ -7,6 +7,7 @@ import {
   EllipsisVertical,
   Eye,
   Loader2,
+  Pencil,
   RefreshCw,
   Share2,
   Trash2,
@@ -39,25 +40,34 @@ const ITEM =
  * The owner's actions on one Manage Ads row (captain, 2026-10-27): the row
  * shows the ad, this menu is what the user can do with it.
  *
- * Only actions the backend really supports are offered: view, renew
+ * Only actions the backend really supports are offered: view, edit (the web
+ * edit screen — the backend already allows editing restricted ads too), renew
  * (`POST /listings/:id/publish` — 30 more days, one renewal from the plan)
- * and delete (soft-delete). Edit has no web flow yet and there is no "sold"
- * status, so neither appears.
+ * and delete (soft-delete). There is no "sold" status, so it does not appear.
  */
 export function ManageAdActions({
   post,
   hidden = false,
+  inactive = false,
   onChanged,
 }: {
   post: Post;
   /** A hidden ad has no public page and cannot be renewed until a slot frees. */
   hidden?: boolean;
-  /** Called after a successful renew/delete so the list reloads. */
+  /** A staff-inactive ad: no public page; the owner fixes and republishes. */
+  inactive?: boolean;
+  /** Called after a successful renew/republish/delete so the list reloads. */
   onChanged: () => void;
 }) {
   const t = useTranslations("Me.manageAds");
   const tShare = useTranslations("Share");
-  const [confirm, setConfirm] = useState<"renew" | "delete" | null>(null);
+  const [confirm, setConfirm] = useState<
+    "renew" | "republish" | "delete" | null
+  >(null);
+  // Closing must not clear `confirm`: the dialog keeps rendering its content
+  // through the close animation, and clearing it flipped the title/button to
+  // the "Renew" fallback for a moment (captain, 2026-11-03).
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -67,18 +77,26 @@ export function ManageAdActions({
   async function run() {
     if (!confirm || pending) return;
     setPending(true);
+    // Renew, republish-from-inactive and first publish all go through the
+    // same backend door; the backend decides whether it spends a renewal.
     const result =
-      confirm === "renew"
-        ? await renewMyListing(id)
-        : await deleteMyListing(id);
+      confirm === "delete"
+        ? await deleteMyListing(id)
+        : await renewMyListing(id);
     setPending(false);
 
     if (!result.success) {
       toast.error(result.error ?? t("actionError"));
       return;
     }
-    toast.success(confirm === "renew" ? t("renewed") : t("deleted"));
-    setConfirm(null);
+    toast.success(
+      confirm === "delete"
+        ? t("deleted")
+        : confirm === "republish"
+          ? t("republished")
+          : t("renewed"),
+    );
+    setDialogOpen(false);
     onChanged();
   }
 
@@ -101,51 +119,74 @@ export function ManageAdActions({
           onClick={(event) => event.stopPropagation()}
         >
           {hidden ? (
-            <DropdownMenuItem asChild className="p-0">
-              <Link href="/premium-account" className={ITEM}>
-                <CircleArrowUp size={16} />
-                {t("upgradePlan")}
-              </Link>
-            </DropdownMenuItem>
-          ) : (
             <>
               <DropdownMenuItem asChild className="p-0">
                 <Link
-                  // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
-                  href={href}
+                  href={{ pathname: "/post/edit/[id]", params: { id } }}
                   className={ITEM}
                 >
-                  <Eye size={16} />
-                  {t("view")}
+                  <Pencil size={16} />
+                  {t("edit")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="p-0">
+                <Link href="/premium-account" className={ITEM}>
+                  <CircleArrowUp size={16} />
+                  {t("upgradePlan")}
+                </Link>
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              {!inactive && (
+                <DropdownMenuItem asChild className="p-0">
+                  <Link
+                    // @ts-expect-error dynamic marketplace slug isn't in the routing pathnames
+                    href={href}
+                    className={ITEM}
+                  >
+                    <Eye size={16} />
+                    {t("view")}
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem asChild className="p-0">
+                <Link
+                  href={{ pathname: "/post/edit/[id]", params: { id } }}
+                  className={ITEM}
+                >
+                  <Pencil size={16} />
+                  {t("edit")}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className={ITEM}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setConfirm("renew");
+                onSelect={() => {
+                  setConfirm(inactive ? "republish" : "renew");
+                  setDialogOpen(true);
                 }}
               >
                 <RefreshCw size={16} />
-                {t("renew")}
+                {inactive ? t("republish") : t("renew")}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={ITEM}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setShareOpen(true);
-                }}
-              >
-                <Share2 size={16} />
-                {t("share")}
-              </DropdownMenuItem>
+              {!inactive && (
+                <DropdownMenuItem
+                  className={ITEM}
+                  onSelect={() => {
+                    setShareOpen(true);
+                  }}
+                >
+                  <Share2 size={16} />
+                  {t("share")}
+                </DropdownMenuItem>
+              )}
             </>
           )}
           <DropdownMenuItem
             className={`${ITEM} text-destructive focus:text-destructive`}
-            onSelect={(event) => {
-              event.preventDefault();
+            onSelect={() => {
               setConfirm("delete");
+              setDialogOpen(true);
             }}
           >
             <Trash2 size={16} />
@@ -154,11 +195,13 @@ export function ManageAdActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* One confirm dialog serves both, with the wording swapped. */}
+      {/* One confirm dialog serves renew/republish/delete, with the wording
+          swapped; `confirm` survives the close so the animation never falls
+          back to the wrong label. */}
       <Dialog
-        open={confirm !== null}
+        open={dialogOpen}
         onOpenChange={(open) => {
-          if (!open) setConfirm(null);
+          if (!open) setDialogOpen(false);
         }}
       >
         <DialogContent
@@ -167,10 +210,18 @@ export function ManageAdActions({
         >
           <DialogHeader>
             <DialogTitle>
-              {confirm === "delete" ? t("deleteTitle") : t("renewTitle")}
+              {confirm === "delete"
+                ? t("deleteTitle")
+                : confirm === "republish"
+                  ? t("republishTitle")
+                  : t("renewTitle")}
             </DialogTitle>
             <DialogDescription>
-              {confirm === "delete" ? t("deleteBody") : t("renewBody")}
+              {confirm === "delete"
+                ? t("deleteBody")
+                : confirm === "republish"
+                  ? t("republishBody")
+                  : t("renewBody")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -178,7 +229,7 @@ export function ManageAdActions({
               variant="outline"
               className="cursor-pointer"
               disabled={pending}
-              onClick={() => setConfirm(null)}
+              onClick={() => setDialogOpen(false)}
             >
               {t("cancel")}
             </Button>
@@ -192,7 +243,11 @@ export function ManageAdActions({
               onClick={() => void run()}
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              {confirm === "delete" ? t("delete") : t("renew")}
+              {confirm === "delete"
+                ? t("delete")
+                : confirm === "republish"
+                  ? t("republish")
+                  : t("renew")}
             </Button>
           </div>
         </DialogContent>

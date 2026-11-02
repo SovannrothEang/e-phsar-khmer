@@ -4,6 +4,7 @@ import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
 import { listings, notifications, users } from '../db/schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { NotificationPayload } from '../notifications/notification-channel.interface';
+import { quotedTitle } from '../notifications/notice-title';
 import {
   DAY_MS,
   EXPIRED_LOOKBACK_MS,
@@ -16,18 +17,6 @@ type ExpiryCandidate = {
   title: string;
   expiresAt: Date;
 };
-
-/** `notifications.title` is varchar(200); a seller's title can be longer. */
-const NOTICE_TITLE_MAX = 120;
-
-function quotedTitle(title: string): string {
-  const trimmed = title.trim();
-  const clipped =
-    trimmed.length > NOTICE_TITLE_MAX
-      ? `${trimmed.slice(0, NOTICE_TITLE_MAX - 1)}…`
-      : trimmed;
-  return `"${clipped}"`;
-}
 
 /**
  * Tells owners their ad is about to lapse and, once, that it has lapsed.

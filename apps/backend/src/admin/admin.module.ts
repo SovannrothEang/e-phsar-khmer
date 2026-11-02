@@ -19,11 +19,21 @@ import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
 import { ListingsModule } from '../listings/listings.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminListingsController } from './admin-listings.controller';
 import { AdminListingsService } from './admin-listings.service';
 
 @Module({
-  imports: [FilesModule, ChatModule, SubscriptionsCoreModule, ListingsModule],
+  imports: [
+    FilesModule,
+    ChatModule,
+    SubscriptionsCoreModule,
+    ListingsModule,
+    // Importing it is a choice to send notifications: moderation take-downs
+    // and inactivations tell the seller why. Not global; no cycle (it depends
+    // only on the pubsub leaf).
+    NotificationsModule,
+  ],
   controllers: [
     AdminController,
     AdminCategoriesController,

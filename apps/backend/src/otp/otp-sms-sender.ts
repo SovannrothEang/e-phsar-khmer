@@ -59,10 +59,11 @@ export class OtpSmsSender {
     phone: string,
     purpose: OtpPurpose,
     ip?: string | null,
+    opts?: { devBypass?: boolean },
   ): Promise<OtpSendResult> {
     // Dev bypass: nothing is sent or stored; the fixed token is accepted.
-    if (this.otp.devBypassActive) {
-      await this.otp.issue(phone, purpose, ip);
+    if (opts?.devBypass !== false && this.otp.devBypassActive) {
+      await this.otp.issue(phone, purpose, ip, opts);
       return { status: 'sent', retryAfterSeconds: this.cooldownSeconds() };
     }
 
@@ -70,7 +71,13 @@ export class OtpSmsSender {
     const blocked = await this.acquire(slot, phone, purpose);
     if (blocked) return blocked;
 
-    const issued = await this.issueReleasingSlot(slot, phone, purpose, ip);
+    const issued = await this.issueReleasingSlot(
+      slot,
+      phone,
+      purpose,
+      ip,
+      opts,
+    );
     return this.deliver(slot, phone, purpose, issued.code, issued.id);
   }
 
@@ -90,9 +97,10 @@ export class OtpSmsSender {
     phone: string,
     purpose: OtpPurpose,
     ip?: string | null,
+    opts?: { devBypass?: boolean },
   ): Promise<{ result: OtpSendResult; delivery: Promise<void> }> {
-    if (this.otp.devBypassActive) {
-      await this.otp.issue(phone, purpose, ip);
+    if (opts?.devBypass !== false && this.otp.devBypassActive) {
+      await this.otp.issue(phone, purpose, ip, opts);
       return {
         result: { status: 'sent', retryAfterSeconds: this.cooldownSeconds() },
         delivery: Promise.resolve(),
@@ -103,7 +111,13 @@ export class OtpSmsSender {
     const blocked = await this.acquire(slot, phone, purpose);
     if (blocked) return { result: blocked, delivery: Promise.resolve() };
 
-    const issued = await this.issueReleasingSlot(slot, phone, purpose, ip);
+    const issued = await this.issueReleasingSlot(
+      slot,
+      phone,
+      purpose,
+      ip,
+      opts,
+    );
     const delivery = this.deliver(slot, phone, purpose, issued.code, issued.id)
       .then(() => undefined)
       .catch(() => {
@@ -146,9 +160,10 @@ export class OtpSmsSender {
     phone: string,
     purpose: OtpPurpose,
     ip?: string | null,
+    opts?: { devBypass?: boolean },
   ): Promise<IssuedOtp> {
     try {
-      return await this.otp.issue(phone, purpose, ip);
+      return await this.otp.issue(phone, purpose, ip, opts);
     } catch (err) {
       // Best-effort: releasing must not mask the original failure, but a
       // failed release means the lockout persists — log it so it is traceable.

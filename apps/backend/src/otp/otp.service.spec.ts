@@ -294,6 +294,38 @@ describe('OtpService', () => {
       ).toBe('invalid');
     });
 
+    it('can be opted out per call — the password-reset path always uses a real code', async () => {
+      const { service, repo } = makeService({
+        devOtpToken: 'dev-bypass-123',
+        nodeEnv: 'development',
+      });
+      service.onModuleInit();
+
+      const issued = await service.issue(PHONE, 'password_reset', null, {
+        devBypass: false,
+      });
+      expect(issued.id).not.toBeNull();
+      expect(repo.rows).toHaveLength(1);
+
+      // The fixed token is not accepted when the caller opts out.
+      expect(
+        (
+          await service.verify(PHONE, 'password_reset', 'dev-bypass-123', {
+            devBypass: false,
+          })
+        ).status,
+      ).not.toBe('ok');
+
+      // The real generated code still verifies.
+      expect(
+        (
+          await service.verify(PHONE, 'password_reset', issued.code, {
+            devBypass: false,
+          })
+        ).status,
+      ).toBe('ok');
+    });
+
     it('is refused in production, with an error log', async () => {
       const error = jest
         .spyOn(Logger.prototype, 'error')

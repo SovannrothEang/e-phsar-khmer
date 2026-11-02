@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useHiddenListing } from "@/components/moderation/moderator-provider";
 import { useListingImpression } from "@/hooks/use-listing-impression";
 import { ThreeDotPost } from "../Card/ThreeDotPost";
 
@@ -23,8 +24,12 @@ export function GridCardPost({ post }: { post: Post }) {
   const format = useFormatter();
   const locale = useLocale();
   const reactions = useReactions();
+  const hiddenByModerator = useHiddenListing(post.postId);
   const impressionRef = useListingImpression(post.postId);
   const listingId = String(post.postId);
+  // An admin just hid this ad on the page — drop it now rather than waiting
+  // for the server refresh (the profile feed keeps its rows in client state).
+  if (hiddenByModerator) return null;
   // No photo at all, or a stored photo missing from storage → empty area. The
   // DB is the only image source: no static stand-in, no broken <img>.
   const photo = post.images[0];

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   and,
   count,
@@ -12,12 +12,18 @@ import {
 } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
-import { listings, listingPhotos } from '../db/schema/listings.schema';
+import {
+  listings,
+  listingPhotos,
+  type ListingRow,
+} from '../db/schema/listings.schema';
 import { categories, subcategories } from '../db/schema/categories.schema';
 import { users } from '../db/schema/users.schema';
 import { listingReports } from '../db/schema/reports.schema';
 import type { PaginatedResponse } from '../common/types/api-response.types';
 import { ListingsService } from '../listings/listings.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { quotedTitle } from '../notifications/notice-title';
 import type { ListAdminListingsDto } from './dto/list-admin-listings.dto';
 import { likeTerm } from '../utils/like-term';
 
@@ -38,6 +44,8 @@ export interface AdminListingRow {
   expiresAt: Date | null;
   moderatedAt: Date | null;
   moderationReason: string | null;
+  inactiveAt: Date | null;
+  inactiveReason: string | null;
 }
 
 /**
@@ -48,9 +56,12 @@ export interface AdminListingRow {
  */
 @Injectable()
 export class AdminListingsService {
+  private readonly logger = new Logger(AdminListingsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly listingsService: ListingsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(
@@ -97,6 +108,8 @@ export class AdminListingsService {
           expiresAt: listings.expiresAt,
           moderatedAt: listings.moderatedAt,
           moderationReason: listings.moderationReason,
+          inactiveAt: listings.inactiveAt,
+          inactiveReason: listings.inactiveReason,
         })
         .from(listings)
         .leftJoin(users, eq(users.id, listings.userId))
@@ -141,11 +154,103 @@ export class AdminListingsService {
     };
   }
 
-  remove(id: string, moderatorId: string, reason?: string) {
-    return this.listingsService.moderate(id, moderatorId, reason ?? null);
+  /**
+   * Permanent take-down. The seller is told why (this is the only channel that
+   * ever does). A repeat request on an already-removed row must not send a
+   * second notice, so the prior state is read first.
+   */
+  async remove(id: string, moderatorId: string, reason: string) {
+    const existing = await this.moderationState(id);
+    const row = await this.listingsService.moderate(id, moderatorId, reason);
+    if (!existing.moderatedAt) {
+      await this.notifyOwner(row, 'removed', reason);
+    }
+    return row;
+  }
+
+  /**
+   * Hide the ad until its owner fixes and republishes it. Unlike `remove`,
+   * the owner keeps control: the ad stays editable and `publish` reactivates
+   * it (free while its 30-day window is still open).
+   */
+  async inactivate(id: string, moderatorId: string, reason: string) {
+    const existing = await this.moderationState(id);
+    const row = await this.listingsService.inactivate(id, moderatorId, reason);
+    if (existing.status !== 'inactive') {
+      await this.notifyOwner(row, 'inactive', reason);
+    }
+    return row;
   }
 
   restore(id: string) {
-    return this.listingsService.restoreModerated(id);
+    return this.listingsService.restoreStaffHidden(id);
+  }
+
+  private async moderationState(
+    id: string,
+  ): Promise<{ status: ListingRow['status']; moderatedAt: Date | null }> {
+    const [row] = await this.db
+      .select({ status: listings.status, moderatedAt: listings.moderatedAt })
+      .from(listings)
+      .where(eq(listings.id, id))
+      .limit(1);
+    if (!row) throw new NotFoundException('Listing not found');
+    return row;
+  }
+
+  /**
+   * Best-effort after the DB write. A notification failure must never turn a
+   * completed moderation into an error the admin would retry — which would
+   * publish a duplicate notice. Mirrors `listing.otp_verified`'s best-effort
+   * contract rather than the outbox handlers' retry contract.
+   */
+  private async notifyOwner(
+    row: ListingRow,
+    action: 'removed' | 'inactive',
+    reason: string,
+  ): Promise<void> {
+    const quoted = quotedTitle(row.title);
+    const why = reason.trim();
+    const notice =
+      action === 'removed'
+        ? {
+            type: 'listing.removed',
+            title: `Your ad ${quoted} was removed by an administrator`,
+            body: `Reason: ${why}. It is no longer visible in the marketplace and cannot be republished. If you believe this is a mistake, contact support.`,
+            data: {
+              listingId: row.id,
+              listingTitle: row.title,
+              reason: why,
+              action,
+            },
+          }
+        : {
+            type: 'listing.inactivated',
+            title: `Your ad ${quoted} was set inactive`,
+            body: `Reason: ${why}. It is hidden from the marketplace. Edit it and publish again once the issue is fixed. ${this.renewalHint(row)}`,
+            data: {
+              listingId: row.id,
+              listingTitle: row.title,
+              reason: why,
+              action,
+              expiresAt: row.expiresAt?.toISOString() ?? null,
+            },
+          };
+
+    try {
+      await this.notifications.notify({ userId: row.userId, ...notice });
+    } catch (error) {
+      this.logger.warn(
+        `Moderation notice for listing ${row.id} failed: ${String(error)}`,
+      );
+    }
+  }
+
+  /** Whether republishing will be free or spend one of the plan's renewals. */
+  private renewalHint(row: ListingRow): string {
+    const open = row.expiresAt !== null && row.expiresAt.getTime() > Date.now();
+    return open
+      ? 'Republishing is free while your 30-day window is still open.'
+      : 'Your 30-day window has lapsed; republishing uses one renewal.';
   }
 }

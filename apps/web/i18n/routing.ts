@@ -28,6 +28,7 @@ export const routing = defineRouting({
 
     "/post": {},
     "/post/[slug]": {},
+    "/post/edit/[id]": {},
     "/[slug]": {},
     "/sell": {},
 

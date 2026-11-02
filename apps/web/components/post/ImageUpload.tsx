@@ -3,6 +3,7 @@ import { useTranslations } from "next-intl";
 import { Upload, X } from "lucide-react";
 import { signUpload, type UploadSignFn } from "@/actions/files";
 import { toast } from "@/components/ui/sonner";
+import DbImage from "@/components/common/DbImage";
 import {
   MAX_UPLOAD_BYTES,
   UPLOAD_ACCEPT,
@@ -20,6 +21,11 @@ import {
  * The heading and cap come from the subcategory's own `field_schema` via the
  * post form: the jobs forms declare a single "Logo" slot (`max: 1`) while
  * every other photo-bearing form declares 8, so neither is a constant here.
+ *
+ * In edit mode `existing` carries the photos already on the listing: they are
+ * shown first (the first one is the cover), count toward `max`, and removing
+ * one only drops it from the payload — the backend deletes the object after a
+ * successful save.
  */
 export default function ImageUpload({
   images,
@@ -27,6 +33,9 @@ export default function ImageUpload({
   onUploaded,
   signFn = signUpload,
   onSigned,
+  existing,
+  onRemoveExisting,
+  onSignedRemoved,
   title = "Photos",
   max = 8,
 }: {
@@ -35,6 +44,11 @@ export default function ImageUpload({
   onUploaded?: (url: string) => void;
   signFn?: UploadSignFn;
   onSigned?: (photo: { url: string; path: string }) => void;
+  /** Photos already on the listing (edit mode), rendered before the new ones. */
+  existing?: { url: string; path: string }[];
+  onRemoveExisting?: (url: string) => void;
+  /** A newly picked file removed again — drop its uploaded photo with it. */
+  onSignedRemoved?: (photo: { url: string; path: string }) => void;
   /** Bold heading above the dropzone (the schema's `photos` label). */
   title?: string;
   /** How many photos this subcategory accepts (the schema's `photos.max`). */
@@ -42,10 +56,13 @@ export default function ImageUpload({
 }) {
   const t = useTranslations("PostForm");
   const inputRef = useRef<HTMLInputElement>(null);
+  // Files upload as soon as they are picked. Keep each signed pair so removing
+  // the file before save also removes it from the submit payload — otherwise a
+  // removed photo silently posts anyway.
+  const signedByFile = useRef(new Map<File, { url: string; path: string }>());
+  const existingPhotos = existing ?? [];
+  const total = existingPhotos.length + images.length;
 
-  // Upload a single new file via /files/sign (scope=listing) and surface the
-  // resulting public URL (+ storage path). The parent collects URLs for the
-  // eventual submit; removal reconciliation is a tracked follow-up.
   const uploadOne = async (file: File) => {
     const mime = resolveUploadMime(file);
     if (!mime) return;
@@ -60,8 +77,10 @@ export default function ImageUpload({
       headers: { "Content-Type": mime },
     });
     if (res.ok) {
-      onUploaded?.(signed.data.publicUrl);
-      onSigned?.({ url: signed.data.publicUrl, path: signed.data.path });
+      const photo = { url: signed.data.publicUrl, path: signed.data.path };
+      signedByFile.current.set(file, photo);
+      onUploaded?.(photo.url);
+      onSigned?.(photo);
     } else toast.error(t("uploadFailed"));
   };
 
@@ -72,13 +91,14 @@ export default function ImageUpload({
     if (picked.some((f) => f.size > MAX_UPLOAD_BYTES)) {
       toast.error(t("fileTooLarge", { max: MAX_UPLOAD_BYTES / (1024 * 1024) }));
     }
-    const room = Math.max(0, max - images.length);
+    const room = Math.max(0, max - total);
     const accepted = picked
       .filter(
         (f) => resolveUploadMime(f) !== null && f.size <= MAX_UPLOAD_BYTES,
       )
       .slice(0, room);
-    onChange([...images, ...accepted].slice(0, max));
+    if (accepted.length === 0) return;
+    onChange([...images, ...accepted]);
     void Promise.all(accepted.map(uploadOne));
   };
 
@@ -91,19 +111,54 @@ export default function ImageUpload({
     addFiles(Array.from(e.target.files ?? []));
   };
 
-  const remove = (i: number) => onChange(images.filter((_, idx) => idx !== i));
+  const remove = (i: number) => {
+    const file = images[i];
+    const signed = file ? signedByFile.current.get(file) : undefined;
+    if (file) signedByFile.current.delete(file);
+    if (signed) onSignedRemoved?.(signed);
+    onChange(images.filter((_, idx) => idx !== i));
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
         <label className="type-card-heading text-foreground">{title}</label>
         <span className="type-meta text-muted-foreground">
-          {t("maxPhotos", { count: images.length, max })}
+          {t("maxPhotos", { count: total, max })}
         </span>
       </div>
 
-      {images.length > 0 && (
+      {total > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
+          {existingPhotos.map((photo, i) => (
+            <div
+              key={photo.url}
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group"
+            >
+              <DbImage
+                src={photo.url}
+                alt=""
+                width={80}
+                height={80}
+                className="w-full h-full object-cover"
+                fallback={<span className="block h-full w-full bg-muted" />}
+              />
+              {onRemoveExisting && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveExisting(photo.url)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-sm bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              {i === 0 && (
+                <span className="absolute bottom-0 left-0 right-0 bg-[#00a0e9] text-white type-discount text-center py-0.5">
+                  {t("cover")}
+                </span>
+              )}
+            </div>
+          ))}
           {images.map((f, i) => (
             <div
               key={i}
@@ -116,20 +171,22 @@ export default function ImageUpload({
                 className="w-full h-full object-cover"
               />
               <button
+                type="button"
                 onClick={() => remove(i)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-sm bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3 h-3" />
               </button>
-              {i === 0 && (
+              {existingPhotos.length === 0 && i === 0 && (
                 <span className="absolute bottom-0 left-0 right-0 bg-[#00a0e9] text-white type-discount text-center py-0.5">
                   {t("cover")}
                 </span>
               )}
             </div>
           ))}
-          {images.length < max && (
+          {total < max && (
             <button
+              type="button"
               onClick={() => inputRef.current?.click()}
               className="w-20 h-20 rounded-sm border-2 border-dashed border-muted flex items-center justify-center text-gray-400 hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
             >
@@ -139,7 +196,7 @@ export default function ImageUpload({
         </div>
       )}
 
-      {images.length === 0 && (
+      {total === 0 && (
         <div
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}

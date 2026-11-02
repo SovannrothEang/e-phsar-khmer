@@ -281,6 +281,21 @@ describe('OtpSmsSender', () => {
     expect(inserted).toHaveLength(0);
   });
 
+  it('dev bypass can be opted out per call (the password-reset path)', async () => {
+    const { sender, send, inserted, otp } = setup({ devBypass: true });
+    expect(
+      (
+        await sender.issueAndSend(PHONE, 'password_reset', null, {
+          devBypass: false,
+        })
+      ).status,
+    ).toBe('sent');
+    // A real code was stored and a send was attempted, unlike the bypass path.
+    expect(otp.issue).toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(inserted.length).toBeGreaterThan(0);
+  });
+
   it('releases the limiter slot when issue() throws, so the phone is not locked out', async () => {
     const { sender, otp } = setup();
     otp.issue.mockRejectedValueOnce(new Error('db down'));

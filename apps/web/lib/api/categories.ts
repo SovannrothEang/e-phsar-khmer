@@ -285,6 +285,11 @@ export interface BackendListing {
   /** Resolved by the backend only while the linked page is published. */
   product?: BackendProductRef | null;
   status: string;
+  /**
+   * Set when staff hid the ad ("set inactive"). The owner's Manage Ads row
+   * shows it; the public feed never sees these rows.
+   */
+  inactiveReason?: string | null;
   viewsCount: number;
   publishedAt: string | null;
   /** End of the ad's 30-day window; null on legacy/seeded rows (always live). */
@@ -632,6 +637,8 @@ export function toCardPost(l: BackendListing): Post {
     // the street address belong to the detail page (see `shortLocation`).
     location: l.locationKm ?? shortLocation(l.location),
     oldPrice: hasDiscount && price !== null ? price : undefined,
+    // Staff "set inactive" reason, surfaced by Manage Ads. Null elsewhere.
+    inactiveReason: l.inactiveReason ?? null,
   };
 }
 

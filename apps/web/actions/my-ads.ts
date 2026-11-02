@@ -3,6 +3,7 @@
 import { ApiError, userServerFetch } from "@/lib/api/user-client";
 import { getMyAdsPage } from "@/lib/api/my-ads";
 import type { MyAdsTab } from "@/lib/api/my-ads";
+import type { FeedQuery } from "@/lib/search-params";
 import { getMyEntitlements } from "@/actions/subscriptions";
 import type { PlanEntitlements } from "@/types/subscription";
 import type { Post } from "@/lib/posts";
@@ -60,10 +61,11 @@ export async function deleteMyListing(id: string): Promise<MyAdActionResult> {
 export async function loadMyAds(
   tab: MyAdsTab,
   page: number,
+  filters: FeedQuery = {},
 ): Promise<MyAdsPageResult> {
   try {
     const [result, plan] = await Promise.all([
-      getMyAdsPage(tab, page),
+      getMyAdsPage(tab, page, filters),
       page === 1 ? getMyEntitlements().catch(() => null) : undefined,
     ]);
     return { ...result, plan };

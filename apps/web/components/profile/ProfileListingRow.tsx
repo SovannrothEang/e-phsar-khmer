@@ -20,6 +20,7 @@ export function ProfileListingRow({
   post,
   action,
   badge,
+  note,
   linkable = true,
 }: {
   post: Post;
@@ -27,6 +28,8 @@ export function ProfileListingRow({
   action?: ReactNode;
   /** Optional state chip beside the title (Manage Ads' Expired tab). */
   badge?: ReactNode;
+  /** Optional second line — Manage Ads shows the staff reason here. */
+  note?: ReactNode;
   /** Set false when the ad has no public page (Manage Ads' Hidden tab). */
   linkable?: boolean;
 }) {
@@ -79,6 +82,11 @@ export function ProfileListingRow({
           {post.location ? (
             <p className="type-meta truncate text-muted-foreground">
               {post.location}
+            </p>
+          ) : null}
+          {note ? (
+            <p className="type-meta line-clamp-2 text-sky-700 dark:text-sky-400">
+              {note}
             </p>
           ) : null}
         </div>

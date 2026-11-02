@@ -49,6 +49,13 @@ export class ListingsController {
     return this.listingsService.findMine(user.id, query);
   }
 
+  @Get('me/:id')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get one of the current user's listings" })
+  getMyListing(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.listingsService.findMineById(user.id, id);
+  }
+
   @Get(':id')
   @Public()
   @ApiOperation({ summary: 'Get listing by ID' })

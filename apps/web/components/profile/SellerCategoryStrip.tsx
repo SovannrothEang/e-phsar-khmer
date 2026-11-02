@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import CategoryTileBody from "@/components/common/CategoryTileBody";
 
 /**
@@ -64,6 +64,7 @@ export default function SellerCategoryStrip({
   onSelect,
 }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const selected = categories.find((c) => c.slug === category);
   // A single-category seller's category is implicitly chosen, so the row that
   // actually has a choice is the one shown.
@@ -79,10 +80,16 @@ export default function SellerCategoryStrip({
 
   if (options.length <= 1) return null;
 
+  // Carries the bar's filters through: a tile tapped into a new tab (or whose
+  // link is copied) must land on the same filtered view, not the seller's
+  // whole catalogue. The in-place click path preserves them via `window.
+  // location`, so the two never disagree.
   const hrefFor = (next: StripSelection) => {
-    const qs = new URLSearchParams();
+    const qs = new URLSearchParams(searchParams.toString());
     if (next.category) qs.set("category", next.category);
+    else qs.delete("category");
     if (next.subcategory) qs.set("subcategory", next.subcategory);
+    else qs.delete("subcategory");
     const query = qs.toString();
     return query ? `${pathname}?${query}` : pathname;
   };

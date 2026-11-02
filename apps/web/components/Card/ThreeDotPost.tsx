@@ -18,6 +18,7 @@ import { IconShare3, IconUser, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "../ui/button";
 import ShareModal from "@/components/share/ShareModel";
 import { useReactions } from "@/components/reactions/reactions-provider";
+import { useStaffListingActions } from "@/components/moderation/admin-listing-actions";
 import { useTranslations } from "next-intl";
 
 /**
@@ -41,6 +42,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const reactions = useReactions();
+  const staff = useStaffListingActions(post);
   const listingId = String(post.postId);
 
   return (
@@ -122,8 +124,10 @@ export function ThreeDotPost({ post }: { post: Post }) {
               <span>{t("Common.report")}</span>
             </button>
           </DropdownMenuItem>
+          {staff.menuItems}
         </DropdownMenuContent>
       </DropdownMenu>
+      {staff.dialog}
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}

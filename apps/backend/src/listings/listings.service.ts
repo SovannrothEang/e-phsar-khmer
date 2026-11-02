@@ -103,6 +103,17 @@ export interface ListingWithPhotos extends ListingRow {
   product?: ProductRef | null;
 }
 
+/**
+ * The owner's single-ad read: the same row the public detail serves, plus the
+ * category slugs the edit form needs and the derived status (which never
+ * overwrites the stored one).
+ */
+export interface OwnerListing extends ListingWithPhotos {
+  categorySlug: string | null;
+  subcategorySlug: string | null;
+  effectiveStatus: ListingRow['status'];
+}
+
 export interface FeedFacet {
   slug: string;
   count: number;
@@ -171,24 +182,7 @@ export class ListingsService {
       dto.photos?.length ?? 0,
     );
 
-    const [cat] = await this.db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(eq(categories.id, dto.categoryId))
-      .limit(1);
-    if (!cat) throw new NotFoundException('Category not found');
-
-    const [sub] = await this.db
-      .select({ id: subcategories.id })
-      .from(subcategories)
-      .where(
-        and(
-          eq(subcategories.id, dto.subcategoryId),
-          eq(subcategories.categoryId, dto.categoryId),
-        ),
-      )
-      .limit(1);
-    if (!sub) throw new NotFoundException('Subcategory not found');
+    await this.assertCategoryPair(dto.categoryId, dto.subcategoryId);
 
     // The web has no draft surface, so a create that cannot be published is
     // an invisible row. Check the allowance here too: an over-limit post never
@@ -259,6 +253,34 @@ export class ListingsService {
   }
 
   /**
+   * Validates a category/subcategory pair. Shared by create and update so the
+   * two FKs can never disagree about the parent.
+   */
+  private async assertCategoryPair(
+    categoryId: string,
+    subcategoryId: string,
+  ): Promise<void> {
+    const [cat] = await this.db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(eq(categories.id, categoryId))
+      .limit(1);
+    if (!cat) throw new NotFoundException('Category not found');
+
+    const [sub] = await this.db
+      .select({ id: subcategories.id })
+      .from(subcategories)
+      .where(
+        and(
+          eq(subcategories.id, subcategoryId),
+          eq(subcategories.categoryId, categoryId),
+        ),
+      )
+      .limit(1);
+    if (!sub) throw new NotFoundException('Subcategory not found');
+  }
+
+  /**
    * Every photo must be an object this user uploaded (`listing/{userId}/…`,
    * the folder `/files/sign` hands them) whose URL is that object's own public
    * URL. Photos already on the listing are exempt, so ads created before the
@@ -302,14 +324,88 @@ export class ListingsService {
       });
     }
 
+    this.assertUpdateShape(existing, dto);
+
+    // A category move is an explicit pair, never a half-patch. Both columns are
+    // structural (they decide the field schema and the plan scope), so a silent
+    // one-sided change would leave an ad pointing at a foreign subcategory.
+    let categoryChanged = false;
+    let nextCategoryId = existing.categoryId;
+    let nextSubcategoryId = existing.subcategoryId;
+    if (dto.categoryId !== undefined || dto.subcategoryId !== undefined) {
+      if (dto.categoryId == null || dto.subcategoryId == null) {
+        throw new BadRequestException({
+          code: 'INVALID_CATEGORY_PAIR',
+          message: 'categoryId and subcategoryId must be sent together.',
+        });
+      }
+      if (
+        dto.categoryId !== existing.categoryId ||
+        dto.subcategoryId !== existing.subcategoryId
+      ) {
+        await this.assertCategoryPair(dto.categoryId, dto.subcategoryId);
+        nextCategoryId = dto.categoryId;
+        nextSubcategoryId = dto.subcategoryId;
+        categoryChanged = true;
+      }
+    }
+
+    // Attributes are replaced wholesale; a category move without them would
+    // carry the old schema's keys into the new one.
+    if (categoryChanged && dto.attributes === undefined) {
+      throw new BadRequestException({
+        code: 'ATTRIBUTES_REQUIRED_FOR_CATEGORY_CHANGE',
+        message: 'attributes must be sent when changing category.',
+      });
+    }
+
+    const nextScope = {
+      categoryId: nextCategoryId,
+      subcategoryId: nextSubcategoryId,
+    };
+
+    // Trusted spec link: validate a supplied id against the target
+    // subcategory, and re-validate a carried link when the category changes.
+    // An unchanged link on a text-only edit is deliberately not re-checked, so
+    // a spec unpublished after posting cannot block a typo fix.
+    if (dto.productModelId !== undefined) {
+      if (dto.productModelId) {
+        await this.products.assertPublishedModel(
+          dto.productModelId,
+          nextSubcategoryId,
+        );
+      }
+    } else if (categoryChanged && existing.productModelId) {
+      await this.products.assertPublishedModel(
+        existing.productModelId,
+        nextSubcategoryId,
+      );
+    }
+
     if (dto.photos !== undefined) {
       await this.entitlements.assertPhotos(
         userId,
-        existing,
+        nextScope,
         dto.photos.length,
         existing.photos.length,
       );
       this.assertPhotosOwned(userId, dto.photos, existing.photos);
+    }
+
+    // Moving a live ad into another scope consumes a slot there; the helper
+    // excludes the ad itself. Expired/draft rows are not live, and publish
+    // enforces the allowance when they are renewed.
+    if (categoryChanged) {
+      const stillLive =
+        (existing.status === 'active' || existing.status === 'restricted') &&
+        (existing.expiresAt === null ||
+          existing.expiresAt.getTime() > Date.now());
+      if (stillLive) {
+        await this.entitlements.assertCanHoldAnotherAd(userId, {
+          id: existing.id,
+          ...nextScope,
+        });
+      }
     }
 
     const updates: Partial<ListingRow> = { updatedAt: new Date() };
@@ -324,15 +420,8 @@ export class ListingsService {
       updates.discountType = dto.discountType ?? null;
     if (dto.condition !== undefined) updates.condition = dto.condition ?? null;
     if (dto.attributes !== undefined) updates.attributes = dto.attributes;
-    if (dto.productModelId !== undefined) {
-      if (dto.productModelId) {
-        await this.products.assertPublishedModel(
-          dto.productModelId,
-          existing.subcategoryId,
-        );
-      }
+    if (dto.productModelId !== undefined)
       updates.productModelId = dto.productModelId ?? null;
-    }
     if (dto.location !== undefined) updates.location = dto.location;
     if (dto.address !== undefined) updates.address = dto.address;
     if (dto.latitude !== undefined)
@@ -347,6 +436,10 @@ export class ListingsService {
     if (dto.contactPhones !== undefined)
       updates.contactPhones = dto.contactPhones;
     if (dto.contactEmail !== undefined) updates.contactEmail = dto.contactEmail;
+    if (categoryChanged) {
+      updates.categoryId = nextCategoryId;
+      updates.subcategoryId = nextSubcategoryId;
+    }
 
     // One transaction: the row update and the photo swap land together, so a
     // failure between the delete and the insert can't leave the ad photoless.
@@ -403,7 +496,59 @@ export class ListingsService {
       ),
     );
 
+    // A move out of a full scope can free a slot for a restricted sibling.
+    if (categoryChanged) {
+      await this.entitlements.reconcileListingsSafely(userId);
+    }
+
     return { ...updated, photos };
+  }
+
+  /**
+   * Rejects the explicit nulls `@IsOptional()` lets through for NOT NULL
+   * columns, and validates the discount pair that results from the patch (the
+   * DB CHECK would otherwise surface as an unmapped 500).
+   */
+  private assertUpdateShape(existing: ListingRow, dto: UpdateListingDto): void {
+    if (Object.is(dto.title, null)) {
+      throw new BadRequestException('title cannot be null');
+    }
+    if (
+      Object.is(dto.attributes, null) ||
+      (dto.attributes !== undefined &&
+        (typeof dto.attributes !== 'object' || Array.isArray(dto.attributes)))
+    ) {
+      throw new BadRequestException('attributes must be an object');
+    }
+    if (Object.is(dto.contactPhones, null)) {
+      throw new BadRequestException('contactPhones cannot be null');
+    }
+    if (Object.is(dto.deliveryFree, null)) {
+      throw new BadRequestException('deliveryFree cannot be null');
+    }
+
+    const nextValue =
+      dto.discountValue !== undefined
+        ? dto.discountValue
+        : existing.discountValue != null
+          ? Number(existing.discountValue)
+          : null;
+    const nextType =
+      dto.discountType !== undefined
+        ? (dto.discountType ?? null)
+        : existing.discountType;
+    if ((nextValue == null) !== (nextType == null)) {
+      throw new BadRequestException({
+        code: 'INVALID_DISCOUNT',
+        message: 'discountValue and discountType must be set together.',
+      });
+    }
+    if (nextType === 'percent' && nextValue != null && nextValue > 100) {
+      throw new BadRequestException({
+        code: 'INVALID_DISCOUNT',
+        message: 'A percentage discount cannot exceed 100.',
+      });
+    }
   }
 
   async findById(id: string): Promise<ListingWithPhotos> {
@@ -723,8 +868,12 @@ export class ListingsService {
 
     if (query.status === 'active') {
       // "Active" means live right now, not merely the stored word: an ad past
-      // its 30-day window belongs to the Expired tab below.
-      conditions.push(...this.liveConditions());
+      // its 30-day window belongs to the Expired tab below. Staff-inactive ads
+      // stay in this tab too, flagged on the row: the owner's fix is to edit
+      // and republish, not to hunt for a separate tab (captain, 2026-11-03).
+      conditions.push(
+        or(eq(listings.status, 'inactive'), and(...this.liveConditions()))!,
+      );
     } else if (query.status === 'expired') {
       conditions.push(
         or(
@@ -748,8 +897,11 @@ export class ListingsService {
         eq(listings.status, query.status as ListingRow['status']),
       );
     }
-    const keyword = keywordCondition(query.q);
-    if (keyword) conditions.push(keyword);
+    // The same builder the public feed uses, so every control in the More
+    // Filters dialog means the same thing here as it does in the marketplace
+    // (keyword, price, condition, attributes, posted-within, …). The status
+    // conditions above stay the owner feed's own dimension.
+    conditions.push(...this.feedConditions(query));
 
     const resolved = await this.resolveFilterIds(query);
     if (resolved === null)
@@ -769,6 +921,10 @@ export class ListingsService {
     const offset =
       query.page && query.pageSize ? (query.page - 1) * query.pageSize : 0;
 
+    // Same sort resolution and ordering as the feed — including its id
+    // tiebreaker, so offset paging cannot repeat or skip a row on equal keys.
+    const ordering = resolveFeedOrdering(query.sort, query.q);
+
     const [countRow] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(listings)
@@ -778,7 +934,7 @@ export class ListingsService {
       .select()
       .from(listings)
       .where(and(...conditions))
-      .orderBy(desc(listings.createdAt))
+      .orderBy(...orderByFor(ordering))
       .limit(limit)
       .offset(offset);
 
@@ -804,6 +960,39 @@ export class ListingsService {
     };
   }
 
+  /**
+   * The owner's single-ad read, used by the web edit page. Unlike the public
+   * detail it serves draft/restricted/moderated rows so the page can explain
+   * why an ad is not editable. A foreign id is a 404, never a 403, so this
+   * cannot be used as an existence oracle.
+   */
+  async findMineById(userId: string, id: string): Promise<OwnerListing> {
+    const listing = await this.findById(id);
+    if (listing.userId !== userId) {
+      throw new NotFoundException('Listing not found');
+    }
+
+    const [[cat], [sub]] = await Promise.all([
+      this.db
+        .select({ slug: categories.slug })
+        .from(categories)
+        .where(eq(categories.id, listing.categoryId))
+        .limit(1),
+      this.db
+        .select({ slug: subcategories.slug })
+        .from(subcategories)
+        .where(eq(subcategories.id, listing.subcategoryId))
+        .limit(1),
+    ]);
+
+    return {
+      ...listing,
+      categorySlug: cat?.slug ?? null,
+      subcategorySlug: sub?.slug ?? null,
+      effectiveStatus: effectiveStatus(listing),
+    };
+  }
+
   async publish(userId: string, id: string): Promise<ListingWithPhotos> {
     const existing = await this.findById(id);
     if (existing.userId !== userId)
@@ -820,6 +1009,29 @@ export class ListingsService {
     const lapsed =
       existing.expiresAt !== null &&
       existing.expiresAt.getTime() <= now.getTime();
+    // Staff set it inactive: republishing is the owner's fix. While the
+    // original 30-day window is still open it is free — the admin action is
+    // not a renewal the owner bought, so no renewal is spent and the expiry is
+    // unchanged. Once the window has lapsed the normal renewal path below
+    // applies like any other expired ad.
+    const inactive = existing.status === 'inactive';
+    if (inactive && !lapsed) {
+      // Hiding the ad freed its plan slot, so reactivating must re-claim one.
+      await this.entitlements.assertCanHoldAnotherAd(userId, existing);
+      const [row] = await this.db
+        .update(listings)
+        .set({
+          status: 'active',
+          inactiveAt: null,
+          inactiveById: null,
+          inactiveReason: null,
+          updatedAt: now,
+        })
+        .where(eq(listings.id, id))
+        .returning();
+      await this.entitlements.reconcileListingsSafely(userId);
+      return { ...row, photos: existing.photos };
+    }
     // A restricted ad whose 30-day window is still open cannot be re-published
     // into a full plan; once it lapses it is a renewal like any expired ad.
     if (existing.status === 'restricted' && !lapsed) {
@@ -863,6 +1075,11 @@ export class ListingsService {
           publishedAt: existing.publishedAt ?? now,
           expiresAt,
           renewCount: isRenewal ? existing.renewCount + 1 : existing.renewCount,
+          // A lapsed inactive ad republishes through this path; clear the
+          // staff-hide fields either way (a no-op for every other ad).
+          inactiveAt: null,
+          inactiveById: null,
+          inactiveReason: null,
           updatedAt: now,
         })
         .where(eq(listings.id, id))
@@ -1170,13 +1387,15 @@ export class ListingsService {
     const listing = await this.findById(id);
     if (listing.moderatedAt) throw new NotFoundException('Listing not found');
     // The public detail must not serve what the marketplace already hides:
-    // a never-published draft, an ad its owner withdrew, or one hidden for
-    // exceeding its plan's allowance. (Moderated rows are `deleted` too, and
-    // are rejected just above with their own comment.)
+    // a never-published draft, an ad its owner withdrew, one hidden for
+    // exceeding its plan's allowance, or one staff set inactive. (Moderated
+    // rows are `deleted` too, and are rejected just above with their own
+    // comment.)
     if (
       listing.status === 'draft' ||
       listing.status === 'deleted' ||
-      listing.status === 'restricted'
+      listing.status === 'restricted' ||
+      listing.status === 'inactive'
     ) {
       throw new NotFoundException('Listing not found');
     }
@@ -1204,6 +1423,11 @@ export class ListingsService {
         moderatedAt: new Date(),
         moderatedById: moderatorId,
         moderationReason: reason?.slice(0, 500) ?? null,
+        // The two staff states never coexist: a removal supersedes an
+        // inactivation.
+        inactiveAt: null,
+        inactiveById: null,
+        inactiveReason: null,
         updatedAt: new Date(),
       })
       .where(eq(listings.id, id))
@@ -1230,20 +1454,17 @@ export class ListingsService {
     }
 
     const now = new Date();
-    const status =
-      existing.publishedAt === null
-        ? 'draft'
-        : existing.expiresAt !== null && existing.expiresAt > now
-          ? 'active'
-          : 'expired';
 
     const [row] = await this.db
       .update(listings)
       .set({
-        status,
+        status: this.restoredStatus(existing, now),
         moderatedAt: null,
         moderatedById: null,
         moderationReason: null,
+        inactiveAt: null,
+        inactiveById: null,
+        inactiveReason: null,
         updatedAt: now,
       })
       .where(and(eq(listings.id, id), isNotNull(listings.moderatedAt)))
@@ -1252,5 +1473,117 @@ export class ListingsService {
 
     await this.entitlements.reconcileListingsSafely(existing.userId);
     return row;
+  }
+
+  /**
+   * Staff hide — reversible by the owner. Unlike `moderate`, the row stays the
+   * owner's: it remains editable and `publish` reactivates it (free while its
+   * 30-day window is still open). A permanently removed row or an ad that was
+   * never published cannot be inactivated.
+   */
+  async inactivate(
+    id: string,
+    moderatorId: string,
+    reason: string,
+  ): Promise<ListingRow> {
+    const [existing] = await this.db
+      .select({
+        moderatedAt: listings.moderatedAt,
+        status: listings.status,
+      })
+      .from(listings)
+      .where(eq(listings.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.moderatedAt || existing.status === 'deleted') {
+      throw new BadRequestException('LISTING_REMOVED_BY_ADMIN');
+    }
+    // No `publishedAt` check: that column is only stamped by the explicit
+    // publish endpoint, while public visibility is status + expiry. Seeded and
+    // legacy rows are live with no publish stamp, and they are exactly the
+    // ads an admin sees and must be able to hide.
+
+    const now = new Date();
+    const [row] = await this.db
+      .update(listings)
+      .set({
+        status: 'inactive',
+        inactiveAt: now,
+        inactiveById: moderatorId,
+        inactiveReason: reason.slice(0, 500),
+        updatedAt: now,
+      })
+      .where(eq(listings.id, id))
+      .returning();
+
+    // Hiding the ad frees a live slot: settle the plan now so a restricted
+    // sibling can come back immediately, the same contract as `moderate`.
+    await this.entitlements.reconcileListingsSafely(row.userId);
+    return row;
+  }
+
+  /**
+   * Staff undo of an inactivation (the owner's own path is `publish`). Same
+   * status derivation as `restoreModerated`.
+   */
+  async restoreInactive(id: string): Promise<ListingRow> {
+    const [existing] = await this.db
+      .select()
+      .from(listings)
+      .where(eq(listings.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.status !== 'inactive') {
+      throw new BadRequestException('LISTING_NOT_MODERATED');
+    }
+
+    const now = new Date();
+    const [row] = await this.db
+      .update(listings)
+      .set({
+        status: this.restoredStatus(existing, now),
+        inactiveAt: null,
+        inactiveById: null,
+        inactiveReason: null,
+        updatedAt: now,
+      })
+      .where(and(eq(listings.id, id), eq(listings.status, 'inactive')))
+      .returning();
+    if (!row) throw new BadRequestException('LISTING_NOT_MODERATED');
+
+    await this.entitlements.reconcileListingsSafely(existing.userId);
+    return row;
+  }
+
+  /**
+   * The admin restore door: a row is either permanently removed or
+   * admin-inactive, never both. Anything else has nothing to restore.
+   */
+  async restoreStaffHidden(id: string): Promise<ListingRow> {
+    const [existing] = await this.db
+      .select({ moderatedAt: listings.moderatedAt, status: listings.status })
+      .from(listings)
+      .where(eq(listings.id, id))
+      .limit(1);
+    if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.moderatedAt) return this.restoreModerated(id);
+    if (existing.status === 'inactive') return this.restoreInactive(id);
+    throw new BadRequestException('LISTING_NOT_MODERATED');
+  }
+
+  /** Where a restored ad lands: live if its window is open, else expired. */
+  private restoredStatus(
+    existing: Pick<ListingRow, 'publishedAt' | 'expiresAt'>,
+    now: Date,
+  ): ListingRow['status'] {
+    // `publishedAt` alone is not "was it ever live": seeded/legacy rows carry
+    // an expiry but no publish stamp. Only a row with neither was never
+    // published; anything with an expiry comes back live or expired.
+    if (existing.publishedAt === null && existing.expiresAt === null) {
+      return 'draft';
+    }
+    return existing.expiresAt !== null && existing.expiresAt > now
+      ? 'active'
+      : 'expired';
   }
 }
