@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import UserAvatar from "@/components/common/UserAvatar";
 import {
-  IconBellFilled,
   IconMessageFilled,
   IconFolderOpen,
   IconHeart,
@@ -26,7 +25,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/routing";
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
-import { NotificationUnreadBadge } from "./NotificationUnreadBadge";
+import { NotificationBell } from "./NotificationBell";
 import { userLogout } from "@/actions/logout";
 import { useQueryClient } from "@tanstack/react-query";
 import { markSignedOut } from "./SessionCacheGuard";
@@ -43,7 +42,14 @@ interface SocialBarUser {
   profileImage?: string;
 }
 
-export function SocialBar({ user }: { user: SocialBarUser }) {
+export function SocialBar({
+  user,
+  hideNotificationBell = false,
+}: {
+  user: SocialBarUser;
+  /** The compact nav shows the bell in its top bar, outside the menu sheet. */
+  hideNotificationBell?: boolean;
+}) {
   const t = useTranslations("Nav");
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -55,15 +61,8 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
   const handle = user.username ? `@${user.username}` : "";
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Notifications */}
-      <Button
-        variant={"ghost"}
-        onClick={() => router.push("/notifications")}
-        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
-      >
-        <IconBellFilled className="scale-150 " />
-        <NotificationUnreadBadge />
-      </Button>
+      {/* Notifications: a popover with the newest items; "View all" opens the page */}
+      {hideNotificationBell ? null : <NotificationBell variant="popover" />}
       {/* Messages */}
       <Button
         variant={"ghost"}

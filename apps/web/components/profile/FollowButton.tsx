@@ -25,6 +25,29 @@ interface FollowButtonProps {
 }
 
 /**
+ * Stand-in for the compact Follow button while the viewer's follow state is
+ * still loading: the same chrome (`className` from the call site), icon slot
+ * and label, hidden, so it occupies the not-following button's exact box. A
+ * viewer who already follows gets the slightly longer "Following" label when
+ * the real button swaps in — the same width change a click causes.
+ */
+export function FollowButtonPlaceholder({ className }: { className?: string }) {
+  const t = useTranslations("Common");
+  return (
+    <Button
+      type="button"
+      disabled
+      aria-hidden
+      tabIndex={-1}
+      className={`${className ?? ""} animate-pulse`}
+    >
+      <UserPlus className="!w-4 !h-4 opacity-0" />
+      <span className="type-meta text-transparent">{t("follow")}</span>
+    </Button>
+  );
+}
+
+/**
  * The follow toggle. Owns the behaviour only (optimistic state, the action
  * call, rollback, the sign-in bounce); each surface keeps its own styling.
  *

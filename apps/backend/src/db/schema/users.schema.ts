@@ -136,6 +136,12 @@ export const users = pgTable(
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
     phoneVerifiedAt: timestamp('phone_verified_at', { withTimezone: true }),
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    /**
+     * Bearer-token cutoff: an access/refresh token whose `iat` is older than
+     * this is rejected. Set on password reset so tokens minted without a
+     * device `sid` (which device-row revocation cannot reach) die too.
+     */
+    tokensValidAfter: timestamp('tokens_valid_after', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),

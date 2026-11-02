@@ -2,9 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -37,7 +41,22 @@ import { isPhoneBanned } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
+import { OtpService } from '../otp/otp.service';
+import { OtpSmsSender } from '../otp/otp-sms-sender';
+import type { OtpSendResult } from '../otp/otp-sms-sender';
+import type { OtpPurpose } from '../otp/otp.types';
 import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
+import { NotificationsService } from '../notifications/notifications.service';
+import { isIssuedBeforeCutoff } from './token-cutoff.util';
+import type { ForgotPasswordDto } from './dto/forgot-password.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
+
+/** Response of every "send me a code" endpoint. */
+export interface OtpRequestResult {
+  otpSent: true;
+  /** Seconds until the next code may be requested (own OTP provider only). */
+  retryAfterSeconds?: number;
+}
 
 export interface AuthTokens {
   accessToken: string;
@@ -62,7 +81,7 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-export type PublicUser = Omit<UserRow, 'passwordHash'>;
+export type PublicUser = Omit<UserRow, 'passwordHash' | 'tokensValidAfter'>;
 
 /** Every successful login path returns this shape. */
 export interface AuthResult extends AuthTokens {
@@ -83,12 +102,17 @@ export interface TelegramAuthPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly supabaseService: SupabaseService,
     private readonly loginDevices: LoginDevicesService,
+    private readonly otpService: OtpService,
+    private readonly otpSender: OtpSmsSender,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async loginWithPassword(
@@ -150,8 +174,168 @@ export class AuthService {
     return this.finishLogin(user, device);
   }
 
-  async registerWithPhone(dto: RegisterDto): Promise<{ otpSent: true }> {
+  /** `supabase` (default) keeps Supabase SMS; `plasgate` uses our own OTPs. */
+  private get usesOwnOtp(): boolean {
+    return this.configService.get<string>('otp.provider') === 'plasgate';
+  }
+
+  /**
+   * plasgate path: issue + send a code and map the outcome. Never leaks
+   * provider text; a cooldown/cap is a 429 the web can show a timer for.
+   */
+  private async sendOwnOtp(
+    phone: string,
+    purpose: OtpPurpose,
+    ip?: string | null,
+  ): Promise<OtpRequestResult> {
+    return this.mapOtpSendResult(
+      await this.otpSender.issueAndSend(phone, purpose, ip),
+    );
+  }
+
+  private mapOtpSendResult(result: OtpSendResult): OtpRequestResult {
+    switch (result.status) {
+      case 'sent':
+        return { otpSent: true, retryAfterSeconds: result.retryAfterSeconds };
+      case 'cooldown':
+        throw new HttpException(
+          {
+            code: 'OTP_COOLDOWN',
+            message: 'Please wait before requesting another code.',
+            retryAfterSeconds: result.retryAfterSeconds,
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      case 'daily_cap':
+        throw new HttpException(
+          {
+            code: 'OTP_DAILY_CAP',
+            message: 'Too many codes requested for this number today.',
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      default:
+        throw new ServiceUnavailableException({
+          code: 'OTP_SEND_FAILED',
+          message: 'We could not send the code. Please try again later.',
+        });
+    }
+  }
+
+  /** Forgot-password only works on the own-OTP path (no Supabase fallback). */
+  private assertForgotPasswordSupported(): void {
+    if (this.usesOwnOtp) return;
+    throw new ServiceUnavailableException({
+      code: 'OTP_PROVIDER_UNSUPPORTED',
+      message: 'Password reset by phone is not available right now.',
+    });
+  }
+
+  /**
+   * The account a reset may act on: active, not deleted, has a password, and
+   * the number is not banned. Always runs BOTH lookups so every phone costs
+   * the same two queries.
+   */
+  private async findResettableUser(phone: string): Promise<UserRow | null> {
+    const [rows, banned] = await Promise.all([
+      this.db
+        .select()
+        .from(users)
+        .where(and(eq(users.primaryPhone, phone), isNull(users.deletedAt)))
+        .limit(1),
+      isPhoneBanned(this.db, phone),
+    ]);
+    const user = rows[0];
+    if (!user || banned) return null;
+    if (user.status !== 'active' || !user.passwordHash) return null;
+    return user;
+  }
+
+  /**
+   * Sends a reset code to an existing account. Answers identically for every
+   * number (no enumeration): an unknown, deleted, passwordless, suspended or
+   * banned number takes the same two lookups, the same limiter slot and the
+   * same cooldown/cap answers, and just never gets a code or an SMS. The send
+   * itself is detached from the response so PlasGate latency (and failures)
+   * do not distinguish the cases. Residual difference: one DB insert (the
+   * stored code) on the real path, a few milliseconds.
+   */
+  async requestPasswordReset(
+    dto: ForgotPasswordDto,
+    ip?: string | null,
+  ): Promise<OtpRequestResult> {
+    this.assertForgotPasswordSupported();
+    const user = await this.findResettableUser(dto.phone);
+    if (!user) {
+      return this.mapOtpSendResult(
+        await this.otpSender.reserveOnly(dto.phone, 'password_reset'),
+      );
+    }
+    const { result } = await this.otpSender.issueAndSendDetached(
+      dto.phone,
+      'password_reset',
+      ip,
+    );
+    return this.mapOtpSendResult(result);
+  }
+
+  /**
+   * Checks the reset code and sets the new password. Every failure (wrong,
+   * expired, reused or unknown number, ineligible account) is the same 401 as
+   * the login verify. Does not log the user in. Revokes all sessions: device
+   * rows (tokens with a `sid`) and the `tokensValidAfter` cutoff (every other
+   * token).
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<{ reset: true }> {
+    this.assertForgotPasswordSupported();
+    const user = await this.findResettableUser(dto.phone);
+    const verified = await this.otpService.verify(
+      dto.phone,
+      'password_reset',
+      dto.code,
+    );
+    // Attempt exhaustion must answer exactly like every other failure: a
+    // distinct body is only reachable when a code row exists, which would be
+    // an account-existence oracle (plan 1.5, assumption A3).
+    if (verified.status !== 'ok' || !user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const now = new Date();
+    await this.db
+      .update(users)
+      .set({
+        passwordHash: await bcrypt.hash(dto.newPassword, PASSWORD_SALT_ROUNDS),
+        tokensValidAfter: now,
+        updatedAt: now,
+      })
+      .where(eq(users.id, user.id));
+
+    await this.loginDevices.revokeAllForUser(user.id);
+
+    try {
+      await this.notifications.notify({
+        userId: user.id,
+        type: 'security.password_changed',
+        title: 'Password changed',
+        body: "Your password was reset and you were signed out everywhere. If this wasn't you, contact support.",
+        data: { changedAt: now.toISOString() },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not create the password-changed notification for user ${user.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    return { reset: true };
+  }
+
+  async registerWithPhone(
+    dto: RegisterDto,
+    ip?: string | null,
+  ): Promise<OtpRequestResult> {
     await this.assertPhoneNotBanned(dto.phone);
+    if (this.usesOwnOtp) return this.sendOwnOtp(dto.phone, 'register', ip);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
@@ -204,21 +388,49 @@ export class AuthService {
       if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
-    const { data, error } = await this.supabaseService.verifyOtp(
-      dto.phone,
-      dto.token,
-    );
-    if (error || !data.user)
-      throw new UnauthorizedException('Invalid or expired OTP');
+    // Supabase user is only a yes/no proof for the phone provider (spike
+    // 0.1), so the plasgate path hands the mirror a stand-in.
+    let supabaseUser: { id: string; phone?: string };
+    if (this.usesOwnOtp) {
+      const verified = await this.otpService.verify(
+        dto.phone,
+        ['register', 'login'],
+        dto.token,
+      );
+      // Same rule as resetPassword: no distinct body for exhaustion, or an
+      // unknown phone (which can never hold a code row) would answer
+      // differently from a real one.
+      if (verified.status !== 'ok')
+        throw new UnauthorizedException('Invalid or expired OTP');
+      supabaseUser = { id: 'otp', phone: dto.phone };
+    } else {
+      const { data, error } = await this.supabaseService.verifyOtp(
+        dto.phone,
+        dto.token,
+      );
+      if (error || !data.user)
+        throw new UnauthorizedException('Invalid or expired OTP');
+      supabaseUser = data.user;
+    }
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
-      return this.finishLogin(revived, device);
+      // The OTP round trip just proved `dto.phone` — `revived.primaryPhone`
+      // (the lookup key for `recoverable`) is that same number.
+      await this.stampPhoneVerified(revived.id);
+      return this.finishLogin(
+        { ...revived, phoneVerifiedAt: new Date() },
+        device,
+      );
     }
 
     if (completingBareAccount) {
       const updateData: Partial<typeof users.$inferInsert> = {
         passwordHash: await bcrypt.hash(dto.password, PASSWORD_SALT_ROUNDS),
+        // Possessing the OTP proves ownership of `dto.phone`, which is
+        // `existing.primaryPhone` (the lookup key above) — the same proof
+        // `verifyPhoneChangeOtp` stamps on a number change.
+        phoneVerifiedAt: new Date(),
         updatedAt: new Date(),
       };
       if (dto.firstName !== undefined) updateData.firstName = dto.firstName;
@@ -259,22 +471,61 @@ export class AuthService {
     }
 
     const user = await this.mirrorSupabaseUser(
-      data.user,
+      supabaseUser,
       'phone',
       dto.phone,
       insertExtras,
     );
     this.assertAccountActive(user);
-    return this.finishLogin(user, device);
+    // Both the fresh-insert and the existing-login branch land here with
+    // `user.primaryPhone === dto.phone` (mirrorSupabaseUser resolves the
+    // phone-provider row by that number), and the OTP round trip above is
+    // what just proved it. Done as its own UPDATE rather than through
+    // `mirrorSupabaseUser`'s conflict path: that path's `onConflictDoUpdate`
+    // is deliberately locked to `{ updatedAt }` so a replayed login body
+    // can never overwrite password/names/username, and this must not widen
+    // that lock.
+    await this.stampPhoneVerified(user.id);
+    return this.finishLogin({ ...user, phoneVerifiedAt: new Date() }, device);
   }
 
-  async requestPhoneOtp(phone: string): Promise<{ otpSent: true }> {
+  /**
+   * Stamps proof of phone ownership — the login/registration OTP chokepoint
+   * (`verifyPhoneOtp`) never wrote this before, so most accounts read
+   * "Not Verified" (`CLAUDE.md` known gap). Deliberately NOT folded into
+   * `mirrorSupabaseUser`'s upsert (see the call sites above) — kept as a
+   * small, separate, idempotent UPDATE instead.
+   */
+  private async stampPhoneVerified(userId: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ phoneVerifiedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async requestPhoneOtp(
+    phone: string,
+    ip?: string | null,
+  ): Promise<OtpRequestResult> {
     await this.assertPhoneNotBanned(phone);
+    if (this.usesOwnOtp) {
+      // The resend call carries no purpose: an active account means this is
+      // a login code, otherwise a registration code (verify accepts both).
+      const [active] = await this.db
+        .select()
+        .from(users)
+        .where(and(eq(users.primaryPhone, phone), isNull(users.deletedAt)))
+        .limit(1);
+      return this.sendOwnOtp(phone, active ? 'login' : 'register', ip);
+    }
     await this.supabaseService.signInWithOtp(phone);
     return { otpSent: true };
   }
 
-  async requestLoginOtp(dto: LoginOtpDto): Promise<{ otpSent: true }> {
+  async requestLoginOtp(
+    dto: LoginOtpDto,
+    ip?: string | null,
+  ): Promise<OtpRequestResult> {
     const [user] = await this.db
       .select()
       .from(users)
@@ -292,6 +543,7 @@ export class AuthService {
     // cannot prove they own.
     await this.assertPhoneNotBanned(dto.phone);
 
+    if (this.usesOwnOtp) return this.sendOwnOtp(dto.phone, 'login', ip);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
   }
@@ -652,6 +904,7 @@ export class AuthService {
       sub: string;
       role: 'user' | 'admin' | 'super_admin';
       sid?: string;
+      iat?: number;
     };
     try {
       payload = await this.jwtService.verifyAsync(dto.refreshToken, {
@@ -673,6 +926,10 @@ export class AuthService {
 
     if (!user || user.status !== 'active' || user.deletedAt)
       throw new UnauthorizedException('User not found');
+
+    // A password reset sets a cutoff that also covers tokens with no `sid`.
+    if (isIssuedBeforeCutoff(payload.iat, user.tokensValidAfter))
+      throw new UnauthorizedException('Session revoked');
 
     // New tokens carry the row's revocation epoch. A rotated id means the
     // device was revoked, so the refresh token dies with the access token.
@@ -1025,7 +1282,7 @@ export class AuthService {
 
   private toPublicUser(user: UserRow): PublicUser {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash: _ph, ...publicUser } = user;
+    const { passwordHash: _ph, tokensValidAfter: _tv, ...publicUser } = user;
     return publicUser;
   }
 

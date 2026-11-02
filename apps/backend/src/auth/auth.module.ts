@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LoginDevicesService } from './login-devices.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { OtpModule } from '../otp/otp.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { SupabaseStrategy } from './strategies/supabase.strategy';
 
@@ -13,6 +14,7 @@ import { SupabaseStrategy } from './strategies/supabase.strategy';
   imports: [
     PassportModule,
     NotificationsModule,
+    OtpModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({

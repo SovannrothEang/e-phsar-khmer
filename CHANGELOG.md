@@ -21,6 +21,55 @@ How to use this file:
 
 ### Added
 
+- **Own phone-OTP service on PlasGate, with forgot-password and full session revocation (tasks
+  1.1-1.5 and 1.8 of the "Own phone-OTP service" plan).** `OTP_PROVIDER=plasgate` (default
+  `supabase`, flip back with no code change) makes `OtpService` issue and verify register /
+  login / password-reset codes (`phone_otps`, HMAC-hashed with `OTP_HMAC_SECRET`, 6 digits, 5 min,
+  5 attempts, single use) and `OtpSmsSender` send them through PlasGate directly, never through
+  the outbox (the code must not sit in an outbox payload and a registering phone has no user
+  row); limits are per phone (`SMS_USER_COOLDOWN_SECONDS` 300, `SMS_USER_DAILY_CAP` 10). New
+  `POST /auth/password/forgot` (same answer for known and unknown numbers) and
+  `POST /auth/password/reset` (plasgate only, 503 `OTP_PROVIDER_UNSUPPORTED` otherwise); a reset
+  revokes every device session and sets the new nullable `users.tokensValidAfter`
+  (migration `0052_brown_stranger`), which `JwtStrategy` and `refresh` compare with the token
+  `iat`, so tokens issued without a `sid` die too. Phone-change OTP is still on Supabase.
+
+- **SMS delivery is now durable, retried, rate-limited and audited (tasks 1.1–1.6 of the
+  "Reliable SMS delivery" plan).** `NotificationsService.notify()` no longer sends SMS inline —
+  `data.sendSms === true` enqueues a transactional outbox event (`notification.sms.requested`,
+  deduped by userId + type + a stable hash of `data`) and writes a `queued` row in the new
+  `sms_deliveries` table (migration `0050_ambiguous_iceman`, no message-text column).
+  `SmsOutboxHandler` + `PlasGateClient` (`src/notifications/sms/`) deliver it later: unconfigured
+  credentials or an unverified phone both record a terminal `skipped` row and never call out;
+  only `auth.phone.verify` / `auth.password.reset` may be texted (other types → `skipped`
+  `type_not_allowed`), with per-user limits from `SmsUserLimiter` — 1 SMS per user per type per
+  5 min (`rate_limited`) and 10 per user per day (`daily_cap`), dropped not delayed, fail closed,
+  slot released when the global limiter or PlasGate asks for a retry;
+  a shared Redis-backed `SmsRateLimiter` (budget `SMS_RATE_LIMIT_PER_MINUTE`, default 150, under
+  PlasGate's own 200/minute ceiling) fails closed (`retry`) when Redis is unreachable; 2xx →
+  `sent`, 429/5xx/network/timeout → `retry`, other 4xx (bad sender id, bad number) → permanent
+  `failed`; the stored outbox payload is redacted (message text stripped) once terminal.
+  `SMS_REQUESTED_MAX_ATTEMPTS` is raised to 20 (from the outbox's global default of 5) because
+  `attempts` is counted at claim time, so a rate-limit `retry` burns budget exactly like a
+  transient failure would. The login/registration OTP flow (`AuthService.verifyPhoneOtp`) now
+  stamps `users.phoneVerifiedAt` too (previously only the phone-change flow did), and changing
+  the primary phone without an OTP (`addPhone`, `setPrimaryPhone`, the auto-promotion inside
+  `removePhone`) clears it, since the column means "the CURRENT `primaryPhone` was verified" and
+  there is no per-number verification record. New env (`apps/backend/.env.example`): `SMS_BASE_URL`,
+  `SMS_PRIVATE_KEY`, `SMS_SECRET`, `SMS_SENDER`, `SMS_RATE_LIMIT_PER_MINUTE`, `SMS_USER_COOLDOWN_SECONDS`, `SMS_USER_DAILY_CAP` — all optional.
+  Verified: backend 93 suites / 1328 tests green, `eslint` clean, `nest build` green. Not yet
+  done: a real end-to-end SMS send against PlasGate (task 1.7, needs an approved sender id) and
+  the optional admin `GET /admin/sms-deliveries` read endpoint (task 2.1).
+
+- **Navbar notification bell opens the newest notifications in place.** The bell no longer jumps
+  straight to `/notifications`: at `lg` and up it opens a popover (6 newest), below `lg` the bell
+  moves out of the hamburger sheet into the top bar and opens a bottom drawer (8 newest). Both
+  show a "Mark all as read" action, per-row mark/delete, and a **View all** footer to the full
+  `/notifications` history. The list loads only while the panel is open
+  (`GET /notifications?pageSize=N`, no backend change). The row markup is now a shared
+  `NotificationRow` used by the page and the panel; the page's mutations also invalidate the
+  panel's cache. Not built: per-type deep links (notifications carry no target), and a live
+  WebSocket refresh of an open panel (it still follows the 60 s badge poll).
 - **Linked social accounts on `/settings`.** The Facebook / Google / Telegram rows now read
   `Add` or `Linked` from the account's real provider links and carry the `>` chevron.
   `GET /users/me?includeAuthProviders=1` returns the linked providers (additive and opt-in, so

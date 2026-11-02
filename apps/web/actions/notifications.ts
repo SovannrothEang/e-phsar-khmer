@@ -35,12 +35,23 @@ export async function getNotifications(
   return { items: data ?? [], hasMore: meta?.hasMore ?? false };
 }
 
-/** Unread count for the navbar bell badge. */
-export async function getUnreadNotificationCount(): Promise<number> {
-  const { data } = await userServerFetch<{ total: number }>(
-    "/notifications/unread-count",
-  );
-  return data?.total ?? 0;
+/**
+ * Unread count for the navbar bell badge. `null` means the session was
+ * rejected: the badge hides and its poll stops, instead of throwing an
+ * uncaught action error on every tick until the next full page load.
+ */
+export async function getUnreadNotificationCount(): Promise<number | null> {
+  try {
+    const { data } = await userServerFetch<{ total: number }>(
+      "/notifications/unread-count",
+    );
+    return data?.total ?? 0;
+  } catch (err) {
+    // Only a dead session is "expected" here — a poll can outlive its cookie.
+    // Anything else (400s, 5xx, network) still reaches the query's error state.
+    if (err instanceof ApiError && err.status === 401) return null;
+    throw err;
+  }
 }
 
 export async function markNotificationRead(

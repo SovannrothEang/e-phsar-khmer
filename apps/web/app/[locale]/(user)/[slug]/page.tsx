@@ -2,7 +2,6 @@ import PostDetail from "@/components/post/Post-Detail";
 import PublicProfileHeader from "@/components/profile/PublicProfileHeader";
 import ProfileTabBody from "@/components/profile/ProfileTabBody";
 import {
-  buildRealDetailData,
   getAllCategories,
   getListingById,
   getListingsFeed,
@@ -11,8 +10,7 @@ import {
 import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { loadJobApplyState } from "@/lib/api/job-apply";
-import { getAdvertisements } from "@/lib/api/advertisements";
+import { loadPostDetailProps } from "@/lib/api/post-detail-props";
 import { redirect } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import {
@@ -39,9 +37,11 @@ export async function generateMetadata({
 
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
-    // Real listings are looked up by UUID; any other id is a dead link.
+    // Real listings are looked up by UUID; any other id is a dead link. Same
+    // locale as the page body asks for, so the two share one request
+    // (`getListingById` is memoised per request).
     if (UUID_RE.test(actualId)) {
-      const listing = await getListingById(actualId, "en");
+      const listing = await getListingById(actualId, await getLocale());
       if (listing) {
         return {
           title: listing.title,
@@ -88,34 +88,14 @@ export default async function SlugPage({
   // other id is a dead link.
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
-    const [viewer, banners] = await Promise.all([
-      getCurrentUser(),
-      getAdvertisements("listing_detail"),
-    ]);
-    if (UUID_RE.test(actualId)) {
-      const real = await buildRealDetailData(actualId, await getLocale());
-      // A real listing that is gone (draft, withdrawn, moderated, unknown id)
-      // must 404 rather than render a fabricated ad at a dead link.
-      if (!real) notFound();
-      return (
-        <PostDetail
-          real={real}
-          banners={banners}
-          viewerId={viewer?.id}
-          sellerFollowing={
-            viewer ? await getFollowStatus(real.listing.userId) : false
-          }
-          jobApply={await loadJobApplyState({
-            listingId: real.listing.id,
-            categorySlug: real.cate?.slug,
-            listingStatus: real.listing.status,
-            posterId: real.listing.userId,
-            viewerId: viewer?.id,
-          })}
-        />
-      );
-    }
-    notFound();
+    // A malformed id is a dead link — nothing to ask the backend.
+    if (!UUID_RE.test(actualId)) notFound();
+    const props = await loadPostDetailProps(actualId, await getLocale());
+    // A real listing that is gone (draft, withdrawn, moderated, unknown id)
+    // must 404 rather than render a fabricated ad at a dead link. Decided here,
+    // before any HTML is sent, so the response status is still a real 404.
+    if (!props) notFound();
+    return <PostDetail {...props} />;
   }
 
   // Handle Public Profile — a real account, looked up by handle.
