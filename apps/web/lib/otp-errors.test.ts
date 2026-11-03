@@ -15,7 +15,10 @@ const err = (code: string, message = "m", extra: object = {}) => ({
 describe("parseOtpFailure", () => {
   it("reads the cooldown wait from the body", () => {
     assert.deepEqual(
-      parseOtpFailure(429, err("OTP_COOLDOWN", "wait", { retryAfterSeconds: 42 })),
+      parseOtpFailure(
+        429,
+        err("OTP_COOLDOWN", "wait", { retryAfterSeconds: 42 }),
+      ),
       { success: false, code: "cooldown", retryAfterSeconds: 42 },
     );
   });
@@ -37,20 +40,28 @@ describe("parseOtpFailure", () => {
   });
 
   it("treats a code-less 429 (global throttler) as a cooldown", () => {
-    const r = parseOtpFailure(429, err("TOO_MANY_REQUESTS", "ThrottlerException"));
+    const r = parseOtpFailure(
+      429,
+      err("TOO_MANY_REQUESTS", "ThrottlerException"),
+    );
     assert.equal(r.code, "cooldown");
   });
 
   it("maps the domain codes", () => {
     assert.equal(parseOtpFailure(429, err("OTP_DAILY_CAP")).code, "daily_cap");
-    assert.equal(parseOtpFailure(503, err("OTP_SEND_FAILED")).code, "send_failed");
+    assert.equal(
+      parseOtpFailure(503, err("OTP_SEND_FAILED")).code,
+      "send_failed",
+    );
     assert.equal(
       parseOtpFailure(503, err("OTP_PROVIDER_UNSUPPORTED")).code,
       "provider_unsupported",
     );
     assert.equal(
-      parseOtpFailure(401, err("OTP_TOO_MANY_ATTEMPTS", "Invalid or expired OTP"))
-        .code,
+      parseOtpFailure(
+        401,
+        err("OTP_TOO_MANY_ATTEMPTS", "Invalid or expired OTP"),
+      ).code,
       "too_many_attempts",
     );
   });
@@ -75,13 +86,17 @@ describe("parseOtpFailure", () => {
 describe("parseOtpSent", () => {
   it("returns the server cooldown", () => {
     assert.deepEqual(
-      parseOtpSent({ success: true, data: { otpSent: true, retryAfterSeconds: 60 } }),
+      parseOtpSent({
+        success: true,
+        data: { otpSent: true, retryAfterSeconds: 60 },
+      }),
       { success: true, retryAfterSeconds: 60 },
     );
   });
   it("defaults when absent (supabase path) and rejects non-success", () => {
     assert.equal(
-      parseOtpSent({ success: true, data: { otpSent: true } })?.retryAfterSeconds,
+      parseOtpSent({ success: true, data: { otpSent: true } })
+        ?.retryAfterSeconds,
       DEFAULT_RETRY_SECONDS,
     );
     assert.equal(parseOtpSent({ success: false }), null);

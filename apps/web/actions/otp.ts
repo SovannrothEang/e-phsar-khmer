@@ -5,7 +5,11 @@ import { API_URL } from "@/lib/api/client";
 import type { BackendUser } from "@/lib/api/adapters";
 import type { DeviceIdentity } from "@/lib/device";
 import { setUserDeviceId, setUserSession } from "@/lib/auth/session";
-import { parseOtpFailure, parseOtpSent, type OtpErrorCode } from "@/lib/otp-errors";
+import {
+  parseOtpFailure,
+  parseOtpSent,
+  type OtpErrorCode,
+} from "@/lib/otp-errors";
 
 interface OtpVerifyResponse {
   accessToken: string;
@@ -39,9 +43,7 @@ export type OtpSendActionResult =
  * wait, failures carry a stable code (lib/otp-errors.ts) plus whatever wait
  * the body or the `Retry-After` header reported.
  */
-async function parseSendResponse(
-  res: Response,
-): Promise<OtpSendActionResult> {
+async function parseSendResponse(res: Response): Promise<OtpSendActionResult> {
   const body = await res.json().catch(() => null);
   if (res.ok) {
     const sent = parseOtpSent(body);

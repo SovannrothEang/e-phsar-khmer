@@ -23,7 +23,13 @@ test("the poster cannot apply to their own job", () => {
 });
 
 test("only active jobs in the jobs category qualify", () => {
-  assert.equal(isJobApplyCandidate({ ...base, listingStatus: "expired" }), false);
+  assert.equal(
+    isJobApplyCandidate({ ...base, listingStatus: "expired" }),
+    false,
+  );
   assert.equal(isJobApplyCandidate({ ...base, categorySlug: "pets" }), false);
-  assert.equal(isJobApplyCandidate({ ...base, categorySlug: undefined }), false);
+  assert.equal(
+    isJobApplyCandidate({ ...base, categorySlug: undefined }),
+    false,
+  );
 });
