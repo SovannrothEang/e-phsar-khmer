@@ -607,6 +607,20 @@ export class UsersService {
       })
       .where(eq(users.id, userId));
 
+    // Same best-effort notice the reset flow writes: the password is already
+    // changed, so a feed failure must not fail the request.
+    try {
+      await this.notifications.notify({
+        userId,
+        type: 'security.password_changed',
+        title: 'Password changed',
+        body: 'Your password was changed and older sessions were signed out. If this was not you, contact support.',
+        data: { changedAt: changedAt.toISOString() },
+      });
+    } catch {
+      // Best-effort by contract; the state change already committed.
+    }
+
     return { updated: true };
   }
 

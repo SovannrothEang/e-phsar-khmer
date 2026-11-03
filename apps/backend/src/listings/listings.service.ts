@@ -156,8 +156,9 @@ function effectiveStatus(
 
 /**
  * Fields whose change can alter what a reviewer once approved. Toggles like
- * `deliveryFree` or a contact-detail edit stay silent: the staff signal is for
- * "the reviewed content changed", not for every save.
+ * `deliveryFree` stay silent: the staff signal is for "the reviewed content
+ * changed", not for every save. Contact details are included — swapping the
+ * phone/email on a live classified after review is the bait-and-switch case.
  */
 const AUDIT_RELEVANT_UPDATE_FIELDS = [
   'title',
@@ -176,6 +177,9 @@ const AUDIT_RELEVANT_UPDATE_FIELDS = [
   'districtId',
   'communeId',
   'productModelId',
+  'contactName',
+  'contactPhones',
+  'contactEmail',
 ] as const;
 
 @Injectable()

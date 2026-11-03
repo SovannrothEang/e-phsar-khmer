@@ -1,3 +1,5 @@
+import { toRetrySeconds } from "./otp-errors.ts";
+
 /**
  * Handoff between the register/login forms and the OTP page.
  *
@@ -7,17 +9,6 @@
  * lands in browser history or server logs.
  */
 export const OTP_REGISTRATION_KEY = "otp_registration";
-
-/**
- * A positive whole-second wait, or undefined. Kept local instead of importing
- * `otp-errors` so this module stays loadable by the plain `node --test` runner
- * (extensionless TS imports do not resolve there).
- */
-function positiveSeconds(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.ceil(value)
-    : undefined;
-}
 
 export interface OtpRegistration {
   mode: "register" | "login";
@@ -81,7 +72,7 @@ export function readOtpRegistration(phone: string): OtpRegistration | null {
         typeof parsed.lastName === "string"
           ? parsed.lastName.slice(0, 100)
           : undefined,
-      retryAfterSeconds: positiveSeconds(parsed.retryAfterSeconds),
+      retryAfterSeconds: toRetrySeconds(parsed.retryAfterSeconds),
       sentAt:
         typeof parsed.sentAt === "number" &&
         Number.isFinite(parsed.sentAt) &&

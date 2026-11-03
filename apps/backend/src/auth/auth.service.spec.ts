@@ -2230,7 +2230,9 @@ describe('AuthService password reset', () => {
       // bound so a concurrent second confirm loses at the database.
       const { sql } = compileWhere(capture.where);
       expect(sql).toContain('tokens_valid_after');
-      expect(sql).toContain(' is null');
+      // Pin the `is null` ARM, not just any `is null` (deleted_at has one too):
+      // without it a first-time reset compares NULL and would 401 for everyone.
+      expect(sql).toMatch(/tokens_valid_after" is null/);
       expect(sql).toMatch(/<=/);
     });
 
