@@ -9,11 +9,16 @@ import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { UserRow } from '../db/schema/users.schema';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('bcrypt');
 
 /** Fixed `iat` for a reset proof, so a test can place `tokensValidAfter` around it. */
 const RESET_IAT_SECONDS = 1_700_000_000;
+
+/** Render a Drizzle condition so a test can pin the SQL bound itself. */
+const compileWhere = (where: unknown) =>
+  new PgDialect().sqlToQuery(where as never);
 
 function makeUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
@@ -1894,7 +1899,7 @@ describe('AuthService password reset', () => {
     returnedRows: { id: string }[],
     tokensValidAfter: Date | null = null,
   ) {
-    const capture: { set?: Record<string, unknown> } = {};
+    const capture: { set?: Record<string, unknown>; where?: unknown } = {};
     const tx = {
       select: jest.fn(() => ({
         from: () => ({
@@ -1907,7 +1912,10 @@ describe('AuthService password reset', () => {
         set: (values: Record<string, unknown>) => {
           capture.set = values;
           return {
-            where: () => ({ returning: () => Promise.resolve(returnedRows) }),
+            where: (where: unknown) => {
+              capture.where = where;
+              return { returning: () => Promise.resolve(returnedRows) };
+            },
           };
         },
       })),
@@ -2199,7 +2207,7 @@ describe('AuthService password reset', () => {
     it('accepts a proof minted after the last password change', async () => {
       (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
       const db = makeDb();
-      mockTransaction(
+      const { capture } = mockTransaction(
         db,
         [{ id: 'user-uuid' }],
         new Date((RESET_IAT_SECONDS - 60) * 1000),
@@ -2217,6 +2225,33 @@ describe('AuthService password reset', () => {
           newPassword: 'newpass123',
         }),
       ).resolves.toEqual({ reset: true });
+
+      // The pre-read alone is not the guarantee: the UPDATE must carry the same
+      // bound so a concurrent second confirm loses at the database.
+      const { sql } = compileWhere(capture.where);
+      expect(sql).toContain('tokens_valid_after');
+      expect(sql).toContain(' is null');
+      expect(sql).toMatch(/<=/);
+    });
+
+    it('refuses a proof with no issued-at claim', async () => {
+      const db = makeDb();
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockResolvedValue({
+        sub: 'user-uuid',
+        typ: 'password_reset',
+      });
+      const service = makeResetService(db, makeResetSupabase(), undefined, jwt);
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
     });
   });
 

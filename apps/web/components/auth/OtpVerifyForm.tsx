@@ -55,9 +55,15 @@ function subscribeCooldown(): () => void {
 }
 
 function getStoredCooldown(phone: string): number {
-  return (
-    readOtpRegistration(phone)?.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS
-  );
+  const handoff = readOtpRegistration(phone);
+  if (!handoff) return RESEND_COOLDOWN_SECONDS;
+  const wait = handoff.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS;
+  // A reload must not restart the whole wait: subtract the time already
+  // spent since the send. The backend still enforces the real limit.
+  const elapsed = handoff.sentAt
+    ? Math.max(0, Math.floor((Date.now() - handoff.sentAt) / 1000))
+    : 0;
+  return Math.max(0, wait - elapsed);
 }
 
 function getServerCooldown(): number {

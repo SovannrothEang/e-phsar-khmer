@@ -81,11 +81,13 @@ export function NotificationRow({
         role={clickable ? "button" : undefined}
         tabIndex={clickable ? 0 : undefined}
         aria-label={
-          notification.isRead
-            ? href
-              ? notification.title
-              : undefined
-            : t("markRowAria", { title: notification.title })
+          // A linked row navigates, so announce its destination title; only a
+          // mark-read-only row says "mark as read".
+          href
+            ? notification.title
+            : notification.isRead
+              ? undefined
+              : t("markRowAria", { title: notification.title })
         }
         onClick={() => {
           if (!clickable) return;

@@ -1893,6 +1893,22 @@ describe('ListingsService update rules', () => {
     expect(notifications.notifyStaff).not.toHaveBeenCalled();
   });
 
+  it('keeps a non-content toggle silent', async () => {
+    const { service, notifications } = setup();
+
+    await service.update('u1', 'l1', { deliveryFree: false } as never);
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edit of a withdrawn ad silent', async () => {
+    const { service, notifications } = setup({ status: 'deleted' });
+
+    await service.update('u1', 'l1', { title: 'new title' } as never);
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
   it('does not fail the update when the staff signal fails', async () => {
     const { service, notifications } = setup();
     notifications.notifyStaff.mockRejectedValue(new Error('db down'));

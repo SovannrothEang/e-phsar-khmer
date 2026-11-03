@@ -154,6 +154,30 @@ function effectiveStatus(
     : listing.status;
 }
 
+/**
+ * Fields whose change can alter what a reviewer once approved. Toggles like
+ * `deliveryFree` or a contact-detail edit stay silent: the staff signal is for
+ * "the reviewed content changed", not for every save.
+ */
+const AUDIT_RELEVANT_UPDATE_FIELDS = [
+  'title',
+  'description',
+  'price',
+  'discountValue',
+  'discountType',
+  'condition',
+  'photos',
+  'attributes',
+  'location',
+  'address',
+  'latitude',
+  'longitude',
+  'provinceId',
+  'districtId',
+  'communeId',
+  'productModelId',
+] as const;
+
 @Injectable()
 export class ListingsService {
   private readonly logger = new Logger(ListingsService.name);
@@ -332,13 +356,17 @@ export class ListingsService {
     this.assertUpdateShape(existing, dto);
 
     // Staff audit signal (#35) only makes sense for an ad that had already
-    // gone public; a draft edit has no live state to review. `publishedAt`
-    // covers a lapsed ad too, while seeded/legacy live rows carry only a
-    // status.
+    // gone public, and only when the patch touched content a reviewer could
+    // care about. A draft or a withdrawn (`deleted`) ad has no live state to
+    // review, and a `deliveryFree` toggle must not ping every admin.
+    const touchedForReview = AUDIT_RELEVANT_UPDATE_FIELDS.some(
+      (key) => (dto as Record<string, unknown>)[key] !== undefined,
+    );
     const wasLive =
-      existing.publishedAt !== null ||
-      existing.status === 'active' ||
-      existing.status === 'restricted';
+      existing.status !== 'deleted' &&
+      (existing.publishedAt !== null ||
+        existing.status === 'active' ||
+        existing.status === 'restricted');
 
     // A category move is an explicit pair, never a half-patch. Both columns are
     // structural (they decide the field schema and the plan scope), so a silent
@@ -518,7 +546,7 @@ export class ListingsService {
     // Best-effort: the edit is already committed, and the owner is
     // deliberately not notified of their own change. A failed staff signal
     // must never turn a completed edit into an error.
-    if (wasLive) {
+    if (wasLive && touchedForReview) {
       try {
         await this.notifications.notifyStaff({
           type: 'listing.edited',

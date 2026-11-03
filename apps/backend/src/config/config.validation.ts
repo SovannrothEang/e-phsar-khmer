@@ -256,9 +256,13 @@ export function validate(config: Record<string, unknown>): EnvConfig {
     );
   }
   // Outside production a missing sender still leaves the OTP flows unusable,
-  // but failing every local boot (tests, builds) is too blunt. Warn once so
-  // the symptom is traceable instead of a silent "code sent".
-  if (result.data.OTP_PROVIDER === 'plasgate') {
+  // but failing every local boot (tests, builds) is too blunt. Warn once per
+  // non-test environment so the symptom is traceable instead of a silent
+  // "code sent".
+  if (
+    result.data.OTP_PROVIDER === 'plasgate' &&
+    result.data.NODE_ENV !== 'test'
+  ) {
     const missing = missingSmsCredentials(result.data);
     if (missing.length > 0) {
       console.warn(

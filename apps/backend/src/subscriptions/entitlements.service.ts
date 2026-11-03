@@ -693,7 +693,8 @@ export class EntitlementsService {
 
       // The ad is visible again, so its "hidden while over the limit" notice
       // is now wrong. Best-effort: reconcile's counts are the caller's
-      // contract, and the sweep heals a missed cleanup on the next pass.
+      // contract. A failed delete leaves a stale row — it is logged, not
+      // retried, because the ad is no longer in `toRestore` on the next pass.
       for (const row of rows) {
         try {
           await this.notifications.removeForListing(
@@ -724,6 +725,8 @@ export class EntitlementsService {
 
       // The status guard above is the dedupe: each ad crosses active →
       // restricted once, so one notice per transition needs no prior query.
+      // A failed send is logged and not retried — the transition will not
+      // recur, so the owner may miss the reason (outbox follow-up).
       for (const row of rows) {
         try {
           await this.notifications.notify({

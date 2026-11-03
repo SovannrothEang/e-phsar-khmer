@@ -1,5 +1,3 @@
-import { toRetrySeconds } from "./otp-errors";
-
 /**
  * Handoff between the register/login forms and the OTP page.
  *
@@ -9,6 +7,17 @@ import { toRetrySeconds } from "./otp-errors";
  * lands in browser history or server logs.
  */
 export const OTP_REGISTRATION_KEY = "otp_registration";
+
+/**
+ * A positive whole-second wait, or undefined. Kept local instead of importing
+ * `otp-errors` so this module stays loadable by the plain `node --test` runner
+ * (extensionless TS imports do not resolve there).
+ */
+function positiveSeconds(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.ceil(value)
+    : undefined;
+}
 
 export interface OtpRegistration {
   mode: "register" | "login";
@@ -22,11 +31,19 @@ export interface OtpRegistration {
    * page seeds its resend countdown from it instead of assuming 60 s.
    */
   retryAfterSeconds?: number;
+  /**
+   * When the send happened, so a reload 200 s later does not restart the whole
+   * countdown. Set by `storeOtpRegistration` when the caller omits it.
+   */
+  sentAt?: number;
 }
 
 export function storeOtpRegistration(payload: OtpRegistration): void {
   try {
-    sessionStorage.setItem(OTP_REGISTRATION_KEY, JSON.stringify(payload));
+    sessionStorage.setItem(
+      OTP_REGISTRATION_KEY,
+      JSON.stringify({ ...payload, sentAt: payload.sentAt ?? Date.now() }),
+    );
   } catch {
     // Private mode / quota — the verify will proceed without the payload.
   }
@@ -64,7 +81,14 @@ export function readOtpRegistration(phone: string): OtpRegistration | null {
         typeof parsed.lastName === "string"
           ? parsed.lastName.slice(0, 100)
           : undefined,
-      retryAfterSeconds: toRetrySeconds(parsed.retryAfterSeconds),
+      retryAfterSeconds: positiveSeconds(parsed.retryAfterSeconds),
+      sentAt:
+        typeof parsed.sentAt === "number" &&
+        Number.isFinite(parsed.sentAt) &&
+        parsed.sentAt > 0 &&
+        parsed.sentAt <= Date.now() + 60_000
+          ? parsed.sentAt
+          : undefined,
     };
   } catch {
     return null; // corrupt JSON / storage unavailable

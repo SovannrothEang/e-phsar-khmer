@@ -326,12 +326,18 @@ export class ReportsService {
         const reason = found.reason
           ? `Reported: ${found.reason}`
           : 'Reported content';
-        const moderated = await this.listingsService.moderate(
-          report.listingId,
-          reviewer.id,
-          reason,
-          tx,
-        );
+        // A listing removed by the direct route (or an earlier report) keeps
+        // its original moderation metadata and its notice: re-running
+        // `moderate` would re-date the removal and rewrite the stored reason
+        // while the owner still holds the first notice.
+        const moderated = found.listingModeratedAt
+          ? null
+          : await this.listingsService.moderate(
+              report.listingId,
+              reviewer.id,
+              reason,
+              tx,
+            );
         await tx
           .update(listingReports)
           .set({ status: 'approved', reviewedById: reviewer.id })
@@ -343,9 +349,7 @@ export class ReportsService {
           );
         return {
           row: updated,
-          notice: found.listingModeratedAt
-            ? null
-            : { listing: moderated, reason },
+          notice: moderated ? { listing: moderated, reason } : null,
         };
       }
       return { row: updated, notice: null };

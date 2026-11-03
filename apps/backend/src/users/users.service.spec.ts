@@ -1677,7 +1677,12 @@ describe('UsersService self-service account changes', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledWith('password456', 10);
       expect(sets).toContainEqual(
-        expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
+        expect.objectContaining({
+          passwordHash: '$2b$10$newhash',
+          // Every session and any outstanding reset proof minted before this
+          // change must stop working.
+          tokensValidAfter: expect.any(Date) as unknown as Date,
+        }),
       );
     });
   });

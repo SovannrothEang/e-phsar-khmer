@@ -133,7 +133,7 @@ describe('ReportsService.updateListingReportStatus', () => {
     expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
   });
 
-  it('does not send a second notice for an already-moderated listing', async () => {
+  it('does not re-moderate or re-notify an already-moderated listing', async () => {
     const { service, listings, adminListings } = setup([
       { ...pending, listingModeratedAt: new Date() },
     ]);
@@ -142,7 +142,7 @@ describe('ReportsService.updateListingReportStatus', () => {
       { status: 'approved' },
       reviewer,
     );
-    expect(listings.moderate).toHaveBeenCalledTimes(1);
+    expect(listings.moderate).not.toHaveBeenCalled();
     expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
   });
 
