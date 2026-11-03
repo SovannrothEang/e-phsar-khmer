@@ -31,15 +31,27 @@ function setup(found: unknown[]) {
     }),
   };
   const db = { transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) };
-  const listings = { moderate: jest.fn().mockResolvedValue({}) };
+  const listing = {
+    id: 'l1',
+    userId: 'u1',
+    title: 'A motorcycle',
+    status: 'deleted',
+    moderatedAt: new Date(),
+    expiresAt: new Date(Date.now() + 86_400_000),
+  };
+  const listings = { moderate: jest.fn().mockResolvedValue(listing) };
   const admin = { authorizeManage: jest.fn().mockResolvedValue(undefined) };
+  const adminListings = {
+    notifyOwnerOfModeration: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new ReportsService(
     db as never,
     listings as never,
     admin as never,
     {} as never,
+    adminListings as never,
   );
-  return { service, tx, sets, listings, admin };
+  return { service, tx, sets, listings, admin, adminListings, listing };
 }
 
 describe('ReportsService.updateListingReportStatus', () => {
@@ -85,7 +97,7 @@ describe('ReportsService.updateListingReportStatus', () => {
   });
 
   it('does not re-moderate an already approved report', async () => {
-    const { service, listings } = setup([
+    const { service, listings, adminListings } = setup([
       { ...pending, report: { ...pending.report, status: 'approved' } },
     ]);
     await service.updateListingReportStatus(
@@ -94,6 +106,54 @@ describe('ReportsService.updateListingReportStatus', () => {
       reviewer,
     );
     expect(listings.moderate).not.toHaveBeenCalled();
+    expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
+  });
+
+  it('tells the owner once, with the report reason, after the take-down commits', async () => {
+    const { service, adminListings, listing } = setup([pending]);
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+    expect(adminListings.notifyOwnerOfModeration).toHaveBeenCalledTimes(1);
+    expect(adminListings.notifyOwnerOfModeration).toHaveBeenCalledWith(
+      listing,
+      'removed',
+      'Reported: Scam',
+    );
+  });
+
+  it('sends no notice when the moderation transaction rolls back', async () => {
+    const { service, listings, adminListings } = setup([pending]);
+    listings.moderate.mockRejectedValue(new Error('db down'));
+    await expect(
+      service.updateListingReportStatus('r1', { status: 'approved' }, reviewer),
+    ).rejects.toThrow('db down');
+    expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
+  });
+
+  it('does not send a second notice for an already-moderated listing', async () => {
+    const { service, listings, adminListings } = setup([
+      { ...pending, listingModeratedAt: new Date() },
+    ]);
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+    expect(listings.moderate).toHaveBeenCalledTimes(1);
+    expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
+  });
+
+  it('sends no notice on rejection', async () => {
+    const { service, adminListings } = setup([pending]);
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'rejected' },
+      reviewer,
+    );
+    expect(adminListings.notifyOwnerOfModeration).not.toHaveBeenCalled();
   });
 
   it('404s an unknown report', async () => {

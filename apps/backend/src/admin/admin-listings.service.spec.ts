@@ -176,6 +176,42 @@ describe('AdminListingsService.inactivate', () => {
   });
 });
 
+describe('AdminListingsService.notifyOwnerOfModeration', () => {
+  it('builds the removal notice the report-approval path sends', async () => {
+    const db = makeDb({ status: 'active', moderatedAt: null });
+    const row = moderationRow({ status: 'deleted', moderatedAt: new Date() });
+    const { service, notifications } = makeService(db, row);
+
+    await service.notifyOwnerOfModeration(
+      row as unknown as ListingRow,
+      'removed',
+      'Reported: Scam',
+    );
+
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+    expect(notifications.notify.mock.calls[0][0]).toMatchObject({
+      userId: 'u1',
+      type: 'listing.removed',
+      data: { listingId: 'l1', action: 'removed', reason: 'Reported: Scam' },
+    });
+  });
+
+  it('swallows a notification failure so the committed approval stands', async () => {
+    const db = makeDb({ status: 'active', moderatedAt: null });
+    const row = moderationRow({ status: 'deleted', moderatedAt: new Date() });
+    const { service, notifications } = makeService(db, row);
+    notifications.notify.mockRejectedValue(new Error('redis down'));
+
+    await expect(
+      service.notifyOwnerOfModeration(
+        row as unknown as ListingRow,
+        'removed',
+        'Reported: Scam',
+      ),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('AdminListingsService.restore', () => {
   it('delegates to the staff restore dispatcher', async () => {
     const db = makeDb({ status: 'inactive', moderatedAt: null });

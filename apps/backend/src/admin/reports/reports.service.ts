@@ -24,6 +24,7 @@ import type {
 import type { RequestUser } from '../../common/types/api-response.types';
 import { ListingsService } from '../../listings/listings.service';
 import { AdminService } from '../admin.service';
+import { AdminListingsService } from '../admin-listings.service';
 import { FilesService } from '../../files/files.service';
 import type {
   CreateReportReasonDto,
@@ -48,6 +49,7 @@ export class ReportsService {
     private readonly listingsService: ListingsService,
     private readonly adminService: AdminService,
     private readonly files: FilesService,
+    private readonly adminListings: AdminListingsService,
   ) {}
 
   // ── Reasons ───────────────────────────────────────────────
@@ -286,34 +288,48 @@ export class ReportsService {
    * .moderate) in the same transaction. As with user reports, un-approving
    * does not restore it — restoring is an explicit action on the admin
    * Listings page.
+   *
+   * The owner notice is emitted only after the transaction resolves: the
+   * notification is not part of the DB write, so a rollback must not leave a
+   * notice behind for a take-down that never happened. A listing that was
+   * already moderated (the Listings page is the other take-down path) gets no
+   * second notice; the prior state is read under the same report lock.
    */
   async updateListingReportStatus(
     id: string,
     dto: UpdateReportStatusDto,
     reviewer: RequestUser,
   ) {
-    return this.db.transaction(async (tx) => {
+    const { row, notice } = await this.db.transaction(async (tx) => {
       const [found] = await tx
-        .select({ report: listingReports, reason: reportReasons.reason })
+        .select({
+          report: listingReports,
+          reason: reportReasons.reason,
+          listingModeratedAt: listings.moderatedAt,
+        })
         .from(listingReports)
         .leftJoin(reportReasons, eq(reportReasons.id, listingReports.reasonId))
+        .leftJoin(listings, eq(listings.id, listingReports.listingId))
         .where(eq(listingReports.id, id))
         .limit(1)
         .for('update', { of: listingReports });
       if (!found) throw new NotFoundException('Listing report not found');
       const { report } = found;
 
-      const [row] = await tx
+      const [updated] = await tx
         .update(listingReports)
         .set({ status: dto.status, reviewedById: reviewer.id })
         .where(eq(listingReports.id, id))
         .returning();
 
       if (dto.status === 'approved' && report.status !== 'approved') {
-        await this.listingsService.moderate(
+        const reason = found.reason
+          ? `Reported: ${found.reason}`
+          : 'Reported content';
+        const moderated = await this.listingsService.moderate(
           report.listingId,
           reviewer.id,
-          found.reason ? `Reported: ${found.reason}` : 'Reported content',
+          reason,
           tx,
         );
         await tx
@@ -325,9 +341,24 @@ export class ReportsService {
               eq(listingReports.status, 'pending'),
             ),
           );
+        return {
+          row: updated,
+          notice: found.listingModeratedAt
+            ? null
+            : { listing: moderated, reason },
+        };
       }
-      return row;
+      return { row: updated, notice: null };
     });
+
+    if (notice) {
+      await this.adminListings.notifyOwnerOfModeration(
+        notice.listing,
+        'removed',
+        notice.reason,
+      );
+    }
+    return row;
   }
 
   async removeListingReport(id: string): Promise<{ id: string }> {

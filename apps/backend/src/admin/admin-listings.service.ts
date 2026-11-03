@@ -163,7 +163,7 @@ export class AdminListingsService {
     const existing = await this.moderationState(id);
     const row = await this.listingsService.moderate(id, moderatorId, reason);
     if (!existing.moderatedAt) {
-      await this.notifyOwner(row, 'removed', reason);
+      await this.notifyOwnerOfModeration(row, 'removed', reason);
     }
     return row;
   }
@@ -177,7 +177,7 @@ export class AdminListingsService {
     const existing = await this.moderationState(id);
     const row = await this.listingsService.inactivate(id, moderatorId, reason);
     if (existing.status !== 'inactive') {
-      await this.notifyOwner(row, 'inactive', reason);
+      await this.notifyOwnerOfModeration(row, 'inactive', reason);
     }
     return row;
   }
@@ -203,8 +203,12 @@ export class AdminListingsService {
    * completed moderation into an error the admin would retry — which would
    * publish a duplicate notice. Mirrors `listing.otp_verified`'s best-effort
    * contract rather than the outbox handlers' retry contract.
+   *
+   * Public because other take-down paths (approving a listing report) commit
+   * the moderation through `ListingsService.moderate` in their own transaction
+   * and must announce it only after that transaction resolves.
    */
-  private async notifyOwner(
+  async notifyOwnerOfModeration(
     row: ListingRow,
     action: 'removed' | 'inactive',
     reason: string,

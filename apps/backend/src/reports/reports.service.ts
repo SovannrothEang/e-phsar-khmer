@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { and, asc, eq, isNull } from 'drizzle-orm';
@@ -16,6 +17,8 @@ import {
   userReports,
 } from '../db/schema/reports.schema';
 import { FilesService } from '../files/files.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import type { NotificationPayload } from '../notifications/notification-channel.interface';
 import type {
   CreateListingReportDto,
   CreateUserReportDto,
@@ -28,9 +31,12 @@ import type {
  */
 @Injectable()
 export class UserReportsService {
+  private readonly logger = new Logger(UserReportsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly files: FilesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   listReasons(targetType: 'user' | 'listing') {
@@ -58,9 +64,9 @@ export class UserReportsService {
     if (listing.userId === reporterId) {
       throw new BadRequestException('CANNOT_REPORT_OWN_LISTING');
     }
-    await this.assertReason(dto.reasonId, 'listing');
+    const reason = await this.assertReason(dto.reasonId, 'listing');
 
-    return this.insertOnce(() =>
+    const report = await this.insertOnce(() =>
       this.db
         .insert(listingReports)
         .values({
@@ -71,6 +77,19 @@ export class UserReportsService {
         })
         .returning({ id: listingReports.id }),
     );
+
+    await this.notifyStaffOfReport({
+      type: 'report.created',
+      title: 'New listing report',
+      body: `Reason: ${reason}. A new listing report is waiting in the admin queue.`,
+      data: {
+        reportId: report.id,
+        targetType: 'listing',
+        targetId: dto.listingId,
+        reason,
+      },
+    });
+    return report;
   }
 
   async reportUser(reporterId: string, dto: CreateUserReportDto) {
@@ -83,7 +102,7 @@ export class UserReportsService {
       .where(and(eq(users.id, dto.targetUserId), isNull(users.deletedAt)))
       .limit(1);
     if (!target) throw new NotFoundException('User not found');
-    await this.assertReason(dto.reasonId, 'user');
+    const reason = await this.assertReason(dto.reasonId, 'user');
     const imagePaths = dto.imagePaths ?? [];
     for (const path of imagePaths) {
       // Only the reporter's own uploads — the admin page renders these, so a
@@ -96,7 +115,7 @@ export class UserReportsService {
       }
     }
 
-    return this.insertOnce(() =>
+    const report = await this.insertOnce(() =>
       this.db
         .insert(userReports)
         .values({
@@ -108,11 +127,27 @@ export class UserReportsService {
         })
         .returning({ id: userReports.id }),
     );
+
+    await this.notifyStaffOfReport({
+      type: 'report.created',
+      title: 'New account report',
+      body: `Reason: ${reason}. A new account report is waiting in the admin queue.`,
+      data: {
+        reportId: report.id,
+        targetType: 'user',
+        targetId: dto.targetUserId,
+        reason,
+      },
+    });
+    return report;
   }
 
-  private async assertReason(id: string, targetType: 'user' | 'listing') {
-    const [reason] = await this.db
-      .select({ id: reportReasons.id })
+  private async assertReason(
+    id: string,
+    targetType: 'user' | 'listing',
+  ): Promise<string> {
+    const [row] = await this.db
+      .select({ reason: reportReasons.reason })
       .from(reportReasons)
       .where(
         and(
@@ -122,7 +157,25 @@ export class UserReportsService {
         ),
       )
       .limit(1);
-    if (!reason) throw new BadRequestException('INVALID_REASON');
+    if (!row) throw new BadRequestException('INVALID_REASON');
+    return row.reason;
+  }
+
+  /**
+   * Staff audit signal after the report row commits. Best-effort: retrying the
+   * POST would only file a duplicate, so a notice failure is logged, never
+   * surfaced. The reporter's identity is deliberately absent from the payload.
+   */
+  private async notifyStaffOfReport(
+    payload: Omit<NotificationPayload, 'userId'>,
+  ): Promise<void> {
+    try {
+      await this.notifications.notifyStaff(payload);
+    } catch (err) {
+      this.logger.warn(
+        `Could not notify staff of report ${String(payload.data?.reportId)}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /**

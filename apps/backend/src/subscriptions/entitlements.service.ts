@@ -13,6 +13,8 @@ import {
 } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
+import { NotificationsService } from '../notifications/notifications.service';
+import { quotedTitle } from '../notifications/notice-title';
 import { listings } from '../db/schema/listings.schema';
 import {
   categories,
@@ -122,7 +124,10 @@ interface Context {
 export class EntitlementsService {
   private readonly logger = new Logger(EntitlementsService.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /** Free-plan numbers and group scopes. Small tables, read whole. */
   async loadConfig(): Promise<AllowanceConfig> {
@@ -685,6 +690,23 @@ export class EntitlementsService {
         )
         .returning({ id: listings.id });
       restored = rows.length;
+
+      // The ad is visible again, so its "hidden while over the limit" notice
+      // is now wrong. Best-effort: reconcile's counts are the caller's
+      // contract, and the sweep heals a missed cleanup on the next pass.
+      for (const row of rows) {
+        try {
+          await this.notifications.removeForListing(
+            row.id,
+            ['listing.restricted'],
+            userId,
+          );
+        } catch (err) {
+          this.logger.warn(
+            `Could not clear the restriction notice for listing ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
     }
     if (toRestrict.length > 0) {
       const rows = await this.db
@@ -697,8 +719,30 @@ export class EntitlementsService {
             eq(listings.status, 'active'),
           ),
         )
-        .returning({ id: listings.id });
+        .returning({ id: listings.id, title: listings.title });
       restricted = rows.length;
+
+      // The status guard above is the dedupe: each ad crosses active →
+      // restricted once, so one notice per transition needs no prior query.
+      for (const row of rows) {
+        try {
+          await this.notifications.notify({
+            userId,
+            type: 'listing.restricted',
+            title: `Your ad ${quotedTitle(row.title)} is hidden while your plan is over its limit`,
+            body: 'It has not been deleted. Renew or upgrade your subscription and it will reappear automatically.',
+            data: {
+              listingId: row.id,
+              listingTitle: row.title,
+              action: 'restricted',
+            },
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Could not send the restriction notice for listing ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
     }
     return { restricted, restored };
   }
