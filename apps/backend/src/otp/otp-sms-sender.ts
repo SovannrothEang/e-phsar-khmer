@@ -180,8 +180,8 @@ export class OtpSmsSender {
 
   buildMessage(purpose: OtpPurpose, code: string): string {
     return purpose === 'password_reset'
-      ? `Your PSA password reset code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not ask for it, ignore this message.`
-      : `Your PSA verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
+      ? `Your Phsar's account password reset code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes. If you did not ask for it, ignore this message.`
+      : `Your Phsar's account verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`;
   }
 
   private async acquire(

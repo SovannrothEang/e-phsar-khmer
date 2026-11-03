@@ -58,7 +58,7 @@ const baseEnvSchema = z.object({
   // Which backend issues/verifies phone OTPs: Supabase (today's behaviour) or
   // our own `OtpService` over PlasGate. `OTP_HMAC_SECRET` keys the code
   // hash; unset, `OtpService` derives one from JWT_SECRET and warns once.
-  OTP_PROVIDER: z.enum(['supabase', 'plasgate']).default('supabase'),
+  OTP_PROVIDER: z.enum(['supabase', 'plasgate']).default('plasgate'),
   OTP_HMAC_SECRET: z.string().min(16).optional(),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().default(24),
   THROTTLE_TTL: z.coerce.number().default(60),
