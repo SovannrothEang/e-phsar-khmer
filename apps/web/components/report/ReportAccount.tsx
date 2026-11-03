@@ -28,7 +28,8 @@ import { FieldGroup } from "@/components/ui/field";
 import { Images, X, ImagePlus } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import type { User } from "@/lib/user";
-import { signUploadUser } from "@/actions/files";
+import { signUpload, signUploadUser } from "@/actions/files";
+import { useReactions } from "@/components/reactions/reactions-provider";
 import { reportUser } from "@/actions/reports";
 import {
   MAX_UPLOAD_BYTES,
@@ -54,6 +55,11 @@ export function ReportAccount({
 }: ReportAccountProps) {
   const router = useRouter();
   const locale = useLocale();
+  // Must match the report action's token choice: a signed-in marketplace
+  // user's evidence is signed with the user session; a staff-only viewer
+  // signs with the admin session. A mismatch would file evidence from a
+  // different account than the reporter and the backend rejects it.
+  const reactions = useReactions();
   const { reasons, isLoading } = useReportReasons("user", open);
   const [files, setFiles] = useState<File[]>([]);
   const [reasonId, setReasonId] = useState("");
@@ -95,11 +101,15 @@ export function ReportAccount({
 
   /** Signed upload into the caller's own `report/{userId}/` folder. */
   const uploadAll = async (): Promise<string[] | null> => {
+    // A staff-only viewer signs with the admin session (the evidence still
+    // lands in that account's own report folder, which the report action's
+    // reporter matches); everyone else signs with their user session.
+    const sign = reactions.signedIn ? signUploadUser : signUpload;
     const paths: string[] = [];
     for (const file of files) {
       const mime = resolveUploadMime(file);
       if (!mime) return null;
-      const signed = await signUploadUser(file.name, "report");
+      const signed = await sign(file.name, "report");
       if (!signed.success) {
         toast.error(signed.error);
         return null;
