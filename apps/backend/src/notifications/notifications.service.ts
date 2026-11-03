@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { stableStringify } from '../common/stable-stringify.util';
 import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
 import { notifications, smsDeliveries } from '../db/schema';
+import { users } from '../db/schema/users.schema';
 import type { PaginatedResponse } from '../common/types/api-response.types';
 import { OutboxService } from '../outbox/outbox.service';
 import {
@@ -61,6 +62,42 @@ export class NotificationsService {
         );
       }
     }
+  }
+
+  /**
+   * Fans one payload out to every active staff member (`admin`/`super_admin`).
+   * Staff notices are a normal notification per recipient, so the in-app feed
+   * and realtime push work unchanged; there is no separate staff feed.
+   *
+   * Each recipient is attempted independently: one failure is logged and the
+   * rest still go out. The staff lookup itself can reject, so a caller that
+   * must not fail (e.g. a report insert) still wraps this call.
+   */
+  async notifyStaff(
+    payload: Omit<NotificationPayload, 'userId'>,
+  ): Promise<void> {
+    const staff = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          inArray(users.role, ['admin', 'super_admin']),
+          eq(users.status, 'active'),
+          isNull(users.deletedAt),
+        ),
+      );
+
+    await Promise.all(
+      staff.map(async (member) => {
+        try {
+          await this.notify({ userId: member.id, ...payload });
+        } catch (err) {
+          this.logger.warn(
+            `Could not notify staff ${member.id} (${payload.type}): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }),
+    );
   }
 
   private async enqueueSms(payload: NotificationPayload): Promise<void> {
@@ -201,6 +238,36 @@ export class NotificationsService {
     const rows = await this.db
       .delete(notifications)
       .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+    return { deleted: rows.length };
+  }
+
+  /**
+   * Deletes the notices about one listing — used when the state that produced
+   * them is undone (an ad restored or republished) so the feed stops claiming
+   * it was removed. `types` is explicit because a caller clears only the
+   * notice kinds it knows are stale.
+   *
+   * `data->>'listingId'` is the key every listing producer already writes, so
+   * no schema change is needed. When `userId` is given it is part of the WHERE
+   * too: a foreign owner's notices are never touched.
+   */
+  async removeForListing(
+    listingId: string,
+    types: string[],
+    userId?: string,
+  ): Promise<{ deleted: number }> {
+    if (types.length === 0) return { deleted: 0 };
+
+    const conditions = [
+      inArray(notifications.type, types),
+      sql`${notifications.data}->>'listingId' = ${listingId}`,
+    ];
+    if (userId) conditions.push(eq(notifications.userId, userId));
+
+    const rows = await this.db
+      .delete(notifications)
+      .where(and(...conditions))
       .returning({ id: notifications.id });
     return { deleted: rows.length };
   }

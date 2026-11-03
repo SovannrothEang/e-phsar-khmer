@@ -13,6 +13,7 @@ import {
   type SocialProvider,
 } from "@/lib/auth/social";
 import { requestLoginOtp } from "@/actions/otp";
+import { otpFailureMessage } from "@/lib/otp-errors";
 import { isLocalPhone, normalizePhone } from "@/lib/phone";
 import { getDeviceIdentity } from "@/lib/device";
 import { storeOtpRegistration } from "@/lib/otp-registration";
@@ -129,11 +130,13 @@ export function LoginForm({
             mode: "login",
             phone,
             password: value.password,
+            retryAfterSeconds: result.retryAfterSeconds,
           });
           toast.success("Code sent to your phone.", { position: "top-right" });
           router.push({ pathname: "/otp", query: { phone } });
         } else {
-          toast.error(result.error || "Login failed.");
+          // Same readable cooldown / daily-cap copy as the verify page.
+          toast.error(otpFailureMessage(result, "Login failed."));
         }
         return;
       }

@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -22,6 +23,7 @@ import {
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import { FilesService } from '../files/files.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ReactionsService } from '../reactions/reactions.service';
 import { EntitlementsService } from '../subscriptions/entitlements.service';
 import { activePaidSubscriptionExistsSql } from '../subscriptions/verified-account.util';
@@ -152,14 +154,45 @@ function effectiveStatus(
     : listing.status;
 }
 
+/**
+ * Fields whose change can alter what a reviewer once approved. Toggles like
+ * `deliveryFree` stay silent: the staff signal is for "the reviewed content
+ * changed", not for every save. Contact details are included — swapping the
+ * phone/email on a live classified after review is the bait-and-switch case.
+ */
+const AUDIT_RELEVANT_UPDATE_FIELDS = [
+  'title',
+  'description',
+  'price',
+  'discountValue',
+  'discountType',
+  'condition',
+  'photos',
+  'attributes',
+  'location',
+  'address',
+  'latitude',
+  'longitude',
+  'provinceId',
+  'districtId',
+  'communeId',
+  'productModelId',
+  'contactName',
+  'contactPhones',
+  'contactEmail',
+] as const;
+
 @Injectable()
 export class ListingsService {
+  private readonly logger = new Logger(ListingsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly filesService: FilesService,
     private readonly reactionsService: ReactionsService,
     private readonly entitlements: EntitlementsService,
     private readonly products: ProductsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -325,6 +358,19 @@ export class ListingsService {
     }
 
     this.assertUpdateShape(existing, dto);
+
+    // Staff audit signal (#35) only makes sense for an ad that had already
+    // gone public, and only when the patch touched content a reviewer could
+    // care about. A draft or a withdrawn (`deleted`) ad has no live state to
+    // review, and a `deliveryFree` toggle must not ping every admin.
+    const touchedForReview = AUDIT_RELEVANT_UPDATE_FIELDS.some(
+      (key) => (dto as Record<string, unknown>)[key] !== undefined,
+    );
+    const wasLive =
+      existing.status !== 'deleted' &&
+      (existing.publishedAt !== null ||
+        existing.status === 'active' ||
+        existing.status === 'restricted');
 
     // A category move is an explicit pair, never a half-patch. Both columns are
     // structural (they decide the field schema and the plan scope), so a silent
@@ -499,6 +545,29 @@ export class ListingsService {
     // A move out of a full scope can free a slot for a restricted sibling.
     if (categoryChanged) {
       await this.entitlements.reconcileListingsSafely(userId);
+    }
+
+    // Best-effort: the edit is already committed, and the owner is
+    // deliberately not notified of their own change. A failed staff signal
+    // must never turn a completed edit into an error.
+    if (wasLive && touchedForReview) {
+      try {
+        await this.notifications.notifyStaff({
+          type: 'listing.edited',
+          title: 'Listing edited after publication',
+          body: 'A published ad was edited. Review the change if it needs approval.',
+          data: {
+            listingId: updated.id,
+            listingTitle: updated.title,
+            ownerId: userId,
+            action: 'edited',
+          },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `listing.edited notice for ${id} failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     return { ...updated, photos };
@@ -1029,6 +1098,11 @@ export class ListingsService {
         })
         .where(eq(listings.id, id))
         .returning();
+      await this.clearListingNotices(
+        id,
+        ['listing.inactivated', 'listing.removed'],
+        userId,
+      );
       await this.entitlements.reconcileListingsSafely(userId);
       return { ...row, photos: existing.photos };
     }
@@ -1089,6 +1163,16 @@ export class ListingsService {
       }
       return row;
     });
+
+    // A lapsed inactive ad republishes through this path too, so the staff
+    // hide notice is stale either way.
+    if (inactive) {
+      await this.clearListingNotices(
+        id,
+        ['listing.inactivated', 'listing.removed'],
+        userId,
+      );
+    }
 
     // The count check above is not atomic with the write; settling here keeps
     // two parallel publishes from leaving the user over their allowance.
@@ -1437,6 +1521,26 @@ export class ListingsService {
   }
 
   /**
+   * Best-effort removal of listing notices whose cause no longer holds (an ad
+   * brought back by a restore or republish). A cleanup failure must never undo
+   * a completed state change — the stale row is cosmetic and a later pass can
+   * clear it.
+   */
+  private async clearListingNotices(
+    listingId: string,
+    types: string[],
+    userId: string,
+  ): Promise<void> {
+    try {
+      await this.notifications.removeForListing(listingId, types, userId);
+    } catch (err) {
+      this.logger.warn(
+        `Could not clear ${types.join(', ')} notices for listing ${listingId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
    * Undoes a take-down. The ad comes back live if its 30-day window is still
    * open, otherwise as expired (a never-published draft stays a draft) — then
    * plan reconciliation runs, since a restored live ad takes one of the
@@ -1471,6 +1575,7 @@ export class ListingsService {
       .returning();
     if (!row) throw new BadRequestException('LISTING_NOT_MODERATED');
 
+    await this.clearListingNotices(id, ['listing.removed'], existing.userId);
     await this.entitlements.reconcileListingsSafely(existing.userId);
     return row;
   }
@@ -1551,6 +1656,11 @@ export class ListingsService {
       .returning();
     if (!row) throw new BadRequestException('LISTING_NOT_MODERATED');
 
+    await this.clearListingNotices(
+      id,
+      ['listing.inactivated'],
+      existing.userId,
+    );
     await this.entitlements.reconcileListingsSafely(existing.userId);
     return row;
   }

@@ -109,4 +109,4 @@ Key properties this gives us:
 - **Per-IP throttles are in-memory and per instance** (`SMS_LIMIT` 5/min, `CREDENTIAL_LIMIT` 10/min), and behind the web server-action proxy many users can share one IP. The per-phone limits and the 5-attempt cap are the real controls.
 - **Detached delivery is fire-and-forget.** If the process exits between the response and the PlasGate call the code is stored but never sent; the user waits out the cooldown. Acceptable for MVP, noted for the rollout pass.
 - **Residual timing difference in forgot-password** (one DB insert, a few ms) is not padded; measure it in the rollout pass (task 1.7) before claiming it is unobservable.
-- **`UsersService.changePassword` does not revoke sessions or set `users.tokensValidAfter`**; only a reset does (see `ARCHITECTURE.md`, Session revocation).
+- **`UsersService.changePassword` sets `users.tokensValidAfter`** (since 2026-11-03), so a settings password change ends older sessions and any outstanding reset proof (see `ARCHITECTURE.md`, Session revocation); device rows are not deleted there, only cut off by the cutoff.

@@ -43,3 +43,74 @@ describe('DEV_OTP_TOKEN', () => {
     ).toMatchObject({ DEV_OTP_TOKEN: '000000' });
   });
 });
+
+describe('OTP_PROVIDER=plasgate credentials', () => {
+  const smsCredentials = {
+    SMS_PRIVATE_KEY: 'private-key',
+    SMS_SECRET: 'secret',
+    SMS_SENDER: 'PSA',
+  };
+
+  it('defaults to plasgate', () => {
+    expect(validate({ ...requiredEnvironment })).toMatchObject({
+      OTP_PROVIDER: 'plasgate',
+    });
+  });
+
+  it('rejects a production boot without SMS credentials — every code would silently fail', () => {
+    expect(() =>
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'production',
+        OTP_PROVIDER: 'plasgate',
+      }),
+    ).toThrow('OTP_PROVIDER');
+  });
+
+  it('names the missing credential', () => {
+    expect(() =>
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'production',
+        OTP_PROVIDER: 'plasgate',
+        SMS_PRIVATE_KEY: 'private-key',
+        SMS_SECRET: 'secret',
+      }),
+    ).toThrow('SMS_SENDER');
+  });
+
+  it('accepts a production boot with every SMS credential set', () => {
+    expect(
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'production',
+        OTP_PROVIDER: 'plasgate',
+        ...smsCredentials,
+      }),
+    ).toMatchObject({ OTP_PROVIDER: 'plasgate', ...smsCredentials });
+  });
+
+  it('does not require SMS credentials when the provider is supabase', () => {
+    expect(
+      validate({
+        ...requiredEnvironment,
+        NODE_ENV: 'production',
+        OTP_PROVIDER: 'supabase',
+      }),
+    ).toMatchObject({ OTP_PROVIDER: 'supabase' });
+  });
+
+  it('warns but boots outside production when the sender is unconfigured', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(validate({ ...requiredEnvironment })).toMatchObject({
+        OTP_PROVIDER: 'plasgate',
+      });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('OTP_PROVIDER=plasgate'),
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});

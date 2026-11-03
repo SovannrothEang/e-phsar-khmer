@@ -15,7 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { and, eq, gt, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -33,6 +33,7 @@ import type { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 import {
   PASSWORD_RESET_TTL_SECONDS,
   PASSWORD_RESET_TYP,
+  resetProofStillValid,
 } from './password-reset-token';
 import type { RegisterDto } from './dto/register.dto';
 import type { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -182,7 +183,7 @@ export class AuthService {
     return this.finishLogin(user, device);
   }
 
-  /** `supabase` (default) keeps Supabase SMS; `plasgate` uses our own OTPs. */
+  /** `supabase` keeps Supabase SMS; `plasgate` (the default) uses our own OTPs. */
   private get usesOwnOtp(): boolean {
     return this.configService.get<string>('otp.provider') === 'plasgate';
   }
@@ -499,6 +500,16 @@ export class AuthService {
     dto: RequestPasswordResetDto,
     ip?: string | null,
   ): Promise<{ otpSent: true }> {
+    // A global config fault is not an existence oracle: answer every caller
+    // the same 503 instead of the usual "code sent" for a code that can never
+    // leave the building.
+    if (this.usesOwnOtp && !this.otpSender.isConfigured()) {
+      throw new ServiceUnavailableException({
+        code: 'OTP_PROVIDER_UNAVAILABLE',
+        message:
+          'Password reset is temporarily unavailable. Please try again later.',
+      });
+    }
     const target = await this.resolveResetTarget(dto.identifier);
     if (target) {
       try {
@@ -593,6 +604,29 @@ export class AuthService {
     const changedAt = new Date();
 
     const updated = await this.db.transaction(async (tx) => {
+      // A reset proof buys exactly one password change. Every change stamps
+      // `tokensValidAfter`, so a proof minted before that stamp is dead —
+      // otherwise a stolen token could change the password again inside its
+      // 10-minute TTL. Read first for a clear failure, then repeat the bound
+      // inside the UPDATE so two concurrent confirms cannot both win.
+      const [current] = await tx
+        .select({ tokensValidAfter: users.tokensValidAfter })
+        .from(users)
+        .where(
+          and(
+            eq(users.id, payload.sub),
+            eq(users.status, 'active'),
+            isNull(users.deletedAt),
+          ),
+        )
+        .limit(1);
+      if (
+        !current ||
+        !resetProofStillValid(payload.issuedAt, current.tokensValidAfter)
+      ) {
+        return null;
+      }
+
       const [row] = await tx
         .update(users)
         .set({
@@ -608,14 +642,18 @@ export class AuthService {
             eq(users.id, payload.sub),
             eq(users.status, 'active'),
             isNull(users.deletedAt),
+            or(
+              isNull(users.tokensValidAfter),
+              lte(users.tokensValidAfter, payload.issuedAt),
+            ),
           ),
         )
         .returning({ id: users.id });
       if (row) await this.loginDevices.revokeAll(payload.sub, tx);
-      return row;
+      return row ?? null;
     });
-    // A concurrent delete/suspend between verify and confirm must not report
-    // a successful reset.
+    // A concurrent delete/suspend or a second use of the same proof must not
+    // report a successful reset.
     if (!updated) throw this.invalidResetSession();
 
     // Best-effort, like every other security notification: the password is
@@ -642,19 +680,21 @@ export class AuthService {
   /** Validates the proof minted by `verifyResetCode`; null on any failure. */
   private async verifyResetToken(
     token: string,
-  ): Promise<{ sub: string } | null> {
+  ): Promise<{ sub: string; issuedAt: Date } | null> {
     try {
       const payload = await this.jwtService.verifyAsync<{
         sub?: unknown;
         typ?: unknown;
+        iat?: unknown;
       }>(token);
       if (
         payload.typ !== PASSWORD_RESET_TYP ||
-        typeof payload.sub !== 'string'
+        typeof payload.sub !== 'string' ||
+        typeof payload.iat !== 'number'
       ) {
         return null;
       }
-      return { sub: payload.sub };
+      return { sub: payload.sub, issuedAt: new Date(payload.iat * 1000) };
     } catch {
       // Expired, tampered with, or signed with another key.
       return null;

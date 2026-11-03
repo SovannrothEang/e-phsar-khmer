@@ -134,6 +134,42 @@ export function parseOtpSent(body: unknown): OtpSent | null {
   };
 }
 
+/** The fields a form needs to phrase a failed send/resend. */
+export interface OtpFailureLike {
+  code: OtpErrorCode;
+  /** Raw backend message — `actions/otp.ts` names it `error`, the parser `message`. */
+  message?: string;
+  error?: string;
+  retryAfterSeconds?: number;
+}
+
+/**
+ * Human copy for a failed send/resend, shared by the login and verify forms so
+ * a cooldown or a daily cap reads the same wherever it is triggered.
+ * `fallback` is the generic sentence for codes this file cannot phrase.
+ */
+export function otpFailureMessage(
+  failure: OtpFailureLike,
+  fallback = "Failed to send code.",
+): string {
+  switch (failure.code) {
+    case "cooldown":
+      return `Please wait ${
+        failure.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS
+      } seconds before requesting another code.`;
+    case "daily_cap":
+      return "You've reached today's limit for codes. Try again tomorrow.";
+    case "send_failed":
+      return "We could not send the code. Please try again.";
+    case "provider_unsupported":
+      return "This is unavailable right now. Please try again later.";
+    case "invalid_credentials":
+      return "Invalid phone number or password";
+    default:
+      return failure.message ?? failure.error ?? fallback;
+  }
+}
+
 /** Under two minutes read as seconds, otherwise as whole minutes (rounded up). */
 export function formatWait(seconds: number): {
   unit: "seconds" | "minutes";

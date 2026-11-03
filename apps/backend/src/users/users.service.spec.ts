@@ -1654,6 +1654,8 @@ describe('UsersService self-service account changes', () => {
     it('stores a bcrypt hash of the new password', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$10$newhash');
+      const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+      service = makeService(db, {}, notifications);
       db.select.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -1677,7 +1679,17 @@ describe('UsersService self-service account changes', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledWith('password456', 10);
       expect(sets).toContainEqual(
-        expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
+        expect.objectContaining({
+          passwordHash: '$2b$10$newhash',
+          // Every session and any outstanding reset proof minted before this
+          // change must stop working.
+          tokensValidAfter: expect.any(Date) as unknown as Date,
+        }),
+      );
+      // Same record the reset flow writes, so the owner can see why the other
+      // devices were signed out.
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'security.password_changed' }),
       );
     });
   });

@@ -592,13 +592,34 @@ export class UsersService {
     // of the very page they mistyped their password on.
     if (!valid) throw new BadRequestException('INVALID_PASSWORD');
 
+    // A password change ends every session minted before it: `JwtStrategy` and
+    // `refresh` reject tokens older than this cutoff, and an outstanding
+    // password-reset proof (minted before the change) stops working too. The
+    // price is that the caller signs in again on their next refresh, which is
+    // the same contract as the reset flow.
+    const changedAt = new Date();
     await this.db
       .update(users)
       .set({
         passwordHash: await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS),
-        updatedAt: new Date(),
+        tokensValidAfter: changedAt,
+        updatedAt: changedAt,
       })
       .where(eq(users.id, userId));
+
+    // Same best-effort notice the reset flow writes: the password is already
+    // changed, so a feed failure must not fail the request.
+    try {
+      await this.notifications.notify({
+        userId,
+        type: 'security.password_changed',
+        title: 'Password changed',
+        body: 'Your password was changed and older sessions were signed out. If this was not you, contact support.',
+        data: { changedAt: changedAt.toISOString() },
+      });
+    } catch {
+      // Best-effort by contract; the state change already committed.
+    }
 
     return { updated: true };
   }

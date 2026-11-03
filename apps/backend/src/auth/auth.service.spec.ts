@@ -9,8 +9,16 @@ import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { UserRow } from '../db/schema/users.schema';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('bcrypt');
+
+/** Fixed `iat` for a reset proof, so a test can place `tokensValidAfter` around it. */
+const RESET_IAT_SECONDS = 1_700_000_000;
+
+/** Render a Drizzle condition so a test can pin the SQL bound itself. */
+const compileWhere = (where: unknown) =>
+  new PgDialect().sqlToQuery(where as never);
 
 function makeUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
@@ -102,6 +110,7 @@ function makeOtpService() {
 function makeOtpSender() {
   return {
     issueAndSend: jest.fn(),
+    isConfigured: jest.fn().mockReturnValue(true),
     issueAndSendDetached: jest.fn().mockResolvedValue({
       result: { status: 'sent', retryAfterSeconds: 300 },
       delivery: Promise.resolve(),
@@ -1888,14 +1897,25 @@ describe('AuthService password reset', () => {
   function mockTransaction(
     db: ReturnType<typeof makeDb>,
     returnedRows: { id: string }[],
+    tokensValidAfter: Date | null = null,
   ) {
-    const capture: { set?: Record<string, unknown> } = {};
+    const capture: { set?: Record<string, unknown>; where?: unknown } = {};
     const tx = {
+      select: jest.fn(() => ({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve([{ tokensValidAfter }]),
+          }),
+        }),
+      })),
       update: jest.fn(() => ({
         set: (values: Record<string, unknown>) => {
           capture.set = values;
           return {
-            where: () => ({ returning: () => Promise.resolve(returnedRows) }),
+            where: (where: unknown) => {
+              capture.where = where;
+              return { returning: () => Promise.resolve(returnedRows) };
+            },
           };
         },
       })),
@@ -2049,6 +2069,7 @@ describe('AuthService password reset', () => {
       jwt.verifyAsync.mockResolvedValue({
         sub: userId,
         typ: 'password_reset',
+        iat: RESET_IAT_SECONDS,
       });
       return jwt;
     }
@@ -2156,6 +2177,84 @@ describe('AuthService password reset', () => {
 
       expect(loginDevices.revokeAll).not.toHaveBeenCalled();
     });
+
+    it('refuses a proof that a later password change already spent', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const db = makeDb();
+      mockTransaction(
+        db,
+        [{ id: 'user-uuid' }],
+        new Date((RESET_IAT_SECONDS + 1) * 1000),
+      );
+      const loginDevices = { ...makeLoginDevices(), revokeAll: jest.fn() };
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        loginDevices,
+        makeValidJwt(),
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(loginDevices.revokeAll).not.toHaveBeenCalled();
+    });
+
+    it('accepts a proof minted after the last password change', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const db = makeDb();
+      const { capture } = mockTransaction(
+        db,
+        [{ id: 'user-uuid' }],
+        new Date((RESET_IAT_SECONDS - 60) * 1000),
+      );
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        undefined,
+        makeValidJwt(),
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).resolves.toEqual({ reset: true });
+
+      // The pre-read alone is not the guarantee: the UPDATE must carry the same
+      // bound so a concurrent second confirm loses at the database.
+      const { sql } = compileWhere(capture.where);
+      expect(sql).toContain('tokens_valid_after');
+      // Pin the `is null` ARM, not just any `is null` (deleted_at has one too):
+      // without it a first-time reset compares NULL and would 401 for everyone.
+      expect(sql).toMatch(/tokens_valid_after" is null/);
+      expect(sql).toMatch(/<=/);
+    });
+
+    it('refuses a proof with no issued-at claim', async () => {
+      const db = makeDb();
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockResolvedValue({
+        sub: 'user-uuid',
+        typ: 'password_reset',
+      });
+      const service = makeResetService(db, makeResetSupabase(), undefined, jwt);
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('plasgate provider', () => {
@@ -2237,6 +2336,51 @@ describe('AuthService password reset', () => {
       await expect(
         service.requestPasswordReset({ identifier: 'sokdara' }),
       ).resolves.toEqual({ otpSent: true });
+    });
+
+    it('answers the same 503 for known and unknown identifiers when the sender is unconfigured', async () => {
+      const { supabase, otpService, otpSender } = providerReset();
+      otpSender.isConfigured.mockReturnValue(false);
+
+      const knownDb = makeDb();
+      mockLookups(knownDb, [makeUser({ primaryPhone: PHONE })]);
+      const known = makeResetService(
+        knownDb,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      const unknownDb = makeDb();
+      mockLookups(unknownDb, []);
+      const unknown = makeResetService(
+        unknownDb,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      const settle = async (service: ReturnType<typeof makeResetService>) => {
+        try {
+          await service.requestPasswordReset({ identifier: 'sokdara' });
+          return null;
+        } catch (err) {
+          return err as ServiceUnavailableException;
+        }
+      };
+
+      const knownResult = await settle(known);
+      const unknownResult = await settle(unknown);
+
+      expect(knownResult).toBeInstanceOf(ServiceUnavailableException);
+      expect(knownResult?.getStatus()).toBe(503);
+      expect(knownResult?.getResponse()).toEqual(unknownResult?.getResponse());
+      expect(otpSender.issueAndSendDetached).not.toHaveBeenCalled();
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
     });
 
     it('verifies the code through OtpService and mints the reset proof', async () => {
