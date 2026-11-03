@@ -3,16 +3,20 @@
 import { registerSchema } from "@/schemas/register";
 import { normalizePhone } from "@/lib/phone";
 import { API_URL } from "@/lib/api/client";
+import { toRetrySeconds } from "@/lib/otp-errors";
 import z from "zod";
 
 /**
  * Step 1 of phone registration: ask the backend to text an OTP to the phone.
- * The returned E.164 `phone` is what the OTP page must verify against.
+ * The returned E.164 `phone` is what the OTP page must verify against, and
+ * `retryAfterSeconds` is the wait the API actually applied (absent when the
+ * provider answers without one — the OTP page then falls back to 60 s).
  */
 export async function register(
   unsafeData: z.infer<typeof registerSchema>,
 ): Promise<
-  { success: true; phone: string } | { success: false; error?: string }
+  | { success: true; phone: string; retryAfterSeconds?: number }
+  | { success: false; error?: string }
 > {
   const data = registerSchema.safeParse(unsafeData);
 
@@ -29,7 +33,7 @@ export async function register(
   });
   const body = (await res.json().catch(() => null)) as {
     success?: boolean;
-    data?: { otpSent?: boolean };
+    data?: { otpSent?: boolean; retryAfterSeconds?: unknown };
     error?: { code?: string; message?: string };
   } | null;
 
@@ -40,5 +44,10 @@ export async function register(
     };
   }
 
-  return { success: true, phone };
+  const retryAfterSeconds = toRetrySeconds(body.data.retryAfterSeconds);
+  return {
+    success: true,
+    phone,
+    ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+  };
 }

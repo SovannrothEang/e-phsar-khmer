@@ -81,36 +81,21 @@ export async function requestOtp(phone: string): Promise<OtpSendActionResult> {
 
 /**
  * Login step 1: validate phone + password; the backend sends the OTP only
- * after the password checks out.
+ * after the password checks out. Same send-shaped answer as `requestOtp`, so
+ * the countdown and the cooldown/daily-cap copy come from the API, not from a
+ * hard-coded 60 s.
  */
 export async function requestLoginOtp(
   phone: string,
   password: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<OtpSendActionResult> {
   const res = await fetch(`${API_URL}/auth/otp/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone, password }),
     cache: "no-store",
   });
-  const body = (await res.json().catch(() => null)) as Envelope<{
-    otpSent: boolean;
-  }> | null;
-
-  if (!res.ok || !body?.success) {
-    // Same contract as actions/login.ts: the domain string rides in `message`,
-    // while `code` is only the HTTP status name.
-    const code = body?.error?.message ?? body?.error?.code;
-    return {
-      success: false,
-      error:
-        code === "INVALID_CREDENTIALS"
-          ? "Invalid phone number or password"
-          : (body?.error?.message ?? "Failed to send code"),
-    };
-  }
-
-  return { success: true };
+  return parseSendResponse(res);
 }
 
 /** Verify the 6-digit OTP; on success the user session cookies are set. */

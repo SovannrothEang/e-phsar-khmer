@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ArrowLeft, RefreshCwIcon } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -20,7 +26,7 @@ import {
 } from "@/components/ui/input-otp";
 import { useRouter } from "@/i18n/routing";
 import { requestOtp, verifyOtp } from "@/actions/otp";
-import type { OtpErrorCode } from "@/lib/otp-errors";
+import { otpFailureMessage } from "@/lib/otp-errors";
 import { getDeviceIdentity } from "@/lib/device";
 import { formatPhoneLocal } from "@/lib/phone";
 import {
@@ -33,26 +39,29 @@ import { isServerRedirect } from "@/lib/next-redirect";
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
-/** Readable text for a failed resend; the backend message is the fallback. */
-function resendFailureText(failure: {
-  code: OtpErrorCode;
-  error?: string;
-  retryAfterSeconds?: number;
-}): string {
-  switch (failure.code) {
-    case "cooldown":
-      return `Please wait ${
-        failure.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS
-      } seconds before requesting another code.`;
-    case "daily_cap":
-      return "You've reached today's limit for codes. Try again tomorrow.";
-    case "send_failed":
-      return "We could not send the code. Please try again.";
-    case "provider_unsupported":
-      return "This is unavailable right now. Please try again later.";
-    default:
-      return failure.error ?? "Failed to resend code.";
-  }
+/**
+ * The wait the send endpoint applied, read from the handoff (see
+ * `lib/otp-registration.ts`); 60 s is only the fallback.
+ *
+ * Read through `useSyncExternalStore` like `chat-workspace.tsx` does for its
+ * localStorage prefs: the server has no sessionStorage, so `getServerSnapshot`
+ * keeps the first paint at the fallback and React reconciles to the API's
+ * value right after hydration — no setState-from-effect, no mismatch.
+ */
+function subscribeCooldown(): () => void {
+  // Nothing can change the handoff while this page is open, so there is
+  // nothing to notify about; only the SSR-safe first read matters.
+  return () => {};
+}
+
+function getStoredCooldown(phone: string): number {
+  return (
+    readOtpRegistration(phone)?.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS
+  );
+}
+
+function getServerCooldown(): number {
+  return RESEND_COOLDOWN_SECONDS;
 }
 
 /**
@@ -68,14 +77,24 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
   const [value, setValue] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
-  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  // `null` until the countdown has ticked or a resend re-armed it; until then
+  // the handoff's wait (or the 60 s fallback) is the countdown.
+  const [remaining, setRemaining] = useState<number | null>(null);
   const inFlightRef = useRef(false);
   const doneRef = useRef(false);
 
-  // The code was just sent by the register step; count the resend cooldown down.
+  const storedCooldown = useSyncExternalStore(
+    subscribeCooldown,
+    () => getStoredCooldown(phone),
+    getServerCooldown,
+  );
+  const cooldown = remaining ?? storedCooldown;
+
+  // The code was just sent by the register/login step; count the resend
+  // cooldown down.
   useEffect(() => {
     if (cooldown <= 0) return;
-    const id = setTimeout(() => setCooldown((seconds) => seconds - 1), 1000);
+    const id = setTimeout(() => setRemaining(cooldown - 1), 1000);
     return () => clearTimeout(id);
   }, [cooldown]);
 
@@ -165,13 +184,13 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
         setValue("");
         // The API owns the wait — never re-arm the countdown with a
         // hard-coded number.
-        setCooldown(res.retryAfterSeconds);
+        setRemaining(res.retryAfterSeconds);
         toast.success("Code resent successfully!");
       } else {
         if (res.code === "cooldown") {
-          setCooldown(res.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS);
+          setRemaining(res.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS);
         }
-        toast.error(resendFailureText(res));
+        toast.error(otpFailureMessage(res, "Failed to resend code."));
       }
     } catch {
       toast.error("Failed to resend code. Please try again.");

@@ -146,6 +146,7 @@ function RecentPanel({ limit, onNavigate, title }: PanelProps) {
                   notification={n}
                   onMarkRead={markOne}
                   onDelete={removeOne}
+                  onNavigate={onNavigate}
                   compact
                 />
               </li>

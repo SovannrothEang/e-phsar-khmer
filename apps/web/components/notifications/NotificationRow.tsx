@@ -10,14 +10,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatNotificationDate } from "@/lib/notifications/format-date";
+import { useRouter } from "@/i18n/routing";
 import type { BackendNotification } from "@/types/notification";
 
 interface NotificationRowProps {
   notification: BackendNotification;
   onMarkRead: (notification: BackendNotification) => void;
   onDelete: (notification: BackendNotification) => void;
+  /** Called after the row navigates — lets the navbar panel close itself. */
+  onNavigate?: () => void;
   /** Smaller icon and clamped text, for the navbar panel. */
   compact?: boolean;
+}
+
+/**
+ * Owner-facing notices whose listing is no longer public (removed, staff-hidden
+ * or over the plan cap) must land on Manage Ads: the public `/post/<id>` detail
+ * 404s for those rows. Expiry notices still point at the ad. A staff
+ * `listing.edited` notice is left unlinked — staff review it in the admin
+ * queue, and that area is outside this router's locale prefix.
+ */
+const MANAGE_ADS_ROUTES = new Set([
+  "listing.removed",
+  "listing.inactivated",
+  "listing.restricted",
+]);
+
+function listingHref(notification: BackendNotification) {
+  if (!notification.type.startsWith("listing.")) return null;
+  if (MANAGE_ADS_ROUTES.has(notification.type)) return "/me" as const;
+  if (notification.type === "listing.edited") return null;
+  const listingId = notification.data?.listingId;
+  if (typeof listingId !== "string" || listingId.length === 0) return null;
+  return { pathname: "/post/[slug]" as const, params: { slug: listingId } };
 }
 
 /**
@@ -30,11 +55,22 @@ export function NotificationRow({
   notification,
   onMarkRead,
   onDelete,
+  onNavigate,
   compact = false,
 }: NotificationRowProps) {
   const t = useTranslations("Notifications");
   const tCommon = useTranslations("Common");
   const locale = useLocale();
+  const router = useRouter();
+  const href = listingHref(notification);
+  const clickable = href !== null || !notification.isRead;
+
+  const activate = () => {
+    if (!notification.isRead) onMarkRead(notification);
+    if (!href) return;
+    router.push(href);
+    onNavigate?.();
+  };
 
   return (
     <div
@@ -42,25 +78,28 @@ export function NotificationRow({
         ${notification.isRead ? "bg-background hover:bg-gray-200" : "bg-muted hover:bg-gray-200"}`}
     >
       <div
-        role={notification.isRead ? undefined : "button"}
-        tabIndex={notification.isRead ? undefined : 0}
+        role={clickable ? "button" : undefined}
+        tabIndex={clickable ? 0 : undefined}
         aria-label={
           notification.isRead
-            ? undefined
+            ? href
+              ? notification.title
+              : undefined
             : t("markRowAria", { title: notification.title })
         }
         onClick={() => {
-          if (!notification.isRead) onMarkRead(notification);
+          if (!clickable) return;
+          activate();
         }}
         onKeyDown={(event) => {
-          if (notification.isRead) return;
+          if (!clickable) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onMarkRead(notification);
+            activate();
           }
         }}
         className={`flex min-w-0 flex-1 items-start text-left outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-sky-500 ${
-          notification.isRead ? "cursor-default" : "cursor-pointer"
+          clickable ? "cursor-pointer" : "cursor-default"
         }`}
       >
         <div
