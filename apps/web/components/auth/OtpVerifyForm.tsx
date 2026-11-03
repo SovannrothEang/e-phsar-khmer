@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/input-otp";
 import { useRouter } from "@/i18n/routing";
 import { requestOtp, verifyOtp } from "@/actions/otp";
+import type { OtpErrorCode } from "@/lib/otp-errors";
 import { getDeviceIdentity } from "@/lib/device";
 import { formatPhoneLocal } from "@/lib/phone";
 import {
@@ -31,6 +32,28 @@ import { isServerRedirect } from "@/lib/next-redirect";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
+
+/** Readable text for a failed resend; the backend message is the fallback. */
+function resendFailureText(failure: {
+  code: OtpErrorCode;
+  error?: string;
+  retryAfterSeconds?: number;
+}): string {
+  switch (failure.code) {
+    case "cooldown":
+      return `Please wait ${
+        failure.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS
+      } seconds before requesting another code.`;
+    case "daily_cap":
+      return "You've reached today's limit for codes. Try again tomorrow.";
+    case "send_failed":
+      return "We could not send the code. Please try again.";
+    case "provider_unsupported":
+      return "This is unavailable right now. Please try again later.";
+    default:
+      return failure.error ?? "Failed to resend code.";
+  }
+}
 
 /**
  * Survives a remount of this page — the verify server action sets session
@@ -140,10 +163,15 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
       const res = await requestOtp(phone);
       if (res.success) {
         setValue("");
-        setCooldown(RESEND_COOLDOWN_SECONDS);
+        // The API owns the wait — never re-arm the countdown with a
+        // hard-coded number.
+        setCooldown(res.retryAfterSeconds);
         toast.success("Code resent successfully!");
       } else {
-        toast.error(res.error ?? "Failed to resend code.");
+        if (res.code === "cooldown") {
+          setCooldown(res.retryAfterSeconds ?? RESEND_COOLDOWN_SECONDS);
+        }
+        toast.error(resendFailureText(res));
       }
     } catch {
       toast.error("Failed to resend code. Please try again.");
