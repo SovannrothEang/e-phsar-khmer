@@ -55,9 +55,10 @@ const baseEnvSchema = z.object({
   SMS_USER_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(300),
   SMS_USER_DAILY_CAP: z.coerce.number().int().positive().default(10),
   DEV_OTP_TOKEN: z.string().optional(),
-  // Which backend issues/verifies phone OTPs: Supabase (today's behaviour) or
-  // our own `OtpService` over PlasGate. `OTP_HMAC_SECRET` keys the code
-  // hash; unset, `OtpService` derives one from JWT_SECRET and warns once.
+  // Which backend issues/verifies phone OTPs: Supabase (the old behaviour) or
+  // our own `OtpService` over PlasGate (the shipped default). `OTP_HMAC_SECRET`
+  // keys the code hash; unset, `OtpService` derives one from JWT_SECRET and
+  // warns once.
   OTP_PROVIDER: z.enum(['supabase', 'plasgate']).default('plasgate'),
   OTP_HMAC_SECRET: z.string().min(16).optional(),
   IDEMPOTENCY_TTL_HOURS: z.coerce.number().default(24),
@@ -205,6 +206,17 @@ const baseEnvSchema = z.object({
   BAKONG_QR_EXPIRY_SECONDS: z.coerce.number().default(300),
 });
 
+/** PlasGate credentials the own-OTP path needs before it can deliver a code. */
+const SMS_CREDENTIAL_KEYS = [
+  'SMS_PRIVATE_KEY',
+  'SMS_SECRET',
+  'SMS_SENDER',
+] as const;
+
+function missingSmsCredentials(env: EnvConfig): string[] {
+  return SMS_CREDENTIAL_KEYS.filter((key) => !env[key]);
+}
+
 const envSchema = baseEnvSchema.superRefine((env, ctx) => {
   // A fixed OTP accepted for every phone is a dev convenience, but the
   // password-reset flow turns it into an account-takeover primitive: anyone
@@ -217,6 +229,21 @@ const envSchema = baseEnvSchema.superRefine((env, ctx) => {
       message: 'DEV_OTP_TOKEN must not be set in production',
     });
   }
+
+  // `plasgate` is the default provider, so a production boot without the
+  // sender credentials would answer every registration, OTP login and
+  // password reset with "code sent" while no SMS can ever leave. Fail the
+  // boot instead of shipping an auth surface that silently does nothing.
+  if (env.OTP_PROVIDER === 'plasgate' && env.NODE_ENV === 'production') {
+    const missing = missingSmsCredentials(env);
+    if (missing.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['OTP_PROVIDER'],
+        message: `OTP_PROVIDER=plasgate requires ${missing.join(', ')} so codes can be delivered`,
+      });
+    }
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
@@ -227,6 +254,17 @@ export function validate(config: Record<string, unknown>): EnvConfig {
     throw new Error(
       `Config validation failed:\n${result.error.errors.map((e) => `  ${e.path.join('.')}: ${e.message}`).join('\n')}`,
     );
+  }
+  // Outside production a missing sender still leaves the OTP flows unusable,
+  // but failing every local boot (tests, builds) is too blunt. Warn once so
+  // the symptom is traceable instead of a silent "code sent".
+  if (result.data.OTP_PROVIDER === 'plasgate') {
+    const missing = missingSmsCredentials(result.data);
+    if (missing.length > 0) {
+      console.warn(
+        `[config] OTP_PROVIDER=plasgate without ${missing.join(', ')}: SMS OTP delivery is disabled in this environment.`,
+      );
+    }
   }
   return result.data;
 }

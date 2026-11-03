@@ -51,6 +51,15 @@ export class OtpSmsSender {
   ) {}
 
   /**
+   * Whether a real SMS can be sent at all. The config layer refuses a
+   * production boot without these credentials; this lets a caller still fail
+   * loudly instead of answering "code sent" on a misconfigured environment.
+   */
+  isConfigured(): boolean {
+    return this.plasGate.isConfigured();
+  }
+
+  /**
    * Preferred entry point. Takes the phone's slot FIRST, so a request that is
    * over the limit never issues a code (which would kill the one the user
    * already received), then issues and sends.
