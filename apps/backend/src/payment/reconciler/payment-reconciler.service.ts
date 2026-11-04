@@ -105,6 +105,8 @@ export class PaymentReconciler
   private enabled = false;
   private stopped = false;
   private running = false;
+  /** Shared by the timer tick and the internal wake-up so they never overlap. */
+  private inFlight: Promise<ReconcileSummary> | null = null;
   /** `arm()` arrived mid-pass, whose scan may predate the new attempt. */
   private rearmRequested = false;
   /** When the recoverable-failed tail was last re-asked about. */
@@ -189,7 +191,7 @@ export class PaymentReconciler
     this.running = true;
     let nextDelayMs = this.intervalMs();
     try {
-      const summary = await this.runOnce();
+      const summary = await this.runExclusive();
       const didWork = Boolean(
         summary.settled ||
         summary.activated ||
@@ -226,6 +228,20 @@ export class PaymentReconciler
       }
       if (!this.stopped) this.schedule(nextDelayMs);
     }
+  }
+
+  /**
+   * One pass, deduplicated: the internal wake-up can land while the boot tick
+   * is still running (it fires unawaited), and a pinger must not turn that into
+   * two provider sweeps. A second caller gets the in-flight promise.
+   */
+  runExclusive(): Promise<ReconcileSummary> {
+    if (!this.inFlight) {
+      this.inFlight = this.runOnce().finally(() => {
+        this.inFlight = null;
+      });
+    }
+    return this.inFlight;
   }
 
   /**

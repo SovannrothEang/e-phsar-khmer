@@ -154,7 +154,12 @@ something to look at.
   `x-internal-secret` (constant-time compare; the route answers 503 when the
   secret is unset, so it can never run unauthenticated). A 1–5 minute pinger or
   cron is the cheapest way to keep a paid QR from waiting for the next request
-  that boots an instance; the pass is the same idempotent one the timer runs.
+  that boots an instance; the pass is the same idempotent one the timer runs,
+  and overlapping calls share a single in-flight pass. **Trade-off:** a pinger
+  that fires every minute keeps an instance warm most of the day, so it
+  replaces rather than removes the idle-instance cost — an always-on worker
+  (option b in the plan) is the alternative if that matters more than the
+  price.
 - **Legacy drain.** `PaymentPollOutboxHandler` and the `poll-attempt` job
   branch in `PaymentProcessor` are now no-ops that mark old
   `payment.attempt.poll_requested` rows / delayed jobs finished. They exist

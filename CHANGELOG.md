@@ -21,6 +21,19 @@ How to use this file:
 
 ### Added
 
+- **Payment wake-up + live notification refresh (2026-11-04).**
+  `POST /api/v1/internal/payments/reconcile` runs one deduplicated
+  reconciliation pass for a caller that sends `INTERNAL_RECONCILE_SECRET` in
+  `x-internal-secret` (SHA-256 digests compared with `timingSafeEqual`). Unset
+  or blank secret → 503, wrong secret → 401, no configured provider → 503, and
+  `PAYMENT_RECONCILER_ENABLED=false` no longer blocks it — that flag only stops
+  the in-process timer. This is the serverless cron/pinger wake-up for a
+  provider with no webhook (Bakong); overlapping calls share one in-flight
+  pass. Web: the unread badge now subscribes to the existing shared socket and
+  invalidates `unread`/`recent` on a notification push, and the durable row is
+  written before the realtime publish, so a fast subscriber cannot refetch
+  pre-insert state. Verified: backend 99 suites / 1,434 tests + `nest build`;
+  web 95 tests + `next build` + eslint.
 - **Users can edit their own ads (web).** Manage Ads now offers **Edit ad** on the Active,
   Expired and Hidden tabs; `/post/edit/[id]` reuses the real post form with every value
   prefilled (photos, attributes, place cascade, contact, product link). Saving PATCHes the
@@ -132,8 +145,9 @@ How to use this file:
   `/notifications` history. The list loads only while the panel is open
   (`GET /notifications?pageSize=N`, no backend change). The row markup is now a shared
   `NotificationRow` used by the page and the panel; the page's mutations also invalidate the
-  panel's cache. Not built: per-type deep links (notifications carry no target), and a live
-  WebSocket refresh of an open panel (it still follows the 60 s badge poll).
+  panel's cache. Updated 2026-11-04: per-type deep links shipped with the 2026-11-03
+  notification work, and the badge now subscribes to the shared socket and invalidates the
+  badge/panel queries on a push (the 60 s poll stays as the floor for a missed push).
 - **Linked social accounts on `/settings`.** The Facebook / Google / Telegram rows now read
   `Add` or `Linked` from the account's real provider links and carry the `>` chevron.
   `GET /users/me?includeAuthProviders=1` returns the linked providers (additive and opt-in, so

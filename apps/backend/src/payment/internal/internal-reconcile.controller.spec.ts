@@ -2,7 +2,10 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InternalReconcileController } from './internal-reconcile.controller';
+import {
+  InternalReconcileController,
+  SECRET_HEADER,
+} from './internal-reconcile.controller';
 import type { ReconcileSummary } from '../reconciler/payment-reconciler.service';
 
 // The reconciler's Effect bridge is ESM-only; this spec only needs the class
@@ -10,6 +13,12 @@ import type { ReconcileSummary } from '../reconciler/payment-reconciler.service'
 // own spec does.
 jest.mock('../reconciler/payment-reconciler.service', () => ({
   PaymentReconciler: class PaymentReconciler {},
+}));
+
+// `@nestjs/throttler` is ESM-only under Jest; the decorator itself is inert in
+// a direct controller test, but importing it would fail to parse.
+jest.mock('@nestjs/throttler', () => ({
+  SkipThrottle: () => () => undefined,
 }));
 
 const SECRET = 'a-16-char-secret-value';
@@ -25,7 +34,7 @@ function setup(values: Record<string, unknown>) {
     pending: 1,
     newestPendingAgeMs: 1_000,
   };
-  const reconciler = { runOnce: jest.fn().mockResolvedValue(summary) };
+  const reconciler = { runExclusive: jest.fn().mockResolvedValue(summary) };
   const config = {
     get: jest.fn((key: string) => values[key]),
   };
@@ -37,51 +46,69 @@ function setup(values: Record<string, unknown>) {
 }
 
 describe('InternalReconcileController', () => {
+  it('uses the documented header name', () => {
+    expect(SECRET_HEADER).toBe('x-internal-secret');
+  });
+
   it('fails closed when no secret is configured', async () => {
     const { controller, reconciler } = setup({
-      'payment.reconcilerEnabled': true,
+      'payment.reconcileProviders': ['bakong'],
     });
 
     await expect(controller.reconcile(SECRET)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(reconciler.runOnce).not.toHaveBeenCalled();
+    expect(reconciler.runExclusive).not.toHaveBeenCalled();
   });
 
-  it('rejects a missing or wrong secret without running a pass', async () => {
+  it('rejects a missing, empty or wrong secret without running a pass', async () => {
     const { controller, reconciler } = setup({
       'payment.internalReconcileSecret': SECRET,
-      'payment.reconcilerEnabled': true,
+      'payment.reconcileProviders': ['bakong'],
     });
 
     await expect(controller.reconcile(undefined)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+    await expect(controller.reconcile('')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
     await expect(
       controller.reconcile('wrong-secret-value'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(reconciler.runOnce).not.toHaveBeenCalled();
+    expect(reconciler.runExclusive).not.toHaveBeenCalled();
   });
 
-  it('runs exactly one pass with the correct secret', async () => {
+  it('runs exactly one non-overlapping pass with the correct secret', async () => {
     const { controller, reconciler, summary } = setup({
       'payment.internalReconcileSecret': SECRET,
-      'payment.reconcilerEnabled': true,
+      'payment.reconcileProviders': ['bakong'],
     });
 
     await expect(controller.reconcile(SECRET)).resolves.toEqual(summary);
-    expect(reconciler.runOnce).toHaveBeenCalledTimes(1);
+    expect(reconciler.runExclusive).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses to run when the reconciler is disabled', async () => {
+  it('still runs when the in-process timer is disabled', async () => {
+    const { controller, reconciler, summary } = setup({
+      'payment.internalReconcileSecret': SECRET,
+      'payment.reconcileProviders': ['bakong'],
+      'payment.reconcilerEnabled': false,
+    });
+
+    await expect(controller.reconcile(SECRET)).resolves.toEqual(summary);
+    expect(reconciler.runExclusive).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses when no provider is configured', async () => {
     const { controller, reconciler } = setup({
       'payment.internalReconcileSecret': SECRET,
-      'payment.reconcilerEnabled': false,
+      'payment.reconcileProviders': [],
     });
 
     await expect(controller.reconcile(SECRET)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(reconciler.runOnce).not.toHaveBeenCalled();
+    expect(reconciler.runExclusive).not.toHaveBeenCalled();
   });
 });

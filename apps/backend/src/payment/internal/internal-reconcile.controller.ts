@@ -9,12 +9,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Public } from '../../common/decorators/public.decorator';
 import { PaymentReconciler } from '../reconciler/payment-reconciler.service';
 import type { ReconcileSummary } from '../reconciler/payment-reconciler.service';
 
-const SECRET_HEADER = 'x-internal-secret';
+export const SECRET_HEADER = 'x-internal-secret';
 
 /**
  * Compares two secrets without leaking length or content through timing:
@@ -51,6 +52,7 @@ export class InternalReconcileController {
 
   @Post('reconcile')
   @Public()
+  @SkipThrottle()
   @HttpCode(200)
   @ApiOperation({
     summary:
@@ -71,13 +73,18 @@ export class InternalReconcileController {
       this.logger.warn('Rejected an internal reconcile call with a bad secret');
       throw new UnauthorizedException('Invalid internal secret');
     }
-    if (!this.config.get<boolean>('payment.reconcilerEnabled')) {
+    // `PAYMENT_RECONCILER_ENABLED=false` only turns off the in-process timer
+    // (the cost saving on a scale-to-zero host); an explicit, authenticated
+    // wake-up is exactly what should still work there.
+    const providers =
+      this.config.get<string[]>('payment.reconcileProviders') ?? [];
+    if (providers.length === 0) {
       throw new ServiceUnavailableException({
-        code: 'RECONCILE_DISABLED',
-        message: 'Payment reconciliation is disabled in this environment.',
+        code: 'RECONCILE_NO_PROVIDERS',
+        message: 'No payment provider is configured for reconciliation.',
       });
     }
 
-    return this.reconciler.runOnce();
+    return this.reconciler.runExclusive();
   }
 }
