@@ -185,3 +185,42 @@ describe('INTERNAL_RECONCILE_SECRET', () => {
     ).toBe('abcdefghijklmnop');
   });
 });
+
+describe('APP_ROLE', () => {
+  it('defaults to all, the single-process shape every deploy had before the switch', () => {
+    expect(validate({ ...requiredEnvironment }).APP_ROLE).toBe('all');
+  });
+
+  it.each(['api', 'worker', 'all'])('accepts %s', (role) => {
+    expect(validate({ ...requiredEnvironment, APP_ROLE: role }).APP_ROLE).toBe(
+      role,
+    );
+  });
+
+  it('rejects an unknown role instead of silently running everything', () => {
+    expect(() =>
+      validate({ ...requiredEnvironment, APP_ROLE: 'cron' }),
+    ).toThrow('APP_ROLE');
+  });
+});
+
+describe('DATABASE_POOL_MAX', () => {
+  it('rejects a pool above 20 — every instance draws on the same project limit', () => {
+    expect(() =>
+      validate({ ...requiredEnvironment, DATABASE_POOL_MAX: '21' }),
+    ).toThrow('DATABASE_POOL_MAX');
+  });
+
+  it('accepts an explicit per-role override up to 20', () => {
+    expect(
+      validate({ ...requiredEnvironment, DATABASE_POOL_MAX: '5' })
+        .DATABASE_POOL_MAX,
+    ).toBe(5);
+  });
+
+  it('leaves the default to the role, so the pool follows APP_ROLE', () => {
+    expect(
+      validate({ ...requiredEnvironment }).DATABASE_POOL_MAX,
+    ).toBeUndefined();
+  });
+});

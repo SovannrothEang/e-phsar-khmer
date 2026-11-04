@@ -23,6 +23,7 @@ import {
   ChatMaintenanceProcessor,
   ChatMaintenanceScheduler,
 } from './chat-maintenance.processor';
+import { backgroundProviders } from '../config/runtime-role';
 
 @Module({
   imports: [
@@ -54,7 +55,8 @@ import {
     E2eNudgeService,
     ChatAttachmentsService,
     ChatMaintenanceScheduler,
-    ChatMaintenanceProcessor,
+    // No BullMQ worker in the api role — see config/runtime-role.ts.
+    ...backgroundProviders([ChatMaintenanceProcessor]),
   ],
   // The pubsub transport is shared with NotificationsModule's realtime
   // channel — see chat-pubsub.module.ts for why it is not provided here.

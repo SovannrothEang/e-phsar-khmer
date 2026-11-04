@@ -31,7 +31,33 @@ export const pgClientProvider = {
   useFactory: (configService: ConfigService) => {
     const url = configService.get<string>('database.url')!;
     const max = configService.get<number>('database.poolMax') ?? 20;
-    return postgres(url, { prepare: false, max });
+    // Statement/lock timeouts are startup parameters, and Supabase's
+    // transaction-mode pooler rejects startup parameters it does not know, so
+    // they stay off unless the operator opted in (see config.validation.ts).
+    const statementTimeoutMs =
+      configService.get<number>('database.statementTimeoutMs') ?? 0;
+    const lockTimeoutMs =
+      configService.get<number>('database.lockTimeoutMs') ?? 0;
+    return postgres(url, {
+      prepare: false,
+      max,
+      connect_timeout:
+        configService.get<number>('database.connectTimeoutSeconds') ?? 10,
+      idle_timeout:
+        configService.get<number>('database.idleTimeoutSeconds') ?? 60,
+      max_lifetime:
+        configService.get<number>('database.maxLifetimeSeconds') ?? 1800,
+      ...(statementTimeoutMs > 0 || lockTimeoutMs > 0
+        ? {
+            connection: {
+              ...(statementTimeoutMs > 0
+                ? { statement_timeout: statementTimeoutMs }
+                : {}),
+              ...(lockTimeoutMs > 0 ? { lock_timeout: lockTimeoutMs } : {}),
+            },
+          }
+        : {}),
+    });
   },
 };
 

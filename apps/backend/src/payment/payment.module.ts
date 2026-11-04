@@ -21,6 +21,7 @@ import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconc
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
+import { backgroundProviders } from '../config/runtime-role';
 
 @Module({
   imports: [
@@ -78,7 +79,9 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     PaymentEventOutboxHandler,
     PaymentPollOutboxHandler,
     // Consumes the BullMQ job kinds — the first @Processor in this repo.
-    PaymentProcessor,
+    // Dropped entirely in the api role: a @Processor opens a blocking Redis
+    // connection even when it never runs a job (see config/runtime-role.ts).
+    ...backgroundProviders([PaymentProcessor]),
     // The one poller for a provider with no webhook, armed by payment.issued:
     // settles any unresolved attempt straight from Postgres, so a payment made
     // while the app was down still activates. See reconciler/payment-reconciler.service.ts.

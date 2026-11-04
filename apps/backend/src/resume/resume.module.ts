@@ -9,6 +9,7 @@ import {
   ResumeMaintenanceProcessor,
   ResumeMaintenanceScheduler,
 } from './resume-maintenance.processor';
+import { backgroundProviders } from '../config/runtime-role';
 
 /**
  * The CV domain: one document per user, its section tables, and the private
@@ -27,7 +28,8 @@ import {
     ResumeService,
     ResumeAttachmentsService,
     ResumeMaintenanceScheduler,
-    ResumeMaintenanceProcessor,
+    // No BullMQ worker in the api role — see config/runtime-role.ts.
+    ...backgroundProviders([ResumeMaintenanceProcessor]),
   ],
   // `ResumeAttachmentsService` is exported for its one internal caller: the
   // applications module signs a CV through the application that carried it

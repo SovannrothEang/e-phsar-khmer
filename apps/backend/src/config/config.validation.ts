@@ -30,10 +30,50 @@ const baseEnvSchema = z.object({
   DATABASE_URL: z.string().refine((v) => v.startsWith('postgres'), {
     message: 'DATABASE_URL must start with postgres',
   }),
+  // Which shape this process runs: `api` serves HTTP and starts no BullMQ
+  // worker or background timer, `worker` runs them (and still answers health
+  // checks), `all` is both — the default, and the single-process behaviour
+  // every local run and deploy had before this switch existed.
+  //
+  // Read from the raw process environment while the module graph is built
+  // (see `config/runtime-role.ts`), so on a host it must be a real environment
+  // variable, not a `.env` line.
+  APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
   // postgres.js defaults this to 10, which the whole backend shares (every
   // module, not just chat) — too small once anything sends concurrent
   // queries, where requests start queueing for a free pool connection.
-  DATABASE_POOL_MAX: z.coerce.number().default(20),
+  //
+  // Optional so the default can follow APP_ROLE (api 5, worker 15, all 20 —
+  // see `config/configuration.ts`). Never above 20: every instance's pool is
+  // counted against the same Supabase project connection limit.
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().max(20).optional(),
+  // Connection lifecycle. `idle_timeout` is what returns a connection to the
+  // pooler while an instance sits idle; without it a scaled-to-zero deploy
+  // holds its slots for as long as the process lives.
+  DATABASE_CONNECT_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(10),
+  DATABASE_IDLE_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(60),
+  DATABASE_MAX_LIFETIME_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1800),
+  // Off (0) by default, on purpose: these are sent as Postgres startup
+  // parameters, and Supabase's transaction-mode pooler rejects startup
+  // parameters it does not know. Enable them only for a direct connection.
+  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(0),
+  DATABASE_LOCK_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(0),
   JWT_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(16),
