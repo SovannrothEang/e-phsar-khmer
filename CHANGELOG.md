@@ -21,6 +21,16 @@ How to use this file:
 
 ### Added
 
+- **ABA PayWay callback verified off the raw body (2026-11-04).** `main.ts` boots
+  with `rawBody: true`, the webhook controller passes `@RawBody()` to the
+  provider, and `signAbaPaywayCallbackRaw` canonicalizes the raw text with a
+  top-level JSON tokenizer that keeps each value's exact representation — so
+  `1.50`, `1e3` and `\u00e9` no longer fail verification and drop a genuine
+  paid callback. The re-encoded signature stays as a second attempt for
+  senders whose canonical form differs from their wire form. A mismatch writes
+  nothing, answers 401, and now logs `tran_id`/`status` so a run of them is
+  visible; ABA retries and the reconciler (`bakong,aba_payway` by default)
+  settles the attempt.
 - **Refresh-token rotation with reuse detection (2026-11-04).** Refresh tokens
   now carry `gen` (the device row's `refresh_epoch`, migration `0055`).
   `LoginDevicesService.rotateRefreshToken` bumps it in one conditional
