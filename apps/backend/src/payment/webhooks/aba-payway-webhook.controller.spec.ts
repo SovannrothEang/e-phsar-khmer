@@ -1,7 +1,13 @@
 import { createHmac } from 'node:crypto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import type { App } from 'supertest/types';
 import { AbaPaywayWebhookController } from './aba-payway-webhook.controller';
 import { AbaPaywayProvider } from '../providers/aba-payway/aba-payway.provider';
+import { PaymentEffectRunner } from '../payment-effect-runner.service';
+import { ResponseInterceptor } from '../../common/interceptors/response.interceptor';
 import { SKIP_ENVELOPE_KEY } from '../../common/decorators/skip-envelope.decorator';
 
 /**
@@ -240,5 +246,49 @@ describe('AbaPaywayWebhookController.webhook', () => {
         payload: ambiguous,
       }),
     );
+  });
+});
+
+describe('AbaPaywayWebhookController over HTTP', () => {
+  it('answers exactly { code: 0 } with no response envelope', async () => {
+    const effectRunner = {
+      run: jest.fn().mockResolvedValue({ id: 'attempt-1' }),
+      runDurably: jest.fn().mockResolvedValue(undefined),
+    };
+    const provider = {
+      name: 'aba_payway',
+      verifyWebhookSignature: jest.fn(() => ({ valid: true })),
+      parseWebhookEvent: jest.fn(() => ({
+        providerEventId: 'evt-1',
+        eventType: 'payment.notify',
+        providerAttemptId: 'attempt-1',
+        status: 'succeeded',
+      })),
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AbaPaywayWebhookController],
+      providers: [
+        { provide: PaymentEffectRunner, useValue: effectRunner },
+        { provide: AbaPaywayProvider, useValue: provider },
+      ],
+    }).compile();
+
+    const app = moduleRef.createNestApplication();
+    // Exactly how main.ts wires it: the global interceptor must honour the
+    // controller's `@SkipEnvelope()`.
+    app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
+    await app.init();
+
+    try {
+      const res = await request(app.getHttpServer() as App)
+        .post('/payments/webhooks/aba-payway')
+        .send({ tran_id: 'x', status: 0 })
+        .expect(200);
+
+      expect(res.body).toEqual({ code: 0 });
+      expect(effectRunner.runDurably).toHaveBeenCalledTimes(1);
+    } finally {
+      await app.close();
+    }
   });
 });

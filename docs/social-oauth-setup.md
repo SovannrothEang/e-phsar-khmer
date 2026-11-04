@@ -139,7 +139,10 @@ dashboard/Team edit before using the admin Google/Facebook buttons.
   and is matched before email, so a provider email change does not create a second account.
 - **Verified email only**: a social login is rejected unless Supabase reports
   `email_confirmed_at`; this closes the unverified-email takeover path from the 2026-10-24
-  audit (M1).
+  audit (M1). Since 2026-11-04 the local row must also have its **own** email verified
+  before the provider is linked: `emailVerifiedAt` is stamped only on provider-confirmed
+  signups, an unverified collision returns 409 `EMAIL_LINK_REQUIRED` (link explicitly from
+  Settings), and changing an email clears the flag.
 - **CSRF binding**: `startSocialLogin` sets an httpOnly `social_oauth_pending` cookie for
   the surface (`user` / `admin`, 10 minutes). The callback refuses to exchange a token
   without it, so a crafted callback URL cannot sign a victim into the attacker's account.

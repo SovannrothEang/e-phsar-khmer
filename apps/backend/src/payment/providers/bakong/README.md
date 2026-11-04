@@ -345,8 +345,8 @@ failure points are independent and it's worth checking both when Bakong
   if Bakong refuses to pay an expired dynamic KHQR — not verified (`Plans.md`
   Task 1.3).
 - **ABA checkouts also arm the reconciler.** `payment.issued` is emitted for
-  any `pending` charge; for a webhook-only provider the pass finds no polled
-  candidates and goes back to sleep. Harmless, one cheap pass per checkout.
+  any `pending` charge; ABA is in the poll set too (recovery for a lost/late
+  callback), so a pass can ask ABA about its unresolved attempts as well.
 - **Deeplink generation isn't wired.** `bakong-khqr` can turn a KHQR string
   into an app-openable shortlink (`BakongKHQR.generateDeepLink`), which
   would be the natural value for `ChargeResult.redirectUrl` (the field

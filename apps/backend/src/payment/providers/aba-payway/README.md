@@ -7,15 +7,19 @@ PayWay's wire format. Endpoint shapes: [`spec.md`](spec.md).
 
 ## Architecture
 
-### Webhook-only: ABA pushes the result, ABA enforces the expiry
+### Webhook-first, polling as the recovery path
 
-`charge()` only creates a KHQR checkout — the attempt stays `pending`. There is
-**no polling of ABA**: the signed callback is the source of truth (the provider
-sets `trustsVerifiedWebhook`, so a verified callback settles directly), and
-expiry comes from ABA's `lifetime` (`ABA_PAYWAY_LIFETIME_MINUTES`) — after it ABA
-rejects the payment and reverses the funds. Our side is closed by a DB-only
-sweep (no ABA call) once the stored `expiresAt` passes. Bakong, which has no
-webhook, is the provider that polls.
+`charge()` only creates a KHQR checkout — the attempt stays `pending`. The
+signed callback is the primary source of truth (the provider sets
+`trustsVerifiedWebhook`, so a verified callback settles directly), and expiry
+comes from ABA's `lifetime` (`ABA_PAYWAY_LIFETIME_MINUTES`) — after it ABA
+rejects the payment and reverses the funds. Because a callback can be lost or
+arrive after we closed our side, ABA is **also** in
+`PAYMENT_RECONCILE_PROVIDERS` (default `bakong,aba_payway`): `reconcile()` asks
+ABA's `check-transaction` about unresolved attempts, and a late success settles
+the attempt instead of being ignored. The DB-only sweep still closes an attempt
+whose stored `expiresAt` passed. Cost: one `check_transaction` per unresolved
+ABA attempt per pass (see `PAYMENT_RECONCILE_INTERVAL_MS`).
 
 Without `ABA_PAYWAY_WEBHOOK_URL` ABA can never confirm a payment, so the
 provider reports itself unavailable (hidden in the checkout picker) rather than
@@ -112,7 +116,7 @@ rejects (fail closed).
 | Piece                               | Status                                                                     |
 | ----------------------------------- | -------------------------------------------------------------------------- |
 | `charge()`                          | Done — confirmed against the sandbox                                       |
-| `reconcile()`                       | Kept (check-transaction works) but unused for ABA: no polling              |
+| `reconcile()`                       | Done — used as ABA's recovery path (in `PAYMENT_RECONCILE_PROVIDERS`)      |
 | Expiry (`lifetime` + sweep)         | Done — unit-tested; not yet run against the live sandbox                   |
 | Callback verify + parse             | Done — a real sandbox callback verified and settled a payment (2026-10-16) |
 | Unit tests                          | Signing, encoding, status, provider, and the controller — all offline      |
@@ -125,10 +129,12 @@ rejects (fail closed).
 - **No refunds or chargebacks.** The `tran_id:status` dedupe would treat a
   later status for the same transaction as a new event; untested for refunds,
   which the provider doesn't model.
-- **A missed callback is not recovered.** With no polling, a payment whose
-  callback never arrives (our server down past ABA's retries, a bad
-  `ABA_PAYWAY_WEBHOOK_URL`) stays `pending` until it expires. Keep the URL
-  reachable; `reconcile()` is there if a recovery path is ever wanted.
+- **A missed callback is recovered by polling.** ABA is in
+  `PAYMENT_RECONCILE_PROVIDERS` by default; `reconcile()` asks
+  `check-transaction` about unresolved attempts, and a late success settles the
+  attempt (reason `late_payment`) instead of being ignored. Keep
+  `ABA_PAYWAY_WEBHOOK_URL` reachable anyway — the callback is still the fast
+  path.
 - **The callback carries no amount/currency**, and nothing else confirms them
   now: we rely on ABA charging the amount we put in the QR.
 

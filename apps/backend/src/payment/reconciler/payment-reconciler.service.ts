@@ -35,9 +35,10 @@ const FAST_INTERVAL_MS = 5 * 1000;
 /** How long after issue the fast spacing applies before relaxing to the base one. */
 const FAST_WINDOW_MS = 60 * 1000;
 /**
- * How often attempts we gave up on (`POLL_EXPIRED` / `POLL_GATEWAY_ERROR`) are
- * re-asked about. They are not a payer watching a screen, so they never ride
- * the tight loop: late money is picked up within this, not within seconds.
+ * How often attempts we gave up on (`POLL_EXPIRED` / `POLL_GATEWAY_ERROR` /
+ * a clock expiry, `EXPIRED`) are re-asked about. They are not a payer watching
+ * a screen, so they never ride the tight loop: late money is picked up within
+ * this, not within seconds.
  */
 const RECOVERABLE_INTERVAL_MS = 5 * 60 * 1000;
 /** Most attempts looked at per tick — bounds provider calls per cycle. */

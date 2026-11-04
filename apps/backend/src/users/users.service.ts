@@ -189,7 +189,9 @@ export class UsersService {
 
     let currentUser: UserRow | undefined;
 
-    if (hasLocationChange || hasNameChange) {
+    const hasEmailChange = dto.email !== undefined;
+
+    if (hasLocationChange || hasNameChange || hasEmailChange) {
       [currentUser] = await this.db
         .select()
         .from(users)
@@ -222,7 +224,15 @@ export class UsersService {
       }
     }
     if (dto.company !== undefined) updateData.company = dto.company;
-    if (dto.email !== undefined) updateData.email = dto.email;
+    if (dto.email !== undefined) {
+      updateData.email = dto.email;
+      // Verification belongs to the address it was granted for. Changing (or
+      // clearing) the email drops the proof, so a social login can never link
+      // on the strength of a flag left over from a previous address.
+      const next = (dto.email ?? '').trim().toLowerCase();
+      const current = (currentUser?.email ?? '').trim().toLowerCase();
+      if (next !== current) updateData.emailVerifiedAt = null;
+    }
     if (dto.provinceId !== undefined) updateData.provinceId = dto.provinceId;
     if (dto.districtId !== undefined) updateData.districtId = dto.districtId;
     if (dto.communeId !== undefined) updateData.communeId = dto.communeId;

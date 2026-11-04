@@ -527,6 +527,72 @@ describe('UsersService updateProfile location validation', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
+  it('clears emailVerifiedAt when the address changes', async () => {
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([
+              {
+                ...fakeUser,
+                email: 'old@example.com',
+                emailVerifiedAt: new Date(),
+              },
+            ]),
+        }),
+      }),
+    });
+    let setData: Record<string, unknown> = {};
+    db.update.mockReturnValue({
+      set: (values: Record<string, unknown>) => {
+        setData = values;
+        return {
+          where: () => ({
+            returning: () =>
+              Promise.resolve([{ ...fakeUser, email: 'new@example.com' }]),
+          }),
+        };
+      },
+    });
+
+    await service.updateProfile('u1', { email: 'new@example.com' });
+
+    expect(setData.email).toBe('new@example.com');
+    expect(setData.emailVerifiedAt).toBeNull();
+  });
+
+  it('keeps emailVerifiedAt when the address is unchanged (case-insensitive)', async () => {
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([
+              {
+                ...fakeUser,
+                email: 'old@example.com',
+                emailVerifiedAt: new Date(),
+              },
+            ]),
+        }),
+      }),
+    });
+    let setData: Record<string, unknown> = {};
+    db.update.mockReturnValue({
+      set: (values: Record<string, unknown>) => {
+        setData = values;
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser }]),
+          }),
+        };
+      },
+    });
+
+    await service.updateProfile('u1', { email: 'OLD@example.com' });
+
+    expect(setData).not.toHaveProperty('emailVerifiedAt');
+  });
+
   it('accepts districtId that belongs to provided provinceId', async () => {
     let selectCall = 0;
     db.select.mockImplementation(() => {

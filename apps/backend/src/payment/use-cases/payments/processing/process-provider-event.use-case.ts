@@ -155,7 +155,8 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
       const lateSuccess =
         attempt.status === 'failed' &&
         outcome === 'succeeded' &&
-        (reconciledResult !== undefined || provider.name === 'aba_payway');
+        (reconciledResult !== undefined ||
+          provider.trustsVerifiedWebhook === true);
 
       if (lateSuccess) {
         const result: ChargeResult & { status: 'succeeded' } = reconciledResult
