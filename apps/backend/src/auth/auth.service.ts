@@ -50,6 +50,7 @@ import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
 import { LoginLockoutService } from './login-lockout.service';
+import { SocialStateService } from './social-state.service';
 import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OtpService } from '../otp/otp.service';
@@ -124,6 +125,7 @@ export class AuthService {
     private readonly otpSender: OtpSmsSender,
     private readonly notifications: NotificationsService,
     private readonly loginLockout: LoginLockoutService,
+    private readonly socialState: SocialStateService,
   ) {}
 
   async loginWithPassword(
@@ -797,18 +799,21 @@ export class AuthService {
   async getSocialAuthUrl(
     provider: string,
     redirectTo?: string,
-  ): Promise<{ url: string }> {
+  ): Promise<{ url: string; state: string }> {
     if (provider !== 'google' && provider !== 'facebook')
       throw new BadRequestException('UNSUPPORTED_PROVIDER');
 
     const safeRedirect = this.resolveSocialRedirectTo(redirectTo);
+    // Minted before the provider round trip so the callback can prove it
+    // belongs to a flow this service started (see SocialStateService).
+    const state = await this.socialState.issue(provider);
     const { data, error } = await this.supabaseService.signInWithOAuth(
       provider,
       safeRedirect,
     );
     if (error || !data.url)
       throw new UnauthorizedException('Failed to get social auth URL');
-    return { url: data.url };
+    return { url: data.url, state };
   }
 
   /**
@@ -863,6 +868,11 @@ export class AuthService {
     dto: SocialLoginDto,
     device: ClientDeviceInfo | null = null,
   ): Promise<AuthResult> {
+    // The state gate runs first and consumes the nonce whatever happens next,
+    // so a rejected callback is never replayable.
+    if (!(await this.socialState.consume(dto.state, dto.provider)))
+      throw new UnauthorizedException('INVALID_OAUTH_STATE');
+
     if (!dto.accessToken)
       throw new UnauthorizedException(
         'accessToken is required for social callback',

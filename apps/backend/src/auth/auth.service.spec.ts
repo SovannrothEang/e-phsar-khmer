@@ -204,6 +204,18 @@ function makeLockout(redis = new FakeLockoutRedis()) {
   );
 }
 
+/**
+ * Stand-in for `SocialStateService`. Defaults to "this flow is live", so the
+ * pre-existing callback tests keep exercising what they were written for; a
+ * test that cares about the gate overrides `consume`.
+ */
+function makeSocialState(accept = true) {
+  return {
+    issue: jest.fn().mockResolvedValue('s'.repeat(32)),
+    consume: jest.fn().mockResolvedValue(accept),
+  };
+}
+
 function makeService(
   db: ReturnType<typeof makeDb>,
   jwtService: ReturnType<typeof makeJwtService>,
@@ -212,6 +224,7 @@ function makeService(
   supabaseService = makeSupabase(),
   notifications = makeNotifications(),
   loginLockout = makeLockout(),
+  socialState = makeSocialState(),
 ) {
   return new AuthService(
     db as never,
@@ -223,6 +236,7 @@ function makeService(
     makeOtpSender() as never,
     notifications as never,
     loginLockout as never,
+    socialState as never,
   );
 }
 
@@ -727,6 +741,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeOtpSender() as never,
       notifications as never,
       makeLockout() as never,
+      makeSocialState() as never,
     );
   }
 
@@ -1503,6 +1518,7 @@ describe('AuthService social login', () => {
   const googleDto = {
     provider: 'google' as const,
     accessToken: 'supabase-access-token',
+    state: 's'.repeat(32),
   };
 
   it('forwards the redirectTo to Supabase when the origin is allowed', async () => {
@@ -1577,6 +1593,52 @@ describe('AuthService social login', () => {
     await expect(service.getSocialAuthUrl('github')).rejects.toThrow(
       'UNSUPPORTED_PROVIDER',
     );
+  });
+
+  it('returns the minted state beside the authorize URL', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const socialState = makeSocialState();
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService({ frontendOrigins: ['http://localhost:3001'] }),
+      undefined,
+      supabase,
+      undefined,
+      undefined,
+      socialState,
+    );
+
+    const result = await service.getSocialAuthUrl(
+      'google',
+      'http://localhost:3001/en/auth/callback/google',
+    );
+
+    expect(socialState.issue).toHaveBeenCalledWith('google');
+    expect(result).toEqual({
+      url: 'https://supabase.example/auth/v1/authorize?provider=google',
+      state: 's'.repeat(32),
+    });
+  });
+
+  it('rejects a callback whose state was never minted here', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+      undefined,
+      undefined,
+      makeSocialState(false),
+    );
+
+    await expect(service.handleSocialCallback(googleDto)).rejects.toThrow(
+      'INVALID_OAUTH_STATE',
+    );
+    // The provider call is never reached: an unproven flow costs no lookups.
+    expect(supabase.getUser).not.toHaveBeenCalled();
   });
 
   it('rejects a token whose identity does not match the claimed provider', async () => {

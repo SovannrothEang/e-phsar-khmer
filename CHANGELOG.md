@@ -21,6 +21,17 @@ How to use this file:
 
 ### Added
 
+- **Social OAuth `state` gate (2026-11-04).** `GET /auth/social/:provider/url`
+  now mints a single-use, provider-bound nonce (`SocialStateService`, Redis,
+  10-minute TTL) and returns it beside the authorize URL;
+  `POST /auth/social/callback` requires it and answers
+  `401 INVALID_OAUTH_STATE` for a missing, expired, foreign or replayed state
+  before the Supabase token is read. The web layer stores the full
+  `<target>:<state>` in its httpOnly pending cookie and compares the whole
+  value, so a crafted callback URL cannot complete with someone else's token.
+  Fails closed when Redis is down; phone/password/OTP sign-in is unaffected.
+  See `docs/social-oauth-setup.md`.
+
 - **Security hardening, batch 2 (2026-11-04).** Shared Redis throttler storage
   (`RedisThrottlerStorage`, atomic Lua, fail-open) so limits no longer multiply
   per instance, plus a per-account failed-login lockout (5→60 s, 10→5 min,

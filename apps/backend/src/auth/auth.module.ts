@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LoginDevicesService } from './login-devices.service';
 import { LoginLockoutService } from './login-lockout.service';
+import { SocialStateService } from './social-state.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
 import { ThrottlerStorageModule } from '../common/throttler/throttler-storage.module';
@@ -31,6 +32,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     AuthService,
     LoginDevicesService,
     LoginLockoutService,
+    SocialStateService,
     JwtStrategy,
   ],
   exports: [AuthService, LoginDevicesService, JwtModule],

@@ -11,14 +11,14 @@ Browser                    Next server (apps/web)              Backend          
   │ click Google              │                                  │                       │
   │── startSocialLogin ──────►│ GET /auth/social/google/url      │                       │
   │                           │   ?redirectTo=<origin>/…/callback│── signInWithOAuth ───►│
-  │◄── { url } ───────────────│                                  │◄── authorize URL ─────│
+  │◄── { url, state } ────────│                                  │◄── authorize URL ─────│
   │── window.open(about:blank) → popup.location = url ─────────────────────────────────►│
   │◄── 302 to provider ──────────────────────────────────────────────────────────────────│
   │◄── 302 <redirectTo>#access_token=…&type=bearer ──────────────────────────────────────│
   │ /auth/callback/<provider> in the popup (client component)                             │
   │   strip fragment, read access_token                                                   │
   │── completeSocialLogin ───►│ POST /auth/social/callback       │                       │
-  │                           │   {provider, accessToken, mode?} │── getUser(token) ────►│
+  │                           │   {provider, accessToken, state} │── getUser(token) ────►│
   │                           │                                  │◄── user ──────────────│
   │                           │◄── backend JWTs + user ──────────│                       │
   │◄── Set-Cookie (httpOnly) ─│                                  │                       │
@@ -43,6 +43,27 @@ Routes:
 
 The user callback sits outside the `(user)` route group (no marketplace chrome); the admin
 callback sits under `/wanderer/*` so the admin-subdomain proxy already allows it.
+
+### CSRF: the per-flow `state`
+
+`GET /auth/social/:provider/url` mints a single-use nonce (`SocialStateService`, 24 random
+bytes, base64url, Redis with a 10-minute TTL) and returns it beside the authorize URL. The
+cookie `social_oauth_pending` stores the **full** value `<target>:<state>`, and
+`POST /auth/social/callback` requires that same `state`:
+
+- the backend consumes the nonce (`GETDEL`, so two callbacks cannot both win it) and only
+  accepts it for the provider it was minted for; a missing, expired, foreign or replayed
+  state answers `401 INVALID_OAUTH_STATE` before the Supabase token is even looked up;
+- the web layer compares the whole cookie value (target **and** state), so a crafted callback
+  URL carrying someone else's Supabase token cannot complete in a browser that is holding a
+  different flow's nonce;
+- the state check fails **closed** when Redis is down — a check that fails open is not a check.
+  Phone, password and OTP sign-in are unaffected.
+
+Residual risk, stated plainly: this does not stop an attacker who can already read the
+victim's cookies or URL bar. The nonce rides in the cookie rather than through the provider's
+`state` parameter because the login callback URLs are exact entries in Supabase's redirect
+allow-list — adding a nonce segment to them is a dashboard change, tracked in `Plans.md`.
 
 ### Account linking (settings)
 

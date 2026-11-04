@@ -13,6 +13,7 @@ import { routing } from "@/i18n/routing";
 import type { BackendUser } from "@/lib/api/adapters";
 import type { DeviceIdentity } from "@/lib/device";
 import {
+  SOCIAL_OAUTH_STATE_PATTERN,
   SOCIAL_STATE_PATTERN,
   type LinkedAuthProvider,
   type SocialCompleteResult,
@@ -23,9 +24,11 @@ import {
 } from "@/lib/auth/social";
 
 /**
- * Bound to the browser that STARTED the flow. The callback only completes when
- * this httpOnly cookie is present, so a crafted callback URL carrying someone
- * else's Supabase token cannot sign the victim into the attacker's account.
+ * Bound to the browser that STARTED the flow, and to the exact flow: the value
+ * is `<target>:<state>` where `state` is the single-use nonce the backend
+ * minted for this round trip (it consumes the nonce on the callback). A
+ * crafted callback URL carrying someone else's Supabase token cannot complete,
+ * because this browser's cookie holds a different flow's nonce.
  */
 const SOCIAL_PENDING_COOKIE = "social_oauth_pending";
 const SOCIAL_PENDING_TTL = 60 * 10;
@@ -106,12 +109,13 @@ async function fetchAuthorizeUrl(
   );
   const body = (await res.json().catch(() => null)) as {
     success?: boolean;
-    data?: { url?: string };
+    data?: { url?: string; state?: string };
     error?: { code?: string; message?: string };
   } | null;
 
   const url = body?.data?.url;
-  if (!res.ok || !body?.success || !url) {
+  const state = body?.data?.state;
+  if (!res.ok || !body?.success || !url || !state) {
     return {
       success: false,
       error: body?.error?.message ?? "Could not start sign-in",
@@ -126,8 +130,12 @@ async function fetchAuthorizeUrl(
   } catch {
     return { success: false, error: "Could not start sign-in" };
   }
+  // A state we cannot echo back would fail the callback for a reason the
+  // visitor cannot act on, so refuse the flow here instead.
+  if (!SOCIAL_OAUTH_STATE_PATTERN.test(state))
+    return { success: false, error: "Could not start sign-in" };
 
-  return { success: true, url };
+  return { success: true, url, state };
 }
 
 export async function startSocialLogin(
@@ -148,8 +156,13 @@ export async function startSocialLogin(
     redirectTo = `${origin}/${resolveLocale(locale)}/auth/callback/${provider}`;
   }
 
+  // The cookie is written only once the backend has minted this flow's state,
+  // so a failed start leaves nothing behind to complete later.
+  const result = await fetchAuthorizeUrl(provider, redirectTo);
+  if (!result.success) return result;
+
   const store = await cookies();
-  store.set(SOCIAL_PENDING_COOKIE, `${target}:${crypto.randomUUID()}`, {
+  store.set(SOCIAL_PENDING_COOKIE, `${target}:${result.state}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -157,7 +170,7 @@ export async function startSocialLogin(
     maxAge: SOCIAL_PENDING_TTL,
   });
 
-  return fetchAuthorizeUrl(provider, redirectTo);
+  return result;
 }
 
 export async function completeSocialLogin(input: {
@@ -183,7 +196,11 @@ export async function completeSocialLogin(input: {
   const store = await cookies();
   const pending = store.get(SOCIAL_PENDING_COOKIE)?.value;
   store.delete(SOCIAL_PENDING_COOKIE);
-  if (pending?.split(":")[0] !== target) {
+  const [pendingTarget, pendingState] = (pending ?? "").split(":");
+  if (
+    pendingTarget !== target ||
+    !SOCIAL_OAUTH_STATE_PATTERN.test(pendingState ?? "")
+  ) {
     return {
       success: false,
       error: "This sign-in did not start in this browser. Please try again.",
@@ -214,6 +231,7 @@ export async function completeSocialLogin(input: {
     body: JSON.stringify({
       provider,
       accessToken,
+      state: pendingState,
       ...(target === "admin" ? { mode: "admin" } : {}),
     }),
     cache: "no-store",
