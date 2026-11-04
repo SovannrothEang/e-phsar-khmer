@@ -90,6 +90,16 @@ sequenceDiagram
 Key properties:
 
 - A bad or unsigned callback is rejected before any write.
+- **The signature is checked against the raw request bytes**, not against a
+  re-encoded payload: `main.ts` boots with `rawBody: true`, the controller
+  passes `@RawBody()` down, and `signAbaPaywayCallbackRaw` canonicalizes the
+  raw text itself (sort keys, concatenate, keep each value exactly as sent).
+  A re-encode would turn `1.50` into `1.5` and `\u00e9` into `é`, rejecting a
+  genuine paid callback. The re-encoded form is still tried second, so a
+  sender whose canonical form differs from its wire form is not broken.
+- A persistent mismatch means the API key or the raw-body wiring is wrong, not
+  that a customer stopped paying: the rejection logs `tran_id`/`status`, ABA
+  retries, and `payment.reconcileProviders` includes `aba_payway` by default.
 - A verified callback is final — nothing else is asked of ABA, so there is no
   per-payment request rate to manage.
 - Retries dedupe on `tran_id:status`, and ABA is always answered `{code: 0}`.
