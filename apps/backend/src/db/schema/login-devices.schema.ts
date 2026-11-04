@@ -1,4 +1,5 @@
 import {
+  integer,
   pgTable,
   timestamp,
   uniqueIndex,
@@ -50,6 +51,15 @@ export const userLoginDevices = pgTable(
     userAgent: varchar('user_agent', { length: 512 }),
     /** Revocation epoch; goes into the JWT as `sid`. Rotates only on revoke. */
     sessionId: uuid('session_id').defaultRandom().notNull(),
+    /**
+     * Refresh-token family generation, carried as `gen`. Bumped on every
+     * rotation, so a token minted before the bump is stale: presenting one is
+     * either a lost race (inside `REFRESH_REUSE_GRACE_SECONDS`) or a replay,
+     * and a replay revokes the whole family.
+     */
+    refreshEpoch: integer('refresh_epoch').default(0).notNull(),
+    /** When the epoch last changed; anchors the grace window above. */
+    refreshRotatedAt: timestamp('refresh_rotated_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     firstSeenAt: timestamp('first_seen_at', { withTimezone: true })
       .defaultNow()

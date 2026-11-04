@@ -93,11 +93,16 @@ function makeConfigService(values: Record<string, string> = {}) {
 
 function makeLoginDevices() {
   return {
-    recordLogin: jest
-      .fn()
-      .mockResolvedValue({ isNewDevice: false, sessionId: null }),
+    recordLogin: jest.fn().mockResolvedValue({
+      isNewDevice: false,
+      sessionId: null,
+      refreshEpoch: 0,
+    }),
     findSessionByDeviceId: jest.fn().mockResolvedValue(null),
     touchActiveSession: jest.fn().mockResolvedValue(true),
+    rotateRefreshToken: jest
+      .fn()
+      .mockResolvedValue({ status: 'rotated', epoch: 1 }),
   };
 }
 
@@ -288,6 +293,8 @@ describe('AuthService', () => {
         sub: 'user-uuid',
         role: 'user',
         sid: 'session-1',
+        // Generation 0 for a fresh session; every refresh bumps it.
+        gen: 0,
       });
     });
   });
@@ -592,7 +599,33 @@ describe('AuthService refresh', () => {
     return { service, jwtService, loginDevices };
   }
 
-  it('reissues tokens with the same sid and touches the row', async () => {
+  it('rotates the generation and reissues tokens with the same sid', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+
+    await service.refresh({ refreshToken: 'token' });
+
+    expect(loginDevices.rotateRefreshToken).toHaveBeenCalledWith(
+      'user-uuid',
+      SID,
+      1,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toEqual({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+  });
+
+  it('treats a refresh token with no generation as the first one', async () => {
     const { service, jwtService, loginDevices } = makeRefreshService();
     jwtService.verifyAsync.mockResolvedValue({
       sub: 'user-uuid',
@@ -602,17 +635,47 @@ describe('AuthService refresh', () => {
 
     await service.refresh({ refreshToken: 'token' });
 
-    expect(loginDevices.touchActiveSession).toHaveBeenCalledWith(
+    expect(loginDevices.rotateRefreshToken).toHaveBeenCalledWith(
       'user-uuid',
       SID,
+      0,
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const firstCallPayload = jwtService.sign.mock.calls[0][0];
-    expect(firstCallPayload).toEqual({
+  });
+
+  it('rejects a replayed refresh token and keeps no session alive', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
       sub: 'user-uuid',
       role: 'user',
       sid: SID,
+      gen: 1,
     });
+    loginDevices.rotateRefreshToken.mockResolvedValue({ status: 'reuse' });
+
+    await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+      'Refresh token reused',
+    );
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('reissues at the winning generation when a parallel refresh lost the race', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+    loginDevices.rotateRefreshToken.mockResolvedValue({
+      status: 'grace',
+      epoch: 2,
+    });
+
+    await service.refresh({ refreshToken: 'token' });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toMatchObject({ sid: SID, gen: 2 });
   });
 
   it('rejects a sid whose device row was revoked', async () => {
@@ -622,12 +685,30 @@ describe('AuthService refresh', () => {
       role: 'user',
       sid: SID,
     });
-    loginDevices.touchActiveSession.mockResolvedValue(false);
+    loginDevices.rotateRefreshToken.mockResolvedValue({ status: 'unknown' });
 
     await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
       'Session revoked',
     );
     expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('rejects a negative or fractional generation before querying', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+
+    for (const gen of [-1, 1.5]) {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-uuid',
+        role: 'user',
+        sid: SID,
+        gen,
+      });
+
+      await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+        'Invalid session',
+      );
+    }
+    expect(loginDevices.rotateRefreshToken).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed sid before querying', async () => {
@@ -672,7 +753,6 @@ describe('AuthService refresh', () => {
     const firstCallPayload = jwtService.sign.mock.calls[0][0];
     expect(firstCallPayload).toMatchObject({ sid: SID });
   });
-
   it('rejects a legacy token whose known device row was revoked', async () => {
     const { service, jwtService, loginDevices } = makeRefreshService();
     jwtService.verifyAsync.mockResolvedValue({

@@ -124,6 +124,30 @@ describe('PAYMENT_RECONCILE_PROVIDERS', () => {
   });
 });
 
+describe('JWT secrets', () => {
+  it('refuses to boot when the refresh secret equals the access secret', () => {
+    // One secret would let a long-lived refresh token pass as an access token,
+    // so the short access lifetime and the `gen` rotation stop meaning anything.
+    expect(() =>
+      validate({
+        ...requiredEnvironment,
+        JWT_SECRET: '0123456789abcdef',
+        JWT_REFRESH_SECRET: '0123456789abcdef',
+      }),
+    ).toThrow('JWT_REFRESH_SECRET');
+  });
+
+  it('accepts two different secrets', () => {
+    expect(
+      validate({
+        ...requiredEnvironment,
+        JWT_SECRET: '0123456789abcdef',
+        JWT_REFRESH_SECRET: 'fedcba9876543210',
+      }).JWT_REFRESH_SECRET,
+    ).toBe('fedcba9876543210');
+  });
+});
+
 describe('INTERNAL_RECONCILE_SECRET', () => {
   it('treats an absent or blank value as disabled, not a validation error', () => {
     expect(

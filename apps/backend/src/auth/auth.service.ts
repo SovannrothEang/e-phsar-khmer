@@ -1160,6 +1160,7 @@ export class AuthService {
       sub: string;
       role: 'user' | 'admin' | 'super_admin';
       sid?: string;
+      gen?: number;
       iat?: number;
     };
     try {
@@ -1171,6 +1172,12 @@ export class AuthService {
     }
 
     if (payload.sid !== undefined && !SESSION_ID_PATTERN.test(payload.sid)) {
+      throw new UnauthorizedException('Invalid session');
+    }
+    if (
+      payload.gen !== undefined &&
+      (!Number.isSafeInteger(payload.gen) || payload.gen < 0)
+    ) {
       throw new UnauthorizedException('Invalid session');
     }
 
@@ -1187,15 +1194,21 @@ export class AuthService {
     if (isIssuedBeforeCutoff(payload.iat, user.tokensValidAfter))
       throw new UnauthorizedException('Session revoked');
 
-    // New tokens carry the row's revocation epoch. A rotated id means the
-    // device was revoked, so the refresh token dies with the access token.
+    // New tokens carry the row's revocation epoch and refresh generation. A
+    // rotated id means the device was revoked, so the refresh token dies with
+    // the access token; a stale generation means the token was replayed.
     if (payload.sid) {
-      const active = await this.loginDevices.touchActiveSession(
+      const rotation = await this.loginDevices.rotateRefreshToken(
         user.id,
         payload.sid,
+        payload.gen ?? 0,
       );
-      if (!active) throw new UnauthorizedException('Session revoked');
-      return this.issueTokens(user, payload.sid);
+      if (rotation.status === 'reuse') {
+        throw new UnauthorizedException('Refresh token reused');
+      }
+      if (rotation.status === 'unknown')
+        throw new UnauthorizedException('Session revoked');
+      return this.issueTokens(user, payload.sid, rotation.epoch);
     }
 
     // A legacy (no-`sid`) refresh token can be bound on its first refresh.
@@ -1213,7 +1226,7 @@ export class AuthService {
           row.sessionId,
         );
         if (!active) throw new UnauthorizedException('Session revoked');
-        return this.issueTokens(user, row.sessionId);
+        return this.issueTokens(user, row.sessionId, row.refreshEpoch ?? 0);
       }
     }
 
@@ -1309,7 +1322,11 @@ export class AuthService {
     device: ClientDeviceInfo | null,
   ): Promise<AuthResult> {
     const recorded = await this.loginDevices.recordLogin(user.id, device);
-    const tokens = this.issueTokens(user, recorded.sessionId);
+    const tokens = this.issueTokens(
+      user,
+      recorded.sessionId,
+      recorded.refreshEpoch,
+    );
     return {
       ...tokens,
       user: this.toPublicUser(user),
@@ -1320,11 +1337,12 @@ export class AuthService {
   private issueTokens(
     user: UserRow,
     sessionId: string | null = null,
+    refreshEpoch = 0,
   ): AuthTokens {
     const jwtPayload = {
       sub: user.id,
       role: user.role,
-      ...(sessionId ? { sid: sessionId } : {}),
+      ...(sessionId ? { sid: sessionId, gen: refreshEpoch } : {}),
     };
     const accessExpiresIn = (this.configService.get<string>(
       'jwt.accessExpiresIn',

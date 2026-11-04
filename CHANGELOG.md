@@ -21,6 +21,15 @@ How to use this file:
 
 ### Added
 
+- **Refresh-token rotation with reuse detection (2026-11-04).** Refresh tokens
+  now carry `gen` (the device row's `refresh_epoch`, migration `0055`).
+  `LoginDevicesService.rotateRefreshToken` bumps it in one conditional
+  `UPDATE`, so only one holder of a given token rotates; a loser within 30 s
+  is a parallel-tab race and is reissued at the winning generation, while an
+  older generation is treated as stolen and revokes the session
+  (`401 Refresh token reused`). The boot also refuses
+  `JWT_REFRESH_SECRET === JWT_SECRET`. Migration is additive and unapplied on
+  existing databases.
 - **Social OAuth `state` gate (2026-11-04).** `GET /auth/social/:provider/url`
   now mints a single-use, provider-bound nonce (`SocialStateService`, Redis,
   10-minute TTL) and returns it beside the authorize URL;

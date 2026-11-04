@@ -259,6 +259,17 @@ const envSchema = baseEnvSchema.superRefine((env, ctx) => {
       });
     }
   }
+
+  // One secret for both token types would let a long-lived refresh token be
+  // presented as an access token (and vice versa), which defeats the shorter
+  // access lifetime and the refresh rotation that keys off `gen`.
+  if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'JWT_REFRESH_SECRET must differ from JWT_SECRET',
+    });
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
