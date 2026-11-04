@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+﻿import { Logger } from '@nestjs/common';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { PAYMENT_PROVIDER_EVENT_OUTBOX_EVENT_TYPE } from '../outbox/payment-outbox-events';
@@ -97,7 +97,7 @@ describe('ProviderEventRedrive stale-event re-drive', () => {
     expect(outbox.wakeupAfterCommit).toHaveBeenCalledTimes(1);
   });
 
-  it('looks only at received rows older than the two-minute job budget', async () => {
+  it('looks only at received rows older than the five-minute job budget', async () => {
     const { redrive, db } = build();
     const staleSink = { where: [] as unknown[] };
     db.select.mockReturnValueOnce(selectChain([], staleSink));
@@ -131,7 +131,7 @@ describe('ProviderEventRedrive stale-event re-drive', () => {
     expect(outbox.wakeupAfterCommit).not.toHaveBeenCalled();
   });
 
-  it('runs the re-drive sweep at most once a minute', async () => {
+  it('runs the re-drive sweep at most once per five-minute interval', async () => {
     const { redrive, db, outbox, respond } = build();
     respond([{ id: 'e1' }]);
     await redrive.sweep(NOW);
@@ -201,7 +201,9 @@ describe('ProviderEventRedrive stale-event re-drive', () => {
     });
 
     respond([{ id: 'e1' }], exhausted);
-    expect(await redrive.sweep(NOW + MINUTE)).toMatchObject({ exhausted: 1 });
+    expect(
+      await redrive.sweep(NOW + PROVIDER_EVENT_REDRIVE_INTERVAL_MS),
+    ).toMatchObject({ exhausted: 1 });
 
     expect(outbox.enqueue).not.toHaveBeenCalled();
     expect(
@@ -234,6 +236,7 @@ describe('ProviderEventRedrive retention', () => {
     expect(rendered.sql).toContain('"received_at" <');
     expect(rendered.sql).toContain('make_interval(days =>');
     expect(rendered.sql).toContain('for update skip locked');
+    expect(rendered.sql).toContain('"status" <>');
     expect(rendered.params).toContain(PROVIDER_EVENT_RETENTION_DAYS);
   });
 
@@ -257,7 +260,7 @@ describe('ProviderEventRedrive retention', () => {
     expect(db.delete).toHaveBeenCalledTimes(1);
 
     respond([]);
-    await redrive.sweep(NOW + MINUTE);
+    await redrive.sweep(NOW + PROVIDER_EVENT_REDRIVE_INTERVAL_MS);
     expect(db.delete).toHaveBeenCalledTimes(1);
 
     respond([]);

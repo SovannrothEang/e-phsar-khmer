@@ -92,13 +92,6 @@ export interface FreePlanView extends FreePlanSettings {
 
 const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
 
-/**
- * Candidate users reconciled per `reconcileAll` run. The sweep runs every ten
- * minutes and continues from `reconcileCursor`, so one run never walks the
- * whole catalogue.
- */
-const RECONCILE_BATCH_SIZE = 200;
-
 /** A number from the purchase's offer snapshot, else the live package value. */
 function limitValue(
   snapshot: Record<string, unknown> | null,
@@ -130,9 +123,6 @@ interface Context {
 @Injectable()
 export class EntitlementsService {
   private readonly logger = new Logger(EntitlementsService.name);
-
-  /** Keyed on `userId`; see `reconcileAll`. Resets when a pass ends. */
-  private reconcileCursor: string | null = null;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -794,39 +784,19 @@ export class EntitlementsService {
       ...config.categoryCaps.values(),
       smallestPackage?.ads ?? config.free.otherAds,
     );
-    const after = this.reconcileCursor;
     const candidates = await this.db
       .select({ userId: listings.userId })
       .from(listings)
-      .where(
-        and(
-          inArray(listings.status, ['active', 'restricted']),
-          after ? gt(listings.userId, after) : undefined,
-        ),
-      )
+      .where(inArray(listings.status, ['active', 'restricted']))
       .groupBy(listings.userId)
       .having(
         sql`count(*) filter (where ${listings.status} = 'restricted') > 0 or count(*) > ${floor}`,
-      )
-      .orderBy(listings.userId)
-      .limit(RECONCILE_BATCH_SIZE);
+      );
 
     for (const { userId } of candidates) {
       await this.reconcileListingsSafely(userId);
     }
 
-    const last = candidates[candidates.length - 1]?.userId ?? null;
-    this.reconcileCursor =
-      candidates.length === RECONCILE_BATCH_SIZE ? last : null;
-    if (candidates.length > 0) {
-      this.logger.log(
-        `Reconciled ${candidates.length} candidate user(s) after ${after ?? 'the start'}; next run continues ${
-          this.reconcileCursor
-            ? `after ${this.reconcileCursor}`
-            : 'from the start'
-        }`,
-      );
-    }
     return candidates.length;
   }
 }

@@ -9,12 +9,18 @@ import { PAYMENT_PROVIDER_EVENT_OUTBOX_EVENT_TYPE } from '../outbox/payment-outb
 
 /**
  * A `received` event this old has already outlived the BullMQ job's whole
- * retry budget (3 attempts, 5 s exponential backoff), so its row being still
- * `received` means the job dead-lettered rather than that it is in flight.
+ * retry budget (3 attempts, 5 s exponential backoff) and the outbox's own
+ * five-attempt budget, so its row being still `received` means the job
+ * dead-lettered rather than that it is in flight. Five minutes (not two)
+ * leaves room for a backlogged queue before the first re-drive is spent.
  */
-export const STALE_PROVIDER_EVENT_MS = 2 * 60 * 1000;
-/** How often the re-drive sweep runs, independent of the reconcile cadence. */
-export const PROVIDER_EVENT_REDRIVE_INTERVAL_MS = 60 * 1000;
+export const STALE_PROVIDER_EVENT_MS = 5 * 60 * 1000;
+/**
+ * How often the re-drive sweep runs. Two sweeps a minute would spend the
+ * three-attempt budget in ~2 minutes while the queue is merely slow; five
+ * minutes gives each attempt a realistic chance to drain first.
+ */
+export const PROVIDER_EVENT_REDRIVE_INTERVAL_MS = 5 * 60 * 1000;
 /** Most stale events looked at per sweep; each one costs one outbox insert. */
 export const PROVIDER_EVENT_REDRIVE_BATCH = 20;
 /** Re-drives a single event gets before it is left for an operator. */
@@ -24,8 +30,9 @@ export const MAX_PROVIDER_EVENT_REDRIVES = 3;
  * (provider, providerEventId) therefore lasts exactly this window: an event
  * replayed after it would look new and be enqueued again. Providers retry a
  * webhook for hours, never weeks, so 30 days is far beyond any real replay.
- * It also bounds the table: a `received` row we gave up re-driving is deleted
- * at this age rather than kept forever.
+ * It also bounds the table: settled/ignored/failed rows are deleted at this
+ * age, while a still-`received` row is deliberately kept as evidence for an
+ * operator (those are rare — the re-drive sweep is the normal recovery).
  */
 export const PROVIDER_EVENT_RETENTION_DAYS = 30;
 const RETENTION_INTERVAL_MS = 60 * 60 * 1000;
@@ -261,6 +268,7 @@ export class ProviderEventRedrive {
             sql`${paymentProviderEvents.id} in (
               select ${paymentProviderEvents.id} from ${paymentProviderEvents}
               where ${paymentProviderEvents.receivedAt} < now() - make_interval(days => ${PROVIDER_EVENT_RETENTION_DAYS})
+                and ${paymentProviderEvents.status} <> 'received'
               order by ${paymentProviderEvents.receivedAt}
               for update skip locked
               limit ${RETENTION_BATCH_LIMIT}

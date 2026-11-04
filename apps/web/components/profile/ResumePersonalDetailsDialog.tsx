@@ -225,7 +225,7 @@ export function ResumePersonalDetailsDialog({
     }
 
     setPhotoUploading(true);
-    const signed = await signUploadUser(file.name, "resume");
+    const signed = await signUploadUser(file.name, "avatar");
     if (!signed.success) {
       setPhotoUploading(false);
       toast.error(signed.error);

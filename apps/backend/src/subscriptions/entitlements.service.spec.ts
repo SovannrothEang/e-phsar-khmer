@@ -506,14 +506,9 @@ describe('EntitlementsService.freePlan', () => {
 });
 
 describe('EntitlementsService.reconcileAll', () => {
-  const pageOf = (from: number, size: number) =>
-    Array.from({ length: size }, (_, i) => ({
-      userId: `u${String(from + i).padStart(3, '0')}`,
-    }));
-
   /**
    * One select batch per run: loadConfig (settings, scopes, caps), the package
-   * minimum, then the candidate page whose `where`/`limit` are recorded.
+   * minimum, then the candidate query whose `where`/`limit` are recorded.
    */
   function setup(pages: { userId: string }[][]) {
     const select = jest.fn();
@@ -543,41 +538,18 @@ describe('EntitlementsService.reconcileAll', () => {
     return { service, reconciled, wheres, limits };
   }
 
-  it('reconciles one bounded page and continues after its last user', async () => {
-    const { service, reconciled, wheres, limits } = setup([
-      pageOf(0, 200),
-      [{ userId: 'u200' }],
+  it('reconciles every candidate user in one run', async () => {
+    const { service, reconciled, limits } = setup([
+      [{ userId: 'u001' }, { userId: 'u002' }],
     ]);
-    const dialect = new PgDialect();
 
-    await expect(service.reconcileAll()).resolves.toBe(200);
-    expect(limits[0]).toBe(200);
-    expect(reconciled).toHaveBeenCalledTimes(200);
-    expect(reconciled).toHaveBeenLastCalledWith('u199');
-    const first = dialect.sqlToQuery(wheres[0] as never);
-    expect(first.sql).not.toContain('"user_id" >');
-    expect(first.params).toEqual(['active', 'restricted']);
+    await expect(service.reconcileAll()).resolves.toBe(2);
 
-    await expect(service.reconcileAll()).resolves.toBe(1);
-    const second = dialect.sqlToQuery(wheres[1] as never);
-    expect(second.sql).toContain('"user_id" >');
-    expect(second.params).toEqual(['active', 'restricted', 'u199']);
-  });
-
-  it('starts a new pass once a short page ends the catalogue', async () => {
-    const { service, wheres } = setup([
-      pageOf(0, 200),
-      [{ userId: 'u200' }],
-      [{ userId: 'u000' }],
-    ]);
-    const dialect = new PgDialect();
-
-    await service.reconcileAll();
-    await service.reconcileAll();
-    await service.reconcileAll();
-
-    const third = dialect.sqlToQuery(wheres[2] as never);
-    expect(third.sql).not.toContain('"user_id" >');
-    expect(third.params).toEqual(['active', 'restricted']);
+    expect(reconciled).toHaveBeenCalledTimes(2);
+    expect(reconciled).toHaveBeenNthCalledWith(1, 'u001');
+    expect(reconciled).toHaveBeenNthCalledWith(2, 'u002');
+    // Paging is deferred until the durable worker (plan 2.3); this run must
+    // still cover the whole candidate set.
+    expect(limits).toEqual([]);
   });
 });

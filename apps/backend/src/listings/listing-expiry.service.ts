@@ -1,15 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import {
-  and,
-  asc,
-  eq,
-  gt,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-} from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
 import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
 import { listings, notifications, users } from '../db/schema';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -27,12 +17,6 @@ type ExpiryCandidate = {
   title: string;
   expiresAt: Date;
 };
-
-/**
- * Ads per sweep query. The hourly run continues after the last id of a full
- * page, so one run is bounded even when a large backlog matches.
- */
-const EXPIRY_BATCH_SIZE = 200;
 
 /**
  * How far back the (listingId, expiresAt) dedupe looks. An expiry notice is
@@ -53,16 +37,6 @@ const UNNOTIFIED_LOOKBACK_MS = 4 * DAY_MS;
 @Injectable()
 export class ListingExpiryService {
   private readonly logger = new Logger(ListingExpiryService.name);
-
-  /**
-   * Keyset cursors over `listings.id`, one per notice pass. A full page leaves
-   * the cursor on its last id; a short page means the pass is done and clears
-   * it, so ids inserted before the cursor are re-scanned next time. Dedupe in
-   * `unnotified` makes that re-scan safe (at most one notice per
-   * (listing, expiry)).
-   */
-  private expiringAfter: string | null = null;
-  private expiredAfter: string | null = null;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -96,11 +70,8 @@ export class ListingExpiryService {
           gt(listings.expiresAt, now),
           lte(listings.expiresAt, until),
           isNull(users.deletedAt),
-          this.expiringAfter ? gt(listings.id, this.expiringAfter) : undefined,
         ),
-      )
-      .orderBy(asc(listings.id))
-      .limit(EXPIRY_BATCH_SIZE);
+      );
 
     const pending = await this.unnotified('listing.expiring', rows, now);
     let sent = 0;
@@ -122,7 +93,6 @@ export class ListingExpiryService {
       });
       if (delivered) sent++;
     }
-    this.expiringAfter = this.nextCursor(rows);
     return sent;
   }
 
@@ -145,11 +115,8 @@ export class ListingExpiryService {
           lte(listings.expiresAt, now),
           gt(listings.expiresAt, since),
           isNull(users.deletedAt),
-          this.expiredAfter ? gt(listings.id, this.expiredAfter) : undefined,
         ),
-      )
-      .orderBy(asc(listings.id))
-      .limit(EXPIRY_BATCH_SIZE);
+      );
 
     const pending = await this.unnotified('listing.expired', rows, now);
     let sent = 0;
@@ -163,18 +130,7 @@ export class ListingExpiryService {
       });
       if (delivered) sent++;
     }
-    this.expiredAfter = this.nextCursor(rows);
     return sent;
-  }
-
-  /**
-   * `id` of the last row of a full page, else null. A failed send still
-   * advances the cursor: progress must not depend on one owner's channel, and
-   * the row is retried when the next pass re-scans from the start.
-   */
-  private nextCursor(rows: { id: string }[]): string | null {
-    if (rows.length < EXPIRY_BATCH_SIZE) return null;
-    return rows[rows.length - 1]?.id ?? null;
   }
 
   /**

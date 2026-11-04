@@ -21,6 +21,26 @@ How to use this file:
 
 ### Added
 
+- **Security hardening, batch 2 (2026-11-04).** Shared Redis throttler storage
+  (`RedisThrottlerStorage`, atomic Lua, fail-open) so limits no longer multiply
+  per instance, plus a per-account failed-login lockout (5→60 s, 10→5 min,
+  15→15 min, hashed identifier, same 429 for unknown accounts). Auth route
+  buckets are sized as a site-wide ceiling (login 100/min, SMS 30/min) because
+  the web calls from one egress; the per-account lockout is the brute-force
+  control. Chat WebSocket auth is ticket-only (no `?token=`/cookie access
+  token), requires an allow-listed `Origin`, and honours `tokensValidAfter`;
+  the gateway now isolates dead/slow sockets, and pub/sub resubscribes with
+  backoff. Payment provider events stranded by a dead-lettered job are
+  re-driven (5-minute sweep, max 3) with an abandonment log and 30-day
+  retention of settled rows. `/insights` is throttled (600/min), `/files/sign`
+  no longer accepts `resume` (resume photos use `avatar`), Swagger is
+  production-off, and CORS fails closed in production. Added the
+  `payment_attempts(status, created_at)` and `listings(status, expires_at)`
+  partial indexes (migration `0054`, not yet applied). Sweep batching is
+  deferred to the durable-worker task: the expiry/reconcile queries keep
+  their complete scan, with the notification dedupe history now bounded to
+  4 days. Verified: backend 106 suites / 1,527 tests, `nest build`, lint 0
+  errors; mobile `tsc` + lint.
 - **Payment wake-up + live notification refresh (2026-11-04).**
   `POST /api/v1/internal/payments/reconcile` runs one deduplicated
   reconciliation pass for a caller that sends `INTERNAL_RECONCILE_SECRET` in

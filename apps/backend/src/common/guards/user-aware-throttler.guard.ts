@@ -3,7 +3,6 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 
 interface RequestWithUser {
   user?: { id?: string };
-  ips?: string[];
   ip?: string;
 }
 
@@ -25,8 +24,10 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
   protected getTracker(req: Record<string, any>): Promise<string> {
     const typed = req as RequestWithUser;
     if (typed.user?.id) return Promise.resolve(`user:${typed.user.id}`);
-    return Promise.resolve(
-      typed.ips?.length ? typed.ips[0] : (typed.ip ?? 'unknown'),
-    );
+    // `req.ip` is the trusted-hop address Express derives from
+    // `trust proxy`; `req.ips[0]` is the leftmost X-Forwarded-For entry, which
+    // a direct caller can set to a new value on every request and thereby
+    // rotate its own bucket.
+    return Promise.resolve(typed.ip ?? 'unknown');
   }
 }
