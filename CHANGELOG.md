@@ -39,7 +39,7 @@ How to use this file:
   partial indexes (migration `0054`, not yet applied). Sweep batching is
   deferred to the durable-worker task: the expiry/reconcile queries keep
   their complete scan, with the notification dedupe history now bounded to
-  4 days. Verified: backend 106 suites / 1,527 tests, `nest build`, lint 0
+  4 days. Verified: backend 106 suites / 1,524 tests, `nest build`, lint 0
   errors; mobile `tsc` + lint.
 - **Payment wake-up + live notification refresh (2026-11-04).**
   `POST /api/v1/internal/payments/reconcile` runs one deduplicated

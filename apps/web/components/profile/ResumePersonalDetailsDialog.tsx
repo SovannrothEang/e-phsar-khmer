@@ -55,7 +55,7 @@ import { Input } from "@/components/ui/input";
  * Resume builder — Step 1 of 8, "Add Personal Details".
  *
  * First/last name prefill from the account, the photo uploads to storage on
- * pick (`resume/{userId}/…`, validated as an image ≤ 5 MB before anything is
+ * pick (`avatar/{userId}/…`, validated as an image ≤ 5 MB before anything is
  * signed), phone rows can be added, Location opens the project's province →
  * district → commune popup, and Education Level is a fixed list. Clicking
  * "Next to summary" with First Name, Last Name or Phone Number missing flags
