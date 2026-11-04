@@ -264,7 +264,61 @@ describe('PaymentReconciler.runOnce', () => {
   });
 });
 
-describe('PaymentReconciler.runOnce — candidate selection', () => {
+describe('PaymentReconciler.runExclusive', () => {
+  const summary: ReconcileSummary = {
+    candidates: 0,
+    checked: 0,
+    settled: 0,
+    activated: 0,
+    abandoned: 0,
+    errors: 0,
+    pending: 0,
+    newestPendingAgeMs: null,
+  };
+
+  it('shares one in-flight pass between concurrent callers', async () => {
+    const { reconciler } = build({});
+    let release!: (value: ReconcileSummary) => void;
+    const gate = new Promise<ReconcileSummary>((resolve) => {
+      release = resolve;
+    });
+    const spy = jest.spyOn(reconciler, 'runOnce').mockReturnValue(gate);
+
+    const first = reconciler.runExclusive();
+    const second = reconciler.runExclusive();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+
+    release(summary);
+    await expect(first).resolves.toEqual(summary);
+    await expect(second).resolves.toEqual(summary);
+  });
+
+  it('starts a fresh pass after the previous one settles', async () => {
+    const { reconciler } = build({});
+    const spy = jest.spyOn(reconciler, 'runOnce').mockResolvedValue(summary);
+
+    await reconciler.runExclusive();
+    await reconciler.runExclusive();
+
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not poison the next call when a pass rejects', async () => {
+    const { reconciler } = build({});
+    const spy = jest
+      .spyOn(reconciler, 'runOnce')
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce(summary);
+
+    await expect(reconciler.runExclusive()).rejects.toThrow('db down');
+    await expect(reconciler.runExclusive()).resolves.toEqual(summary);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PaymentReconciler.runOnce - candidate selection', () => {
   beforeEach(() => {
     reconcileMock.mockReset();
     expireMock.mockReset();

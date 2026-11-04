@@ -159,7 +159,9 @@ something to look at.
   that fires every minute keeps an instance warm most of the day, so it
   replaces rather than removes the idle-instance cost — an always-on worker
   (option b in the plan) is the alternative if that matters more than the
-  price.
+  price. On a **cold** instance the first pass also includes the 50-row
+  recoverable tail, so a 1-minute pinger pays up to ~150 serial provider calls
+  per wake-up; dedupe removes duplicate sweeps, not that cold-start cost.
 - **Legacy drain.** `PaymentPollOutboxHandler` and the `poll-attempt` job
   branch in `PaymentProcessor` are now no-ops that mark old
   `payment.attempt.poll_requested` rows / delayed jobs finished. They exist

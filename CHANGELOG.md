@@ -32,7 +32,7 @@ How to use this file:
   pass. Web: the unread badge now subscribes to the existing shared socket and
   invalidates `unread`/`recent` on a notification push, and the durable row is
   written before the realtime publish, so a fast subscriber cannot refetch
-  pre-insert state. Verified: backend 99 suites / 1,434 tests + `nest build`;
+  pre-insert state. Verified: backend 99 suites / 1,436 tests + `nest build`;
   web 95 tests + `next build` + eslint.
 - **Users can edit their own ads (web).** Manage Ads now offers **Edit ad** on the Active,
   Expired and Hidden tabs; `/post/edit/[id]` reuses the real post form with every value

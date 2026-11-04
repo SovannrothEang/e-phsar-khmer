@@ -157,8 +157,11 @@ export class PaymentReconciler
    */
   arm(): void {
     if (!this.enabled || this.stopped) return;
-    if (this.running) {
+    if (this.running || this.inFlight) {
       this.rearmRequested = true;
+      // If the in-flight pass was started by the internal wake-up, no tick is
+      // waiting to consume the flag — queue one so the new attempt is seen soon.
+      this.schedule(FAST_INTERVAL_MS, { onlyIfSooner: true });
       return;
     }
     this.schedule(FAST_INTERVAL_MS, { onlyIfSooner: true });
@@ -233,7 +236,8 @@ export class PaymentReconciler
   /**
    * One pass, deduplicated: the internal wake-up can land while the boot tick
    * is still running (it fires unawaited), and a pinger must not turn that into
-   * two provider sweeps. A second caller gets the in-flight promise.
+   * two provider sweeps. A second caller gets the in-flight promise; once it
+   * settles the field clears, so a failure is not sticky.
    */
   runExclusive(): Promise<ReconcileSummary> {
     if (!this.inFlight) {

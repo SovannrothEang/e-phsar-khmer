@@ -158,10 +158,12 @@ const baseEnvSchema = z.object({
   // absent disables the route (it answers 503) instead of failing the boot.
   INTERNAL_RECONCILE_SECRET: z
     .string()
-    .min(16)
     .optional()
     .or(z.literal(''))
-    .transform((value) => value || undefined),
+    .transform((value) => value?.trim() || undefined)
+    .refine((value) => value === undefined || value.length >= 16, {
+      message: 'INTERNAL_RECONCILE_SECRET must be at least 16 characters',
+    }),
 
   // ABA PayWay gateway credentials. Optional so build/tests don't require
   // sandbox access — AbaPaywayProvider fails fast with a clear message if

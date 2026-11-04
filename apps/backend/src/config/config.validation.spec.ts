@@ -114,3 +114,41 @@ describe('OTP_PROVIDER=plasgate credentials', () => {
     }
   });
 });
+
+describe('INTERNAL_RECONCILE_SECRET', () => {
+  it('treats an absent or blank value as disabled, not a validation error', () => {
+    expect(
+      validate({ ...requiredEnvironment }).INTERNAL_RECONCILE_SECRET,
+    ).toBeUndefined();
+    expect(
+      validate({
+        ...requiredEnvironment,
+        INTERNAL_RECONCILE_SECRET: '',
+      }).INTERNAL_RECONCILE_SECRET,
+    ).toBeUndefined();
+    expect(
+      validate({
+        ...requiredEnvironment,
+        INTERNAL_RECONCILE_SECRET: '   ',
+      }).INTERNAL_RECONCILE_SECRET,
+    ).toBeUndefined();
+  });
+
+  it('rejects a value shorter than 16 characters', () => {
+    expect(() =>
+      validate({
+        ...requiredEnvironment,
+        INTERNAL_RECONCILE_SECRET: 'too-short',
+      }),
+    ).toThrow('INTERNAL_RECONCILE_SECRET');
+  });
+
+  it('accepts and trims a 16+ character value', () => {
+    expect(
+      validate({
+        ...requiredEnvironment,
+        INTERNAL_RECONCILE_SECRET: '  abcdefghijklmnop  ',
+      }).INTERNAL_RECONCILE_SECRET,
+    ).toBe('abcdefghijklmnop');
+  });
+});
