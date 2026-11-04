@@ -33,6 +33,11 @@ function setup(values: Record<string, unknown>) {
     errors: 0,
     pending: 1,
     newestPendingAgeMs: 1_000,
+    providerEventsRedriven: 0,
+    providerEventsExhausted: 0,
+    providerEventsPurged: 0,
+    deadlineReached: false,
+    skippedBackoff: 0,
   };
   const reconciler = { runExclusive: jest.fn().mockResolvedValue(summary) };
   const config = {

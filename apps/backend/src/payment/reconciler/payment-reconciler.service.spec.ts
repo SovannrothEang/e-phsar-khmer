@@ -62,7 +62,8 @@ function build(opts: {
     select: jest
       .fn()
       // In call order: purchases awaiting activation, expired webhook-only
-      // attempts, pending attempts, then recoverable-failed attempts.
+      // attempts, pending attempts, recoverable-failed attempts, then the
+      // oldest-first tail (only when the pending page came back full).
       .mockReturnValueOnce(chain(opts.stuck ?? []))
       .mockReturnValueOnce(chain(opts.expired ?? []))
       .mockReturnValueOnce(chain(opts.candidates ?? [], opts.pendingSink))
@@ -96,9 +97,10 @@ function build(opts: {
   return { reconciler, db, outbox, activation, providerEventRedrive };
 }
 
-const attempt = (id: string, ageMs: number) => ({
+const attempt = (id: string, ageMs: number, provider = 'bakong') => ({
   id,
   createdAt: new Date(Date.now() - ageMs),
+  provider,
 });
 
 describe('PaymentReconciler.runOnce', () => {
@@ -318,6 +320,8 @@ describe('PaymentReconciler.runExclusive', () => {
     providerEventsRedriven: 0,
     providerEventsExhausted: 0,
     providerEventsPurged: 0,
+    deadlineReached: false,
+    skippedBackoff: 0,
   };
 
   it('shares one in-flight pass between concurrent callers', async () => {
@@ -556,6 +560,91 @@ describe('PaymentReconciler.runOnce — webhook-only expiry', () => {
 
     expect(summary.abandoned).toBe(1);
     expect(summary.checked).toBe(0);
+  });
+});
+
+describe('PaymentReconciler.runOnce — pass budget', () => {
+  beforeEach(() => {
+    reconcileMock.mockReset();
+    expireMock.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('stops dispatching once the wall-clock deadline is spent', async () => {
+    jest.useFakeTimers({ now: new Date('2026-11-04T10:00:00Z') });
+    reconcileMock.mockImplementation(() => {
+      // Each provider call burns 4 s of the 10 s budget.
+      jest.advanceTimersByTime(4_000);
+      return Promise.resolve('still_pending');
+    });
+    const { reconciler } = build({
+      candidates: Array.from({ length: 10 }, (_, i) =>
+        attempt(`c${i}`, MINUTE),
+      ),
+    });
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary.deadlineReached).toBe(true);
+    expect(summary.checked).toBeLessThan(10);
+  });
+
+  it('reaches an attempt older than the newest batch on the next pass', async () => {
+    // A full newest-first page means older attempts exist that it cannot see.
+    reconcileMock.mockResolvedValue('still_pending');
+    const fullPage = Array.from({ length: 100 }, (_, i) =>
+      attempt(`new-${i}`, i * 1_000),
+    );
+    const { reconciler, db } = build({
+      candidates: fullPage,
+    });
+    // The tail query is the fifth select, after activation, expiry, pending and
+    // the recoverable page.
+    db.select.mockReturnValueOnce(chain([attempt('old-1', 20 * MINUTE)]));
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary.checked).toBe(101);
+    expect(reconcileMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ paymentAttemptId: 'old-1' }),
+    );
+  });
+
+  it('does not query the tail when the newest page was not full', async () => {
+    reconcileMock.mockResolvedValue('still_pending');
+    const { reconciler, db } = build({ candidates: [attempt('only', MINUTE)] });
+
+    await reconciler.runOnce();
+
+    // activation, expiry, pending, recoverable — no tail query.
+    expect(db.select).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips a provider that just errored instead of spending the budget on it', async () => {
+    const { reconciler, db } = build({
+      candidates: [attempt('a1', MINUTE, 'bakong')],
+    });
+    reconcileMock.mockResolvedValueOnce('error');
+
+    const first = await reconciler.runOnce();
+    expect(first.errors).toBe(1);
+
+    // Second pass: same provider. The recoverable tail is not due, so the
+    // pass makes three selects (activation, expiry, pending).
+    db.select
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([attempt('a2', MINUTE, 'bakong')]));
+    reconcileMock.mockClear();
+
+    const second = await reconciler.runOnce();
+
+    expect(second.skippedBackoff).toBe(1);
+    expect(reconcileMock).not.toHaveBeenCalled();
   });
 });
 

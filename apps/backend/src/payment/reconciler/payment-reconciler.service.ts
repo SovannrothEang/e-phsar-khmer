@@ -12,11 +12,13 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
   lt,
   notInArray,
+  or,
 } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
@@ -55,6 +57,25 @@ const RECOVERABLE_LIMIT = 50;
  * grace.
  */
 const EXPIRY_GRACE_MS = 30 * 1000;
+/**
+ * Wall-clock budget for one pass. A provider that answers slowly must not
+ * stretch a tick past the next one: whatever is left is picked up by the next
+ * pass, which is why the cursor below matters.
+ */
+const PASS_DEADLINE_MS = 10 * 1000;
+/** Candidates in flight at once. Small on purpose: each one is a provider call. */
+const PASS_CONCURRENCY = 3;
+/**
+ * How long a provider is skipped after one of its attempts errored. A provider
+ * outage otherwise turns every pending attempt into a timeout on every pass.
+ */
+const PROVIDER_BACKOFF_MS = 60 * 1000;
+/**
+ * How many older pending attempts the keyset tail looks at per pass. The
+ * newest-first page above serves the payers watching a screen; this one walks
+ * the rest oldest-first so a full page of new checkouts cannot starve them.
+ */
+const TAIL_LIMIT = 50;
 
 export interface ReconcileSummary {
   /** Unresolved attempts in view this pass. Zero means an empty system. */
@@ -75,6 +96,10 @@ export interface ReconcileSummary {
   providerEventsExhausted: number;
   /** Provider event rows deleted by the hourly retention sweep. */
   providerEventsPurged: number;
+  /** The pass ran out of its wall-clock budget with candidates left over. */
+  deadlineReached: boolean;
+  /** Candidates skipped because their provider is backing off after an error. */
+  skippedBackoff: number;
 }
 
 /**
@@ -120,6 +145,14 @@ export class PaymentReconciler
   private rearmRequested = false;
   /** When the recoverable-failed tail was last re-asked about. */
   private lastRecoverableCheckAt = 0;
+  /**
+   * Keyset position for the oldest-first tail: the last row the previous pass
+   * looked at. `null` means "start from the oldest again", which is what a
+   * short page sets.
+   */
+  private pendingCursor: { createdAt: Date; id: string } | null = null;
+  /** Provider name → epoch ms before which its attempts are skipped. */
+  private readonly providerBackoffUntil = new Map<string, number>();
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -277,7 +310,12 @@ export class PaymentReconciler
       providerEventsRedriven: 0,
       providerEventsExhausted: 0,
       providerEventsPurged: 0,
+      deadlineReached: false,
+      skippedBackoff: 0,
     };
+    // One pass gets a bounded slice of wall clock: a provider that answers
+    // slowly must not make the tick longer than the tick interval.
+    const deadline = Date.now() + PASS_DEADLINE_MS;
 
     // Last hop first: a payment that already settled but whose purchase never
     // activated (the `payment.succeeded` event was consumed by an instance
@@ -298,6 +336,7 @@ export class PaymentReconciler
     const candidateColumns = {
       id: paymentAttempts.id,
       createdAt: paymentAttempts.createdAt,
+      provider: paymentAttempts.provider,
     };
     const baseFilter = and(
       inArray(paymentAttempts.provider, providers),
@@ -340,21 +379,21 @@ export class PaymentReconciler
     summary.candidates = pending.length + recoverable.length;
 
     // Pending first: those are the payers still waiting.
-    for (const candidate of pending) {
-      const outcome = await this.reconcileCandidate(candidate.id, summary);
-      // Still unpaid (or the provider hiccuped): keep the loop tight.
-      if (outcome === 'still_pending' || outcome === 'error') {
-        const ageMs = now - candidate.createdAt.getTime();
-        summary.pending += 1;
-        summary.newestPendingAgeMs = Math.min(
-          summary.newestPendingAgeMs ?? ageMs,
-          ageMs,
-        );
-      }
+    await this.processCandidates(pending, summary, deadline, {
+      countPending: true,
+    });
+
+    // The newest-first page serves the payers watching a screen. When it came
+    // back full, older pending attempts exist that it never reached, so walk
+    // them oldest-first from a keyset cursor; a short page means the whole set
+    // was covered and the cursor wraps on the next pass.
+    if (pending.length === BATCH_LIMIT) {
+      const tail = await this.tailPending(baseFilter);
+      summary.candidates += tail.length;
+      await this.processCandidates(tail, summary, deadline);
     }
-    for (const candidate of recoverable) {
-      await this.reconcileCandidate(candidate.id, summary);
-    }
+
+    await this.processCandidates(recoverable, summary, deadline);
 
     // Settling enqueued `payment.succeeded` rows (activation + notification);
     // wake the outbox rather than leave them to its poll fallback.
@@ -381,6 +420,100 @@ export class PaymentReconciler
         `Provider event sweep failed: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * Runs candidates with a small concurrency and a shared deadline. A worker
+   * stops taking new work once the budget is spent; whatever is left is picked
+   * up by the next pass (the tail cursor guarantees it is not the same set).
+   */
+  private async processCandidates(
+    candidates: { id: string; createdAt: Date; provider: string }[],
+    summary: ReconcileSummary,
+    deadline: number,
+    options: { countPending?: boolean } = {},
+  ): Promise<void> {
+    const queue = [...candidates];
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const candidate = queue.shift();
+        if (!candidate) return;
+        if (Date.now() >= deadline) {
+          summary.deadlineReached = true;
+          return;
+        }
+        const backoffUntil = this.providerBackoffUntil.get(candidate.provider);
+        if (backoffUntil && backoffUntil > Date.now()) {
+          summary.skippedBackoff += 1;
+          continue;
+        }
+        const outcome = await this.reconcileCandidate(candidate.id, summary);
+        if (outcome === 'error' && candidate.provider) {
+          // One timeout is a signal about the provider, not about this
+          // attempt: stop asking it for a while so a slow provider cannot
+          // spend the whole budget on every pass.
+          this.providerBackoffUntil.set(
+            candidate.provider,
+            Date.now() + PROVIDER_BACKOFF_MS,
+          );
+        }
+        if (
+          options.countPending &&
+          (outcome === 'still_pending' || outcome === 'error')
+        ) {
+          const ageMs = Date.now() - candidate.createdAt.getTime();
+          summary.pending += 1;
+          summary.newestPendingAgeMs = Math.min(
+            summary.newestPendingAgeMs ?? ageMs,
+            ageMs,
+          );
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(PASS_CONCURRENCY, queue.length) }, worker),
+    );
+  }
+
+  /**
+   * Oldest-first keyset page over the pending attempts the newest-first page
+   * did not reach. The cursor advances past the last row; a short page means
+   * the set was covered, so the next pass starts from the oldest again.
+   */
+  private async tailPending(
+    baseFilter: ReturnType<typeof and>,
+  ): Promise<{ id: string; createdAt: Date; provider: string }[]> {
+    const cursor = this.pendingCursor;
+    const afterCursor = cursor
+      ? or(
+          gt(paymentAttempts.createdAt, cursor.createdAt),
+          and(
+            eq(paymentAttempts.createdAt, cursor.createdAt),
+            gt(paymentAttempts.id, cursor.id),
+          ),
+        )
+      : undefined;
+
+    const rows = await this.db
+      .select({
+        id: paymentAttempts.id,
+        createdAt: paymentAttempts.createdAt,
+        provider: paymentAttempts.provider,
+      })
+      .from(paymentAttempts)
+      .where(
+        and(baseFilter, eq(paymentAttempts.status, 'pending'), afterCursor),
+      )
+      .orderBy(asc(paymentAttempts.createdAt), asc(paymentAttempts.id))
+      .limit(TAIL_LIMIT);
+
+    const last = rows[rows.length - 1];
+    this.pendingCursor =
+      rows.length < TAIL_LIMIT || !last
+        ? null
+        : { createdAt: last.createdAt, id: last.id };
+    return rows;
   }
 
   private async reconcileCandidate(
