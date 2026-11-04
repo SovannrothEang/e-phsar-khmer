@@ -118,3 +118,28 @@ the held-send core and the content-free nudge all shipped.
   other page, a partner who never opened Messages is still targetable, and a held send
   lands when the recipient registers. Scenario 3 is verified; 1, 2 and 4 need a
   browser session (findings and commands are in `tasks/todo.md`).
+
+## 8. Closed plans — caveats kept when Plans.md rows were collapsed
+
+`Plans.md` keeps one stub line per closed task, so the "not exercised / not
+verified" notes from those rows now live here. The code and the DoD prose are in
+the commit that closed each row.
+
+- **Security 0.4** — the raw `{ code: 0 }` ack is verified over HTTP (supertest);
+  the throttle burst and the forwarded-IP path were never exercised.
+- **Security 4.2** — mobile chat backoff/AppState is code-verified only; the repo
+  has no mobile test runner.
+- **SMS 1.5** — the no-backfill decision for existing unverified phone numbers
+  still needs the owner's OK.
+- **Images 1.1** — "TTFB lower by one round trip" rests on the structure and an
+  injected-latency run, not on a rebuild of the original page.
+- **Images 1.3** — a moderated listing was not tested separately (same `!real`
+  path as an unknown id).
+- **Images 2.7** — immutable `cache-control` is set on upload; the HEAD on a
+  fresh object is still a deploy check.
+- **Background-work 5.1** — the Bakong backoff ladder is no longer greppable
+  after the demand-driven rewrite; `BAKONG_POLL_INTERVAL_MS` remains the knob.
+- **E2E H1.3** — the `visibilitychange`/`pagehide` backup flush is not
+  browser-verified.
+- **E2E H3.2** — only the "locked + passcode" notice state was seen in a browser;
+  "ready" and "locked, no passcode" were not.
