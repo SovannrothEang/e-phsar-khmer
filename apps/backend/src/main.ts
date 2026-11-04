@@ -8,7 +8,11 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Keep the request bytes the client sent: the ABA PayWay webhook signature
+    // is computed over them, and a re-encoded body turns `1.50` into `1.5`.
+    rawBody: true,
+  });
 
   // Vercel terminates TLS and forwards exactly one hop, so the client address
   // is the last X-Forwarded-For entry. Without this Express reports the

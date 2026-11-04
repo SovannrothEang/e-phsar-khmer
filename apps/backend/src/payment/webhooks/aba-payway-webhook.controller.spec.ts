@@ -173,6 +173,24 @@ describe('AbaPaywayWebhookController.webhook', () => {
     );
   });
 
+  it('verifies the raw request bytes, not a re-encoded body', async () => {
+    const { controller } = build();
+    const raw =
+      '{"tran_id":"T1","payment_amount":1.50,"status":0,"apv":"123456"}';
+    // Signed over the raw text, which no JSON re-encode can reproduce.
+    const signature = createHmac('sha512', API_KEY)
+      .update('1234561.500T1', 'utf-8')
+      .digest('base64');
+
+    await expect(
+      controller.webhook(
+        JSON.parse(raw) as Record<string, unknown>,
+        { [SIG]: signature },
+        Buffer.from(raw, 'utf-8'),
+      ),
+    ).resolves.toEqual({ code: 0 });
+  });
+
   it('rejects a bad signature with 401 and writes nothing', async () => {
     const { controller, effectRunner } = build();
 
@@ -273,20 +291,29 @@ describe('AbaPaywayWebhookController over HTTP', () => {
       ],
     }).compile();
 
-    const app = moduleRef.createNestApplication();
+    const app = moduleRef.createNestApplication({ rawBody: true });
     // Exactly how main.ts wires it: the global interceptor must honour the
     // controller's `@SkipEnvelope()`.
     app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
     await app.init();
 
     try {
+      const raw = '{"tran_id":"x","status":0,"payment_amount":1.50}';
       const res = await request(app.getHttpServer() as App)
         .post('/payments/webhooks/aba-payway')
-        .send({ tran_id: 'x', status: 0 })
+        .set('Content-Type', 'application/json')
+        .send(raw)
         .expect(200);
 
       expect(res.body).toEqual({ code: 0 });
       expect(effectRunner.runDurably).toHaveBeenCalledTimes(1);
+      // `rawBody: true` on the app is what the signature depends on: the
+      // provider must receive the bytes, not a re-encoded object.
+      const firstArg = (
+        provider.verifyWebhookSignature.mock.calls as unknown as [Buffer][]
+      )[0][0];
+      expect(Buffer.isBuffer(firstArg)).toBe(true);
+      expect(firstArg.toString('utf-8')).toBe(raw);
     } finally {
       await app.close();
     }
