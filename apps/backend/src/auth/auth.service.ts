@@ -49,6 +49,7 @@ import { isPhoneBanned, normalizePhoneE164 } from '../reports/phone-ban.util';
 import { ACCOUNT_RETENTION_DAYS } from '../users/account-purge.service';
 import type { ClientDeviceInfo } from './client-device.decorator';
 import { LoginDevicesService } from './login-devices.service';
+import { LoginLockoutService } from './login-lockout.service';
 import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OtpService } from '../otp/otp.service';
@@ -122,12 +123,18 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly otpSender: OtpSmsSender,
     private readonly notifications: NotificationsService,
+    private readonly loginLockout: LoginLockoutService,
   ) {}
 
   async loginWithPassword(
     dto: LoginDto,
     device: ClientDeviceInfo | null = null,
   ): Promise<AuthResult> {
+    // Per-account gate first: the IP buckets cannot separate web users (every
+    // web call arrives from Next's server), so a credential-stuffing run
+    // against one account is only stopped here.
+    await this.loginLockout.assertNotLocked(dto.identifier);
+
     const [user] = await this.db
       .select()
       .from(users)
@@ -153,6 +160,7 @@ export class AuthService {
       // still intact until AccountPurgeService runs).
       const recoverable = await this.findRecoverable(dto.identifier);
       if (!recoverable?.passwordHash) {
+        await this.loginLockout.recordFailure(dto.identifier);
         throw new UnauthorizedException('INVALID_CREDENTIALS');
       }
 
@@ -160,18 +168,26 @@ export class AuthService {
         dto.password,
         recoverable.passwordHash,
       );
-      if (!matches) throw new UnauthorizedException('INVALID_CREDENTIALS');
+      if (!matches) {
+        await this.loginLockout.recordFailure(dto.identifier);
+        throw new UnauthorizedException('INVALID_CREDENTIALS');
+      }
 
       const revived = await this.revive(recoverable.id);
+      await this.loginLockout.reset(dto.identifier);
       return this.finishLogin(revived, device);
     }
 
     if (!user.passwordHash) {
+      await this.loginLockout.recordFailure(dto.identifier);
       throw new UnauthorizedException('INVALID_CREDENTIALS');
     }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    if (!valid) {
+      await this.loginLockout.recordFailure(dto.identifier);
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
     // Unreachable while the lookup above filters deleted rows out, but kept as
     // the guard it has always been: it is the only thing between a deleted
     // account and a token if that filter is ever lifted. Recovery goes through
@@ -180,6 +196,7 @@ export class AuthService {
     if (user.status !== 'active')
       throw new UnauthorizedException('Account suspended');
 
+    await this.loginLockout.reset(dto.identifier);
     return this.finishLogin(user, device);
   }
 
@@ -467,17 +484,27 @@ export class AuthService {
     dto: LoginOtpDto,
     ip?: string | null,
   ): Promise<OtpRequestResult> {
+    await this.loginLockout.assertNotLocked(dto.phone);
     const [user] = await this.db
       .select()
       .from(users)
       .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
       .limit(1);
 
-    if (!user || !user.passwordHash)
+    if (!user || !user.passwordHash) {
+      await this.loginLockout.recordFailure(dto.phone);
       throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    if (!valid) {
+      await this.loginLockout.recordFailure(dto.phone);
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
+
+    // The password is proven; a later SMS ban or provider failure is not a
+    // credential failure, so it must not extend this account's lockout.
+    await this.loginLockout.reset(dto.phone);
 
     // After the credential check on purpose: a wrong password still answers
     // 401 with no SMS, so the ban is not an oracle for a number the caller
@@ -554,8 +581,15 @@ export class AuthService {
   async verifyResetCode(
     dto: VerifyResetCodeDto,
   ): Promise<{ resetToken: string }> {
+    // The reset code is a credential: a locked identifier must not be able to
+    // grind codes here either, and an unknown identifier locks the same way.
+    await this.loginLockout.assertNotLocked(dto.identifier);
+
     const target = await this.resolveResetTarget(dto.identifier);
-    if (!target) throw this.invalidResetOtp();
+    if (!target) {
+      await this.loginLockout.recordFailure(dto.identifier);
+      throw this.invalidResetOtp();
+    }
 
     if (this.usesOwnOtp) {
       // Same rule as the request step: the real code only, never
@@ -567,7 +601,10 @@ export class AuthService {
         dto.token,
         { devBypass: false },
       );
-      if (verified.status !== 'ok') throw this.invalidResetOtp();
+      if (verified.status !== 'ok') {
+        await this.loginLockout.recordFailure(dto.identifier);
+        throw this.invalidResetOtp();
+      }
     } else {
       const { data, error } = await this.supabaseService.verifyOtp(
         target.phone,
@@ -575,9 +612,13 @@ export class AuthService {
         // Never accept the dev token on the reset path.
         { devBypass: false },
       );
-      if (error || !data.user) throw this.invalidResetOtp();
+      if (error || !data.user) {
+        await this.loginLockout.recordFailure(dto.identifier);
+        throw this.invalidResetOtp();
+      }
     }
 
+    await this.loginLockout.reset(dto.identifier);
     const resetToken = this.jwtService.sign(
       { sub: target.userId, typ: PASSWORD_RESET_TYP },
       { expiresIn: PASSWORD_RESET_TTL_SECONDS },

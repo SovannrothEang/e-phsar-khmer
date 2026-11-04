@@ -153,6 +153,12 @@ export const listings = pgTable(
     index('listings_created_at_idx').on(t.createdAt),
     // Matches the (createdAt, id) cursor tie-break used by the public feed
     index('listings_status_created_at_idx').on(t.status, t.createdAt, t.id),
+    // The hourly expiry sweep and the derived-expiry filters both read live
+    // rows by their expiry. Partial because a listing without an expiry (a
+    // draft, or one that never had a window) is never a sweep candidate.
+    index('listings_status_expires_at_idx')
+      .on(t.status, t.expiresAt)
+      .where(sql`${t.expiresAt} is not null`),
     index('listings_province_id_idx').on(t.provinceId),
     index('listings_district_id_idx').on(t.districtId),
     index('listings_commune_id_idx').on(t.communeId),

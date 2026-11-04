@@ -32,6 +32,13 @@ export interface ProcessAttemptJobData {
 
 export interface ProcessProviderEventJobData {
   paymentProviderEventId: string;
+  /**
+   * Set when `ProviderEventRedrive` re-enqueued the event. It only changes the
+   * BullMQ job id, so the re-drive is a new job even while the original
+   * (dead-lettered) one is still retained. `processProviderEvent` reads the
+   * event row, not the job, so it ignores this.
+   */
+  redriveAttempt?: number;
 }
 
 /**

@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "listings_status_expires_at_idx" ON "listings" USING btree ("status","expires_at") WHERE "listings"."expires_at" is not null;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "payment_attempts_status_created_at_idx" ON "payment"."payment_attempts" USING btree ("status","created_at" DESC NULLS LAST) WHERE "payment"."payment_attempts"."provider_attempt_id" is not null;

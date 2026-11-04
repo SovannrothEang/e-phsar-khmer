@@ -1,5 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
-import { FilesController } from './files.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { FilesController, SignUploadDto } from './files.controller';
 import { FilesService } from './files.service';
 
 function setup() {
@@ -42,6 +44,15 @@ describe('FilesController', () => {
         scope: 'brand',
       }),
     ).toThrow(ForbiddenException);
+  });
+
+  it('no longer accepts the resume scope (CVs use the private resume flow)', async () => {
+    const dto = plainToInstance(SignUploadDto, {
+      filename: 'cv.pdf',
+      scope: 'resume',
+    });
+    const errors = await validate(dto);
+    expect(errors).toEqual([expect.objectContaining({ property: 'scope' })]);
   });
 
   it('signs catalog uploads into the shared folder for staff', async () => {

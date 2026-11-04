@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service';
+import { LoginLockoutService } from './login-lockout.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { UserRow } from '../db/schema/users.schema';
 import { PgDialect } from 'drizzle-orm/pg-core';
@@ -127,6 +128,82 @@ function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
   };
 }
 
+/**
+ * In-memory stand-in for the handful of Redis commands `LoginLockoutService`
+ * issues. Expiry is evaluated against `clock`, so a test can age a lock
+ * without touching timers.
+ */
+class FakeLockoutRedis {
+  private readonly entries = new Map<
+    string,
+    { value: number; expiresAt: number | null }
+  >();
+  clock = 1_700_000_000_000;
+
+  advance(ms: number): void {
+    this.clock += ms;
+  }
+
+  incr(key: string): Promise<number> {
+    const entry = this.live(key);
+    const value = (entry?.value ?? 0) + 1;
+    this.entries.set(key, { value, expiresAt: entry?.expiresAt ?? null });
+    return Promise.resolve(value);
+  }
+
+  expire(key: string, seconds: number): Promise<number> {
+    const entry = this.live(key);
+    if (!entry) return Promise.resolve(0);
+    entry.expiresAt = this.clock + seconds * 1000;
+    return Promise.resolve(1);
+  }
+
+  pttl(key: string): Promise<number> {
+    const entry = this.live(key);
+    if (!entry) return Promise.resolve(-2);
+    return Promise.resolve(
+      entry.expiresAt === null ? -1 : entry.expiresAt - this.clock,
+    );
+  }
+
+  set(key: string, value: string, _mode: 'EX', seconds: number): Promise<'OK'> {
+    this.entries.set(key, {
+      value: Number(value),
+      expiresAt: this.clock + seconds * 1000,
+    });
+    return Promise.resolve('OK');
+  }
+
+  del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) {
+      if (this.entries.delete(key)) removed++;
+    }
+    return Promise.resolve(removed);
+  }
+
+  private live(
+    key: string,
+  ): { value: number; expiresAt: number | null } | null {
+    const entry = this.entries.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt !== null && entry.expiresAt <= this.clock) {
+      this.entries.delete(key);
+      return null;
+    }
+    return entry;
+  }
+}
+
+function makeLockout(redis = new FakeLockoutRedis()) {
+  return new LoginLockoutService(
+    redis as never,
+    {
+      get: () => 'test',
+    } as never,
+  );
+}
+
 function makeService(
   db: ReturnType<typeof makeDb>,
   jwtService: ReturnType<typeof makeJwtService>,
@@ -134,6 +211,7 @@ function makeService(
   loginDevices = makeLoginDevices(),
   supabaseService = makeSupabase(),
   notifications = makeNotifications(),
+  loginLockout = makeLockout(),
 ) {
   return new AuthService(
     db as never,
@@ -144,6 +222,7 @@ function makeService(
     makeOtpService() as never,
     makeOtpSender() as never,
     notifications as never,
+    loginLockout as never,
   );
 }
 
@@ -296,6 +375,180 @@ describe('AuthService', () => {
         }),
       ).rejects.toThrow(UnauthorizedException);
       expect(loginDevices.recordLogin).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('AuthService per-account lockout', () => {
+  function makeUserLookup(user: UserRow | null) {
+    const db = makeDb();
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve(user ? [user] : []),
+        }),
+      }),
+    });
+    return db;
+  }
+
+  async function failLogin(
+    service: AuthService,
+    identifier: string,
+  ): Promise<unknown> {
+    try {
+      await service.loginWithPassword({ identifier, password: 'wrong-pass' });
+      throw new Error('expected the login to fail');
+    } catch (err) {
+      return err;
+    }
+  }
+
+  it('locks the identifier after five failures with a 429 and retryAfterSeconds', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    const db = makeUserLookup(makeUser());
+    const redis = new FakeLockoutRedis();
+    const lockout = makeLockout(redis);
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      lockout,
+    );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await expect(
+        service.loginWithPassword({
+          // Mixed case on purpose: the lockout key is normalized.
+          identifier: attempt % 2 === 0 ? 'SokDara' : 'sokdara',
+          password: 'wrong-pass',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+
+    const locked = await failLogin(service, 'sokdara');
+    expect(locked).toBeInstanceOf(HttpException);
+    const exception = locked as HttpException;
+    expect(exception.getStatus()).toBe(429);
+    expect(exception.getResponse()).toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      retryAfterSeconds: 60,
+    });
+
+    // The lock is enforced BEFORE any credential work: no bcrypt call for the
+    // rejected attempt.
+    const compareCalls = (bcrypt.compare as jest.Mock).mock.calls.length;
+    await failLogin(service, 'SOKDARA');
+    expect((bcrypt.compare as jest.Mock).mock.calls.length).toBe(compareCalls);
+
+    // The lock expires on its own.
+    redis.advance(60_000);
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    await expect(
+      service.loginWithPassword({ identifier: 'sokdara', password: 'wrong' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('does not lock a different identifier', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    const db = makeUserLookup(makeUser());
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await failLogin(service, 'victim');
+    }
+    await expect(failLogin(service, 'victim')).resolves.toBeInstanceOf(
+      HttpException,
+    );
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    await expect(
+      service.loginWithPassword({ identifier: 'bystander', password: 'pass' }),
+    ).resolves.toMatchObject({ accessToken: 'signed-token' });
+  });
+
+  it('resets the counter after a successful login', async () => {
+    const db = makeUserLookup(makeUser());
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await failLogin(service, 'testuser');
+    }
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    await service.loginWithPassword({
+      identifier: 'testuser',
+      password: 'pass',
+    });
+
+    // Four more failures would be the ninth inside the window: with the reset
+    // they are counted from zero, so no lock yet.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'wrong',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+  });
+
+  it('gives unknown identifiers the same lockout shape as real accounts', async () => {
+    const known = makeService(
+      makeUserLookup(makeUser()),
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+    const unknown = makeService(
+      makeUserLookup(null),
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await failLogin(known, 'testuser');
+      await failLogin(unknown, 'ghost');
+    }
+
+    const knownError = (await failLogin(known, 'testuser')) as HttpException;
+    const unknownError = (await failLogin(unknown, 'ghost')) as HttpException;
+
+    expect(knownError.getStatus()).toBe(429);
+    expect(unknownError.getStatus()).toBe(429);
+    expect(unknownError.getResponse()).toEqual(knownError.getResponse());
+    expect(unknownError.getResponse()).toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      retryAfterSeconds: 60,
     });
   });
 });
@@ -473,6 +726,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeOtpService() as never,
       makeOtpSender() as never,
       notifications as never,
+      makeLockout() as never,
     );
   }
 
@@ -1975,6 +2229,7 @@ describe('AuthService password reset', () => {
       (otp.service ?? makeOtpService()) as never,
       (otp.sender ?? makeOtpSender()) as never,
       notifications as never,
+      makeLockout() as never,
     );
   }
 
@@ -2588,6 +2843,7 @@ describe('AuthService phone OTP (provider switch)', () => {
       otpService as never,
       otpSender as never,
       { notify: jest.fn() } as never,
+      makeLockout() as never,
     );
     return { db, service, otpService, otpSender, supabase };
   }

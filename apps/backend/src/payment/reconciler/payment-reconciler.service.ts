@@ -27,6 +27,7 @@ import { paymentAttempts, paymentTransactions } from '../entity';
 import { PAYMENT_ISSUED_EVENT } from '../payment.constants';
 import { PaymentGatewayRegistry } from '../providers/payment-gateway.registry';
 import { RECOVERABLE_FAILURE_CODES, nextTickDelayMs } from './reconcile-policy';
+import { ProviderEventRedrive } from './provider-event-redrive.service';
 import { runExpireAttempt, runReconcileAttempt } from './run-reconcile-attempt';
 import type { ReconcileAttemptResult } from './run-reconcile-attempt';
 
@@ -68,6 +69,12 @@ export interface ReconcileSummary {
   pending: number;
   /** Age of the newest of those, `null` when none. */
   newestPendingAgeMs: number | null;
+  /** Stale provider events re-enqueued for processing this pass. */
+  providerEventsRedriven: number;
+  /** Stale provider events that spent their whole re-drive budget. */
+  providerEventsExhausted: number;
+  /** Provider event rows deleted by the hourly retention sweep. */
+  providerEventsPurged: number;
 }
 
 /**
@@ -120,6 +127,7 @@ export class PaymentReconciler
     private readonly outbox: OutboxService,
     private readonly activation: SubscriptionActivationService,
     private readonly configService: ConfigService,
+    private readonly providerEventRedrive: ProviderEventRedrive,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -266,6 +274,9 @@ export class PaymentReconciler
       errors: 0,
       pending: 0,
       newestPendingAgeMs: null,
+      providerEventsRedriven: 0,
+      providerEventsExhausted: 0,
+      providerEventsPurged: 0,
     };
 
     // Last hop first: a payment that already settled but whose purchase never
@@ -274,10 +285,15 @@ export class PaymentReconciler
     summary.activated = await this.activateSettledPurchases();
     summary.abandoned += await this.expireWebhookAttempts();
 
+    const now = Date.now();
+    // Housekeeping for events whose BullMQ job dead-lettered (and for the
+    // ingestion table's own retention). Independent of which providers are
+    // polled, so it runs before the provider gate below.
+    await this.sweepProviderEvents(summary, now);
+
     const providers = this.providers();
     if (providers.length === 0) return summary;
 
-    const now = Date.now();
     const since = new Date(now - this.latePaymentGraceMs());
     const candidateColumns = {
       id: paymentAttempts.id,
@@ -345,6 +361,26 @@ export class PaymentReconciler
     if (summary.settled > 0) this.outbox.wakeupAfterCommit();
 
     return summary;
+  }
+
+  /**
+   * Isolated so a housekeeping failure (a Redis outage while re-driving, a
+   * retention delete timing out) never stops the payment sweep that follows.
+   */
+  private async sweepProviderEvents(
+    summary: ReconcileSummary,
+    now: number,
+  ): Promise<void> {
+    try {
+      const sweep = await this.providerEventRedrive.sweep(now);
+      summary.providerEventsRedriven = sweep.redriven;
+      summary.providerEventsExhausted = sweep.exhausted;
+      summary.providerEventsPurged = sweep.purged;
+    } catch (err) {
+      this.logger.warn(
+        `Provider event sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   private async reconcileCandidate(

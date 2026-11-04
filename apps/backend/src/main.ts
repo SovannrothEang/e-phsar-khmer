@@ -52,6 +52,18 @@ async function bootstrap() {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // `origin: true` reflects whatever origin asks, so with credentials on it
+  // grants every site a logged-in context. That is tolerable while developing
+  // against arbitrary localhost ports; in production it is a misconfiguration
+  // (a forgotten env var), so boot fails loudly rather than silently opening
+  // the API to any origin.
+  if (isProduction && frontendOrigins.length === 0) {
+    throw new Error(
+      'FRONTEND_ORIGINS must list the allowed browser origins in production: CORS with credentials cannot default to every origin. Set it to a comma-separated list, e.g. "https://phsarkhmer.com".',
+    );
+  }
 
   app.enableCors({
     origin: frontendOrigins.length ? frontendOrigins : true,
@@ -60,14 +72,18 @@ async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('PhsarKhmer.com API')
-    .setDescription('E-Market API — PhsarKhmer.com marketplace')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  // The schema enumerates every route and DTO shape; keep it off the public
+  // production surface (it is still mounted for local/dev and E2E runs).
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('PhsarKhmer.com API')
+      .setDescription('E-Market API — PhsarKhmer.com marketplace')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0', () => {
     console.log(
@@ -78,4 +94,12 @@ async function bootstrap() {
   });
 }
 
-void bootstrap();
+// A boot-time configuration error (e.g. missing FRONTEND_ORIGINS in
+// production) must stop the process with a readable message, not leave a
+// rejected promise whose default report buries the reason.
+void bootstrap().catch((err: unknown) => {
+  console.error(
+    `Fatal error during boot: ${err instanceof Error ? err.message : String(err)}`,
+  );
+  process.exit(1);
+});

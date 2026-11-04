@@ -12,6 +12,8 @@ import { DbModule } from './db/db.module';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { UserAwareThrottlerGuard } from './common/guards/user-aware-throttler.guard';
+import { RedisThrottlerStorage } from './common/throttler/throttler-storage';
+import { ThrottlerStorageModule } from './common/throttler/throttler-storage.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -54,14 +56,26 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
       envFilePath: ['.env', '.env.local'],
     }),
     EventEmitterModule.forRoot(),
+    // Shared, Redis-backed throttler counters: the in-memory default
+    // multiplied every limit by the number of instances, so a "5/min" auth
+    // bucket was really 5/min per process. `ThrottlerStorageModule` owns the
+    // dedicated connection (and the fail-open policy — see the storage).
+    ThrottlerStorageModule,
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => [
-        {
-          ttl: (configService.get<number>('throttle.ttl') ?? 60) * 1000,
-          limit: configService.get<number>('throttle.limit') ?? 100,
-        },
-      ],
+      imports: [ThrottlerStorageModule],
+      inject: [ConfigService, RedisThrottlerStorage],
+      useFactory: (
+        configService: ConfigService,
+        storage: RedisThrottlerStorage,
+      ) => ({
+        throttlers: [
+          {
+            ttl: (configService.get<number>('throttle.ttl') ?? 60) * 1000,
+            limit: configService.get<number>('throttle.limit') ?? 100,
+          },
+        ],
+        storage,
+      }),
     }),
     // Shared BullMQ connection. Read through ConfigService rather than
     // process.env so the Zod-validated (and coerced) values are used — a

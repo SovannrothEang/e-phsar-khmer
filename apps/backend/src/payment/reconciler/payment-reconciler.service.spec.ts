@@ -80,14 +80,20 @@ function build(opts: {
         : undefined,
     ),
   };
+  const providerEventRedrive = {
+    sweep: jest
+      .fn()
+      .mockResolvedValue({ redriven: 0, exhausted: 0, purged: 0 }),
+  };
   const reconciler = new PaymentReconciler(
     db as never,
     {} as never,
     outbox as never,
     activation as never,
     config as never,
+    providerEventRedrive as never,
   );
-  return { reconciler, db, outbox, activation };
+  return { reconciler, db, outbox, activation, providerEventRedrive };
 }
 
 const attempt = (id: string, ageMs: number) => ({
@@ -262,6 +268,41 @@ describe('PaymentReconciler.runOnce', () => {
     // activation + expiry only — the candidates query is skipped.
     expect(db.select).toHaveBeenCalledTimes(2);
   });
+
+  it('reports the provider-event re-drive sweep in the summary', async () => {
+    const { reconciler, providerEventRedrive } = build({});
+    providerEventRedrive.sweep.mockResolvedValueOnce({
+      redriven: 2,
+      exhausted: 1,
+      purged: 7,
+    });
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary).toMatchObject({
+      providerEventsRedriven: 2,
+      providerEventsExhausted: 1,
+      providerEventsPurged: 7,
+    });
+    expect(providerEventRedrive.sweep).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('keeps reconciling when the provider-event sweep fails', async () => {
+    reconcileMock.mockResolvedValue('succeeded');
+    const { reconciler, providerEventRedrive } = build({
+      candidates: [attempt('a1', MINUTE)],
+    });
+    providerEventRedrive.sweep.mockRejectedValueOnce(new Error('redis down'));
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary).toMatchObject({
+      settled: 1,
+      providerEventsRedriven: 0,
+      providerEventsExhausted: 0,
+      providerEventsPurged: 0,
+    });
+  });
 });
 
 describe('PaymentReconciler.runExclusive', () => {
@@ -274,6 +315,9 @@ describe('PaymentReconciler.runExclusive', () => {
     errors: 0,
     pending: 0,
     newestPendingAgeMs: null,
+    providerEventsRedriven: 0,
+    providerEventsExhausted: 0,
+    providerEventsPurged: 0,
   };
 
   it('shares one in-flight pass between concurrent callers', async () => {
@@ -567,6 +611,11 @@ describe('PaymentReconciler timer', () => {
           if (key === 'payment.reconcileIdleIntervalMs') return IDLE;
           return undefined;
         }),
+      } as never,
+      {
+        sweep: jest
+          .fn()
+          .mockResolvedValue({ redriven: 0, exhausted: 0, purged: 0 }),
       } as never,
     );
     const original = reconciler.runOnce.bind(

@@ -16,6 +16,7 @@ import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
 import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
 import { PaymentReconciler } from './reconciler/payment-reconciler.service';
+import { ProviderEventRedrive } from './reconciler/provider-event-redrive.service';
 import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconciler.service';
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -82,6 +83,9 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     // settles any unresolved attempt straight from Postgres, so a payment made
     // while the app was down still activates. See reconciler/payment-reconciler.service.ts.
     PaymentReconciler,
+    // Re-drives provider events whose BullMQ job dead-lettered, and purges
+    // ingestion rows past the 30-day dedupe window. Called from the reconciler.
+    ProviderEventRedrive,
     // Lets a payer's own GET /payments/:id nudge a settle along (throttled).
     PaymentOnDemandReconciler,
     // Consumes the business-level payment.succeeded event — notifies the

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
@@ -18,13 +18,17 @@ export class InsightsController {
    * (feed impressions, detail views) is anonymous. A present Bearer token is
    * verified so the listing owner's own actions can be excluded.
    *
-   * Deliberately unthrottled: the web calls this through a Next server action,
-   * so every visitor shares the Next/Vercel egress IP; an IP-keyed bucket
-   * would throttle the whole site together. The DTO's 50-event cap is the
-   * bound — see the module README / plan for the trade-off.
+   * Throttled since the 2026-11-03 review. The web calls this through a Next
+   * server action, so anonymous traffic shares the Next/Vercel egress IP and
+   * this bucket is effectively one site-wide budget, not a per-visitor one —
+   * hence 600/min (10/s) rather than a per-user number: high enough not to
+   * drop ordinary beacon traffic, low enough to bound a flood. Because the
+   * route is `@Public()`, the global JwtAuthGuard does not run, so the
+   * throttler keys even token-carrying calls by IP. The DTO's 50-event cap
+   * still bounds each payload; this bucket bounds how often the write is hit.
    */
   @Public()
-  @SkipThrottle()
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
   @UseGuards(OptionalJwtAuthGuard)
   @Post('events')
   @ApiOperation({ summary: 'Record a batch of listing interactions' })

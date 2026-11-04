@@ -193,4 +193,70 @@ describe('ListingExpiryService', () => {
       (service as unknown as { db: { update?: unknown } }).db.update,
     ).toBeUndefined();
   });
+
+  it('processes one bounded page and resumes after its last id', async () => {
+    const { service, recs, queue } = setup();
+    const expiresAt = new Date(now.getTime() + DAY_MS);
+    const page = Array.from({ length: 200 }, (_, i) => ({
+      id: `l${String(i).padStart(3, '0')}`,
+      userId: 'u1',
+      title: 'Toy car',
+      expiresAt,
+    }));
+    queue(page, [], [], []);
+
+    const result = await service.sweep(now);
+
+    expect(result).toEqual({ expiring: 200, expired: 0 });
+    expect(recs[0].limit).toEqual([200]);
+
+    queue([], []);
+    await service.sweep(now);
+
+    const where = dialect.sqlToQuery(recs[0].where[0] as never);
+    expect(where.sql).toContain('"id" > $');
+    expect(where.params).toContain('l199');
+    expect(recs[0].limit).toEqual([200]);
+  });
+
+  it('re-scans from the start after a short page', async () => {
+    const { service, recs, queue } = setup();
+    const expiresAt = new Date(now.getTime() + DAY_MS);
+    const full = Array.from({ length: 200 }, (_, i) => ({
+      id: `l${String(i).padStart(3, '0')}`,
+      userId: 'u1',
+      title: 'Toy car',
+      expiresAt,
+    }));
+    queue(full, [], [], []);
+    await service.sweep(now);
+
+    queue([{ id: 'l200', userId: 'u1', title: 'Lamp', expiresAt }], [], [], []);
+    await service.sweep(now);
+
+    queue([], []);
+    await service.sweep(now);
+
+    const where = dialect.sqlToQuery(recs[0].where[0] as never);
+    expect(where.sql).not.toContain('"id" >');
+  });
+
+  it('bounds the dedupe history to four days', async () => {
+    const { service, recs, queue } = setup();
+    const expiresAt = new Date(now.getTime() + DAY_MS);
+    queue(
+      [{ id: 'l1', userId: 'u1', title: 'Toy car', expiresAt }],
+      [],
+      [],
+      [],
+    );
+
+    await service.sweep(now);
+
+    const where = dialect.sqlToQuery(recs[1].where[0] as never);
+    expect(where.sql).toContain('"created_at" >=');
+    expect(where.params).toContain(
+      new Date(now.getTime() - 4 * DAY_MS).toISOString(),
+    );
+  });
 });

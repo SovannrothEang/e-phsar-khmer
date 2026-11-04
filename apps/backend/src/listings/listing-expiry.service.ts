@@ -1,5 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+} from 'drizzle-orm';
 import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
 import { listings, notifications, users } from '../db/schema';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -19,6 +29,19 @@ type ExpiryCandidate = {
 };
 
 /**
+ * Ads per sweep query. The hourly run continues after the last id of a full
+ * page, so one run is bounded even when a large backlog matches.
+ */
+const EXPIRY_BATCH_SIZE = 200;
+
+/**
+ * How far back the (listingId, expiresAt) dedupe looks. An expiry notice is
+ * only ever produced inside the 3-day warning window or the 24-hour lapse
+ * lookback, so a notice older than this cannot suppress a current one.
+ */
+const UNNOTIFIED_LOOKBACK_MS = 4 * DAY_MS;
+
+/**
  * Tells owners their ad is about to lapse and, once, that it has lapsed.
  *
  * The ad itself never changes status when `expires_at` passes — expiry is
@@ -30,6 +53,16 @@ type ExpiryCandidate = {
 @Injectable()
 export class ListingExpiryService {
   private readonly logger = new Logger(ListingExpiryService.name);
+
+  /**
+   * Keyset cursors over `listings.id`, one per notice pass. A full page leaves
+   * the cursor on its last id; a short page means the pass is done and clears
+   * it, so ids inserted before the cursor are re-scanned next time. Dedupe in
+   * `unnotified` makes that re-scan safe (at most one notice per
+   * (listing, expiry)).
+   */
+  private expiringAfter: string | null = null;
+  private expiredAfter: string | null = null;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -63,10 +96,13 @@ export class ListingExpiryService {
           gt(listings.expiresAt, now),
           lte(listings.expiresAt, until),
           isNull(users.deletedAt),
+          this.expiringAfter ? gt(listings.id, this.expiringAfter) : undefined,
         ),
-      );
+      )
+      .orderBy(asc(listings.id))
+      .limit(EXPIRY_BATCH_SIZE);
 
-    const pending = await this.unnotified('listing.expiring', rows);
+    const pending = await this.unnotified('listing.expiring', rows, now);
     let sent = 0;
     for (const row of pending) {
       const days = Math.max(
@@ -86,6 +122,7 @@ export class ListingExpiryService {
       });
       if (delivered) sent++;
     }
+    this.expiringAfter = this.nextCursor(rows);
     return sent;
   }
 
@@ -108,10 +145,13 @@ export class ListingExpiryService {
           lte(listings.expiresAt, now),
           gt(listings.expiresAt, since),
           isNull(users.deletedAt),
+          this.expiredAfter ? gt(listings.id, this.expiredAfter) : undefined,
         ),
-      );
+      )
+      .orderBy(asc(listings.id))
+      .limit(EXPIRY_BATCH_SIZE);
 
-    const pending = await this.unnotified('listing.expired', rows);
+    const pending = await this.unnotified('listing.expired', rows, now);
     let sent = 0;
     for (const row of pending) {
       const delivered = await this.send({
@@ -123,12 +163,25 @@ export class ListingExpiryService {
       });
       if (delivered) sent++;
     }
+    this.expiredAfter = this.nextCursor(rows);
     return sent;
+  }
+
+  /**
+   * `id` of the last row of a full page, else null. A failed send still
+   * advances the cursor: progress must not depend on one owner's channel, and
+   * the row is retried when the next pass re-scans from the start.
+   */
+  private nextCursor(rows: { id: string }[]): string | null {
+    if (rows.length < EXPIRY_BATCH_SIZE) return null;
+    return rows[rows.length - 1]?.id ?? null;
   }
 
   /**
    * Drops candidates whose (listingId, expiresAt) already produced a notice
    * of this type. The key lives in `data`, so no extra column or migration.
+   * History is bounded to the notice's own horizon: older rows cannot match a
+   * candidate still inside the warning/lapse window.
    */
   private async unnotified(
     type: string,
@@ -138,6 +191,7 @@ export class ListingExpiryService {
       title: string;
       expiresAt: Date | null;
     }[],
+    now: Date,
   ): Promise<ExpiryCandidate[]> {
     const candidates = rows.filter(
       (row): row is ExpiryCandidate => row.expiresAt !== null,
@@ -152,6 +206,10 @@ export class ListingExpiryService {
         and(
           eq(notifications.type, type),
           inArray(notifications.userId, userIds),
+          gte(
+            notifications.createdAt,
+            new Date(now.getTime() - UNNOTIFIED_LOOKBACK_MS),
+          ),
         ),
       );
     const seen = new Set(

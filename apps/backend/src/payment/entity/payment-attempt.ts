@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, numeric, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { paymentTransactions } from './payment-transaction';
 import { paymentSchema } from './payment.pg-schema';
@@ -50,6 +51,13 @@ export const paymentAttempts = paymentSchema.table(
       t.provider,
       t.providerAttemptId,
     ),
+    // Matches PaymentReconciler's pending/recoverable scans: a status filter
+    // ordered newest-first, over attempts the provider has acknowledged
+    // (`providerAttemptId` not null). Partial so unacknowledged attempts, which
+    // the reconciler never looks at, stay out of the index.
+    index('payment_attempts_status_created_at_idx')
+      .on(t.status, t.createdAt.desc())
+      .where(sql`${t.providerAttemptId} is not null`),
   ],
 );
 
