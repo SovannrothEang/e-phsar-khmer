@@ -339,3 +339,42 @@
 .command-list::-webkit-scrollbar-thumb:hover {
   background: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
 }
+
+/* ── DbImage placeholder ──────────────────────────────────────────────────
+   A DB image is a remote Storage object, so on a slow connection the box is
+   empty until the bytes decode. `DbImage` marks the element `data-dbimg`
+   "pending" until `onLoad` fires, and this paints the same element's
+   background: the shimmer shows while the image is missing and is covered by
+   the decoded image afterwards, so no wrapper element (and no change to
+   `fill` layout) is needed. `prefers-reduced-motion` keeps a flat tint. */
+img[data-dbimg="pending"] {
+  background-color: var(--muted);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in oklab, var(--foreground) 7%, transparent) 40%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: dbimg-shimmer 1.4s ease-in-out infinite;
+}
+
+img[data-dbimg="loaded"] {
+  animation: none;
+  transition: opacity 300ms ease-out;
+}
+
+@keyframes dbimg-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  img[data-dbimg="pending"] {
+    animation: none;
+  }
+}
