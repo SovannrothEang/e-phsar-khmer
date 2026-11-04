@@ -153,6 +153,10 @@ const baseEnvSchema = z.object({
   // How long after creation a failed-by-timeout attempt is still checked, so
   // a late-arriving payment is honoured instead of lost.
   PAYMENT_LATE_PAYMENT_GRACE_MS: z.coerce.number().default(24 * 60 * 60 * 1000),
+  // Shared secret for `POST /internal/payments/reconcile`, the wake-up an
+  // external pinger/cron calls when nobody is on a checkout page. Unset, the
+  // route answers 503 so it can never be triggered by accident.
+  INTERNAL_RECONCILE_SECRET: z.string().min(16).optional(),
 
   // ABA PayWay gateway credentials. Optional so build/tests don't require
   // sandbox access — AbaPaywayProvider fails fast with a clear message if

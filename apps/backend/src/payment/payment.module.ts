@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentsController } from './payment.controller';
 import { AbaPaywayWebhookController } from './webhooks/aba-payway-webhook.controller';
+import { InternalReconcileController } from './internal/internal-reconcile.controller';
 import { PAYMENT_GATEWAY_PROVIDERS, PaymentGatewayRegistry } from './providers';
 import { AbaPaywayProvider } from './providers/aba-payway/aba-payway.provider';
 import { BakongProvider } from './providers/bakong/bakong.provider';
@@ -49,7 +50,13 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     NotificationsModule,
     SubscriptionsCoreModule,
   ],
-  controllers: [PaymentsController, AbaPaywayWebhookController],
+  controllers: [
+    PaymentsController,
+    AbaPaywayWebhookController,
+    // The external pinger/cron wake-up for a provider with no webhook; the
+    // secret header is the whole auth (see the controller's doc comment).
+    InternalReconcileController,
+  ],
   providers: [
     PaymentGatewayRegistry,
     AbaPaywayProvider,

@@ -1,9 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getUnreadNotificationCount } from "@/actions/notifications";
 import { notificationKeys } from "@/lib/notifications/queries";
+import { useNotificationEvents } from "@/hooks/use-chat-ws";
 
 /** Matches the chat badge's cadence; the feed page invalidates on mutations. */
 const POLL_MS = 60_000;
@@ -18,6 +19,7 @@ const POLL_MS = 60_000;
  */
 export function NotificationUnreadBadge() {
   const t = useTranslations("Notifications");
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: notificationKeys.unread(),
     queryFn: getUnreadNotificationCount,
@@ -28,6 +30,23 @@ export function NotificationUnreadBadge() {
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30 * 1000,
+  });
+
+  // The badge already has a socket sitewide (the chat badge opens the shared
+  // one), so this only adds a listener. A push invalidates the two queries the
+  // bell panel and the badge read, instead of waiting out the 60 s poll. The
+  // poll stays as the floor: a push sent while the socket was down is not
+  // replayed.
+  useNotificationEvents({
+    enabled: typeof data === "number",
+    onNotification: () => {
+      void queryClient.invalidateQueries({
+        queryKey: notificationKeys.unread(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: notificationKeys.recent(),
+      });
+    },
   });
 
   if (!data || data <= 0) return null;

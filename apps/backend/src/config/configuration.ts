@@ -95,6 +95,7 @@ export default () => {
         .filter(Boolean),
       pendingAbandonMs: env.PAYMENT_PENDING_ABANDON_MS,
       latePaymentGraceMs: env.PAYMENT_LATE_PAYMENT_GRACE_MS,
+      internalReconcileSecret: env.INTERNAL_RECONCILE_SECRET,
     },
     abaPayway: {
       apiKey: env.ABA_PAYWAY_API_KEY,

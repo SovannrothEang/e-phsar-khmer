@@ -149,6 +149,12 @@ something to look at.
   waiting no longer than 4 s. The response still comes from the database; it
   re-reads only if the check resolved something. On a serverless instance this
   is also what keeps the check running while a payer is on the page.
+- **External wake-up (serverless).** `POST /internal/payments/reconcile` runs one
+  `runOnce` pass for a caller holding `INTERNAL_RECONCILE_SECRET` in
+  `x-internal-secret` (constant-time compare; the route answers 503 when the
+  secret is unset, so it can never run unauthenticated). A 1–5 minute pinger or
+  cron is the cheapest way to keep a paid QR from waiting for the next request
+  that boots an instance; the pass is the same idempotent one the timer runs.
 - **Legacy drain.** `PaymentPollOutboxHandler` and the `poll-attempt` job
   branch in `PaymentProcessor` are now no-ops that mark old
   `payment.attempt.poll_requested` rows / delayed jobs finished. They exist
