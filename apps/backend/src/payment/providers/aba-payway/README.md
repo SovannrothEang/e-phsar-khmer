@@ -84,7 +84,7 @@ sequenceDiagram
     API->>API: verify signature (401 → nothing written)
     API->>Q: store event + enqueue
     Q->>API: settle → payment.succeeded → activate purchase
-    Note over API: unpaid past expiresAt (+30s): DB-only sweep fails the attempt
+    Note over API: unpaid past expiresAt: the ABA poll (or the DB sweep for a<br/>non-polled provider) fails the attempt
 ```
 
 Key properties:
@@ -117,7 +117,7 @@ rejects (fail closed).
 | ----------------------------------- | -------------------------------------------------------------------------- |
 | `charge()`                          | Done — confirmed against the sandbox                                       |
 | `reconcile()`                       | Done — used as ABA's recovery path (in `PAYMENT_RECONCILE_PROVIDERS`)      |
-| Expiry (`lifetime` + sweep)         | Done — unit-tested; not yet run against the live sandbox                   |
+| Expiry (`lifetime` + poll/sweep)    | Done — unit-tested; not yet run against the live sandbox                   |
 | Callback verify + parse             | Done — a real sandbox callback verified and settled a payment (2026-10-16) |
 | Unit tests                          | Signing, encoding, status, provider, and the controller — all offline      |
 | `transaction-detail`/`close`/`list` | Not implemented, not needed yet                                            |

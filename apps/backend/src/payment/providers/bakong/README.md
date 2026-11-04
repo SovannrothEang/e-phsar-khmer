@@ -120,7 +120,8 @@ something to look at.
   costs at most one sweep interval, never a payment.
 - **`PaymentReconciler`** (`../../reconciler/payment-reconciler.service.ts`)
   reads every unresolved attempt for `PAYMENT_RECONCILE_PROVIDERS` (default
-  `bakong`) straight from Postgres and settles through one idempotent path
+  `bakong,aba_payway`; ABA is the lost/late-callback recovery path) straight
+  from Postgres and settles through one idempotent path
   (`settleReconciledAttempt`). Pacing comes from `nextTickDelayMs`:
 
   | State seen by the last pass                    | Next pass in                                             |
