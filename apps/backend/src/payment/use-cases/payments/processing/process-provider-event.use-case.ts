@@ -22,6 +22,7 @@ import { updatePaymentAttempt } from '../attempt/update-payment-attempt.use-case
 import { upsertPaymentTransactionDetail } from '../transaction/upsert-payment-transaction-detail.use-case';
 import { recordPaymentStatusHistory } from '../transaction/record-payment-status-history.use-case';
 import { upsertPayment } from '../transaction/upsert-payment.use-case';
+import { settleReconciledAttempt } from './settle-reconciled-attempt.use-case';
 import { postPaymentSettlementLedger } from '../../ledgers';
 import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
 import { resolveProviderEventFailure } from './provider-event-failure';
@@ -54,6 +55,12 @@ function nextTransactionStatus(
  * currently knows (`reconcile()`) — defense in depth for a signed webhook,
  * and the only check for a provider whose webhook carries no signature. A
  * gateway with no `reconcile()` trusts the re-parsed payload directly.
+ *
+ * A delivery for an attempt that is already resolved is normally a duplicate.
+ * The exception is money that arrived after we gave up: when the attempt is
+ * `failed` and the provider corroborates success (`reconcile()`, or ABA's
+ * signature-verified webhook), it settles through `settleReconciledAttempt`
+ * with reason `late_payment` rather than being ignored.
  */
 export const processProviderEvent = Effect.fn('processProviderEvent')(
   function* (
@@ -90,12 +97,6 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
 
     const attempt = yield* findPaymentAttempt(event.paymentAttemptId);
     const transaction = yield* checkPayment(attempt.paymentTransactionId);
-
-    if (attempt.status !== 'pending') {
-      // Already resolved — a later delivery for the same attempt is a duplicate.
-      yield* settlePaymentProviderEvent({ id: event.id, status: 'ignored' });
-      return 'ignored_already_settled';
-    }
 
     const registry = yield* PaymentGatewayRegistryTag;
     let provider: ReturnType<typeof registry.resolve> | undefined;
@@ -136,6 +137,58 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
       // Authoritative — overrides whatever the webhook claimed, signed or not.
       outcome = reconciledResult.status;
       rawResponse = reconciledResult.rawResponse ?? rawResponse;
+    }
+
+    if (attempt.status !== 'pending') {
+      // Normally a resolved attempt means this delivery is a duplicate. A
+      // failed attempt is the exception: money can land after we gave up on
+      // the clock (a delayed callback, a poll that stopped), so a
+      // *corroborated* success still settles it.
+      //
+      // `reconciledResult` is the authoritative answer whenever the gateway
+      // was asked. ABA is deliberately not asked (it trusts its
+      // HMAC-verified webhook — see `trustsVerifiedWebhook`), so for ABA
+      // alone the verified `succeeded` status is the answer; its controller
+      // rejected a bad signature before this event row existed. For any other
+      // provider a webhook alone is not enough: an unverified callback must
+      // never resurrect a failed attempt.
+      const lateSuccess =
+        attempt.status === 'failed' &&
+        outcome === 'succeeded' &&
+        (reconciledResult !== undefined || provider.name === 'aba_payway');
+
+      if (lateSuccess) {
+        const result: ChargeResult & { status: 'succeeded' } = reconciledResult
+          ? { ...reconciledResult, status: 'succeeded' }
+          : {
+              status: 'succeeded',
+              providerTransactionId:
+                parsed.providerAttemptId ??
+                attempt.providerAttemptId ??
+                undefined,
+              rawResponse,
+            };
+
+        yield* settleReconciledAttempt(outbox, {
+          attempt,
+          transaction,
+          provider,
+          result,
+          reason: 'late_payment',
+        });
+        // The settlement owns its DB transaction; closing the event row right
+        // after is safe because a retry finds the attempt `succeeded` and is a
+        // no-op (the `ignored_already_settled` branch below).
+        yield* settlePaymentProviderEvent({
+          id: event.id,
+          status: 'processed',
+        });
+        return 'succeeded';
+      }
+
+      // Already resolved — a later delivery for the same attempt is a duplicate.
+      yield* settlePaymentProviderEvent({ id: event.id, status: 'ignored' });
+      return 'ignored_already_settled';
     }
 
     if (outcome === 'pending') {

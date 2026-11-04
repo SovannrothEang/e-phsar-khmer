@@ -84,7 +84,8 @@ export interface FollowUserItem {
  * Everything the public profile page renders. Deliberately an explicit
  * allow-list rather than `PublicUser`: this shape is served to anonymous
  * callers, so phone, email, role, status and moderation fields must never be
- * part of it — the same over-exposure `GET /users/:id` is already flagged for.
+ * part of it. `GET /users/:id` serves the same projection to signed-in
+ * callers, because a seller's id is public in listings.
  */
 export interface PublicProfile {
   id: string;
@@ -945,6 +946,21 @@ export class UsersService {
 
   /** The public profile, looked up by handle. */
   async getPublicProfile(username: string): Promise<PublicProfile> {
+    return this.loadPublicProfile({ username });
+  }
+
+  /** The same projection, looked up by id for `GET /users/:id`. */
+  async getPublicProfileById(id: string): Promise<PublicProfile> {
+    return this.loadPublicProfile({ id });
+  }
+
+  /**
+   * One allow-list projection for both public reads, so `GET /users/:id`
+   * cannot drift back into serving the full user row.
+   */
+  private async loadPublicProfile(
+    match: { id: string } | { username: string },
+  ): Promise<PublicProfile> {
     const [user] = await this.db
       .select({
         id: users.id,
@@ -962,7 +978,9 @@ export class UsersService {
       // user report must take the profile down, not just block its login.
       .where(
         and(
-          eq(users.username, username),
+          'id' in match
+            ? eq(users.id, match.id)
+            : eq(users.username, match.username),
           isNull(users.deletedAt),
           eq(users.status, 'active'),
         ),

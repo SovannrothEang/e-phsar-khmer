@@ -1324,9 +1324,18 @@ export class AuthService {
    * Social identity resolution, in order of trust:
    *   1. an existing (provider, provider account id) link — stable even when
    *      the provider email changes;
-   *   2. a non-deleted account with the same confirmed email;
-   *   3. a new account created by the email upsert (the partial unique index
-   *      keeps concurrent first logins safe).
+   *   2. a non-deleted local account with the same email whose own email is
+   *      verified (`emailVerifiedAt` is set);
+   *   3. otherwise a new account created by the email upsert (the partial
+   *      unique index keeps concurrent first logins safe).
+   *
+   * The provider's `email_confirmed_at` only proves the provider controls the
+   * address, not that the local row does: anyone can write an email through
+   * `PATCH /users/me` without verification. Auto-linking on an unverified
+   * local row would therefore hand that account to whoever typed the victim's
+   * address first. An unverified collision is refused with a stable code
+   * instead, and the user links the provider explicitly from Settings through
+   * `linkSocialProvider`.
    */
   private async resolveSocialUser(
     provider: 'google' | 'facebook',
@@ -1341,19 +1350,41 @@ export class AuthService {
 
     const existing = await this.findUserByEmail(email);
     if (existing) {
+      if (!existing.emailVerifiedAt) {
+        throw new ConflictException({
+          code: 'EMAIL_LINK_REQUIRED',
+          message:
+            'An account already uses this email. Sign in with your existing method and link this provider from Settings.',
+        });
+      }
       await this.linkProvider(existing.id, provider, providerAccountId);
       return existing;
     }
 
     const [created] = await this.db
       .insert(users)
-      .values({ email })
+      // The provider already proved it controls this address
+      // (`email_confirmed_at`), so the brand-new row's email is verified from
+      // the start. That is what lets the same person link a second provider
+      // later without tripping the unverified-collision gate.
+      .values({ email, emailVerifiedAt: new Date() })
       .onConflictDoUpdate({
         target: users.email,
         targetWhere: isNull(users.deletedAt),
         set: { updatedAt: new Date() },
       })
       .returning();
+
+    // A concurrent first login can win the upsert with a row this social flow
+    // did not create. If that row's email was never verified, it is exactly
+    // the unverified collision above — refuse instead of linking it.
+    if (!created.emailVerifiedAt) {
+      throw new ConflictException({
+        code: 'EMAIL_LINK_REQUIRED',
+        message:
+          'An account already uses this email. Sign in with your existing method and link this provider from Settings.',
+      });
+    }
 
     await this.linkProvider(created.id, provider, providerAccountId);
     return created;

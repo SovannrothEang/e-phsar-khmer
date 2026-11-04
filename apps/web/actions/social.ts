@@ -226,16 +226,19 @@ export async function completeSocialLogin(input: {
 
   if (!res.ok || !body?.success || !body.data) {
     const message = body?.error?.message;
+    const code = body?.error?.code;
     return {
       success: false,
       error:
         target === "admin"
           ? "This account is not authorized for the admin dashboard"
-          : message === "SOCIAL_EMAIL_UNVERIFIED"
-            ? "The email on that account is not verified."
-            : message === "SOCIAL_EMAIL_REQUIRED"
-              ? "That provider did not return an email address."
-              : (message ?? "Sign-in failed"),
+          : code === "EMAIL_LINK_REQUIRED"
+            ? "An account already uses this email. Sign in with your existing method, then link this provider from Settings."
+            : message === "SOCIAL_EMAIL_UNVERIFIED"
+              ? "The email on that account is not verified."
+              : message === "SOCIAL_EMAIL_REQUIRED"
+                ? "That provider did not return an email address."
+                : (message ?? "Sign-in failed"),
     };
   }
 

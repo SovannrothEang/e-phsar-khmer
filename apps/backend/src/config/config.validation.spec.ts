@@ -115,6 +115,15 @@ describe('OTP_PROVIDER=plasgate credentials', () => {
   });
 });
 
+describe('PAYMENT_RECONCILE_PROVIDERS', () => {
+  it('includes ABA by default, so a lost or late callback is recovered by the poller', () => {
+    // Bakong has no webhook; ABA has one but it can be lost, so both are polled.
+    expect(
+      validate({ ...requiredEnvironment }).PAYMENT_RECONCILE_PROVIDERS,
+    ).toBe('bakong,aba_payway');
+  });
+});
+
 describe('INTERNAL_RECONCILE_SECRET', () => {
   it('treats an absent or blank value as disabled, not a validation error', () => {
     expect(

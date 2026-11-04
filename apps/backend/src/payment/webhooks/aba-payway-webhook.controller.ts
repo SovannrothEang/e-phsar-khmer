@@ -9,7 +9,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
+import { SkipEnvelope } from '../../common/decorators/skip-envelope.decorator';
 import { PaymentEffectRunner } from '../payment-effect-runner.service';
 import {
   findPaymentAttemptByProviderAttemptId,
@@ -27,8 +29,16 @@ import { AbaPaywayProvider } from '../providers/aba-payway/aba-payway.provider';
  * Legacy alias `webhooks/aba-payway`: ABA gets the callback URL per
  * transaction, so checkouts created before the move still call the old path.
  * Drop it once none are unresolved (the reconciler covers a missed callback).
+ *
+ * `@SkipEnvelope()` is part of the external contract: ABA treats a top-level
+ * `code: 0` in the body as success, so the global `{ success, data }` wrapper
+ * would look like a failure and trigger endless retries. `@SkipThrottle()`
+ * because the callback is server-to-server and a retry burst from one ABA IP
+ * must not be dropped.
  */
 @ApiTags('webhooks')
+@SkipEnvelope()
+@SkipThrottle()
 @Controller(['payments/webhooks/aba-payway', 'webhooks/aba-payway'])
 export class AbaPaywayWebhookController {
   private readonly logger = new Logger(AbaPaywayWebhookController.name);
@@ -92,6 +102,7 @@ export class AbaPaywayWebhookController {
     );
 
     // ABA retries on a non-zero `code` in the body, not just on HTTP status.
-    return { code: 0, message: 'Received' };
+    // Exactly `{ code: 0 }` — see spec.md; the envelope is skipped above.
+    return { code: 0 };
   }
 }

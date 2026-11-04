@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
@@ -9,6 +9,12 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Vercel terminates TLS and forwards exactly one hop, so the client address
+  // is the last X-Forwarded-For entry. Without this Express reports the
+  // proxy's address for every request, and the IP-keyed throttler puts all
+  // clients in one bucket (and rotating the proxy IP would bypass it).
+  app.set('trust proxy', 1);
 
   // Without this, SIGTERM (every Vercel scale-down and redeploy) killed the
   // process with no lifecycle hooks: BullMQ workers never closed (an active
@@ -39,7 +45,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   const rawOrigins = process.env.FRONTEND_ORIGINS ?? '';
   const frontendOrigins = rawOrigins

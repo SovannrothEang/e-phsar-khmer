@@ -267,7 +267,8 @@ Key properties this gives us:
 
 Polling cadence is not configured here. It belongs to the payment module's
 `PAYMENT_RECONCILE_*` variables — `PAYMENT_RECONCILER_ENABLED`,
-`PAYMENT_RECONCILE_PROVIDERS` (default `bakong`),
+`PAYMENT_RECONCILE_PROVIDERS` (default `bakong,aba_payway` — ABA is polled
+too, as the recovery path for a lost or late callback),
 `PAYMENT_RECONCILE_INTERVAL_MS` (15 s) and
 `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (60 s) — plus
 `PAYMENT_PENDING_ABANDON_MS` (15 min age backstop) and

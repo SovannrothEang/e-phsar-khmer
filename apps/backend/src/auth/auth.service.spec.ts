@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   HttpException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -1181,11 +1182,13 @@ describe('AuthService social login', () => {
         values: jest.fn(() => chain),
         onConflictDoUpdate: jest.fn(() => chain),
         onConflictDoNothing: jest.fn(() => chain),
-        returning: jest
-          .fn()
-          .mockResolvedValue([
-            opts.createdUser ?? makeUser({ email: 'new@example.com' }),
-          ]),
+        returning: jest.fn().mockResolvedValue([
+          opts.createdUser ??
+            makeUser({
+              email: 'new@example.com',
+              emailVerifiedAt: new Date(),
+            }),
+        ]),
       };
       return chain;
     });
@@ -1424,7 +1427,10 @@ describe('AuthService social login', () => {
     const supabase = makeSocialSupabase(
       makeSocialUser({ email: 'Staff@Example.com' }),
     );
-    const existing = makeUser({ email: 'staff@example.com' });
+    const existing = makeUser({
+      email: 'staff@example.com',
+      emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+    });
     const db = makeSocialDb({ providerUser: null, emailUser: existing });
     const service = makeService(
       db,
@@ -1438,6 +1444,101 @@ describe('AuthService social login', () => {
 
     expect(result.user.id).toBe(existing.id);
     // The email match wins; only the provider link is inserted.
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('user mode refuses to link an account whose local email is unverified', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    // An attacker can write any email through PATCH /users/me: this row holds
+    // the victim's address but never proved it.
+    const unverified = makeUser({
+      email: 'staff@example.com',
+      emailVerifiedAt: null,
+    });
+    const db = makeSocialDb({ providerUser: null, emailUser: unverified });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const thrown = await service
+      .handleSocialCallback(googleDto)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    const response = (thrown as ConflictException).getResponse() as {
+      code: string;
+      message: string;
+    };
+    expect(response.code).toBe('EMAIL_LINK_REQUIRED');
+    expect(response.message).toContain('link this provider from Settings');
+    // Neither the provider link nor a second user row is written.
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('stamps a brand-new social account email as verified', async () => {
+    const supabase = makeSocialSupabase(
+      makeSocialUser({ email: 'new@example.com' }),
+    );
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: null,
+      createdUser: makeUser({
+        id: 'created-user',
+        email: 'new@example.com',
+        emailVerifiedAt: new Date(),
+      }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await service.handleSocialCallback(googleDto);
+
+    // The row insert (index 0) carries the stamp; the provider link is the
+    // second insert and must not touch it.
+    const values = (db.insert.mock.results[0].value as { values: jest.Mock })
+      .values;
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'new@example.com',
+        emailVerifiedAt: expect.any(Date) as unknown as Date,
+      }),
+    );
+  });
+
+  it('refuses when a concurrent first login owns the email unverified', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: null, // the SELECT missed it; the upsert finds it
+      createdUser: makeUser({
+        id: 'unverified-owner',
+        email: 'staff@example.com',
+        emailVerifiedAt: null,
+      }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const thrown = await service
+      .handleSocialCallback(googleDto)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    // Only the user upsert ran; no provider link was written.
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
@@ -1464,7 +1565,11 @@ describe('AuthService social login', () => {
 
   it('user mode creates an account when no link or email matched', async () => {
     const supabase = makeSocialSupabase(makeSocialUser());
-    const created = makeUser({ email: 'staff@example.com' });
+    const created = makeUser({
+      email: 'staff@example.com',
+      // A new social row is stamped verified from the provider's confirmed email.
+      emailVerifiedAt: new Date(),
+    });
     const db = makeSocialDb({
       providerUser: null,
       emailUser: null,

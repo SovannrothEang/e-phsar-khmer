@@ -70,7 +70,7 @@ export interface ReconcileSummary {
 }
 
 /**
- * The one poller for a provider with no webhook (Bakong), and the guarantee
+ * The one poller for a provider's unresolved attempts, and the guarantee
  * behind "money taken ⇒ plan activated", whatever the app was doing when the
  * payer paid.
  *
@@ -90,7 +90,8 @@ export interface ReconcileSummary {
  * on another instance is found by this one's next safety sweep.
  *
  * It also revisits attempts we ourselves failed by timeout (`POLL_EXPIRED` /
- * `POLL_GATEWAY_ERROR`) for a grace window, on the slow
+ * `POLL_GATEWAY_ERROR` for a polled provider, `EXPIRED` for a webhook-only one
+ * whose callback never arrived) for a grace window, on the slow
  * `RECOVERABLE_INTERVAL_MS` cadence, so money that arrives late still counts —
  * an attempt is never failed *because* we couldn't see the payment.
  */
@@ -426,9 +427,12 @@ export class PaymentReconciler
 
   /**
    * Fails pending attempts whose stored `expiresAt` has passed, for providers
-   * that are NOT polled (webhook-only, i.e. ABA): the provider refuses payment
-   * after its lifetime, so there is nothing to ask — this only closes our side.
-   * Database only, never a provider call.
+   * that are NOT polled: a provider rejects payment after the checkout's
+   * lifetime, so there is nothing to ask — this only closes our side. With the
+   * default `PAYMENT_RECONCILE_PROVIDERS` (both providers) this selects
+   * nothing; it still covers a provider left out of the poll set, whose lost
+   * callback would otherwise stay `pending` forever. Database only, never a
+   * provider call.
    */
   private async expireWebhookAttempts(): Promise<number> {
     const polled = this.providers();

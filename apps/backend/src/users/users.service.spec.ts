@@ -2,13 +2,19 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  INestApplication,
   NotFoundException,
 } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import request from 'supertest';
+import type { App } from 'supertest/types';
 import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { BillingAddressesService } from './billing-addresses.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 jest.mock('bcrypt');
@@ -1949,5 +1955,123 @@ describe('UsersService verified account flag', () => {
 
     expect(me.authProviders).toEqual(['google', 'telegram']);
     expect(db.select).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('UsersService getPublicProfileById', () => {
+  const PROFILE_ID = '18d78b3e-1767-43b5-b4a0-947c2b5f8e1f';
+  const PRIVATE_ROW = {
+    ...fakeUser,
+    id: PROFILE_ID,
+    primaryPhone: '+85512345678',
+    email: 'victim@example.com',
+    role: 'admin' as const,
+    phoneVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  /** 1: the user row, 2-3: follow counts, 4: subscription probe. */
+  function makeProfileDb(rows: Record<string, unknown>[]) {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain(rows);
+      if (call === 4) return chain([{ id: 'sub-1' }]);
+      return chain([{ value: 0 }]);
+    });
+    return db;
+  }
+
+  it("does not expose another user's phone, email, role or moderation state", async () => {
+    const service = makeService(makeProfileDb([PRIVATE_ROW]));
+
+    const profile = await service.getPublicProfileById(PROFILE_ID);
+
+    expect(profile).toEqual({
+      id: PROFILE_ID,
+      username: fakeUser.username,
+      firstName: fakeUser.firstName,
+      lastName: fakeUser.lastName,
+      profilePhotoUrl: fakeUser.profilePhotoUrl,
+      coverPhotoUrl: fakeUser.coverPhotoUrl,
+      isVerified: true,
+      verifiedAccount: true,
+      createdAt: fakeUser.createdAt,
+      followers: 0,
+      following: 0,
+    });
+    for (const key of [
+      'primaryPhone',
+      'email',
+      'role',
+      'status',
+      'phoneVerifiedAt',
+      'emailVerifiedAt',
+      'passwordHash',
+    ]) {
+      expect(profile).not.toHaveProperty(key);
+    }
+  });
+
+  it('reuses the same projection as the username lookup', async () => {
+    const byId = await makeService(
+      makeProfileDb([PRIVATE_ROW]),
+    ).getPublicProfileById(PROFILE_ID);
+    const byUsername = await makeService(
+      makeProfileDb([PRIVATE_ROW]),
+    ).getPublicProfile('sokdara');
+
+    expect(byId).toEqual(byUsername);
+  });
+
+  it('is a 404 for an unknown id, like the username lookup', async () => {
+    const service = makeService(makeProfileDb([]));
+
+    await expect(service.getPublicProfileById(PROFILE_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
+describe('UsersController GET /users/:id', () => {
+  const PROFILE_ID = '18d78b3e-1767-43b5-b4a0-947c2b5f8e1f';
+  const getPublicProfileById = jest.fn();
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [
+        { provide: UsersService, useValue: { getPublicProfileById } },
+        { provide: BillingAddressesService, useValue: {} },
+      ],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    getPublicProfileById.mockReset();
+  });
+
+  it('answers 400, not 500, for a non-UUID id', async () => {
+    await request(app.getHttpServer()).get('/users/not-a-uuid').expect(400);
+
+    expect(getPublicProfileById).not.toHaveBeenCalled();
+  });
+
+  it('serves the public projection instead of the full user row', async () => {
+    getPublicProfileById.mockResolvedValue({ id: PROFILE_ID });
+
+    await request(app.getHttpServer())
+      .get(`/users/${PROFILE_ID}`)
+      .expect(200)
+      .expect({ id: PROFILE_ID });
+
+    expect(getPublicProfileById).toHaveBeenCalledWith(PROFILE_ID);
   });
 });

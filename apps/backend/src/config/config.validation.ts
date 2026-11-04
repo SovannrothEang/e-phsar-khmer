@@ -144,9 +144,13 @@ const baseEnvSchema = z.object({
   // Gap between passes while nothing is unresolved (no pending attempt, nothing
   // to activate or expire). Any activity returns to the interval above.
   PAYMENT_RECONCILE_IDLE_INTERVAL_MS: z.coerce.number().default(60_000),
-  // Providers the reconciler polls: only those with no webhook (Bakong). ABA
-  // PayWay is webhook-only — its expiry is `ABA_PAYWAY_LIFETIME_MINUTES`.
-  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong'),
+  // Providers the reconciler asks about. Bakong has no webhook at all; ABA is
+  // webhook-only, but its callback can be lost or arrive after we expired the
+  // attempt, so it is polled too as the recovery path. Cost: one provider call
+  // (`check_transaction`) per unresolved ABA attempt per pass — raise
+  // PAYMENT_RECONCILE_INTERVAL_MS / PAYMENT_RECONCILE_IDLE_INTERVAL_MS rather
+  // than dropping ABA from this list if that becomes the bill.
+  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong,aba_payway'),
   // A pending attempt this old that the provider still reports unpaid is
   // failed (the QR has long expired). 15 min vs. the 5 min QR lifetime.
   PAYMENT_PENDING_ABANDON_MS: z.coerce.number().default(15 * 60 * 1000),

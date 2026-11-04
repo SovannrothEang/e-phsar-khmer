@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AbaPaywayWebhookController } from './aba-payway-webhook.controller';
 import { AbaPaywayProvider } from '../providers/aba-payway/aba-payway.provider';
+import { SKIP_ENVELOPE_KEY } from '../../common/decorators/skip-envelope.decorator';
 
 /**
  * Real provider + real controller, fully offline: same mocks as
@@ -23,6 +24,11 @@ jest.mock('../../utils/api-client', () => ({
     post: (...args: unknown[]) =>
       (mockNetworkPost as (...a: unknown[]) => never)(...args),
   })),
+}));
+// `@nestjs/throttler` is ESM-only under Jest; the decorator's own behaviour is
+// covered by Nest, the controller only needs it applied.
+jest.mock('@nestjs/throttler', () => ({
+  SkipThrottle: () => () => undefined,
 }));
 jest.mock('effect', () => ({ Effect: { runPromise: jest.fn() } }));
 jest.mock(
@@ -115,6 +121,17 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+describe('AbaPaywayWebhookController ack contract', () => {
+  it('opts the whole controller out of the response envelope', () => {
+    // The global ResponseInterceptor reads this key; without it the ack would
+    // reach ABA as `{ success: true, data: { code: 0 } }` and look like a
+    // failure.
+    expect(
+      Reflect.getMetadata(SKIP_ENVELOPE_KEY, AbaPaywayWebhookController),
+    ).toBe(true);
+  });
+});
+
 describe('AbaPaywayWebhookController.webhook', () => {
   it('stores a correctly signed callback and acks with a top-level code 0', async () => {
     const { controller, effectRunner } = build();
@@ -123,7 +140,8 @@ describe('AbaPaywayWebhookController.webhook', () => {
       [SIG]: abaSignature(callback),
     });
 
-    expect(ack).toEqual({ code: 0, message: 'Received' });
+    // Exactly ABA's contract — no `message`, no envelope (see spec.md).
+    expect(ack).toEqual({ code: 0 });
     expect(mockFindAttempt).toHaveBeenCalledWith({
       provider: 'aba_payway',
       providerAttemptId: callback.tran_id,
