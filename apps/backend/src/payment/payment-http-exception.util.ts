@@ -32,5 +32,9 @@ export function toHttpException(error: PaymentUseCaseError): HttpException {
       return new InternalServerErrorException(
         'Payment could not be queued for processing',
       );
+    case 'LedgerImbalanceError':
+      return new InternalServerErrorException(
+        'The settlement ledger entry does not balance — nothing was written',
+      );
   }
 }

@@ -24,4 +24,13 @@ export class UpdatePaymentDto {
     description: 'A description for the payment transaction',
   })
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiPropertyOptional({
+    description:
+      'Why the override was made. Stored on the payment_status_history row ' +
+      'next to the actor id.',
+  })
+  reason?: string;
 }

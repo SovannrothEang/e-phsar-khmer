@@ -51,7 +51,11 @@ export type PaymentUseCaseError =
   | DuplicateIdempotencyKeyError
   | PaymentTransactionConflictError
   | PaymentPersistenceError
-  | PaymentQueueError;
+  | PaymentQueueError
+  // The admin override is the one controller route that can post a settlement
+  // ledger (see admin-override-payment.use-case.ts), so its imbalance failure
+  // is controller-visible too.
+  | LedgerImbalanceError;
 
 /**
  * Failures specific to the BullMQ processor's own use-cases

@@ -18,11 +18,11 @@ import { PaymentEffectRunner } from './payment-effect-runner.service';
 import { PaymentGatewayRegistry } from './providers';
 import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconciler.service';
 import {
+  adminOverridePayment,
   checkOwnedPaymentTransaction,
   createPaymentTransaction,
   listOwnedPaymentAttempts,
   listPayments,
-  upsertPayment,
 } from './use-cases';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
@@ -143,25 +143,32 @@ export class PaymentsController {
   }
 
   @Patch(':id')
-  @Roles('admin')
+  @Roles('super_admin')
   @UseGuards(RolesGuard)
   @ApiOperation({
     summary:
-      'Update a payment transaction (optimistic-locked on version). ' +
-      'Admin-only: status transitions are a system/webhook/admin concern ' +
-      '(see payment_status_history.actorType) — never customer-initiated.',
+      'Manually override a payment transaction status (optimistic-locked on ' +
+      'version). Super-admin only, and every call writes an audit row naming ' +
+      'the actor; marking a payment succeeded posts the settlement ledger. ' +
+      'Never customer-initiated.',
   })
-  update(@Param('id') id: string, @Body() dto: UpdatePaymentDto) {
+  update(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePaymentDto,
+  ) {
     // Every purchase is final — there is no refund path, not even for admins.
     if (dto.status === 'refund_pending' || dto.status === 'refunded') {
       throw new BadRequestException('Refunds are not supported');
     }
-    return this.effectRunner.run(
-      upsertPayment({
+    return this.effectRunner.runDurably((outbox) =>
+      adminOverridePayment(outbox, {
         id,
         expectedVersion: dto.expectedVersion,
         status: dto.status,
         description: dto.description,
+        actorId: user.id,
+        reason: dto.reason,
       }),
     );
   }
