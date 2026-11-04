@@ -5,10 +5,14 @@ import { signUpload, type UploadSignFn } from "@/actions/files";
 import { toast } from "@/components/ui/sonner";
 import DbImage from "@/components/common/DbImage";
 import {
-  MAX_UPLOAD_BYTES,
+  MAX_SOURCE_BYTES,
   UPLOAD_ACCEPT,
   resolveUploadMime,
 } from "@/lib/upload";
+import {
+  IMMUTABLE_CACHE_CONTROL,
+  prepareImageForUpload,
+} from "@/lib/upload-image";
 
 /**
  * Drag/drop + click photo picker. Signs a Supabase upload via a
@@ -66,15 +70,25 @@ export default function ImageUpload({
   const uploadOne = async (file: File) => {
     const mime = resolveUploadMime(file);
     if (!mime) return;
-    const signed = await signFn(file.name, "listing");
+    // Cap the long side at 2560 px and re-encode to WebP where the browser can
+    // — a listing card shows ~260 px and the hero ~760 px, so the original
+    // 4000 px upload is detail nothing displays. The original is uploaded if
+    // the browser cannot do it (never fail an upload over the optimizer).
+    const prepared = await prepareImageForUpload(file);
+    const signed = await signFn(prepared.file.name, "listing");
     if (!signed.success) {
       toast.error(signed.error);
       return;
     }
     const res = await fetch(signed.data.signedUrl, {
       method: "PUT",
-      body: file,
-      headers: { "Content-Type": mime },
+      body: prepared.file,
+      headers: {
+        "Content-Type": prepared.mime,
+        // Immutable object (UUID in the name): one year instead of the
+        // one-hour default, so a repeat view is a cache hit.
+        "Cache-Control": IMMUTABLE_CACHE_CONTROL,
+      },
     });
     if (res.ok) {
       const photo = { url: signed.data.publicUrl, path: signed.data.path };
@@ -88,13 +102,13 @@ export default function ImageUpload({
     if (picked.some((f) => resolveUploadMime(f) === null)) {
       toast.error(t("unsupportedType"));
     }
-    if (picked.some((f) => f.size > MAX_UPLOAD_BYTES)) {
-      toast.error(t("fileTooLarge", { max: MAX_UPLOAD_BYTES / (1024 * 1024) }));
+    if (picked.some((f) => f.size > MAX_SOURCE_BYTES)) {
+      toast.error(t("fileTooLarge", { max: MAX_SOURCE_BYTES / (1024 * 1024) }));
     }
     const room = Math.max(0, max - total);
     const accepted = picked
       .filter(
-        (f) => resolveUploadMime(f) !== null && f.size <= MAX_UPLOAD_BYTES,
+        (f) => resolveUploadMime(f) !== null && f.size <= MAX_SOURCE_BYTES,
       )
       .slice(0, room);
     if (accepted.length === 0) return;

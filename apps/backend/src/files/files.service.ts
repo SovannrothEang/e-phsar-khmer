@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import { SupabaseService } from '../common/supabase/supabase.service';
+import { declaredTypeMatches, sniffImageType } from './image-sniff';
 
 /** Upload scopes namespaced per user (`{scope}/{userId}/…`). */
 export const USER_SCOPES = [
@@ -213,6 +214,13 @@ export class FilesService {
     }
     if (file.size > 5 * 1024 * 1024) {
       throw new BadRequestException('File size must not exceed 5MB');
+    }
+    // The header above is what the client *claimed*. The bytes are what land
+    // in a public bucket, so they get the last word: a text file renamed .png
+    // and sent as `image/png` is rejected here (2026-11-04).
+    const sniffed = sniffImageType(file.buffer);
+    if (!sniffed || !declaredTypeMatches(file.mimetype, sniffed)) {
+      throw new BadRequestException('File content is not a supported image');
     }
   }
 
