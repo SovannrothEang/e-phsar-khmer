@@ -548,8 +548,44 @@ describe('EntitlementsService.reconcileAll', () => {
     expect(reconciled).toHaveBeenCalledTimes(2);
     expect(reconciled).toHaveBeenNthCalledWith(1, 'u001');
     expect(reconciled).toHaveBeenNthCalledWith(2, 'u002');
-    // Paging is deferred until the durable worker (plan 2.3); this run must
-    // still cover the whole candidate set.
-    expect(limits).toEqual([]);
+    // Plan 5.2 restored paging: a short page ends the run after one keyset page.
+    expect(limits).toEqual([200]);
+  });
+
+  it('walks a full page into the next keyset page instead of loading every user', async () => {
+    const select = jest
+      .fn()
+      .mockReturnValueOnce(query(settings))
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query(caps))
+      .mockReturnValueOnce(query([{ ads: 1 }]));
+    const fullPage = Array.from({ length: 200 }, (_, i) => ({
+      userId: `u${String(i).padStart(3, '0')}`,
+    }));
+    const first = query(fullPage) as Record<string, jest.Mock>;
+    const second = query([{ userId: 'z999' }]) as Record<string, jest.Mock>;
+    const limits: number[] = [];
+    const ordered: unknown[] = [];
+    for (const page of [first, second]) {
+      page.limit = jest.fn((n: number) => {
+        limits.push(n);
+        return page;
+      });
+      page.orderBy = jest.fn((...args: unknown[]) => {
+        ordered.push(args);
+        return page;
+      });
+    }
+    select.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    const service = new EntitlementsService({ select } as never, {} as never);
+    const reconciled = jest
+      .spyOn(service, 'reconcileListingsSafely')
+      .mockResolvedValue(undefined);
+
+    await expect(service.reconcileAll()).resolves.toBe(201);
+    expect(limits).toEqual([200, 200]);
+    expect(ordered).toHaveLength(2);
+    expect(reconciled).toHaveBeenCalledTimes(201);
   });
 });

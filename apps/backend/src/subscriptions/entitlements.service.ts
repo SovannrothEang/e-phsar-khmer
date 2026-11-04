@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -91,6 +92,11 @@ export interface FreePlanView extends FreePlanSettings {
 }
 
 const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
+
+/** Users reconciled per keyset page inside one sweep run. */
+const SWEEP_PAGE_SIZE = 200;
+/** Hard cap on pages per run, so one run cannot loop forever on a huge table. */
+const SWEEP_MAX_PAGES = 50;
 
 /** A number from the purchase's offer snapshot, else the live package value. */
 function limitValue(
@@ -766,10 +772,12 @@ export class EntitlementsService {
    * the free plan: every user holding restricted ads (maybe renewed), or more
    * live ads than the smallest allowance anywhere (maybe lapsed or moved).
    *
-   * One page per run, keyed on `userId`: a full page leaves the cursor on its
-   * last user so the next run resumes there, and a short page ends the pass and
-   * clears the cursor so newly problematic users before it are picked up on the
-   * next pass. Returns how many users this run reconciled.
+   * Pages the candidate users by `userId` inside one run, so memory stays
+   * bounded no matter how many accounts there are. The cursor is local to the
+   * run on purpose: a process that restarts simply starts from the beginning,
+   * which re-checks the first page rather than skipping the rest — the earlier
+   * cross-run cursor did the opposite on a scale-to-zero host.
+   * Returns how many users this run reconciled.
    */
   async reconcileAll(): Promise<number> {
     const config = await this.loadConfig();
@@ -784,19 +792,35 @@ export class EntitlementsService {
       ...config.categoryCaps.values(),
       smallestPackage?.ads ?? config.free.otherAds,
     );
-    const candidates = await this.db
-      .select({ userId: listings.userId })
-      .from(listings)
-      .where(inArray(listings.status, ['active', 'restricted']))
-      .groupBy(listings.userId)
-      .having(
-        sql`count(*) filter (where ${listings.status} = 'restricted') > 0 or count(*) > ${floor}`,
-      );
 
-    for (const { userId } of candidates) {
-      await this.reconcileListingsSafely(userId);
+    let reconciled = 0;
+    let afterUserId: string | null = null;
+    for (let page = 0; page < SWEEP_MAX_PAGES; page++) {
+      const candidates = await this.db
+        .select({ userId: listings.userId })
+        .from(listings)
+        .where(
+          and(
+            inArray(listings.status, ['active', 'restricted']),
+            afterUserId ? gt(listings.userId, afterUserId) : undefined,
+          ),
+        )
+        .groupBy(listings.userId)
+        .having(
+          sql`count(*) filter (where ${listings.status} = 'restricted') > 0 or count(*) > ${floor}`,
+        )
+        .orderBy(asc(listings.userId))
+        .limit(SWEEP_PAGE_SIZE);
+
+      for (const { userId } of candidates) {
+        await this.reconcileListingsSafely(userId);
+        reconciled++;
+      }
+
+      if (candidates.length < SWEEP_PAGE_SIZE) break;
+      afterUserId = candidates[candidates.length - 1].userId;
     }
 
-    return candidates.length;
+    return reconciled;
   }
 }

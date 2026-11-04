@@ -151,8 +151,8 @@ describe('ListingExpiryService', () => {
     const where = dialect.sqlToQuery(recs[1].where[0] as never);
     expect(where.params).toEqual([
       'active',
-      now.toISOString(),
       since.toISOString(),
+      now.toISOString(),
     ]);
   });
 
