@@ -108,7 +108,12 @@ export default () => {
         .filter(Boolean),
       pendingAbandonMs: env.PAYMENT_PENDING_ABANDON_MS,
       latePaymentGraceMs: env.PAYMENT_LATE_PAYMENT_GRACE_MS,
-      internalReconcileSecret: env.INTERNAL_RECONCILE_SECRET,
+    },
+    // Shared secret for the internal maintenance routes (payment reconcile,
+    // housekeeping jobs). One value, because they are one operator concern:
+    // "this caller may run server-side work".
+    internal: {
+      secret: env.INTERNAL_RECONCILE_SECRET,
     },
     abaPayway: {
       apiKey: env.ABA_PAYWAY_API_KEY,

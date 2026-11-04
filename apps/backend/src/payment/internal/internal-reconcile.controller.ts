@@ -10,24 +10,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { Public } from '../../common/decorators/public.decorator';
+import { SECRET_HEADER, secretMatches } from '../../common/internal-secret';
 import { PaymentReconciler } from '../reconciler/payment-reconciler.service';
 import type { ReconcileSummary } from '../reconciler/payment-reconciler.service';
 
-export const SECRET_HEADER = 'x-internal-secret';
-
-/**
- * Compares two secrets without leaking length or content through timing:
- * both sides are hashed to a fixed 32 bytes first. A plain
- * `timingSafeEqual(Buffer.from(a), Buffer.from(b))` would throw on a length
- * mismatch and is only constant-time for equal-length inputs.
- */
-function secretMatches(received: string, expected: string): boolean {
-  const a = createHash('sha256').update(received).digest();
-  const b = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(a, b);
-}
+export { SECRET_HEADER };
 
 /**
  * The wake-up for a provider with no webhook (Bakong) when nobody is on a
@@ -61,7 +49,7 @@ export class InternalReconcileController {
   async reconcile(
     @Headers(SECRET_HEADER) received?: string,
   ): Promise<ReconcileSummary> {
-    const expected = this.config.get<string>('payment.internalReconcileSecret');
+    const expected = this.config.get<string>('internal.secret');
     if (!expected) {
       throw new ServiceUnavailableException({
         code: 'RECONCILE_NOT_CONFIGURED',

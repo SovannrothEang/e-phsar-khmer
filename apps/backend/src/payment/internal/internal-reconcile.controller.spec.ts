@@ -63,7 +63,7 @@ describe('InternalReconcileController', () => {
 
   it('rejects a missing, empty or wrong secret without running a pass', async () => {
     const { controller, reconciler } = setup({
-      'payment.internalReconcileSecret': SECRET,
+      'internal.secret': SECRET,
       'payment.reconcileProviders': ['bakong'],
     });
 
@@ -81,7 +81,7 @@ describe('InternalReconcileController', () => {
 
   it('runs exactly one non-overlapping pass with the correct secret', async () => {
     const { controller, reconciler, summary } = setup({
-      'payment.internalReconcileSecret': SECRET,
+      'internal.secret': SECRET,
       'payment.reconcileProviders': ['bakong'],
     });
 
@@ -91,7 +91,7 @@ describe('InternalReconcileController', () => {
 
   it('still runs when the in-process timer is disabled', async () => {
     const { controller, reconciler, summary } = setup({
-      'payment.internalReconcileSecret': SECRET,
+      'internal.secret': SECRET,
       'payment.reconcileProviders': ['bakong'],
       'payment.reconcilerEnabled': false,
     });
@@ -102,7 +102,7 @@ describe('InternalReconcileController', () => {
 
   it('refuses when no provider is configured', async () => {
     const { controller, reconciler } = setup({
-      'payment.internalReconcileSecret': SECRET,
+      'internal.secret': SECRET,
       'payment.reconcileProviders': [],
     });
 

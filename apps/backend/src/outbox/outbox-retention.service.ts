@@ -62,6 +62,11 @@ export class OutboxRetention
       this.timer.unref();
     }, firstSweepMs);
     this.bootTimer.unref();
+    // Observable on purpose: "is retention armed on this instance?" is the
+    // first question when rows start accumulating.
+    this.logger.log(
+      `Outbox retention armed: every ${SWEEP_INTERVAL_MS / 60_000} min, first sweep in ~${Math.round(firstSweepMs / 1000)} s`,
+    );
   }
 
   onModuleDestroy(): void {

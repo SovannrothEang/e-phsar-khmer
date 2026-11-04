@@ -46,6 +46,7 @@ import {
 import { createQueueClient } from './common/queue/queue-connection';
 import { PaymentModule } from './payment/payment.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { InternalJobsModule } from './internal/internal-jobs.module';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     AdminModule,
     PaymentModule,
     SubscriptionsModule,
+    InternalJobsModule,
   ],
   controllers: [AppController],
   providers: [
