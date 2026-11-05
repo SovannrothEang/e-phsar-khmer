@@ -42,7 +42,7 @@ export function FollowSlot({ userId, viewerId, ...rest }: FollowProps) {
   // Nothing to ask for a signed-out viewer or the seller's own ad; the button
   // itself renders the sign-in bounce or nothing at all.
   const needsLookup = !!viewerId && viewerId !== userId;
-  const { data, isPending } = useQuery({
+  const { data, isPending, isFetching } = useQuery({
     queryKey: followStatusKey(userId),
     queryFn: () => loadFollowStatus(userId),
     enabled: needsLookup,
@@ -50,13 +50,20 @@ export function FollowSlot({ userId, viewerId, ...rest }: FollowProps) {
     gcTime: 0,
   });
 
-  if (needsLookup && isPending) {
+  // `isFetching` as well as `isPending`: a remount can start with a cached
+  // answer, and showing it before the background refetch lands is exactly the
+  // flash of a stale label this slot exists to avoid.
+  if (needsLookup && (isPending || isFetching)) {
     return <FollowButtonPlaceholder className={rest.className} />;
   }
 
   return (
     <FollowButton
       {...rest}
+      // Keyed on the resolved value so the button is remounted (and re-seeded)
+      // if the answer changes under it. `FollowButton` keeps its own state and
+      // never re-reads `initialFollowing`.
+      key={`${userId}:${data ?? false}`}
       userId={userId}
       viewerId={viewerId}
       initialFollowing={data ?? false}
