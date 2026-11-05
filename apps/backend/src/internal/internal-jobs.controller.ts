@@ -72,7 +72,7 @@ export class InternalJobsController {
       throw new UnauthorizedException('Invalid internal secret');
     }
 
-    const outboxPurged = await this.retention.sweep();
+    const outboxPurged = await this.retention.runOnce();
     // Throws on failure on purpose: a non-2xx is what tells the cron to retry,
     // and both sweeps are safe to run again.
     const accountsPurged = await this.purge.purgeDueAccounts();

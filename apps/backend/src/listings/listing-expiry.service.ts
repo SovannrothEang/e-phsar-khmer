@@ -38,8 +38,6 @@ const UNNOTIFIED_LOOKBACK_MS = 4 * DAY_MS;
 
 /** Candidates per keyset page, so a backlog cannot be loaded into memory. */
 const SWEEP_PAGE_SIZE = 200;
-/** Hard cap on pages per sweep, so one run cannot loop forever. */
-const SWEEP_MAX_PAGES = 50;
 
 /**
  * Tells owners their ad is about to lapse and, once, that it has lapsed.
@@ -126,7 +124,10 @@ export class ListingExpiryService {
     let sent = 0;
     let cursor: { expiresAt: Date; id: string } | null = null;
 
-    for (let page = 0; page < SWEEP_MAX_PAGES; page++) {
+    // The keyset strictly advances on (expires_at, id), so this terminates
+    // when the window is exhausted. No page cap: a cap would restart at the
+    // oldest row on the next run and never reach the newer ones.
+    for (;;) {
       const rows = await this.db
         .select({
           id: listings.id,

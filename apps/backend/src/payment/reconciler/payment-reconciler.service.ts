@@ -262,6 +262,11 @@ export class PaymentReconciler
           `Reconcile: checked ${summary.checked}, settled ${summary.settled}, activated ${summary.activated}, abandoned ${summary.abandoned}, errors ${summary.errors}`,
         );
       }
+      // A truncated pass means work is waiting: do not fall back to the idle
+      // interval just because the processed subset happened to settle.
+      if (summary.deadlineReached) {
+        nextDelayMs = Math.min(nextDelayMs, this.intervalMs());
+      }
     } catch (err) {
       this.logger.error(
         `Reconcile tick failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -388,9 +393,21 @@ export class PaymentReconciler
     // them oldest-first from a keyset cursor; a short page means the whole set
     // was covered and the cursor wraps on the next pass.
     if (pending.length === BATCH_LIMIT) {
-      const tail = await this.tailPending(baseFilter);
+      const tail = await this.tailPending(
+        baseFilter,
+        pending.map((candidate) => candidate.id),
+      );
       summary.candidates += tail.length;
       await this.processCandidates(tail, summary, deadline);
+      // Advance only for rows this pass actually finished. A pass that ran out
+      // of budget re-reads the same page instead of skipping it.
+      if (!summary.deadlineReached) {
+        const last = tail[tail.length - 1];
+        this.pendingCursor =
+          tail.length < TAIL_LIMIT || !last
+            ? null
+            : { createdAt: last.createdAt, id: last.id };
+      }
     }
 
     await this.processCandidates(recoverable, summary, deadline);
@@ -478,11 +495,13 @@ export class PaymentReconciler
 
   /**
    * Oldest-first keyset page over the pending attempts the newest-first page
-   * did not reach. The cursor advances past the last row; a short page means
-   * the set was covered, so the next pass starts from the oldest again.
+   * did not reach. `excludeIds` are the rows this pass already handled, so a
+   * pending set of exactly `BATCH_LIMIT` does not make the tail re-ask them.
+   * The caller advances the cursor after the page is processed.
    */
   private async tailPending(
     baseFilter: ReturnType<typeof and>,
+    excludeIds: string[],
   ): Promise<{ id: string; createdAt: Date; provider: string }[]> {
     const cursor = this.pendingCursor;
     const afterCursor = cursor
@@ -495,7 +514,7 @@ export class PaymentReconciler
         )
       : undefined;
 
-    const rows = await this.db
+    return this.db
       .select({
         id: paymentAttempts.id,
         createdAt: paymentAttempts.createdAt,
@@ -503,17 +522,17 @@ export class PaymentReconciler
       })
       .from(paymentAttempts)
       .where(
-        and(baseFilter, eq(paymentAttempts.status, 'pending'), afterCursor),
+        and(
+          baseFilter,
+          eq(paymentAttempts.status, 'pending'),
+          afterCursor,
+          excludeIds.length > 0
+            ? notInArray(paymentAttempts.id, excludeIds)
+            : undefined,
+        ),
       )
       .orderBy(asc(paymentAttempts.createdAt), asc(paymentAttempts.id))
       .limit(TAIL_LIMIT);
-
-    const last = rows[rows.length - 1];
-    this.pendingCursor =
-      rows.length < TAIL_LIMIT || !last
-        ? null
-        : { createdAt: last.createdAt, id: last.id };
-    return rows;
   }
 
   private async reconcileCandidate(

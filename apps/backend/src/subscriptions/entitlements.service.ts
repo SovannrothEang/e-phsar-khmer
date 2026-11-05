@@ -95,8 +95,6 @@ const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
 
 /** Users reconciled per keyset page inside one sweep run. */
 const SWEEP_PAGE_SIZE = 200;
-/** Hard cap on pages per run, so one run cannot loop forever on a huge table. */
-const SWEEP_MAX_PAGES = 50;
 
 /** A number from the purchase's offer snapshot, else the live package value. */
 function limitValue(
@@ -795,7 +793,10 @@ export class EntitlementsService {
 
     let reconciled = 0;
     let afterUserId: string | null = null;
-    for (let page = 0; page < SWEEP_MAX_PAGES; page++) {
+    // The keyset strictly advances on `user_id`, so this terminates when the
+    // candidate set is exhausted. No page cap: a cap would restart at the
+    // beginning on the next run and never reach the tail.
+    for (;;) {
       const candidates = await this.db
         .select({ userId: listings.userId })
         .from(listings)

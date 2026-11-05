@@ -105,12 +105,14 @@ describe('adminOverridePayment', () => {
     expect(mockEnqueueSettled).toHaveBeenCalledTimes(1);
   });
 
-  it('does not post a second ledger row for an already-settled payment', async () => {
+  it('re-posts the ledger idempotently for an already-settled payment, so a missing row heals', async () => {
     await run(makeDb({ ...ROW, status: 'succeeded' }), { status: 'succeeded' });
 
     expect(mockRecordHistory).toHaveBeenCalledTimes(1);
-    expect(mockPostLedger).not.toHaveBeenCalled();
-    expect(mockEnqueueSettled).not.toHaveBeenCalled();
+    // The ledger key is the transaction id, so the second post is a no-op that
+    // returns the existing row — it must still be attempted.
+    expect(mockPostLedger).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueSettled).toHaveBeenCalledTimes(1);
   });
 
   it('does not post a ledger row for a non-settling override', async () => {

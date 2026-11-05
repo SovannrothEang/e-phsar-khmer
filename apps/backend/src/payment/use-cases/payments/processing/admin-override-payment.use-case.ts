@@ -79,7 +79,14 @@ export const adminOverridePayment = Effect.fn('adminOverridePayment')(
           expectedVersion: input.expectedVersion,
           status: input.status,
           description: input.description,
-          completedAt: input.status === 'succeeded' ? now : undefined,
+          completedAt:
+            input.status === 'succeeded'
+              ? now
+              : input.status
+                ? // Moving away from `succeeded` must not leave a completion
+                  // timestamp behind.
+                  null
+                : undefined,
         });
 
         if (input.status !== undefined) {
@@ -93,10 +100,10 @@ export const adminOverridePayment = Effect.fn('adminOverridePayment')(
           });
         }
 
-        // Only the transition into `succeeded` needs money recognized. An
-        // override that keeps an already-settled payment settled must not post a
-        // second ledger row (the idempotency key would reject it anyway).
-        if (input.status === 'succeeded' && current.status !== 'succeeded') {
+        // Idempotent on the transaction id, and the settled event has its own
+        // dedupe key, so this also heals a payment that reached `succeeded`
+        // before the ledger existed.
+        if (input.status === 'succeeded') {
           const ledgerTransaction = yield* postPaymentSettlementLedger(
             updated,
             now,

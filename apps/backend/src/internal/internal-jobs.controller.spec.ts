@@ -21,7 +21,7 @@ jest.mock('@nestjs/throttler', () => ({
 const SECRET = 'a-16-char-secret-value';
 
 function setup(values: Record<string, unknown>) {
-  const retention = { sweep: jest.fn().mockResolvedValue(7) };
+  const retention = { runOnce: jest.fn().mockResolvedValue(7) };
   const purge = { purgeDueAccounts: jest.fn().mockResolvedValue(2) };
   const config = { get: jest.fn((key: string) => values[key]) };
   const controller = new InternalJobsController(
@@ -39,7 +39,7 @@ describe('InternalJobsController', () => {
     await expect(controller.run(SECRET)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(retention.sweep).not.toHaveBeenCalled();
+    expect(retention.runOnce).not.toHaveBeenCalled();
     expect(purge.purgeDueAccounts).not.toHaveBeenCalled();
   });
 
@@ -57,7 +57,7 @@ describe('InternalJobsController', () => {
     await expect(controller.run('wrong-secret-value')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
-    expect(retention.sweep).not.toHaveBeenCalled();
+    expect(retention.runOnce).not.toHaveBeenCalled();
     expect(purge.purgeDueAccounts).not.toHaveBeenCalled();
   });
 
@@ -70,7 +70,7 @@ describe('InternalJobsController', () => {
       outboxPurged: 7,
       accountsPurged: 2,
     });
-    expect(retention.sweep).toHaveBeenCalledTimes(1);
+    expect(retention.runOnce).toHaveBeenCalledTimes(1);
     expect(purge.purgeDueAccounts).toHaveBeenCalledTimes(1);
   });
 
@@ -88,7 +88,7 @@ describe('InternalJobsController', () => {
       outboxPurged: 7,
       accountsPurged: 2,
     });
-    expect(retention.sweep).toHaveBeenCalledTimes(1);
+    expect(retention.runOnce).toHaveBeenCalledTimes(1);
     expect(purge.purgeDueAccounts).toHaveBeenCalledTimes(1);
   });
 
