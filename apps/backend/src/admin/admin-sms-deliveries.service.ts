@@ -31,6 +31,8 @@ export interface AdminSmsDeliveryRow {
   attempts: number;
   purpose: string | null;
   createdAt: Date;
+  /** When the provider accepted it; null for queued/failed/skipped rows. */
+  sentAt: Date | null;
 }
 
 /**
@@ -71,6 +73,7 @@ export class AdminSmsDeliveriesService {
           attempts: smsDeliveries.attempts,
           purpose: smsDeliveries.purpose,
           createdAt: smsDeliveries.createdAt,
+          sentAt: smsDeliveries.sentAt,
         })
         .from(smsDeliveries)
         .where(where)
@@ -103,6 +106,10 @@ export class AdminSmsDeliveriesService {
    * module's plan. Until that is answered against the live provider, the admin
    * surface is not allowed to relay it unfiltered: any configured credential
    * that appears in the body is replaced, and the result is bounded.
+   *
+   * Every non-empty configured value is replaced, not only long ones — the
+   * config puts no minimum on these keys, and a missed short secret in an audit
+   * field is worse than a mangled error string.
    */
   private redactProviderReply(reply: string | null): string | null {
     if (!reply) return reply;
@@ -113,7 +120,7 @@ export class AdminSmsDeliveriesService {
     ]
       .filter(
         (value): value is string =>
-          typeof value === 'string' && value.length >= 8,
+          typeof value === 'string' && value.length > 0,
       )
       .flatMap((value) => [value, encodeURIComponent(value)]);
 

@@ -4,6 +4,7 @@ import { AdminSmsDeliveriesService } from './admin-sms-deliveries.service';
 interface ChainCalls {
   limit: number | null;
   offset: number | null;
+  where: unknown[];
 }
 
 /**
@@ -12,11 +13,14 @@ interface ChainCalls {
  * the count chain resolves, and `offset` returns the rows.
  */
 function makeDb(rows: Record<string, unknown>[], total: number) {
-  const calls: ChainCalls = { limit: null, offset: null };
+  const calls: ChainCalls = { limit: null, offset: null, where: [] };
   const selected: Record<string, unknown>[] = [];
   const chain: Record<string, unknown> = {
     from: () => chain,
-    where: () => chain,
+    where: (condition: unknown) => {
+      calls.where.push(condition);
+      return chain;
+    },
     orderBy: () => chain,
     limit: (value: number) => {
       calls.limit = value;
@@ -60,12 +64,13 @@ function delivery(overrides: Record<string, unknown> = {}) {
     attempts: 3,
     purpose: null,
     createdAt: new Date('2026-11-05T00:00:00Z'),
+    sentAt: null,
     ...overrides,
   };
 }
 
 describe('AdminSmsDeliveriesService.list', () => {
-  it('pages the audit trail and never exposes a message body', async () => {
+  it('pages the audit trail and projects only audit columns', async () => {
     const rows = [delivery(), delivery({ id: 'd2', status: 'sent' })];
     const { db, calls, selected } = makeDb(rows, 21);
     const service = makeService(db);
@@ -98,11 +103,31 @@ describe('AdminSmsDeliveriesService.list', () => {
         'providerReply',
         'providerStatus',
         'purpose',
+        'sentAt',
         'skipReason',
         'status',
         'userId',
       ].sort(),
     );
+  });
+
+  it('applies the status and user filters to both queries', async () => {
+    const { db, calls } = makeDb([], 0);
+    const service = makeService(db);
+
+    await service.list({ userId: 'u1', status: 'failed' });
+
+    // Page query + count query both carry a condition; with no filter they
+    // both carry `undefined`.
+    expect(calls.where).toHaveLength(2);
+    for (const condition of calls.where) expect(condition).toBeDefined();
+
+    const unfiltered = makeDb([], 0);
+    await makeService(unfiltered.db).list({});
+    expect(unfiltered.calls.where).toHaveLength(2);
+    for (const condition of unfiltered.calls.where) {
+      expect(condition).toBeUndefined();
+    }
   });
 
   it('redacts a configured credential echoed back in the provider reply', async () => {
@@ -124,5 +149,15 @@ describe('AdminSmsDeliveriesService.list', () => {
       'bad request for private_key=[redacted] secret=[redacted]',
     );
     expect(result.data[1].providerReply).toBeNull();
+  });
+
+  it('bounds a long provider reply', async () => {
+    const { db } = makeDb([delivery({ providerReply: 'x'.repeat(900) })], 1);
+    const service = makeService(db);
+
+    const [row] = (await service.list({ page: 1, pageSize: 20 })).data;
+
+    expect(row.providerReply).toHaveLength(501);
+    expect(row.providerReply?.endsWith('…')).toBe(true);
   });
 });
