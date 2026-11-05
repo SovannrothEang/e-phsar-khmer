@@ -424,7 +424,7 @@ Admin and user auth are **split onto separate surfaces**:
 
 ### Category + subcategory pages (backend-driven)
 
-`/[locale]/category/[categorySlug]` and `/[locale]/category/[categorySlug]/[subcategorySlug]` are **async RSC** fetching `GET /api/v1/categories/:slug` (one call each — the response nests subcategories, so the subcategory page `.find()`s by slug; both pages pass the locale via `Accept-Language` and render backend names directly). The data plumbing lives in `lib/api/categories.ts` (server-only — `CategoryGrid`-style raw `fetch`, `cache: "no-store"`, envelope unwrap, `null`/`[]` on failure):
+`/[locale]/category/[categorySlug]` and `/[locale]/category/[categorySlug]/[subcategorySlug]` are **async RSC** fetching `GET /api/v1/categories/:slug` (one call each — the response nests subcategories, so the subcategory page `.find()`s by slug; both pages pass the locale via `Accept-Language` and render backend names directly). The data plumbing lives in `lib/api/categories.ts` (server-only - `CategoryGrid`-style raw `fetch`, `cache: "no-store"` with one exception: `getAllCategories` without a `userId` is the same public tree for every visitor and the slowest call on the detail page, so it is reused for 5 minutes (`next: { revalidate: 300 }`); the seller-scoped tree stays `no-store`, envelope unwrap, `null`/`[]` on failure):
 
 - `getCategoryWithSubcategories(slug, locale)` → `BackendCategory {id, slug, name, icon, subcategories: BackendSubcategory[]}` (BackendSubcategory has `id` — required: bodytype rows carry `subcategoryIds` as UUIDs)
 - `getBrandsForSubcategory(subSlug)` → `BackendBrand {id, slug, name, icon}` (map `icon` → OptionGrid's `image` at the page boundary)
