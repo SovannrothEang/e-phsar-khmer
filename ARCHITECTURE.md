@@ -35,6 +35,23 @@ Request
 
 JwtAuthGuard runs first specifically so the throttler can see `req.user` — a fairness fix for shared-NAT traffic (one busy office/campus no longer shares a single IP-keyed bucket). `UserAwareThrottlerGuard` (`common/guards/user-aware-throttler.guard.ts`) falls back to IP for anonymous/public requests, where `req.user` is never set.
 
+### Deployment model (`APP_ROLE`)
+
+`APP_ROLE=api|worker|all` (default `all`) picks the shape of the process (`src/config/runtime-role.ts`):
+
+| Role     | Serves HTTP    | Background work                                                                  |
+| -------- | -------------- | -------------------------------------------------------------------------------- |
+| `api`    | yes            | none — no BullMQ `Worker`, no housekeeping or polling timer                      |
+| `worker` | yes (same app) | BullMQ workers, outbox drain + retention, account purge, payment reconciler      |
+| `all`    | yes            | both — the single-process shape every local run and deploy had before the switch |
+
+- **`api` starts no BullMQ `Worker`.** A `@Processor` provider makes BullExplorer construct a `Worker`, which opens a dedicated blocking Redis connection per processor; dropping the provider from the module is the only way not to open them. The same role gates the background timers through `configuration.ts` (`outbox.workerEnabled`, `accounts.purgeEnabled`, `payment.reconcilerEnabled`). An outbox row written by an `api` instance is therefore drained by whichever worker instance polls next, bounded by `OUTBOX_POLL_INTERVAL_MS` (default 30 s). The chat WebSocket heartbeat still runs — it is part of serving live connections, not a background sweep.
+- **`APP_ROLE` is read from the raw process environment while the module graph is built**, before `ConfigModule` loads `.env`. On a host it must be a real environment variable (Vercel project env, a shell export), not a `.env` line: a `.env`-only value still reaches the validated config, but the module wiring keeps `all`. That mismatch is benign because `all` is a superset of both explicit roles.
+
+**Postgres connection budget.** One postgres.js pool per process, shared by the whole backend (every module, not just chat). `DATABASE_POOL_MAX` defaults by role — `api` 5, `worker` 15, `all` 20 — and is capped at 20, because every instance's pool counts against the same Supabase project connection limit. Connection lifecycle: `DATABASE_CONNECT_TIMEOUT_SECONDS` 10, `DATABASE_IDLE_TIMEOUT_SECONDS` 60 (returns a connection to the pooler while an instance idles), `DATABASE_MAX_LIFETIME_SECONDS` 1800. `DATABASE_STATEMENT_TIMEOUT_MS` and `DATABASE_LOCK_TIMEOUT_MS` stay `0` (off) unless the connection is direct: they are sent as Postgres startup parameters, and Supabase's transaction-mode pooler rejects parameters it does not know.
+
+**Authenticated cron tick.** A host that scales to zero never keeps an instance warm long enough for the hourly outbox-retention sweep or the 6-hourly account purge, so `POST /api/v1/internal/jobs/run` runs one pass of both on demand (`src/internal/internal-jobs.controller.ts`). It takes the same `x-internal-secret` header and `INTERNAL_RECONCILE_SECRET` value as `POST /api/v1/internal/payments/reconcile`, and fails closed the same way: unset secret → 503, wrong or missing header → 401. Both sweeps are idempotent predicates, so calling it from a cron is harmless while a `worker`/`all` instance runs them on their own schedule too. The response is `{ outboxPurged, accountsPurged }`.
+
 ### URL structure
 
 Global prefix `api`, excluded for `GET /` and `GET /health`. URI versioning with `defaultVersion: '1'`.
