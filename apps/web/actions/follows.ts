@@ -1,7 +1,7 @@
 "use server";
 
 import { ApiError, userServerFetch } from "@/lib/api/user-client";
-import { getFollowList, toFollowRow } from "@/lib/api/users";
+import { getFollowList, getFollowStatus, toFollowRow } from "@/lib/api/users";
 import type { FollowRowUser, FollowSide } from "@/lib/api/users";
 
 /**
@@ -35,6 +35,17 @@ export async function followUser(userId: string): Promise<FollowActionResult> {
   } catch (err) {
     return toFailure(err);
   }
+}
+
+/**
+ * The viewer's follow state for one seller, exposed as an action so the
+ * listing detail page can resolve it in the browser after mount instead of
+ * putting a per-viewer answer into the server HTML. Fail-soft: a request that
+ * does not succeed reads as "not following", which is the honest answer for an
+ * anonymous visitor and leaves the toggle working.
+ */
+export async function loadFollowStatus(userId: string): Promise<boolean> {
+  return getFollowStatus(userId);
 }
 
 /** Unfollow a user. Also idempotent — unfollowing twice is not an error. */
