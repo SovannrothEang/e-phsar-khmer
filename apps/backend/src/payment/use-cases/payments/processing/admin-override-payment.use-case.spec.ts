@@ -112,7 +112,9 @@ describe('adminOverridePayment', () => {
     // The ledger key is the transaction id, so the second post is a no-op that
     // returns the existing row — it must still be attempted.
     expect(mockPostLedger).toHaveBeenCalledTimes(1);
-    expect(mockEnqueueSettled).toHaveBeenCalledTimes(1);
+    // The settled event is not re-announced: its dedupe row expires after 7
+    // days, so a second enqueue would notify the customer again.
+    expect(mockEnqueueSettled).not.toHaveBeenCalled();
   });
 
   it('does not post a ledger row for a non-settling override', async () => {

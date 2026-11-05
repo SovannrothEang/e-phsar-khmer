@@ -100,15 +100,18 @@ export const adminOverridePayment = Effect.fn('adminOverridePayment')(
           });
         }
 
-        // Idempotent on the transaction id, and the settled event has its own
-        // dedupe key, so this also heals a payment that reached `succeeded`
-        // before the ledger existed.
+        // Idempotent on the transaction id, so this also heals a payment that
+        // reached `succeeded` before the ledger existed.
         if (input.status === 'succeeded') {
           const ledgerTransaction = yield* postPaymentSettlementLedger(
             updated,
             now,
           );
-          if (ledgerTransaction) {
+          // The settled event's dedupe key is an outbox row that retention
+          // deletes after 7 days, so re-announcing an old settlement would
+          // notify the customer a second time. Announce only on the
+          // transition; the ledger post above stays unconditional.
+          if (ledgerTransaction && current.status !== 'succeeded') {
             yield* enqueuePaymentSettledEvent(
               outbox,
               updated,
