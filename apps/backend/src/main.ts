@@ -1,9 +1,15 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  assertRoleIsExported,
+  runsBackgroundWork,
+  type AppRole,
+} from './config/runtime-role';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
@@ -13,6 +19,14 @@ async function bootstrap() {
     // is computed over them, and a re-encoded body turns `1.50` into `1.5`.
     rawBody: true,
   });
+
+  // `APP_ROLE` picks the provider list while the modules are imported, but
+  // `ConfigModule` validates whatever `.env` supplied afterwards. A value only
+  // `.env` knows about would wire one shape and budget another, so boot refuses
+  // it instead of running a shape nobody asked for.
+  const configService = app.get(ConfigService);
+  const appRole = configService.get<AppRole>('appRole') ?? 'all';
+  assertRoleIsExported(appRole);
 
   // Vercel terminates TLS and forwards exactly one hop, so the client address
   // is the last X-Forwarded-For entry. Without this Express reports the
@@ -93,6 +107,8 @@ async function bootstrap() {
     console.log(
       `🚀 Server listening on port ${process.env.PORT ?? 3000} (env: ${
         process.env.NODE_ENV ?? 'development'
+      }, role: ${appRole}, background work: ${
+        runsBackgroundWork(appRole) ? 'on' : 'off'
       })`,
     );
   });

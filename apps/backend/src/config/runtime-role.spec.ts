@@ -1,7 +1,9 @@
 import {
+  assertRoleIsExported,
   backgroundProviders,
   resolveAppRole,
   runsBackgroundWork,
+  wiredAppRole,
 } from './runtime-role';
 
 describe('resolveAppRole', () => {
@@ -15,6 +17,37 @@ describe('resolveAppRole', () => {
     ['API', 'all'],
   ])('maps %s to %s', (raw, expected) => {
     expect(resolveAppRole(raw)).toBe(expected);
+  });
+});
+
+describe('assertRoleIsExported', () => {
+  it('accepts the role the module graph was built with', () => {
+    expect(() => assertRoleIsExported('api', 'api')).not.toThrow();
+    expect(() => assertRoleIsExported('all', 'all')).not.toThrow();
+  });
+
+  it('refuses a role that only .env knew about', () => {
+    // The dangerous pair: `.env` said api (pool 5, every timer off) while the
+    // modules had already been built as all (five blocking Redis connections).
+    expect(() => assertRoleIsExported('api', 'all')).toThrow(
+      /APP_ROLE=api was not visible/,
+    );
+    expect(() => assertRoleIsExported('api', 'all')).toThrow(/\.env/);
+  });
+
+  it('names both readings, so the log says which shape actually booted', () => {
+    expect(() => assertRoleIsExported('worker', 'all')).toThrow(
+      /wired the all shape/,
+    );
+  });
+});
+
+describe('wiredAppRole', () => {
+  it('drives the defaults, so the wiring and the guard cannot disagree', () => {
+    expect(runsBackgroundWork()).toBe(runsBackgroundWork(wiredAppRole));
+    expect(backgroundProviders(['a'])).toEqual(
+      backgroundProviders(['a'], wiredAppRole),
+    );
   });
 });
 

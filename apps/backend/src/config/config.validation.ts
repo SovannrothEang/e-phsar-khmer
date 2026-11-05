@@ -31,13 +31,15 @@ const baseEnvSchema = z.object({
     message: 'DATABASE_URL must start with postgres',
   }),
   // Which shape this process runs: `api` serves HTTP and starts no BullMQ
-  // worker or background timer, `worker` runs them (and still answers health
-  // checks), `all` is both — the default, and the single-process behaviour
-  // every local run and deploy had before this switch existed.
+  // worker or background timer, `worker` is the same app plus those (it still
+  // serves HTTP, with a worker-sized pool), `all` is both — the default, and
+  // the single-process behaviour every local run and deploy had before this
+  // switch existed.
   //
   // Read from the raw process environment while the module graph is built
   // (see `config/runtime-role.ts`), so on a host it must be a real environment
-  // variable, not a `.env` line.
+  // variable, not a `.env` line: a value only `.env` knows about fails the boot
+  // through `assertRoleIsExported`.
   APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
   // postgres.js defaults this to 10, which the whole backend shares (every
   // module, not just chat) — too small once anything sends concurrent
