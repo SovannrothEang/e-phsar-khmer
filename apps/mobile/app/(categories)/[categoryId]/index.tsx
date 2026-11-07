@@ -26,7 +26,9 @@ export default function CategoryScreen() {
   const categoryId = Array.isArray(params.categoryId)
     ? params.categoryId[0]
     : params.categoryId;
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    params.view === "grid" ? "grid" : "list",
+  );
 
   const categoryQuery = useQuery({
     queryKey: ["category", categoryId],
@@ -113,12 +115,18 @@ export default function CategoryScreen() {
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
       <CategorySearchHeader
-        placeholder={`Search in ${categoryName}...`}
+        placeholder={categoryName}
+        onSearchPress={() =>
+          router.push({
+            pathname: "/search",
+            params: { categorySlug: categoryId, scopeName: categoryName },
+          } as never)
+        }
         onFiltersPress={openFilters}
       />
 
       <View className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between border-b border-gray-100 px-4 py-3">
+        <View className="flex-row items-center justify-between px-4 pt-3 pb-2">
           <Text className="text-xl font-bold capitalize text-gray-900">
             {categoryName}
           </Text>
@@ -136,7 +144,6 @@ export default function CategoryScreen() {
 
         <FilterChips
           categoryId={categoryId as string}
-          onLocationPress={openFilters}
           onFiltersPress={openFilters}
         />
 
@@ -146,81 +153,84 @@ export default function CategoryScreen() {
           showsVerticalScrollIndicator={false}
         >
           {subCategoryPages.length > 0 && (
-            <View
-              className="mb-2 border-b border-gray-100 bg-white pb-4 pt-2"
-              onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-            >
-              <ScrollView
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                contentContainerStyle={{
-                  width: containerWidth
-                    ? containerWidth * subCategoryPages.length
-                    : "100%",
-                }}
+            <>
+              <View
+                className="bg-white pb-4 pt-2"
+                onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
               >
-                {subCategoryPages.map((pageSubs, pageIdx) => (
-                  <View
-                    key={`page-${pageIdx}`}
-                    style={{ width: containerWidth || "100%" }}
-                    className="flex-row flex-wrap px-2"
-                  >
-                    {pageSubs.map((sub, index) => (
-                      <TouchableOpacity
-                        key={`${sub.id}-${index}`}
-                        onPress={() =>
-                          router.push(
-                            `/(categories)/${categoryId}/${sub.slug}` as never,
-                          )
-                        }
-                        className="w-[25%] items-center px-1 py-2.5"
-                        activeOpacity={0.7}
-                      >
-                        <View className="mb-1.5 h-14 w-14 items-center justify-center rounded-full bg-slate-100/90 p-2 dark:bg-gray-800">
-                          {sub.icon ? (
-                            <Image
-                              source={{ uri: sub.icon }}
-                              className="h-10 w-10"
-                              resizeMode="contain"
-                            />
-                          ) : (
-                            <Ionicons
-                              name="grid-outline"
-                              size={26}
-                              color="#2563EB"
-                            />
-                          )}
-                        </View>
-                        <Text
-                          className="text-center text-[11px] font-medium leading-3.5 text-gray-800"
-                          numberOfLines={2}
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
+                  contentContainerStyle={{
+                    width: containerWidth
+                      ? containerWidth * subCategoryPages.length
+                      : "100%",
+                  }}
+                >
+                  {subCategoryPages.map((pageSubs, pageIdx) => (
+                    <View
+                      key={`page-${pageIdx}`}
+                      style={{ width: containerWidth || "100%" }}
+                      className="flex-row flex-wrap px-2"
+                    >
+                      {pageSubs.map((sub, index) => (
+                        <TouchableOpacity
+                          key={`${sub.id}-${index}`}
+                          onPress={() =>
+                            router.push(
+                              `/(categories)/${categoryId}/${sub.slug}` as never,
+                            )
+                          }
+                          className="w-[25%] items-center px-1 py-2.5"
+                          activeOpacity={0.7}
                         >
-                          {sub.name}
-                        </Text>
-                      </TouchableOpacity>
+                          <View className="mb-1.5 h-14 w-14 items-center justify-center rounded-full bg-slate-100/90 p-2 dark:bg-gray-800">
+                            {sub.icon ? (
+                              <Image
+                                source={{ uri: sub.icon }}
+                                className="h-10 w-10"
+                                resizeMode="contain"
+                              />
+                            ) : (
+                              <Ionicons
+                                name="grid-outline"
+                                size={26}
+                                color="#2563EB"
+                              />
+                            )}
+                          </View>
+                          <Text
+                            className="text-center text-[11px] font-medium leading-3.5 text-gray-800"
+                            numberOfLines={2}
+                          >
+                            {sub.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+
+                {subCategoryPages.length > 1 && (
+                  <View className="mt-3 flex-row items-center justify-center gap-1.5">
+                    {subCategoryPages.map((_, dotIdx) => (
+                      <View
+                        key={`dot-${dotIdx}`}
+                        className={`h-2 rounded-full ${
+                          currentPage === dotIdx
+                            ? "w-4 bg-orange-500"
+                            : "w-2 bg-gray-300"
+                        }`}
+                      />
                     ))}
                   </View>
-                ))}
-              </ScrollView>
-
-              {subCategoryPages.length > 1 && (
-                <View className="mt-3 flex-row items-center justify-center gap-1.5">
-                  {subCategoryPages.map((_, dotIdx) => (
-                    <View
-                      key={`dot-${dotIdx}`}
-                      className={`h-2 rounded-full ${
-                        currentPage === dotIdx
-                          ? "w-4 bg-orange-500"
-                          : "w-2 bg-gray-300"
-                      }`}
-                    />
-                  ))}
-                </View>
-              )}
-            </View>
+                )}
+              </View>
+              <View className="h-3 bg-neutral-border" />
+            </>
           )}
 
           <View className="pt-2">

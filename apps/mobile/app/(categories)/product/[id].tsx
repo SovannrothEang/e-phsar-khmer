@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useReactions } from "@/contexts/ReactionsContext";
 import { ApiError } from "@/lib/api/client";
 import { fetchCategories, fetchListing } from "@/lib/api/listings";
+import { fetchFollowStatus, followUser, unfollowUser } from "@/lib/api/users";
 import {
   basePrice,
   buildSpecRows,
@@ -17,6 +18,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { setStringAsync } from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -35,13 +37,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
 export default function ProductDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { isLiked, isSaved, likeCountFor, toggleLike, toggleSave } =
     useReactions();
 
@@ -58,10 +61,29 @@ export default function ProductDetailScreen() {
 
   const listing = listingQuery.data;
 
+  const insets = useSafeAreaInsets();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [revealedPhones, setRevealedPhones] = useState<number[]>([]);
   const [emailRevealed, setEmailRevealed] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [following, setFollowing] = useState<boolean | null>(null);
+  const [pendingFollow, setPendingFollow] = useState(false);
+
+  const followQuery = useQuery({
+    queryKey: ["follow-status", listing?.userId],
+    queryFn: () => fetchFollowStatus(listing!.userId),
+    enabled: isAuthenticated && !!listing?.userId,
+  });
+  // The follow button mirrors the fetched follow status. It is derived from
+  // query data, so it is synced during render instead of from an effect.
+  const followData = followQuery.data;
+  const [syncedFollow, setSyncedFollow] = useState(followData);
+  if (followData && followData !== syncedFollow) {
+    setSyncedFollow(followData);
+    setFollowing(followData.following);
+  }
 
   const images = useMemo(() => {
     const photos = [...(listing?.photos ?? [])].sort((a, b) => a.sort - b.sort);
@@ -133,13 +155,52 @@ export default function ProductDetailScreen() {
   const locationLabel = [listing.address, listing.location]
     .filter(Boolean)
     .join(", ");
+  // Section one shows the province only, not the address/district/commune.
+  const provinceOnly = listing.location?.split(",")[0]?.trim() || "";
   const shareUrl = listingShareUrl(listing);
   const mapLink = mapsUrl(listing);
+  // Always offer the map: fall back to a search of the written location.
+  const mapTarget =
+    mapLink ??
+    (locationLabel
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          locationLabel,
+        )}`
+      : null);
   const specRows = buildSpecRows(listing, category?.name, subcategory?.name);
   const sellerName =
     listing.contactName ||
     (listing.sellerUsername ? `@${listing.sellerUsername}` : "Seller");
   const sellerInitial = sellerName.replace("@", "").charAt(0).toUpperCase();
+  const isSelfSeller =
+    !!user?.username &&
+    !!listing.sellerUsername &&
+    user.username === listing.sellerUsername;
+
+  const toggleFollowSeller = async () => {
+    if (!isAuthenticated) {
+      router.push("/(auth)/sign-in");
+      return;
+    }
+    if (pendingFollow) return;
+    setPendingFollow(true);
+    try {
+      if (following) {
+        await unfollowUser(listing.userId);
+        setFollowing(false);
+      } else {
+        await followUser(listing.userId);
+        setFollowing(true);
+      }
+    } catch (error) {
+      Alert.alert(
+        "Could not update follow",
+        error instanceof ApiError ? error.message : "Please try again.",
+      );
+    } finally {
+      setPendingFollow(false);
+    }
+  };
 
   const handleContact = (type: "call" | "email", value?: string | null) => {
     if (!value) return;
@@ -181,59 +242,118 @@ export default function ProductDetailScreen() {
   return (
     <View className="flex-1 bg-neutral-background">
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      <StatusBar barStyle="light-content" />
 
-      {/* Header Actions - Absolute positioned */}
-      <View className="absolute left-0 right-0 top-0 z-10 flex-row justify-between px-4 pt-12">
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+      {/* Header: floating actions over the gallery, blue bar once scrolled */}
+      {scrolled ? (
+        <View
+          className="absolute left-0 right-0 top-0 z-20 bg-primary"
+          style={{ paddingTop: insets.top }}
         >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <View className="flex-row gap-3">
-          <TouchableOpacity
-            onPress={handleReport}
-            className="rounded-full bg-black/30 p-2 backdrop-blur-md"
-          >
-            <Ionicons name="flag-outline" size={24} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => void toggleSave(listing.id)}
-            className="rounded-full bg-black/30 p-2 backdrop-blur-md"
-          >
-            <Ionicons
-              name={saved ? "bookmark" : "bookmark-outline"}
-              size={24}
-              color={saved ? "#38BDF8" : "white"}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => void toggleLike(listing.id)}
-            className="rounded-full bg-black/30 p-2 backdrop-blur-md"
-          >
-            <Ionicons
-              name={liked ? "heart" : "heart-outline"}
-              size={24}
-              color={liked ? "#EF4444" : "white"}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShareModalVisible(true)}
-            className="rounded-full bg-black/30 p-2 backdrop-blur-md"
-          >
-            <Ionicons name="share-social-outline" size={24} color="white" />
-          </TouchableOpacity>
+          <View className="h-16 flex-row items-center gap-2.5 px-3">
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="h-10 w-10 items-center justify-center"
+            >
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
+            <View className="h-11 w-11 items-center justify-center overflow-hidden rounded bg-white/20">
+              {images[0] ? (
+                <Image
+                  source={{ uri: images[0] }}
+                  className="h-full w-full"
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="image-outline" size={20} color="white" />
+              )}
+            </View>
+            <View className="flex-1">
+              <Text
+                className="text-sm font-semibold text-white"
+                numberOfLines={1}
+              >
+                {listing.title}
+              </Text>
+              <Text className="mt-0.5 text-base font-bold text-white">
+                {priceLabel}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => void toggleSave(listing.id)}
+              className="p-1"
+            >
+              <Ionicons
+                name={saved ? "bookmark" : "bookmark-outline"}
+                size={22}
+                color="white"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShareModalVisible(true)}
+              className="p-1"
+            >
+              <Ionicons name="share-social-outline" size={22} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View
+          className="absolute left-0 right-0 z-10 flex-row justify-between px-4"
+          style={{ top: insets.top + 8 }}
+        >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+          >
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <View className="flex-row gap-3">
+            <TouchableOpacity
+              onPress={handleReport}
+              className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+            >
+              <Ionicons name="flag-outline" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void toggleSave(listing.id)}
+              className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+            >
+              <Ionicons
+                name={saved ? "bookmark" : "bookmark-outline"}
+                size={24}
+                color={saved ? "#38BDF8" : "white"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void toggleLike(listing.id)}
+              className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+            >
+              <Ionicons
+                name={liked ? "heart" : "heart-outline"}
+                size={24}
+                color={liked ? "#EF4444" : "white"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShareModalVisible(true)}
+              className="rounded-full bg-black/30 p-2 backdrop-blur-md"
+            >
+              <Ionicons name="share-social-outline" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 100 }}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          const next =
+            event.nativeEvent.contentOffset.y > Math.round(width) - 80;
+          if (next !== scrolled) setScrolled(next);
+        }}
       >
         {/* Expired notice */}
         {isExpired && (
@@ -245,70 +365,101 @@ export default function ProductDetailScreen() {
           </View>
         )}
 
-        {/* Image Carousel */}
-        <View
-          className={`relative h-72 w-full bg-neutral-background ${isExpired ? "mt-2" : ""}`}
-        >
-          {images.length > 0 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={(e) => {
-                const slide = Math.ceil(
-                  e.nativeEvent.contentOffset.x /
-                    e.nativeEvent.layoutMeasurement.width,
-                );
-                if (slide !== activeImageIndex) setActiveImageIndex(slide);
-              }}
-              scrollEventThrottle={16}
-            >
-              {images.map((uri, index) => (
-                <Image
-                  key={`${uri}-${index}`}
-                  source={{ uri }}
-                  style={{ width, height: 288 }}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-          ) : (
-            <View className="h-full w-full items-center justify-center bg-neutral-background">
-              <Ionicons
-                name="image-outline"
-                size={48}
-                color={Colors.text.muted}
+        {/* Gallery: main image + thumbnails */}
+        <View className={isExpired ? "mt-2" : ""}>
+          <View
+            style={{ width, height: Math.round(width) }}
+            className="relative bg-neutral-background"
+          >
+            {images.length > 0 ? (
+              <Image
+                source={{ uri: images[activeImageIndex] }}
+                style={{ width, height: Math.round(width) }}
+                resizeMode="cover"
               />
-              <Text className="mt-2 text-neutral-text-muted">
-                No Image Available
-              </Text>
-            </View>
-          )}
-
-          {images.length > 1 && (
-            <View className="absolute bottom-4 left-0 right-0 flex-row justify-center gap-2">
-              {images.map((_, i) => (
-                <View
-                  key={i}
-                  className={`h-2 w-2 rounded-full ${i === activeImageIndex ? "bg-white" : "bg-white/50"}`}
+            ) : (
+              <View className="h-full w-full items-center justify-center bg-neutral-background">
+                <Ionicons
+                  name="image-outline"
+                  size={48}
+                  color={Colors.text.muted}
                 />
-              ))}
-            </View>
-          )}
+                <Text className="mt-2 text-neutral-text-muted">
+                  No Image Available
+                </Text>
+              </View>
+            )}
+            {/* Dim the top so the status bar stays visible over white photos */}
+            <LinearGradient
+              colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0)"]}
+              pointerEvents="none"
+              className="absolute left-0 right-0 top-0 h-28"
+            />
+          </View>
 
-          {images.length > 0 && (
-            <View className="absolute bottom-4 right-4 rounded-md bg-black/60 px-2 py-1">
-              <Text className="text-xs font-medium text-white">
-                {activeImageIndex + 1}/{images.length}
-              </Text>
+          {images.length > 1 ? (
+            <View className="flex-row gap-1 bg-neutral-surface p-1">
+              {images.length <= 3 ? (
+                images.map((uri, index) => (
+                  <TouchableOpacity
+                    key={`thumb-${uri}-${index}`}
+                    onPress={() => setActiveImageIndex(index)}
+                    activeOpacity={0.8}
+                    className="flex-1"
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={{ width: "100%", aspectRatio: 1 }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <>
+                  {[0, 1].map((index) => (
+                    <TouchableOpacity
+                      key={`thumb-${images[index]}-${index}`}
+                      onPress={() => setActiveImageIndex(index)}
+                      activeOpacity={0.8}
+                      className="flex-1"
+                    >
+                      <Image
+                        source={{ uri: images[index] }}
+                        style={{ width: "100%", aspectRatio: 1 }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() => setViewerOpen(true)}
+                    activeOpacity={0.8}
+                    className="relative flex-1"
+                  >
+                    <Image
+                      source={{ uri: images[2] }}
+                      style={{ width: "100%", aspectRatio: 1 }}
+                      resizeMode="cover"
+                    />
+                    <View className="absolute inset-0 items-center justify-center bg-black/55">
+                      <Text className="text-lg font-bold text-white">
+                        +{images.length - 3}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
-          )}
+          ) : null}
         </View>
 
-        {/* Basic Info */}
+        {/* Section one: name, province + date, price */}
         <View className="bg-neutral-surface px-4 py-4">
           <Text className="text-xl font-bold text-neutral-text-main leading-7">
             {listing.title}
+          </Text>
+
+          <Text className="mt-1 text-base text-neutral-text-sub">
+            {[provinceOnly, publishedLabel].filter(Boolean).join(" - ")}
           </Text>
 
           <View className="mt-2 flex-row items-center gap-2 flex-wrap">
@@ -328,177 +479,173 @@ export default function ProductDetailScreen() {
               </View>
             )}
           </View>
-
-          <Text className="mt-1 text-xs text-neutral-text-sub">
-            {[locationLabel, publishedLabel].filter(Boolean).join(" • ")}
-          </Text>
         </View>
 
-        {/* Description + specs */}
-        <View className="mt-2 bg-neutral-surface p-4">
-          <Text className="mb-4 text-lg font-bold text-neutral-text-main">
-            Description
-          </Text>
+        {/* Gray divider between section one and section two */}
+        <View className="h-2 bg-neutral-border" />
 
+        {/* Section two: specs, description, contact, location + map */}
+        <View className="bg-neutral-surface">
           {specRows.length > 0 && (
-            <View className="mb-6 gap-2">
+            <View className="px-4 py-3">
               {specRows.map((row, index) => (
-                <View key={`${row.label}-${index}`} className="flex-row">
-                  <Text className="w-32 text-neutral-text-sub">
-                    {row.label}:
-                  </Text>
-                  <Text className="flex-1 text-neutral-text-main">
-                    {row.value}
-                  </Text>
-                </View>
+                <Text
+                  key={`${row.label}-${index}`}
+                  className="mb-1 text-base text-neutral-text-main"
+                >
+                  {row.label}: {row.value}
+                </Text>
               ))}
             </View>
           )}
 
-          <View className="h-[1px] w-full bg-neutral-background mb-4" />
-
-          <Text className="text-base leading-6 text-neutral-text-main">
-            {listing.description?.trim() || "No description provided."}
-          </Text>
-        </View>
-
-        {/* Contact */}
-        {!isExpired && (
-          <View className="mt-2 bg-neutral-surface p-4">
-            <Text className="font-bold text-neutral-text-main mb-2">
-              Contact Info:
+          <View className="px-4 py-3">
+            <Text className="text-base leading-6 text-neutral-text-main">
+              {listing.description?.trim() || "No description provided."}
             </Text>
-            <Text className="text-neutral-text-sub mb-4">
-              Please don&apos;t forget to mention that you found this ad on
-              PhsarKhmer.
-            </Text>
+          </View>
 
-            {listing.contactPhones.map((phone, index) => {
-              const isRevealed = revealedPhones.includes(index);
-              const maskedPhone =
-                phone.length > 3
-                  ? phone.substring(0, phone.length - 3) + "XXX"
-                  : phone;
+          {/* Contact */}
+          {!isExpired && (
+            <View className="px-4 py-3">
+              <Text className="font-bold text-neutral-text-main mb-2">
+                Contact Info:
+              </Text>
+              <Text className="text-neutral-text-sub mb-4">
+                Please don&apos;t forget to mention that you found this ad on
+                PhsarKhmer.
+              </Text>
 
-              return (
-                <View
-                  key={`${phone}-${index}`}
-                  className="flex-row items-center mb-2"
-                >
-                  <View className="w-6 h-6 bg-secondary-orange rounded flex items-center justify-center mr-2">
-                    <Ionicons name="call" size={14} color="white" />
+              {listing.contactPhones.map((phone, index) => {
+                const isRevealed = revealedPhones.includes(index);
+                const maskedPhone =
+                  phone.length > 3
+                    ? phone.substring(0, phone.length - 3) + "XXX"
+                    : phone;
+
+                return (
+                  <View
+                    key={`${phone}-${index}`}
+                    className="flex-row items-center mb-2"
+                  >
+                    <View className="w-6 h-6 bg-secondary-orange rounded flex items-center justify-center mr-2">
+                      <Ionicons name="call" size={14} color="white" />
+                    </View>
+                    <Text className="text-lg font-medium text-neutral-text-main mr-2">
+                      {isRevealed ? phone : maskedPhone}
+                    </Text>
+                    {!isRevealed ? (
+                      <TouchableOpacity
+                        onPress={() =>
+                          setRevealedPhones((prev) => [...prev, index])
+                        }
+                      >
+                        <Text className="text-primary underline text-sm italic">
+                          Click to Show
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => handleContact("call", phone)}
+                      >
+                        <Text className="text-primary underline text-sm italic">
+                          Call Now
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+
+              {listing.contactEmail && (
+                <View className="flex-row items-center mt-1">
+                  <View className="w-6 h-6 bg-primary rounded flex items-center justify-center mr-2">
+                    <Ionicons name="mail" size={14} color="white" />
                   </View>
                   <Text className="text-lg font-medium text-neutral-text-main mr-2">
-                    {isRevealed ? phone : maskedPhone}
+                    {emailRevealed
+                      ? listing.contactEmail
+                      : maskEmail(listing.contactEmail)}
                   </Text>
-                  {!isRevealed ? (
-                    <TouchableOpacity
-                      onPress={() =>
-                        setRevealedPhones((prev) => [...prev, index])
-                      }
-                    >
+                  {!emailRevealed ? (
+                    <TouchableOpacity onPress={() => setEmailRevealed(true)}>
                       <Text className="text-primary underline text-sm italic">
                         Click to Show
                       </Text>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      onPress={() => handleContact("call", phone)}
+                      onPress={() =>
+                        handleContact("email", listing.contactEmail)
+                      }
                     >
                       <Text className="text-primary underline text-sm italic">
-                        Call Now
+                        Send Email
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
-              );
-            })}
+              )}
+            </View>
+          )}
 
-            {listing.contactEmail && (
-              <View className="flex-row items-center mt-1">
-                <View className="w-6 h-6 bg-primary rounded flex items-center justify-center mr-2">
-                  <Ionicons name="mail" size={14} color="white" />
-                </View>
-                <Text className="text-lg font-medium text-neutral-text-main mr-2">
-                  {emailRevealed
-                    ? listing.contactEmail
-                    : maskEmail(listing.contactEmail)}
-                </Text>
-                {!emailRevealed ? (
-                  <TouchableOpacity onPress={() => setEmailRevealed(true)}>
-                    <Text className="text-primary underline text-sm italic">
-                      Click to Show
+          {/* Location + map */}
+          {(locationLabel || mapTarget) && (
+            <View className="px-4 py-3">
+              {locationLabel ? (
+                <View className="flex-row">
+                  <Ionicons
+                    name="location-sharp"
+                    size={24}
+                    color={Colors.text.muted}
+                    style={{ marginTop: 2 }}
+                  />
+                  <View className="ml-2 flex-1">
+                    <Text className="text-base font-medium text-neutral-text-main">
+                      Location:{" "}
+                      <Text className="font-normal">{locationLabel}</Text>
                     </Text>
-                  </TouchableOpacity>
-                ) : (
+                  </View>
+                </View>
+              ) : null}
+
+              {mapTarget ? (
+                <View className="mt-4 h-48 w-full items-center justify-center overflow-hidden rounded-lg">
+                  <Image
+                    source={require("@/assets/images/map_placeholder.png")}
+                    className="absolute h-full w-full"
+                    resizeMode="cover"
+                  />
                   <TouchableOpacity
-                    onPress={() => handleContact("email", listing.contactEmail)}
+                    onPress={() => Linking.openURL(mapTarget)}
+                    className="flex-row items-center rounded-full bg-neutral-surface px-4 py-2.5 shadow-sm"
                   >
-                    <Text className="text-primary underline text-sm italic">
-                      Send Email
+                    <Ionicons name="map" size={20} color={Colors.danger} />
+                    <Text className="ml-2 font-medium text-neutral-text-main">
+                      Show Location on Map
                     </Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Location */}
-        {(locationLabel || mapLink) && (
-          <View className="mt-2 bg-neutral-surface p-4">
-            {locationLabel ? (
-              <View className="flex-row">
-                <Ionicons
-                  name="location-sharp"
-                  size={24}
-                  color={Colors.text.muted}
-                  style={{ marginTop: 2 }}
-                />
-                <View className="ml-2 flex-1">
-                  <Text className="text-base font-medium text-neutral-text-main">
-                    Location:{" "}
-                    <Text className="font-normal">{locationLabel}</Text>
-                  </Text>
                 </View>
-              </View>
-            ) : null}
+              ) : null}
+            </View>
+          )}
+        </View>
 
-            {mapLink ? (
-              <View className="mt-4 h-48 w-full overflow-hidden rounded-lg bg-neutral-background items-center justify-center border border-neutral-border">
-                <Image
-                  source={require("@/assets/images/map_placeholder.png")}
-                  className="absolute w-full h-full opacity-50"
-                  resizeMode="cover"
-                />
-                <TouchableOpacity
-                  onPress={() => Linking.openURL(mapLink)}
-                  className="flex-row items-center bg-neutral-surface px-4 py-2 rounded-full shadow-sm"
-                >
-                  <Ionicons name="map" size={20} color={Colors.danger} />
-                  <Text className="ml-2 font-medium text-neutral-text-main">
-                    Show Location on Map
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-        )}
+        {/* Gray divider before the poster profile */}
+        <View className="h-2 bg-neutral-border" />
 
-        {/* Seller Profile */}
-        <View className="mt-2.5 bg-neutral-surface p-4 rounded-xl border border-neutral-border/60 mx-3 shadow-sm">
+        {/* Seller — plain section like the reference, no card */}
+        <View className="bg-neutral-surface px-4 py-4">
           <View className="flex-row items-center">
-            <View className="h-16 w-16 mr-3.5 rounded-full overflow-hidden border-2 border-primary/20 p-0.5 bg-neutral-background">
-              <View className="w-full h-full items-center justify-center bg-primary/10 rounded-full">
-                <Text className="text-xl font-bold text-primary">
-                  {sellerInitial || "S"}
-                </Text>
-              </View>
+            <View className="mr-3 h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#00A0E9]">
+              <Text className="text-xl font-semibold text-white">
+                {sellerInitial || "S"}
+              </Text>
             </View>
 
             <View className="flex-1">
               <View className="flex-row items-center gap-1.5">
-                <Text className="text-base font-bold text-neutral-text-main">
+                <Text className="text-lg font-bold text-neutral-text-main">
                   {sellerName}
                 </Text>
                 {listing.sellerVerifiedAccount && (
@@ -510,33 +657,45 @@ export default function ProductDetailScreen() {
                 )}
               </View>
               {listing.sellerUsername ? (
-                <Text className="text-xs text-neutral-text-sub mt-0.5">
+                <Text className="mt-0.5 text-sm text-neutral-text-sub">
                   @{listing.sellerUsername}
                 </Text>
               ) : null}
             </View>
           </View>
 
-          {listing.sellerUsername ? (
-            <View className="mt-4 flex-row gap-3 pt-3 border-t border-neutral-border/40">
+          <View className="mt-4 flex-row gap-3">
+            {listing.sellerUsername ? (
               <TouchableOpacity
                 onPress={() =>
                   router.push(`/user/${listing.sellerUsername}` as never)
                 }
-                className="flex-1 bg-primary/10 py-2.5 rounded-xl items-center flex-row justify-center gap-1.5"
+                className="flex-1 items-center justify-center rounded-lg bg-[#DCEEF8] py-3"
                 activeOpacity={0.7}
               >
-                <Ionicons
-                  name="person-outline"
-                  size={16}
-                  color={Colors.primary.DEFAULT}
-                />
-                <Text className="text-primary font-semibold text-xs">
+                <Text className="text-base font-semibold text-primary">
                   View Profile
                 </Text>
               </TouchableOpacity>
-            </View>
-          ) : null}
+            ) : null}
+            {!isSelfSeller ? (
+              <TouchableOpacity
+                onPress={() => void toggleFollowSeller()}
+                disabled={pendingFollow}
+                className="flex-1 flex-row items-center justify-center gap-1 rounded-lg border border-primary py-3"
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={following ? "checkmark" : "add"}
+                  size={18}
+                  color={Colors.primary.DEFAULT}
+                />
+                <Text className="text-base font-semibold text-primary">
+                  {following ? "Following" : "Follow"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         <View className="h-24" />
@@ -752,6 +911,41 @@ export default function ProductDetailScreen() {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Full-screen photo viewer */}
+      <Modal
+        visible={viewerOpen}
+        animationType="fade"
+        onRequestClose={() => setViewerOpen(false)}
+      >
+        <View className="flex-1 bg-black">
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: width * 2, y: 0 }}
+            className="flex-1"
+          >
+            {images.map((uri, index) => (
+              <Image
+                key={`viewer-${uri}-${index}`}
+                source={{ uri }}
+                style={{ width, height: "100%" }}
+                resizeMode="contain"
+              />
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => setViewerOpen(false)}
+            className="absolute left-4 h-10 w-10 items-center justify-center rounded-full bg-black/40"
+            style={{ top: insets.top + 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Close photos"
+          >
+            <Ionicons name="close" size={26} color="white" />
+          </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );

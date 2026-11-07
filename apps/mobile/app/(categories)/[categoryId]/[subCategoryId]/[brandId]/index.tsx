@@ -1,25 +1,50 @@
+import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
 import ModelGrid from "@/components/category/ModelGrid";
+import TypeSelector from "@/components/category/TypeSelector";
 import Divider from "@/components/common/Divider";
 import SafeAreaView from "@/components/common/SafeAreaView";
+import SelectionSheet from "@/components/common/SelectionSheet";
 import { Colors } from "@/constants/Colors";
-import { fetchBrands, fetchModels, fetchSubcategory } from "@/lib/api/catalog";
-import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
+import {
+  fetchBrands,
+  fetchLinkedAttributes,
+  fetchModels,
+  fetchSubcategory,
+} from "@/lib/api/catalog";
+import { resolveTypeTiles } from "@/lib/category-types";
+import {
+  feedQueryFromParams,
+  firstParam,
+  pickFilterParams,
+} from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 
 type ViewMode = "list" | "grid";
+
+/** `attrs` holds the attribute filters as JSON; the model chip lives there. */
+function parseAttrs(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>).map(
+          ([key, value]) => [key, String(value)],
+        ),
+      );
+    }
+  } catch {
+    /* a bad param simply filters nothing */
+  }
+  return {};
+}
 
 export default function BrandScreen() {
   const params = useLocalSearchParams();
@@ -32,7 +57,10 @@ export default function BrandScreen() {
   const brandId = Array.isArray(params.brandId)
     ? params.brandId[0]
     : params.brandId;
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    params.view === "grid" ? "grid" : "list",
+  );
+  const [modelSheetOpen, setModelSheetOpen] = useState(false);
 
   const subQuery = useQuery({
     queryKey: ["subcategory", categoryId, subCategoryId],
@@ -56,6 +84,17 @@ export default function BrandScreen() {
   });
   const models = modelsQuery.data ?? [];
 
+  const attributesQuery = useQuery({
+    queryKey: ["linked-attributes", subcategory?.id],
+    queryFn: () => fetchLinkedAttributes(subcategory!.id),
+    enabled: !!subcategory?.id,
+  });
+  const typeTiles = useMemo(
+    () =>
+      resolveTypeTiles(attributesQuery.data ?? [], subcategory?.fieldSchema),
+    [attributesQuery.data, subcategory?.fieldSchema],
+  );
+
   const brandName =
     brand?.name ||
     (brandId
@@ -65,13 +104,20 @@ export default function BrandScreen() {
           .join(" ")
       : "");
 
+  const feedBrand = brand?.name;
+
+  const attrsRaw = firstParam(params.attrs);
+  const selectedModel = parseAttrs(attrsRaw).model ?? "";
+  const selectedModelId =
+    models.find((model) => model.name === selectedModel)?.slug ?? "";
+
   const feedQuery = useMemo(
     () => ({
       subcategorySlug: subCategoryId,
-      ...(brand?.name ? { brand: brand.name } : {}),
+      ...(feedBrand ? { brand: feedBrand } : {}),
       ...feedQueryFromParams(params),
     }),
-    [subCategoryId, brand?.name, params],
+    [subCategoryId, feedBrand, params],
   );
 
   const toggleViewMode = () => {
@@ -88,18 +134,33 @@ export default function BrandScreen() {
       },
     });
 
-  const openModel = (modelName: string, modelSlug: string) =>
+  /** Model taps filter the feed in place: same model clears, a new one wins. */
+  const toggleModel = (name: string) => {
+    const next = { ...parseAttrs(attrsRaw) };
+    if (next.model === name) {
+      delete next.model;
+    } else {
+      next.model = name;
+    }
+    router.setParams({
+      attrs: Object.keys(next).length > 0 ? JSON.stringify(next) : "",
+    });
+  };
+
+  const openType = (typeId: string, name: string) => {
+    if (!typeTiles) return;
     router.push({
       pathname:
         "/(categories)/[categoryId]/[subCategoryId]/type/[typeId]" as never,
       params: {
         categoryId,
         subCategoryId,
-        typeId: modelSlug,
-        attrKey: "model",
-        attrValue: modelName,
+        typeId,
+        attrKey: typeTiles.key,
+        attrValue: name,
       },
     });
+  };
 
   if (subQuery.isLoading || brandsQuery.isLoading) {
     return (
@@ -111,33 +172,29 @@ export default function BrandScreen() {
     );
   }
 
+  const screenTitle = `${subcategory?.name || subCategoryId} • ${brandName}`;
+
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      <View className="bg-[#0EA5E9] px-4 pb-3 pt-3">
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="white" />
-          </TouchableOpacity>
-          <View className="flex-1 flex-row items-center rounded bg-white/20 px-3 py-2">
-            <Ionicons name="search" size={20} color="white" />
-            <TextInput
-              placeholder="Search..."
-              placeholderTextColor="white"
-              className="ml-2 flex-1 text-base text-white"
-              editable={false}
-            />
-          </View>
-          <TouchableOpacity onPress={openFilters}>
-            <Ionicons name="options-outline" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CategorySearchHeader
+        placeholder={screenTitle}
+        onSearchPress={() =>
+          router.push({
+            pathname: "/search",
+            params: {
+              categorySlug: categoryId,
+              subcategorySlug: subCategoryId,
+              ...(brand?.name ? { brand: brand.name } : {}),
+              scopeName: screenTitle,
+            },
+          } as never)
+        }
+        onFiltersPress={openFilters}
+      />
 
       <View className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between px-4 py-4">
-          <Text className="text-xl font-bold text-gray-900">
-            {subcategory?.name || subCategoryId} • {brandName}
-          </Text>
+        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
+          <Text className="text-xl font-bold text-gray-900">{screenTitle}</Text>
 
           <View className="flex-row gap-4">
             <TouchableOpacity onPress={toggleViewMode}>
@@ -152,7 +209,7 @@ export default function BrandScreen() {
 
         <FilterChips
           categoryId={categoryId as string}
-          onLocationPress={openFilters}
+          subCategoryId={subCategoryId as string}
           onFiltersPress={openFilters}
         />
 
@@ -167,7 +224,19 @@ export default function BrandScreen() {
                 id: model.slug,
                 name: model.name,
               }))}
-              onModelPress={(model) => openModel(model.name, model.id)}
+              selectedName={selectedModel}
+              onModelPress={(model) => toggleModel(model.name)}
+              onShowMore={() => setModelSheetOpen(true)}
+            />
+          )}
+
+          {typeTiles && typeTiles.rows.length > 0 && (
+            <TypeSelector
+              types={typeTiles.rows}
+              onTypePress={(typeId) => {
+                const row = typeTiles.rows.find((tile) => tile.id === typeId);
+                if (row) openType(typeId, row.name);
+              }}
             />
           )}
 
@@ -182,6 +251,25 @@ export default function BrandScreen() {
           </View>
         </FeedScrollView>
       </View>
+
+      <SelectionSheet
+        visible={modelSheetOpen}
+        title="Model"
+        options={models.map((model) => ({ id: model.slug, name: model.name }))}
+        value={selectedModelId}
+        onSelect={(option) => {
+          toggleModel(option.name);
+          setModelSheetOpen(false);
+        }}
+        onClear={() => {
+          const next = { ...parseAttrs(attrsRaw) };
+          delete next.model;
+          router.setParams({
+            attrs: Object.keys(next).length > 0 ? JSON.stringify(next) : "",
+          });
+        }}
+        onClose={() => setModelSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

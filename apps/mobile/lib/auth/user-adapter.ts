@@ -37,6 +37,8 @@ export function toUserProfile(user: BackendUser): UserProfile {
 
   return {
     name,
+    firstName: user.firstName ?? undefined,
+    lastName: user.lastName ?? undefined,
     username: user.username ?? undefined,
     email: user.email ?? "",
     phone: user.primaryPhone ?? "",

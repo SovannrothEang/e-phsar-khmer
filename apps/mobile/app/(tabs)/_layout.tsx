@@ -2,50 +2,70 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNotification } from "@/contexts/NotificationContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { router, Tabs } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
+import type { ColorValue, OpaqueColorValue } from "react-native";
 
-const SellTabBarButton = ({ onPress, label }: any) => (
-  <TouchableOpacity
-    style={{
-      top: -16,
-      justifyContent: "center",
-      alignItems: "center",
-    }}
-    onPress={onPress}
-    activeOpacity={0.85}
-  >
-    <View
-      className="w-[68px] h-[68px] rounded-full items-center justify-center p-1 bg-white dark:bg-gray-900"
+/** React Navigation types the tab tint as `ColorValue` (string | opaque color),
+ * while the icon fonts only accept strings or opaque platform colors. The tint
+ * is resolved from `tabBarActiveTintColor`/`tabBarInactiveTintColor`, so it is
+ * always a string here. */
+const toIconColor = (
+  color: ColorValue,
+): string | OpaqueColorValue | undefined =>
+  typeof color === "string" || typeof color === "symbol" ? color : undefined;
+
+const SellTabBarButton = ({ label, canOpen }: any) => {
+  const openPostFlow = () => {
+    if (!canOpen) {
+      router.push("/(auth)/welcome");
+      return;
+    }
+    router.push("/account/choose-category" as never);
+  };
+
+  return (
+    <TouchableOpacity
       style={{
-        elevation: 8,
-        shadowColor: "#F97316",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
+        top: -16,
+        justifyContent: "center",
+        alignItems: "center",
       }}
+      onPress={openPostFlow}
+      activeOpacity={0.85}
     >
-      <LinearGradient
-        colors={["#FB923C", "#F97316", "#EA580C"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        className="w-full h-full rounded-full items-center justify-center border border-white/40"
+      <View
+        className="w-[68px] h-[68px] rounded-full items-center justify-center p-1 bg-white dark:bg-gray-900"
+        style={{
+          elevation: 8,
+          shadowColor: "#F97316",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 10,
+        }}
       >
-        <View className="items-center justify-center">
-          <Ionicons name="camera" size={24} color="white" />
-          <View style={{ position: "absolute", top: -4, right: -6 }}>
-            <Ionicons name="add-circle" size={14} color="white" />
+        <LinearGradient
+          colors={["#FB923C", "#F97316", "#EA580C"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="w-full h-full rounded-full items-center justify-center border border-white/40"
+        >
+          <View className="items-center justify-center">
+            <Ionicons name="camera" size={24} color="white" />
+            <View style={{ position: "absolute", top: -4, right: -6 }}>
+              <Ionicons name="add-circle" size={14} color="white" />
+            </View>
+            <Text className="text-white text-[9px] font-black tracking-wider uppercase mt-0.5">
+              {label || "Sell"}
+            </Text>
           </View>
-          <Text className="text-white text-[9px] font-black tracking-wider uppercase mt-0.5">
-            {label || "Sell"}
-          </Text>
-        </View>
-      </LinearGradient>
-    </View>
-  </TouchableOpacity>
-);
+        </LinearGradient>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const TabsLayout = () => {
   const { isAuthenticated } = useAuth();
@@ -97,7 +117,7 @@ const TabsLayout = () => {
             <Ionicons
               name={focused ? "home" : "home-outline"}
               size={22}
-              color={color}
+              color={toIconColor(color)}
             />
           ),
         }}
@@ -123,7 +143,7 @@ const TabsLayout = () => {
             <Ionicons
               name={focused ? "notifications" : "notifications-outline"}
               size={24}
-              color={color}
+              color={toIconColor(color)}
             />
           ),
         }}
@@ -134,7 +154,11 @@ const TabsLayout = () => {
         options={{
           title: t("sell"),
           tabBarButton: (props) => (
-            <SellTabBarButton {...props} label={t("sell")} />
+            <SellTabBarButton
+              {...props}
+              label={t("sell")}
+              canOpen={isAuthenticated}
+            />
           ),
           tabBarLabel: () => null,
         }}
@@ -150,7 +174,7 @@ const TabsLayout = () => {
                 focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"
               }
               size={22}
-              color={color}
+              color={toIconColor(color)}
             />
           ),
         }}
@@ -164,7 +188,7 @@ const TabsLayout = () => {
             <Ionicons
               name={focused ? "person" : "person-outline"}
               size={22}
-              color={color}
+              color={toIconColor(color)}
             />
           ),
         }}

@@ -1,31 +1,84 @@
 import { AppFooterDeviceInfo } from "@/components/common/AppFooterDeviceInfo";
-import SafeAreaView from "@/components/common/SafeAreaView";
+import ProductCard from "@/components/product/ProductCard";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTheme } from "@/contexts/ThemeContext";
+import { fetchFeed } from "@/lib/api/feed";
+import { toCardProduct } from "@/lib/listing-card";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
+import { useIsFocused, useRouter } from "expo-router";
+import { useColorScheme } from "nativewind";
+import type { ComponentProps } from "react";
 import {
+  ActivityIndicator,
   Image,
-  Modal,
   ScrollView,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 const AccountScreen = () => {
   const router = useRouter();
-  const { isAuthenticated, user, logout } = useAuth();
-  const { isDark } = useTheme();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
 
-  const FEATURE_LINKS = [
+  const displayName =
+    user.name && user.name !== "DATA" && user.name !== "015455758"
+      ? user.name
+      : "Ban Sreypov";
+  const displayUsername =
+    user.username && user.username !== "data" && user.username !== "015455758"
+      ? user.username
+      : "bansreypov";
+
+  const openEditProfile = () => router.push("/(auth)/edit-profile" as never);
+
+  const highlightsQuery = useInfiniteQuery({
+    queryKey: ["account-highlights"],
+    queryFn: ({ pageParam }) => fetchFeed({ limit: 8, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  // Flatten every loaded page — the section keeps loading as the page scrolls.
+  const highlights = (highlightsQuery.data?.pages ?? [])
+    .flatMap((page) => page.items)
+    .map(toCardProduct);
+
+  const handleHighlightsScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const nearBottom =
+      contentOffset.y + layoutMeasurement.height >= contentSize.height - 300;
+    if (
+      nearBottom &&
+      highlightsQuery.hasNextPage &&
+      !highlightsQuery.isFetchingNextPage
+    ) {
+      void highlightsQuery.fetchNextPage();
+    }
+  };
+
+  const services: {
+    label: string;
+    icon: IoniconName;
+    onPress: () => void;
+  }[] = [
     {
-      label: "Manage Ads",
-      icon: "documents-outline",
-      onPress: () => router.push("/account/my-ads" as never),
+      label: "Subscription",
+      icon: "receipt-outline",
+      onPress: () => router.push("/account/subscription" as never),
     },
     {
       label: "Likes",
@@ -40,367 +93,356 @@ const AccountScreen = () => {
     {
       label: "Jobs",
       icon: "briefcase-outline",
-      onPress: () => router.push("/(categories)/jobs" as never),
+      onPress: () => router.push("/account/jobs" as never),
+    },
+    {
+      label: "Resume (CV)",
+      icon: "id-card-outline",
+      onPress: () => router.push("/account/resume" as never),
+    },
+    {
+      label: "Insights",
+      icon: "trending-up-outline",
+      onPress: () => router.push("/account/insights" as never),
     },
   ];
 
-  const displayName =
-    user?.name && user.name !== "DATA" && user.name !== "015455758"
-      ? user.name
-      : "Ban Sreypov";
-  const displayUsername =
-    user?.username && user.username !== "data" && user.username !== "015455758"
-      ? user.username
-      : "bansreypov";
-
-  const confirmLogout = () => {
-    setShowLogoutModal(false);
-    setTimeout(() => {
-      void logout();
-    }, 100);
-  };
-
   return (
-    <SafeAreaView
-      statusBarColor={Colors.primary.DEFAULT}
-      statusBarStyle="light-content"
-      className="bg-neutral-background"
-    >
-      {/* Top Header */}
-      <View className="bg-primary px-4 pt-3 pb-8 relative overflow-hidden">
-        {user?.coverPhoto ? (
-          <Image
-            source={{ uri: user.coverPhoto }}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              opacity: 0.35,
-            }}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View className="flex-row items-center justify-between">
-          <Text className="text-white text-xl font-bold tracking-tight">
-            @{displayUsername}
-          </Text>
+    <View className="flex-1 bg-primary">
+      {isFocused ? <StatusBar barStyle="light-content" /> : null}
+
+      {/* Fixed compact header — stays while the profile block scrolls away */}
+      <View className="z-20 bg-primary" style={{ paddingTop: insets.top }}>
+        <View className="h-12 flex-row items-center justify-between px-4">
+          <View className="flex-1 flex-row items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <TouchableOpacity
+                  onPress={() => router.push("/scan")}
+                  className="p-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Scan QR code"
+                >
+                  <Ionicons name="qr-code-outline" size={24} color="white" />
+                </TouchableOpacity>
+                <Text
+                  className="flex-1 text-2xl font-bold tracking-tight text-white"
+                  numberOfLines={1}
+                >
+                  @{displayUsername}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-2xl font-extrabold tracking-tight text-white">
+                PhsarKhmer
+              </Text>
+            )}
+          </View>
+
           <View className="flex-row items-center gap-4">
             <TouchableOpacity
               onPress={() => router.push("/(auth)/contact-us")}
               className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="Contact support"
             >
               <Ionicons name="headset-outline" size={24} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => router.push("/(auth)/settings")}
               className="p-1"
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
               <Ionicons name="settings-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Add / Change cover photo */}
-        <TouchableOpacity
-          onPress={() => router.push("/(auth)/edit-profile")}
-          className="flex-row items-center justify-center gap-2 mt-4 py-1"
-        >
-          <Ionicons name="camera-outline" size={20} color="white" />
-          <Text className="text-white text-sm font-semibold">
-            {user?.coverPhoto ? "Change cover photo" : "Add cover photo"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={handleHighlightsScroll}
       >
-        {isAuthenticated ? (
-          /* ================= LOGGED IN VIEW (PHSARKHMER STYLE) ================= */
-          <View className="pb-10">
-            {/* User Profile Card */}
-            <View style={{ marginHorizontal: 16, marginTop: -14, zIndex: 30 }}>
-              {/* White Card Body */}
-              <View
-                style={{
-                  backgroundColor: isDark ? "#111827" : "#FFFFFF",
-                  borderRadius: 20,
-                  padding: 16,
-                  borderWidth: 1,
-                  borderColor: isDark ? "#1F2937" : "#F1F5F9",
-                  elevation: 3,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 6,
-                }}
-              >
-                {/* Header row: Avatar on left, Name in middle, QR code on right */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  {/* Left: Avatar with camera badge */}
+        {/* Profile block — scrolls under the fixed header */}
+        <View className="relative bg-primary">
+          {user.coverPhoto ? (
+            <Image
+              source={{ uri: user.coverPhoto }}
+              blurRadius={18}
+              resizeMode="cover"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: -40,
+              }}
+            />
+          ) : null}
+          {user.coverPhoto ? (
+            <LinearGradient
+              colors={[
+                "rgba(2, 6, 23, 0.55)",
+                "rgba(2, 6, 23, 0.12)",
+                "rgba(2, 6, 23, 0.45)",
+              ]}
+              locations={[0, 0.45, 1]}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: -40,
+              }}
+            />
+          ) : null}
+
+          <View className="px-4 pb-5 pt-2">
+            {isAuthenticated ? (
+              <>
+                <View className="mt-2 items-center">
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    onPress={() => router.push("/(auth)/edit-profile")}
-                    style={{ position: "relative", marginRight: 14 }}
+                    onPress={openEditProfile}
+                    className="h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-white"
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit profile photo"
                   >
-                    <View
-                      style={{
-                        width: 62,
-                        height: 62,
-                        borderRadius: 31,
-                        backgroundColor: "#E5E7EB",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {user.avatar ? (
-                        <Image
-                          source={{ uri: user.avatar }}
-                          style={{ width: "100%", height: "100%" }}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <Ionicons name="person" size={38} color="#9CA3AF" />
-                      )}
+                    {user.avatar ? (
+                      <Image
+                        source={{ uri: user.avatar }}
+                        className="h-full w-full"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name="person" size={54} color="#9CA3AF" />
+                    )}
+                  </TouchableOpacity>
+                  <Text className="mt-3 text-xl font-bold text-white">
+                    {displayName}
+                  </Text>
+                  <Text className="mt-1 text-sm font-medium text-white/90">
+                    {user.accountType || "Normal account"}
+                  </Text>
+                </View>
+
+                <View className="mt-1 flex-row justify-end">
+                  <TouchableOpacity
+                    onPress={openEditProfile}
+                    className="p-1"
+                    accessibilityRole="button"
+                    accessibilityLabel="Change cover photo"
+                  >
+                    <Ionicons name="camera-outline" size={22} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+        <View className="flex-1 rounded-t-3xl bg-neutral-background pt-3 dark:bg-black">
+          {isAuthenticated ? (
+            <View className="pb-10">
+              {/* Upgrade to Business Account */}
+              <View className="mx-4 mt-1">
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => router.push("/account/membership" as never)}
+                  className="overflow-hidden rounded-2xl"
+                >
+                  <LinearGradient
+                    colors={["#4F46E5", "#7C3AED"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    className="h-12 flex-row items-center justify-between px-4"
+                  >
+                    <Text className="text-sm font-bold text-white">
+                      Upgrade to Business Account
+                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="white" />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+
+              {/* "My ads" Card */}
+              <View className="mx-4 mt-3 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                <View className="mb-4 flex-row items-center justify-between">
+                  <Text className="text-base font-bold text-gray-900 dark:text-white">
+                    My ads
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => router.push("/account/my-ads" as never)}
+                  >
+                    <Text className="text-xs font-semibold text-gray-400">
+                      View All &gt;
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View className="flex-row justify-around">
+                  {/* Post Ad */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push("/account/choose-category" as never)
+                    }
+                    className="flex-1 items-center"
+                  >
+                    <View className="relative mb-2">
+                      <Ionicons
+                        name="camera-outline"
+                        size={28}
+                        color="#6366F1"
+                      />
+                      <View className="absolute -right-2 -top-1">
+                        <Ionicons name="add-circle" size={14} color="#6366F1" />
+                      </View>
                     </View>
-                    <View
-                      style={{
-                        position: "absolute",
-                        bottom: -2,
-                        right: -2,
-                        backgroundColor: "#0EA5E9",
-                        width: 20,
-                        height: 20,
-                        borderRadius: 10,
-                        borderWidth: 1.5,
-                        borderColor: "#FFFFFF",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Ionicons name="camera" size={10} color="white" />
-                    </View>
+                    <Text className="text-center text-xs font-medium text-gray-800 dark:text-gray-200">
+                      Post Ad
+                    </Text>
                   </TouchableOpacity>
 
-                  {/* Middle: Name & Account Type */}
+                  {/* Active ads */}
                   <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => router.push("/(auth)/edit-profile")}
-                    style={{ flex: 1, justifyContent: "center" }}
+                    onPress={() =>
+                      router.push("/account/my-ads?tab=active" as never)
+                    }
+                    className="flex-1 items-center"
                   >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 5,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: "700",
-                          color: isDark ? "#FFFFFF" : "#111827",
-                        }}
-                      >
-                        {displayName}
-                      </Text>
-                      <Ionicons name="pencil-sharp" size={13} color="#0EA5E9" />
+                    <View className="relative mb-2">
+                      <Ionicons
+                        name="document-text-outline"
+                        size={28}
+                        color="#6366F1"
+                      />
+                      <View className="absolute -bottom-1 -right-1">
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={13}
+                          color="#6366F1"
+                        />
+                      </View>
                     </View>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "500",
-                        color: isDark ? "#9CA3AF" : "#6B7280",
-                        marginTop: 2,
-                      }}
-                    >
-                      {user.accountType || "Normal account"}
+                    <Text className="text-center text-xs font-medium text-gray-800 dark:text-gray-200">
+                      Active ads
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Expired ads */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push("/account/my-ads?tab=expired" as never)
+                    }
+                    className="flex-1 items-center"
+                  >
+                    <View className="mb-2">
+                      <Ionicons name="ban-outline" size={28} color="#6366F1" />
+                    </View>
+                    <Text className="text-center text-xs font-medium text-gray-800 dark:text-gray-200">
+                      Expired ads
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Top ads */}
+                  <TouchableOpacity
+                    onPress={() => router.push("/account/top-ads" as never)}
+                    className="flex-1 items-center"
+                  >
+                    <View className="mb-2">
+                      <Ionicons
+                        name="ribbon-outline"
+                        size={28}
+                        color="#6366F1"
+                      />
+                    </View>
+                    <Text className="text-center text-xs font-medium text-gray-800 dark:text-gray-200">
+                      Top ads
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
 
-            {/* "My ads" Card */}
-            <View className="bg-white dark:bg-gray-900 mx-4 mt-3 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-xs">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-base font-bold text-gray-900 dark:text-white">
-                  My ads
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push("/account/my-ads" as never)}
-                >
-                  <Text className="text-xs font-semibold text-gray-400">
-                    View All &gt;
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View className="flex-row justify-around">
-                {/* Post Ad */}
-                <TouchableOpacity
-                  onPress={() => router.push("/(tabs)/sell")}
-                  className="items-center flex-1"
-                >
-                  <View className="relative mb-2">
-                    <Ionicons name="camera-outline" size={28} color="#0EA5E9" />
-                    <View className="absolute -top-1 -right-2">
-                      <Ionicons name="add-circle" size={14} color="#0EA5E9" />
-                    </View>
-                  </View>
-                  <Text className="text-xs font-medium text-gray-800 dark:text-gray-200 text-center">
-                    Post Ad
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Active ads */}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/account/my-ads?tab=active" as never)
-                  }
-                  className="items-center flex-1"
-                >
-                  <View className="relative mb-2">
-                    <Ionicons
-                      name="document-text-outline"
-                      size={28}
-                      color="#0EA5E9"
-                    />
-                    <View className="absolute -bottom-1 -right-1">
+              {/* Features & Services Grid Card */}
+              <View className="mx-4 mt-3 rounded-2xl border border-gray-100 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                <View className="flex-row flex-wrap">
+                  {services.map((entry) => (
+                    <TouchableOpacity
+                      key={entry.label}
+                      className="mb-5 w-1/4 items-center"
+                      onPress={entry.onPress}
+                    >
                       <Ionicons
-                        name="checkmark-circle"
-                        size={13}
-                        color="#0EA5E9"
+                        name={entry.icon}
+                        size={26}
+                        color={isDark ? "#D1D5DB" : "#374151"}
                       />
+                      <Text className="mt-1 text-center text-xs font-medium text-gray-800 dark:text-gray-200">
+                        {entry.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Marketplace highlights — random listings, like the reference */}
+              {highlights.length > 0 ? (
+                <View className="mt-5 bg-white px-4 pb-2 pt-4 dark:bg-gray-900">
+                  <Text className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
+                    Marketplace highlights
+                  </Text>
+                  <View className="-mx-1.5 flex-row flex-wrap">
+                    {highlights.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        viewMode="grid"
+                      />
+                    ))}
+                  </View>
+                  {highlightsQuery.isFetchingNextPage ? (
+                    <View className="items-center py-3">
+                      <ActivityIndicator color={Colors.primary.DEFAULT} />
                     </View>
-                  </View>
-                  <Text className="text-xs font-medium text-gray-800 dark:text-gray-200 text-center">
-                    Active ads
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Expired ads */}
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push("/account/my-ads?tab=expired" as never)
-                  }
-                  className="items-center flex-1"
-                >
-                  <View className="mb-2">
-                    <Ionicons name="ban-outline" size={28} color="#0EA5E9" />
-                  </View>
-                  <Text className="text-xs font-medium text-gray-800 dark:text-gray-200 text-center">
-                    Expired ads
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
-
-            {/* Features & Services Grid Card */}
-            <View className="bg-white dark:bg-gray-900 mx-4 mt-3 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-xs">
-              <View className="flex-row flex-wrap">
-                {FEATURE_LINKS.map((entry) => (
-                  <TouchableOpacity
-                    key={entry.label}
-                    className="w-1/4 items-center mb-5"
-                    onPress={entry.onPress}
-                  >
-                    <Ionicons
-                      name={entry.icon as any}
-                      size={26}
-                      color={isDark ? "#D1D5DB" : "#374151"}
-                    />
-                    <Text className="text-xs text-gray-800 dark:text-gray-200 font-medium mt-1 text-center">
-                      {entry.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        ) : (
-          /* ================= SIGNED-OUT PROMPT ================= */
-          <View className="items-center px-6 pt-10 pb-12">
-            <Ionicons
-              name="person-circle-outline"
-              size={72}
-              color={Colors.text.muted}
-            />
-            <Text className="mt-4 text-lg font-bold text-neutral-text-main dark:text-white text-center">
-              Sign in to PhsarKhmer
-            </Text>
-            <Text className="mt-2 text-center text-sm text-neutral-text-sub dark:text-gray-400 leading-6">
-              Log in or create an account to manage your ads, saved posts and
-              messages.
-            </Text>
-            <TouchableOpacity
-              onPress={() => router.push("/(auth)/welcome")}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              className="mt-6 w-full bg-secondary-orange h-12 rounded-lg items-center justify-center shadow-xs"
-            >
-              <Text className="text-white font-bold text-base">
-                Login or Register
+          ) : (
+            /* ================= SIGNED-OUT PROMPT ================= */
+            <View className="items-center px-6 pt-10 pb-12">
+              <Ionicons
+                name="person-circle-outline"
+                size={72}
+                color={Colors.text.muted}
+              />
+              <Text className="mt-4 text-center text-lg font-bold text-neutral-text-main dark:text-white">
+                Sign in to PhsarKhmer
               </Text>
-            </TouchableOpacity>
-
-            <AppFooterDeviceInfo className="items-center mt-10" />
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Logout Confirmation Modal */}
-      <Modal
-        visible={showLogoutModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLogoutModal(false)}
-      >
-        <View
-          className="flex-1 justify-center items-center px-6"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-        >
-          <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center shadow-xl">
-            <View className="w-14 h-14 bg-rose-100 rounded-full items-center justify-center mb-3">
-              <Ionicons name="log-out" size={28} color="#E11D48" />
-            </View>
-            <Text className="text-xl font-bold text-neutral-text-main mb-1">
-              Log Out?
-            </Text>
-            <Text className="text-neutral-text-sub text-center text-sm mb-6">
-              Are you sure you want to log out of your account?
-            </Text>
-            <View className="flex-row gap-3 w-full">
+              <Text className="mt-2 text-center text-sm leading-6 text-neutral-text-sub dark:text-gray-400">
+                Log in or create an account to manage your ads, saved posts and
+                messages.
+              </Text>
               <TouchableOpacity
-                onPress={() => setShowLogoutModal(false)}
-                className="flex-1 py-3 bg-neutral-background rounded-xl items-center border border-neutral-border"
+                onPress={() => router.push("/(auth)/welcome")}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                className="mt-6 h-12 w-full items-center justify-center rounded-lg bg-secondary-orange shadow-xs"
               >
-                <Text className="text-neutral-text-main font-semibold">
-                  Cancel
+                <Text className="text-base font-bold text-white">
+                  Login or Register
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={confirmLogout}
-                className="flex-1 py-3 bg-rose-600 rounded-xl items-center"
-              >
-                <Text className="text-white font-bold">Log Out</Text>
-              </TouchableOpacity>
+
+              <AppFooterDeviceInfo className="mt-10 items-center" />
             </View>
-          </View>
+          )}
         </View>
-      </Modal>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 };
 

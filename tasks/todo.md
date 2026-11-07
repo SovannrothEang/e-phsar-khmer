@@ -7106,3 +7106,121 @@ Captain: "add more function that user can edit the post that they post... let pl
 - **Verified** — backend full suite 87/87 suites, 1,260 tests (scoped listings pattern 119 tests), `nest build`, scoped eslint clean (repo-wide backend lint still flags only the other session's new `admin-listings.service.spec.ts`/`listings.moderation.spec.ts`); web `next build`, eslint, `format:check` clean. Live API walk: create → publish → owner read (slugs/status) → text edit + clears (description/email/discount null) → cross-category move with dates/status preserved → one-sided pair/discount and null-title 400s → delete. Headless Chromium walk: edit route prefilled (title/price/photo), Save → toast → detail navigation → new title shown, `publishedAt`/`expiresAt` unchanged; ad and photo object cleaned up.
 - **Follow-up (captain, same day) — Manage Ads inactive error** — "don't add inactive tabs there, use in active, but flag tabs as inactive." Removed the Inactive tab from `MyAdsTab`/`TAB_ORDER`/the count probes (the `status=inactive` probe was the 400). The backend Active filter now includes `status='inactive'` and `QueryListingsDto` accepts `inactive`; `getMyAdsPage` maps a row-level `inactive` flag, and `Manage-Ads` shows the Inactive chip + staff reason on that row (no public link) with the republish action, while the tab grid is Active/Expired/Hidden only. Restarted the dev backend from the new `dist`; verified `status=active|inactive` 200 and a headless Manage Ads walk (Active (1)/Expired (0), ad listed, no "Validation failed"). Backend scoped tests 120/120 + `nest build`; web `next build` + eslint + prettier clean.
 - **Known gaps / risks** — the dev stack's migration `0050` (another session's `inactive` status/columns) was applied with the captain's approval to unblock verification. The inactive row's badge/republish menu is type-checked but was not clicked through with a real admin-inactivated ad (no admin fixture in this session). Test account `+85511998002` (edittest) remains in the dev DB; its test ads/photos were deleted. Legacy rows with a free-text location and no province id must be fixed once on first edit; an unchanged legacy email is not resent. Concurrent edits remain last-write-wins. Mobile edit remains deferred.
+
+## 2026-11-06 — Mobile Resume (CV) 8-step wizard
+
+Captain: add the Resume (CV) flow to the mobile app from the 15 reference screenshots; the entry
+screen offers only Create a New Resume (no Upload Existing Resume), the wizard has 8 steps, and the
+web resume flow is the reference. Approved decisions: require Skill/Language levels; an existing
+resume opens the completed overview (captain, 2026-11-06, superseding the earlier
+prefilled-wizard choice); one Experience and one Reference form each;
+phone is required.
+
+- **Route and entry** — `apps/mobile/app/account/resume.tsx`; the account tab's Resume (CV) item
+  now routes there instead of showing an `Alert`.
+- **API** — new `lib/api/resume.ts` mirrors `apps/web/actions/resume.ts`: `GET /resume`,
+  `PUT /resume/personal`, `PATCH /resume` (summary/hobbies), per-entry
+  `PUT/DELETE /resume/{experiences|educations|skills|languages|references}/:id`,
+  `POST /files/sign` (scope `resume`) and `DELETE /files` cleanup. Dates stay date-only strings;
+  month-year pickers land on day 01; client ids are `expo-crypto` UUIDs.
+- **UI** — the reference's dark surfaces and chrome: start card with the 8 numbered chips;
+  step header (X/back + left-aligned title + `Step N of 8` pill); fixed footer (Skip + orange
+  Next/Save, or one orange CTA); floating-label filled fields; the personal photo tile; gender
+  and marital segmented choices; native-style DOB (year/month/day) and Start/End (year/month)
+  wheel pickers with Cancel/Done; iOS-style action sheets for Education Level, Degree and
+  Skill/Language level ("Bachelor" shown, "Bachelor's Degree" stored); province→district→
+  commune location sheet; the three list editors with edit/delete and the `Missing info`
+  legacy pill; the single Experience and Reference forms; the Resume Ready dialog
+  (Finish → completed-resume view, Feedback → feedback screen).
+- **Behaviour** — each step/save awaits the API and only then advances; failures Alert and keep
+  the form; Skip sends nothing. Validation runs on Next/Save only and every flag is rendered
+  (first/last name, ≥1 valid phone, email format, years 0–60, experience/education dates,
+  required title/level, reference fields). An existing resume lands on the completed overview;
+  the Create card appears only when no resume exists. A failed `GET /resume` shows Retry, never
+  an empty start card. The photo uploads through the signed flow and is deleted on close when
+  unsaved.
+  `FloatingInput`/`DropdownField` gained the filled/dark variant, `required` asterisk and a
+  multiline height; existing forms keep the defaults.
+- **Finished flow** — Finish from the ready dialog opens the completed-resume view
+  (`ResumeOverview.tsx`): the flat reference sections, personal block with photo/links,
+  Completed Profile meter + missing chips, all eight sections with edit/add links (the wizard
+  forms are reused in a return-to-overview mode), entry 3-dot edit/delete menus, the CV / Resume
+  card (open through the signed attachment URL, remove via `DELETE /resume/attachments`, and
+  upload/replace with `expo-file-system`'s `File.pickFileAsync` through the web's
+  create → PUT → complete handshake), and Job
+  Preferences display/edit (`PATCH /resume`, options from the jobs category, jobtypes
+  attributes and provinces). Feedback opens `ResumeFeedback.tsx` (mood, section chips, notes)
+  and submits to the public `POST /feedback` with the resume's name/phone/email. Reopening an
+  existing resume lands on this overview directly; the Create card is only for no-resume
+  accounts.
+- **Verified** — `pnpm --filter phsarkhmer exec tsc --noEmit` (0), `expo lint` (0), Prettier
+  and `git diff --check` clean. `apps/mobile` has no test runner. The mobile paths were probed
+  against the running dev backend: `GET /resume`, `PUT /resume/personal`, `PATCH /resume`,
+  `POST /files/sign`, `POST /resume/attachments/sign` and `DELETE /resume/attachments` all
+  answer `401 UNAUTHORIZED` (routes present, guard active); `POST /feedback` answers `400`
+  (public route, rejects the empty probe body before writing a row).
+- **Pending** — runtime API walk and the device/emulator UI walk (all 8 steps, validation,
+  photo, add/edit/delete, Skip/Back, Finish, the overview and feedback screens, Job
+  Preferences, reopen-overview, dark/light). No dev session was
+  available in this pass: the runtime floor blocks reading the backend `.env` secrets and the
+  mobile needs a signed-in session, so the walk is left for a session with a test login.
+
+## 2026-11-06 — Category quick-filter sheets
+
+Captain's screenshots of the "Cars And Vehicles" feed: Location should slide up a searchable
+province → khan → sangkat drill-down (not open the full Filters screen), and Sort/Price should
+open their own sheets.
+
+- `FilterChips` owns one `SelectionSheet` that swaps title/options through a searchable
+  province → khan/district → sangkat/commune drill-down (back chevron walks up a step;
+  `fetchProvinces`/`fetchDistricts`/`fetchCommunes`, cached 10 minutes). Each selection writes
+  `provinceSlug`/`districtSlug`/`communeSlug` through `router.setParams` (clearing the deeper
+  levels), so the current feed refetches and the chip shows the deepest name and turns blue;
+  the sheet's Clear resets the current level (province Clear resets all). The `Filters` chip
+  still opens `/filters`.
+- Sort opens a compact radio `SelectionSheet` (Latest Ads / Price: Low to High / Price: High
+  to Low); choosing writes `sort` (Latest Ads clears it) and closes. Price (Salary on Jobs)
+  opens `PriceFilterSheet` (title "Filters", Min/Max inputs, orange Apply Filter) and writes
+  `minPrice`/`maxPrice` only on apply.
+- `SORT_OPTIONS` moved to `lib/filter-options.ts`, shared by `/filters` and the chip row.
+- The chip row was enlarged per the captain's screenshot: `text-base` labels, `px-4 py-2`,
+  16/12px icons and 4px corners (was `text-sm`, `rounded-lg`). The category search field was
+  enlarged/squared too: `text-lg`, `px-4 py-2.5`, 22px icon, `rounded-sm` (was `text-base`,
+  `px-3 py-2`, 20px icon, `rounded`).
+- `SelectionSheet` now keys its list on the title so the scroll position resets between
+  drill-down steps.
+- Removed the now-unused `onLocationPress` prop from the six category feed screens (category,
+  subcategory, brand, brand/type, type, type/brand).
+- Verified — `pnpm --filter phsarkhmer exec tsc --noEmit` (0), `expo lint` (0), Prettier and
+  `git diff --check` clean. The sheet/UI walk is pending with the same no-session caveat.
+
+## 2026-11-06 — Mobile SDK 58 upgrade (Expo Go 58 client)
+
+The user runs Expo Go on physical devices (Android client 58.0.5, iOS client 58.0.7; Expo Go
+supports SDK 58 only), so `apps/mobile` moved from Expo SDK 54 / React Native 0.81 to the Expo
+SDK 58 package set.
+
+- **Packages** — mobile realigned to `expo` `~58.0.23`, `react-native` `0.88.1`,
+  `react`/`react-dom` `19.3.0`, `expo-router` `~58.0.30`, `typescript` `~6.0.3`,
+  `eslint-config-expo` `~58.0.4`.
+- **Config** — SDK 58 is New Architecture only and Android edge-to-edge is always on, so
+  `newArchEnabled` and `android.edgeToEdgeEnabled` were removed from `app.json`.
+  `@react-navigation/*` imports migrated to `expo-router` exports (`useIsFocused`); the
+  reanimated Babel plugin was removed because `babel-preset-expo` wires
+  `react-native-worklets`.
+- **RN 0.88 API migrations** — ScrollView/TextInput refs now type the instance
+  (`React.ComponentRef<typeof …>`), `StyleSheet.absoluteFillObject` → `StyleSheet.absoluteFill`,
+  the `StatusBar` `backgroundColor`/`translucent` props are gone under forced edge-to-edge, and
+  `Appearance.setColorScheme(…, 'auto')` replaces `null`.
+- **Lint** — React Compiler rules enabled by `eslint-config-expo` 58 (react-hooks v7) were
+  driven to 0 errors.
+- **Types** — `@types/react` aligned on 19.3.0 across `apps/mobile`, `apps/web` and `@repo/ui`
+  so the workspace resolves one copy and `next build` stays green (a second copy breaks it).
+- **Verified** — `pnpm --filter phsarkhmer exec tsc --noEmit` (0), `expo lint` (0),
+  `npx expo-doctor` 20/20, `expo install --check` up to date, `expo export -p android` and
+  `-p ios` Hermes bundles, and the Expo Go LAN manifest (`sdkVersion 58.0.0`,
+  `runtimeVersion exposdk:58.0.0`, LAN `hostUri`/`launchAsset` for both platforms). Web
+  `next build` passes with one `@types/react` copy; Prettier and `git diff --check` clean.
+- **Pending** — physical-device walk (Android Expo Go 58.0.5 + iOS 58.0.7 on real devices) is
+  not possible from this machine; only the LAN/firewall hop between the phone and
+  `expo start --lan` remains unverified.

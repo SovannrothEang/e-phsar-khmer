@@ -34,10 +34,8 @@ const SignUpScreen = () => {
     setIsLoading(false);
 
     if (result.kind === "otp") {
-      router.push({
-        pathname: "/(auth)/otp",
-        params: { mode: "register" },
-      } as never);
+      // Name + password are collected next; the code is verified last.
+      router.push("/(auth)/create-account" as never);
       return;
     }
     if (result.kind === "authenticated") {
@@ -61,7 +59,7 @@ const SignUpScreen = () => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-neutral-text-sub dark:text-gray-300 text-center text-sm leading-6 mb-6">
+        <Text className="text-neutral-text-sub dark:text-gray-300 text-center text-[16px] leading-7 mb-6">
           Please enter your phone number and we&apos;ll send the code to
           register your new account.
         </Text>
@@ -86,7 +84,7 @@ const SignUpScreen = () => {
             disabled={isLoading}
             activeOpacity={0.8}
             accessibilityRole="button"
-            className={`bg-secondary-orange py-4 rounded-xl items-center justify-center mt-2 shadow-xs ${
+            className={`bg-secondary-orange h-[44px] rounded-[4px] items-center justify-center mt-2 shadow-xs ${
               isLoading ? "opacity-60" : ""
             }`}
           >
@@ -96,18 +94,13 @@ const SignUpScreen = () => {
               <Text className="text-white font-bold text-base">Submit</Text>
             )}
           </TouchableOpacity>
-
-          <View className="flex-row justify-center items-center gap-1 mt-1">
-            <Text className="text-sm text-neutral-text-sub dark:text-gray-400">
-              Already have an account?
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/(auth)/sign-in")}>
-              <Text className="text-primary font-bold text-sm">Log in</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        <SocialAuthSection variant="telegramOnly" />
+        {/* Same rhythm as Welcome/Login: one 40dp gap under Submit and the
+            same again between the divider and Telegram. */}
+        <View className="mt-[40px]">
+          <SocialAuthSection variant="telegramOnly" gap={40} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

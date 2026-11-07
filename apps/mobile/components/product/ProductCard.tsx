@@ -24,11 +24,15 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
     return img;
   };
 
-  const renderImageBadges = () => (
+  const renderImageBadges = (mode: "grid" | "list") => (
     <>
-      {/* Favorite Button */}
+      {/* Favorite Button: flat list rows keep the reference's white heart. */}
       <TouchableOpacity
-        className="absolute right-2.5 top-2.5 rounded-full bg-black/50 p-2 shadow-sm border border-white/20"
+        className={`absolute top-2.5 ${
+          mode === "list"
+            ? "left-2.5 p-1"
+            : "right-2.5 rounded-full border border-white/20 bg-black/50 p-2 shadow-sm"
+        }`}
         activeOpacity={0.7}
         onPress={(e) => {
           e.stopPropagation();
@@ -37,16 +41,29 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
       >
         <Ionicons
           name={liked ? "heart" : "heart-outline"}
-          size={15}
+          size={mode === "list" ? 24 : 15}
           color={liked ? "#EF4444" : "white"}
+          style={
+            mode === "list"
+              ? {
+                  textShadowColor: "rgba(0,0,0,0.35)",
+                  textShadowOffset: { width: 0, height: 1 },
+                  textShadowRadius: 3,
+                }
+              : undefined
+          }
         />
       </TouchableOpacity>
 
       {/* Free Delivery Badge */}
       {product.hasFreeDelivery && (
-        <View className="absolute bottom-2.5 left-2.5 flex-row items-center rounded-full bg-black/70 px-2 py-0.5 border border-white/20">
+        <View
+          className={`absolute bottom-2.5 ${
+            mode === "list" ? "right-2.5" : "left-2.5"
+          } flex-row items-center rounded-full border border-white/20 bg-black/70 px-2 py-0.5`}
+        >
           <Ionicons name="car" size={11} color="#38BDF8" />
-          <Text className="ml-1 text-[10px] font-bold text-white uppercase tracking-wider">
+          <Text className="ml-1 text-[10px] font-bold uppercase tracking-wider text-white">
             Free Delivery
           </Text>
         </View>
@@ -54,9 +71,21 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
 
       {/* Image Count Badge */}
       {(product.imageCount ?? 0) > 0 && (
-        <View className="absolute bottom-2.5 right-2.5 flex-row items-center rounded-full bg-black/70 px-2 py-0.5 border border-white/20">
-          <Ionicons name="camera" size={11} color="white" />
-          <Text className="ml-1 text-[10px] font-bold text-white">
+        <View
+          className={`absolute bottom-2.5 ${
+            mode === "list" ? "left-2.5" : "right-2.5"
+          } flex-row items-center rounded-full border border-white/20 bg-black/70 px-2 py-0.5`}
+        >
+          <Ionicons
+            name="camera"
+            size={mode === "list" ? 13 : 11}
+            color="white"
+          />
+          <Text
+            className={`ml-1 font-bold text-white ${
+              mode === "list" ? "text-xs" : "text-[10px]"
+            }`}
+          >
             {product.imageCount}
           </Text>
         </View>
@@ -93,94 +122,85 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
     </View>
   );
 
-  // LIST VIEW
+  // LIST VIEW — a flat reference row, not a bordered card.
   if (viewMode === "list") {
     return (
-      <View className="px-4 py-1.5">
-        <TouchableOpacity
-          className="flex-row rounded-3xl bg-white dark:bg-gray-900 p-3 border border-gray-100 dark:border-gray-800"
-          style={{
-            elevation: 2,
-            shadowColor: "#0F172A",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
-          }}
-          onPress={() => router.push(`/product/${product.id}`)}
-          activeOpacity={0.7}
-        >
-          {/* Image Container */}
-          <View className="relative h-32 w-32 overflow-hidden rounded-2xl bg-gray-100">
-            {product.image ? (
-              <Image
-                source={getImageSource(product.image)}
-                className="h-full w-full"
-                resizeMode="cover"
-              />
-            ) : (
-              renderPlaceholderImage()
-            )}
-            {renderImageBadges()}
-          </View>
+      <TouchableOpacity
+        className="flex-row px-4 py-1.5"
+        onPress={() => router.push(`/product/${product.id}`)}
+        activeOpacity={0.75}
+      >
+        {/* Image Container */}
+        <View className="relative h-36 w-36 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
+          {product.image ? (
+            <Image
+              source={getImageSource(product.image)}
+              className="h-full w-full"
+              resizeMode="cover"
+            />
+          ) : (
+            renderPlaceholderImage()
+          )}
+          {renderImageBadges("list")}
+        </View>
 
-          {/* Details */}
-          <View className="ml-3 h-32 flex-1 justify-between py-0.5">
-            {/* Title */}
+        {/* Details */}
+        <View className="ml-4 h-36 flex-1 justify-between py-0.5">
+          {/* Title */}
+          <Text
+            className="text-base leading-6 text-gray-900 dark:text-white"
+            numberOfLines={2}
+          >
+            {product.title}
+          </Text>
+
+          {/* Time, Location */}
+          <View className="flex-row items-center">
+            <Ionicons name="time-outline" size={15} color="#6B7280" />
             <Text
-              className="text-sm font-bold text-gray-900 dark:text-white leading-5"
-              numberOfLines={2}
-            >
-              {product.title}
-            </Text>
-
-            {/* Date, Location */}
-            <View className="flex-row items-center">
-              <Ionicons name="location-outline" size={12} color="#6B7280" />
-              <Text
-                className="ml-1 flex-1 text-xs text-gray-500 dark:text-gray-400 font-medium"
-                numberOfLines={1}
-              >
-                {product.date}
-                {product.location ? ` • ${product.location}` : ""}
-              </Text>
-            </View>
-
-            {/* Condition / Info */}
-            <Text
-              className="text-xs text-gray-400 dark:text-gray-500"
+              className="ml-1 flex-1 text-sm text-gray-500 dark:text-gray-400"
               numberOfLines={1}
             >
-              {getSecondaryInfo()}
+              {product.date}
+              {product.location ? ` • ${product.location}` : ""}
             </Text>
-
-            {/* Verified Badge */}
-            {product.isVerified && (
-              <View className="flex-row items-center">
-                <View className="rounded-md bg-sky-50 dark:bg-sky-950 px-2 py-0.5 border border-sky-200 dark:border-sky-800">
-                  <Text className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
-                    ✓ Verified Account
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Price */}
-            <View className="flex-row items-center">
-              <Text className="text-base font-black text-rose-600 dark:text-rose-400">
-                {product.price === null
-                  ? "Negotiable"
-                  : `$${product.price.toLocaleString()}`}
-                {product.price !== null && product.jobType ? "+" : ""}
-              </Text>
-              {product.oldPrice ? (
-                <Text className="ml-2 text-xs text-gray-400 line-through">
-                  ${product.oldPrice.toLocaleString()}
-                </Text>
-              ) : null}
-            </View>
           </View>
-        </TouchableOpacity>
-      </View>
+
+          {/* Condition / Info */}
+          <Text
+            className="text-sm text-gray-500 dark:text-gray-400"
+            numberOfLines={1}
+          >
+            {getSecondaryInfo()}
+          </Text>
+
+          {/* Verified Badge */}
+          {product.isVerified && (
+            <View className="flex-row items-center">
+              <View className="rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 dark:border-sky-800 dark:bg-sky-950">
+                <Text className="text-[10px] font-bold text-sky-600 dark:text-sky-400">
+                  ✓ Verified Account
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Price */}
+          <View className="flex-row items-baseline">
+            <Text className="text-xl font-bold text-rose-600 dark:text-rose-400">
+              {product.price === null
+                ? "Negotiable"
+                : `$${product.price.toLocaleString()}`}
+              {product.price !== null && product.jobType ? "+" : ""}
+            </Text>
+            {product.oldPrice ? (
+              <Text className="ml-2 text-sm text-gray-400 line-through">
+                ${product.oldPrice.toLocaleString()}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   }
 
@@ -193,14 +213,14 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
       activeOpacity={0.75}
     >
       <View
-        className="overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"
+        className="overflow-hidden rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800"
         style={{
           height: total,
-          elevation: 3,
+          elevation: 1,
           shadowColor: "#0F172A",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.04,
-          shadowRadius: 8,
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
         }}
       >
         {/* Image Container */}
@@ -214,7 +234,7 @@ const ProductCard = ({ product, viewMode, fixedWidth }: ProductCardProps) => {
           ) : (
             renderPlaceholderImage()
           )}
-          {renderImageBadges()}
+          {renderImageBadges("grid")}
         </View>
 
         {/* Details */}
