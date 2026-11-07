@@ -1,7 +1,12 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DbClient } from '../../db/drizzle.provider';
 import { listings, listingPhotos } from '../../db/schema/listings.schema';
-import { users, provinces, districts } from '../../db/schema/users.schema';
+import {
+  users,
+  provinces,
+  districts,
+  communes,
+} from '../../db/schema/users.schema';
 import { categories, subcategories } from '../../db/schema/categories.schema';
 import { brands, models } from '../../db/schema/brands.schema';
 import { modelSlug } from '../../products/seeds/products.seed';
@@ -585,18 +590,29 @@ export async function seedListings(db: DbClient): Promise<void> {
     return;
   }
 
-  const [cats, subs, provs, dists] = await Promise.all([
+  const [cats, subs, provs, dists, communeRows] = await Promise.all([
     db.select({ id: categories.id, slug: categories.slug }).from(categories),
     db
       .select({ id: subcategories.id, slug: subcategories.slug })
       .from(subcategories),
     db.select({ id: provinces.id, slug: provinces.slug }).from(provinces),
     db.select({ id: districts.id, slug: districts.slug }).from(districts),
+    db
+      .select({ id: communes.id, districtId: communes.districtId })
+      .from(communes),
   ]);
   const catBySlug = new Map(cats.map((c) => [c.slug, c.id]));
   const subBySlug = new Map(subs.map((s) => [s.slug, s.id]));
   const provBySlug = new Map(provs.map((p) => [p.slug, p.id]));
   const distBySlug = new Map(dists.map((d) => [d.slug, d.id]));
+  // Demo rows only carry a district; give them its first commune so the
+  // three-level location filter has something to match.
+  const firstCommuneByDistrict = new Map<string, string>();
+  for (const row of communeRows) {
+    if (!firstCommuneByDistrict.has(row.districtId)) {
+      firstCommuneByDistrict.set(row.districtId, row.id);
+    }
+  }
 
   // `${brandSlug}:${modelSlug}` → models.id, for the spec-page links.
   const modelRows = await db
@@ -670,6 +686,9 @@ export async function seedListings(db: DbClient): Promise<void> {
         attributes: demo.attributes,
         provinceId: demo.province ? provBySlug.get(demo.province) : undefined,
         districtId: demo.district ? distBySlug.get(demo.district) : undefined,
+        communeId: demo.district
+          ? firstCommuneByDistrict.get(distBySlug.get(demo.district) ?? '')
+          : undefined,
         location: demo.location,
         address: demo.address,
         deliveryFree: demo.deliveryFree ?? false,
