@@ -29,6 +29,10 @@ export type ChatPushEvent =
 
 const CHANNEL = 'chat:push';
 
+/** First retry delay after a failed SUBSCRIBE; doubles up to the cap. */
+const RESUBSCRIBE_BASE_MS = 1_000;
+const RESUBSCRIBE_MAX_MS = 30_000;
+
 /**
  * Cross-instance chat push over Redis pub/sub — reuses the same Redis
  * BullMQ already connects to (see BullModule.forRootAsync in app.module.ts).
@@ -51,12 +55,26 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
   private readonly pub: Redis;
   private readonly sub: Redis;
   private handler: ((event: ChatPushEvent) => void) | null = null;
+  private resubscribeTimer: ReturnType<typeof setTimeout> | null = null;
+  private resubscribeAttempt = 0;
+  private subscribing = false;
+  private degraded = false;
+  private destroyed = false;
 
   constructor(private readonly config: ConfigService) {
     // Pub/sub needs its own connection — a subscribed ioredis client can't
     // issue other commands — so this is deliberately separate from BullMQ's.
     this.pub = new Redis(queueRedisOptions(this.config, 'chat-pub'));
-    this.sub = new Redis(queueRedisOptions(this.config, 'chat-sub'));
+    // A subscriber is a long-lived connection: never let a retry count reject
+    // the SUBSCRIBE, and queue commands while ioredis reconnects (the BullMQ
+    // client uses the same maxRetriesPerRequest for the same reason). Without
+    // this, a Redis outage longer than 20 retries leaves the process silently
+    // deaf to chat pushes until it restarts.
+    this.sub = new Redis({
+      ...queueRedisOptions(this.config, 'chat-sub'),
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+    });
 
     // ioredis is an EventEmitter: an 'error' event with no listener is a
     // fatal unhandled exception that crashes the whole process, not just
@@ -87,11 +105,67 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
     // every route answers 503 (Vercel, 2026-11-01). Kick the subscribe off in
     // the background instead: chat falls back to REST polling, and a
     // subscription that lands later still starts delivering.
-    void this.sub.subscribe(CHANNEL).catch((err: unknown) => {
+    //
+    // Re-issue on every reconnect event, not only once at boot: ioredis only
+    // auto-resubscribes channels it already registered, so a SUBSCRIBE that
+    // failed before the connection was up (or was dropped on `end`) would
+    // leave this instance permanently deaf while the web client believes the
+    // socket is fine.
+    this.sub.on('ready', () => this.ensureSubscribed());
+    this.sub.on('end', () => this.ensureSubscribed());
+    this.sub.on('reconnecting', () => this.ensureSubscribed());
+    this.ensureSubscribed();
+  }
+
+  /**
+   * Idempotent SUBSCRIBE: ioredis returns the subscriber count for an
+   * already-subscribed channel, and `subscribing` prevents a burst of
+   * reconnect events from stacking commands. A failure schedules one retry
+   * with capped exponential backoff and logs once per outage, not per retry.
+   */
+  private ensureSubscribed(): void {
+    if (this.destroyed || this.subscribing) return;
+    this.subscribing = true;
+    this.sub
+      .subscribe(CHANNEL)
+      .then(() => {
+        this.subscribing = false;
+        this.resubscribeAttempt = 0;
+        if (this.resubscribeTimer) {
+          clearTimeout(this.resubscribeTimer);
+          this.resubscribeTimer = null;
+        }
+        if (this.degraded) {
+          this.degraded = false;
+          this.logger.log('Chat pub/sub restored: pushes resumed');
+        }
+      })
+      .catch((err: unknown) => {
+        this.subscribing = false;
+        this.scheduleResubscribe(err);
+      });
+  }
+
+  private scheduleResubscribe(err: unknown): void {
+    if (!this.degraded) {
+      this.degraded = true;
       this.logger.warn(
         `Chat pub/sub unavailable (${String(err)}): pushes degrade to polling`,
       );
-    });
+    }
+    if (this.resubscribeTimer) return;
+    const attempt = this.resubscribeAttempt ?? 0;
+    const delay = Math.min(
+      RESUBSCRIBE_BASE_MS * 2 ** attempt,
+      RESUBSCRIBE_MAX_MS,
+    );
+    this.resubscribeAttempt = attempt + 1;
+    this.resubscribeTimer = setTimeout(() => {
+      this.resubscribeTimer = null;
+      this.ensureSubscribed();
+    }, delay);
+    // Never keep the process (or a test worker) alive for a retry.
+    this.resubscribeTimer.unref?.();
   }
 
   /** ChatGateway registers the one handler that delivers to local sockets. */
@@ -104,6 +178,11 @@ export class ChatPubSubService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    this.destroyed = true;
+    if (this.resubscribeTimer) {
+      clearTimeout(this.resubscribeTimer);
+      this.resubscribeTimer = null;
+    }
     await Promise.all([this.sub.quit(), this.pub.quit()]);
   }
 }

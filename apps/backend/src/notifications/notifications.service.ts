@@ -31,23 +31,25 @@ export class NotificationsService {
   ) {}
 
   /**
-   * Fires every registered channel. Left as a plain `Promise.all` rather
-   * than `allSettled` on purpose: today's only channel (`InAppNotificationChannel`)
-   * is the durable record itself, so its failure has to propagate — the
-   * caller (an `OutboxHandler`) reports `retry` and the outbox's own backoff
-   * tries again. A future best-effort channel (e.g. push) that shouldn't
-   * block persistence on a transient failure should catch its own errors
-   * inside `send()` rather than change this method's error semantics.
+   * Fires every registered channel, durable first.
+   *
+   * The in-app channel is the durable record itself and is always first in
+   * `NOTIFICATION_CHANNELS`. It must commit before the realtime channel is
+   * allowed to publish: a push tells a client to re-read, and a subscriber
+   * that refetches before the row is visible would show stale state and never
+   * be retried. A durable failure still propagates (the caller — an
+   * `OutboxHandler` — reports `retry`), while a best-effort channel must catch
+   * its own errors inside `send()`.
    *
    * SMS is NOT one of these channels and never runs inline: `data.sendSms
    * === true` only enqueues a durable `notification.sms.requested` outbox
    * event (`SmsOutboxHandler` in `./sms/` delivers it later, independently
-   * of this call). The in-app/realtime row this method writes is wholly
-   * unaffected by whether SMS is sendable, configured or even attempted —
-   * that decoupling is the entire point of moving it off this call stack.
+   * of this call).
    */
   async notify(payload: NotificationPayload): Promise<void> {
-    await Promise.all(this.channels.map((channel) => channel.send(payload)));
+    const [durable, ...bestEffort] = this.channels;
+    if (durable) await durable.send(payload);
+    await Promise.all(bestEffort.map((channel) => channel.send(payload)));
 
     if (payload.data?.sendSms === true) {
       // Best-effort: the in-app row above is already committed, and a caller

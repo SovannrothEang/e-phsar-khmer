@@ -2,8 +2,16 @@ import { validate } from './config.validation';
 
 export default () => {
   const env = validate(process.env);
+  // `api` must not hold background work: on a scale-to-zero host every
+  // instance that does is an instance that never idles. The role is the
+  // master switch; the individual OUTBOX_WORKER_ENABLED / ACCOUNT_PURGE_ENABLED
+  // / PAYMENT_RECONCILER_ENABLED flags keep working inside the worker shapes.
+  const runsBackgroundWork = env.APP_ROLE !== 'api';
+  const defaultPoolMax =
+    env.APP_ROLE === 'api' ? 5 : env.APP_ROLE === 'worker' ? 15 : 20;
   return {
     nodeEnv: env.NODE_ENV,
+    appRole: env.APP_ROLE,
     port: env.PORT,
     frontendOrigins: env.FRONTEND_ORIGINS
       ? env.FRONTEND_ORIGINS.split(',')
@@ -26,7 +34,12 @@ export default () => {
     },
     database: {
       url: env.DATABASE_URL,
-      poolMax: env.DATABASE_POOL_MAX,
+      poolMax: env.DATABASE_POOL_MAX ?? defaultPoolMax,
+      connectTimeoutSeconds: env.DATABASE_CONNECT_TIMEOUT_SECONDS,
+      idleTimeoutSeconds: env.DATABASE_IDLE_TIMEOUT_SECONDS,
+      maxLifetimeSeconds: env.DATABASE_MAX_LIFETIME_SECONDS,
+      statementTimeoutMs: env.DATABASE_STATEMENT_TIMEOUT_MS,
+      lockTimeoutMs: env.DATABASE_LOCK_TIMEOUT_MS,
     },
     jwt: {
       secret: env.JWT_SECRET,
@@ -59,7 +72,7 @@ export default () => {
       limit: env.THROTTLE_LIMIT,
     },
     outbox: {
-      workerEnabled: env.OUTBOX_WORKER_ENABLED,
+      workerEnabled: env.OUTBOX_WORKER_ENABLED && runsBackgroundWork,
       workerConcurrency: env.OUTBOX_WORKER_CONCURRENCY,
       pollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
       batchSize: env.OUTBOX_BATCH_SIZE,
@@ -71,7 +84,7 @@ export default () => {
       retentionDays: env.OUTBOX_RETENTION_DAYS,
     },
     accounts: {
-      purgeEnabled: env.ACCOUNT_PURGE_ENABLED,
+      purgeEnabled: env.ACCOUNT_PURGE_ENABLED && runsBackgroundWork,
       purgeIntervalMs: env.ACCOUNT_PURGE_INTERVAL_MS,
     },
     queue: {
@@ -87,7 +100,7 @@ export default () => {
       jobAttempts: env.PAYMENT_JOB_ATTEMPTS,
       jobBackoffMs: env.PAYMENT_JOB_BACKOFF_MS,
       workerConcurrency: env.PAYMENT_WORKER_CONCURRENCY,
-      reconcilerEnabled: env.PAYMENT_RECONCILER_ENABLED,
+      reconcilerEnabled: env.PAYMENT_RECONCILER_ENABLED && runsBackgroundWork,
       reconcileIntervalMs: env.PAYMENT_RECONCILE_INTERVAL_MS,
       reconcileIdleIntervalMs: env.PAYMENT_RECONCILE_IDLE_INTERVAL_MS,
       reconcileProviders: env.PAYMENT_RECONCILE_PROVIDERS.split(',')
@@ -95,6 +108,12 @@ export default () => {
         .filter(Boolean),
       pendingAbandonMs: env.PAYMENT_PENDING_ABANDON_MS,
       latePaymentGraceMs: env.PAYMENT_LATE_PAYMENT_GRACE_MS,
+    },
+    // Shared secret for the internal maintenance routes (payment reconcile,
+    // housekeeping jobs). One value, because they are one operator concern:
+    // "this caller may run server-side work".
+    internal: {
+      secret: env.INTERNAL_RECONCILE_SECRET,
     },
     abaPayway: {
       apiKey: env.ABA_PAYWAY_API_KEY,

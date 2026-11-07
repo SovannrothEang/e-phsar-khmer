@@ -65,8 +65,8 @@ export function GridCardPost({ post }: { post: Post }) {
             alt={post.title}
             fill
             className="object-cover"
-            priority={false}
-            unoptimized
+            // The feed lays cards out 1 / 2 / 4 across; a phone is one column.
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
             fallback={emptyPhoto}
           />
         ) : (

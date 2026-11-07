@@ -123,3 +123,172 @@ export function verifyAbaPaywayCallbackSignature(
     expected.length === received.length && timingSafeEqual(expected, received)
   );
 }
+
+interface RawJsonMember {
+  key: string;
+  /** The value exactly as it appears in the request body. */
+  raw: string;
+}
+
+/**
+ * Splits a flat JSON object into its members, keeping each value's source
+ * text. Returns null for anything that is not one well-formed object.
+ *
+ * Why not `JSON.parse` alone: re-encoding a parsed body is lossy in exactly
+ * the places a signature is computed over — `1.50` becomes `1.5`, `1e3`
+ * becomes `1000`, an escaped `\u00e9` becomes `é`, a big integer loses
+ * digits. ABA signed the bytes it sent, so the bytes are what we verify.
+ */
+export function splitTopLevelJsonObject(raw: string): RawJsonMember[] | null {
+  const length = raw.length;
+  let index = 0;
+
+  const skipWhitespace = (): void => {
+    while (index < length && /\s/.test(raw[index])) index++;
+  };
+
+  const readStringToken = (): string | null => {
+    if (raw[index] !== '"') return null;
+    const start = index;
+    index++;
+    while (index < length) {
+      const char = raw[index];
+      if (char === '\\') {
+        index += 2;
+        continue;
+      }
+      index++;
+      if (char === '"') return raw.slice(start, index);
+    }
+    return null;
+  };
+
+  /** Consumes one value token: a scalar, or a nested object/array whole. */
+  const readValueToken = (): string | null => {
+    const start = index;
+    let depth = 0;
+    let inString = false;
+    while (index < length) {
+      const char = raw[index];
+      if (inString) {
+        if (char === '\\') {
+          index += 2;
+          continue;
+        }
+        if (char === '"') inString = false;
+        index++;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        index++;
+        continue;
+      }
+      if (char === '{' || char === '[') {
+        depth++;
+        index++;
+        continue;
+      }
+      if (char === '}' || char === ']') {
+        if (depth === 0) break; // closes the enclosing object
+        depth--;
+        index++;
+        continue;
+      }
+      if (char === ',' && depth === 0) break;
+      index++;
+    }
+    const token = raw.slice(start, index).trim();
+    return token.length > 0 ? token : null;
+  };
+
+  const members: RawJsonMember[] = [];
+  skipWhitespace();
+  if (raw[index] !== '{') return null;
+  index++;
+  skipWhitespace();
+  if (raw[index] === '}') {
+    index++;
+    return index === length ? members : null;
+  }
+
+  for (;;) {
+    skipWhitespace();
+    const rawKey = readStringToken();
+    if (rawKey === null) return null;
+    let key: string;
+    try {
+      key = JSON.parse(rawKey) as string;
+    } catch {
+      return null;
+    }
+    skipWhitespace();
+    if (raw[index] !== ':') return null;
+    index++;
+    skipWhitespace();
+    const rawValue = readValueToken();
+    if (rawValue === null) return null;
+    members.push({ key, raw: rawValue });
+    skipWhitespace();
+    if (raw[index] === ',') {
+      index++;
+      continue;
+    }
+    if (raw[index] === '}') {
+      index++;
+      break;
+    }
+    return null;
+  }
+
+  skipWhitespace();
+  return index === length ? members : null;
+}
+
+/**
+ * The callback signature computed over the raw body instead of a re-encoded
+ * payload. `null` when the body is not one well-formed object.
+ *
+ * Same rule as `signAbaPaywayCallback` (sort keys, concatenate values, JSON
+ * for non-strings), but each value keeps the representation ABA sent. A
+ * string token is decoded exactly once — ABA signs the string's content, not
+ * its quotes — and every other token is used verbatim.
+ */
+export function signAbaPaywayCallbackRaw(
+  rawJson: string,
+  apiKey: string,
+): string | null {
+  const members = splitTopLevelJsonObject(rawJson);
+  if (members === null) return null;
+
+  const values = members
+    .slice()
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    .map(({ raw }) => {
+      if (!raw.startsWith('"')) return raw;
+      try {
+        return String(JSON.parse(raw));
+      } catch {
+        // Unreachable for a token `splitTopLevelJsonObject` accepted; keeping
+        // the quoted text is still the closer answer than dropping it.
+        return raw.slice(1, -1);
+      }
+    });
+
+  return hmac(values.join(''), apiKey);
+}
+
+/** Constant-time compare of the raw-body signature. */
+export function verifyAbaPaywayCallbackSignatureRaw(
+  rawJson: string,
+  apiKey: string,
+  receivedSignature: string,
+): boolean {
+  const expectedSignature = signAbaPaywayCallbackRaw(rawJson, apiKey);
+  if (expectedSignature === null) return false;
+  const expected = Buffer.from(expectedSignature);
+  const received = Buffer.from(receivedSignature);
+  return (
+    expected.length === received.length && timingSafeEqual(expected, received)
+  );
+}

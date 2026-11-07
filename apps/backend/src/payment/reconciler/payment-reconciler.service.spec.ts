@@ -62,7 +62,8 @@ function build(opts: {
     select: jest
       .fn()
       // In call order: purchases awaiting activation, expired webhook-only
-      // attempts, pending attempts, then recoverable-failed attempts.
+      // attempts, pending attempts, recoverable-failed attempts, then the
+      // oldest-first tail (only when the pending page came back full).
       .mockReturnValueOnce(chain(opts.stuck ?? []))
       .mockReturnValueOnce(chain(opts.expired ?? []))
       .mockReturnValueOnce(chain(opts.candidates ?? [], opts.pendingSink))
@@ -80,19 +81,26 @@ function build(opts: {
         : undefined,
     ),
   };
+  const providerEventRedrive = {
+    sweep: jest
+      .fn()
+      .mockResolvedValue({ redriven: 0, exhausted: 0, purged: 0 }),
+  };
   const reconciler = new PaymentReconciler(
     db as never,
     {} as never,
     outbox as never,
     activation as never,
     config as never,
+    providerEventRedrive as never,
   );
-  return { reconciler, db, outbox, activation };
+  return { reconciler, db, outbox, activation, providerEventRedrive };
 }
 
-const attempt = (id: string, ageMs: number) => ({
+const attempt = (id: string, ageMs: number, provider = 'bakong') => ({
   id,
   createdAt: new Date(Date.now() - ageMs),
+  provider,
 });
 
 describe('PaymentReconciler.runOnce', () => {
@@ -262,9 +270,103 @@ describe('PaymentReconciler.runOnce', () => {
     // activation + expiry only — the candidates query is skipped.
     expect(db.select).toHaveBeenCalledTimes(2);
   });
+
+  it('reports the provider-event re-drive sweep in the summary', async () => {
+    const { reconciler, providerEventRedrive } = build({});
+    providerEventRedrive.sweep.mockResolvedValueOnce({
+      redriven: 2,
+      exhausted: 1,
+      purged: 7,
+    });
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary).toMatchObject({
+      providerEventsRedriven: 2,
+      providerEventsExhausted: 1,
+      providerEventsPurged: 7,
+    });
+    expect(providerEventRedrive.sweep).toHaveBeenCalledWith(expect.any(Number));
+  });
+
+  it('keeps reconciling when the provider-event sweep fails', async () => {
+    reconcileMock.mockResolvedValue('succeeded');
+    const { reconciler, providerEventRedrive } = build({
+      candidates: [attempt('a1', MINUTE)],
+    });
+    providerEventRedrive.sweep.mockRejectedValueOnce(new Error('redis down'));
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary).toMatchObject({
+      settled: 1,
+      providerEventsRedriven: 0,
+      providerEventsExhausted: 0,
+      providerEventsPurged: 0,
+    });
+  });
 });
 
-describe('PaymentReconciler.runOnce — candidate selection', () => {
+describe('PaymentReconciler.runExclusive', () => {
+  const summary: ReconcileSummary = {
+    candidates: 0,
+    checked: 0,
+    settled: 0,
+    activated: 0,
+    abandoned: 0,
+    errors: 0,
+    pending: 0,
+    newestPendingAgeMs: null,
+    providerEventsRedriven: 0,
+    providerEventsExhausted: 0,
+    providerEventsPurged: 0,
+    deadlineReached: false,
+    skippedBackoff: 0,
+  };
+
+  it('shares one in-flight pass between concurrent callers', async () => {
+    const { reconciler } = build({});
+    let release!: (value: ReconcileSummary) => void;
+    const gate = new Promise<ReconcileSummary>((resolve) => {
+      release = resolve;
+    });
+    const spy = jest.spyOn(reconciler, 'runOnce').mockReturnValue(gate);
+
+    const first = reconciler.runExclusive();
+    const second = reconciler.runExclusive();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+
+    release(summary);
+    await expect(first).resolves.toEqual(summary);
+    await expect(second).resolves.toEqual(summary);
+  });
+
+  it('starts a fresh pass after the previous one settles', async () => {
+    const { reconciler } = build({});
+    const spy = jest.spyOn(reconciler, 'runOnce').mockResolvedValue(summary);
+
+    await reconciler.runExclusive();
+    await reconciler.runExclusive();
+
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not poison the next call when a pass rejects', async () => {
+    const { reconciler } = build({});
+    const spy = jest
+      .spyOn(reconciler, 'runOnce')
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce(summary);
+
+    await expect(reconciler.runExclusive()).rejects.toThrow('db down');
+    await expect(reconciler.runExclusive()).resolves.toEqual(summary);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PaymentReconciler.runOnce - candidate selection', () => {
   beforeEach(() => {
     reconcileMock.mockReset();
     expireMock.mockReset();
@@ -461,6 +563,91 @@ describe('PaymentReconciler.runOnce — webhook-only expiry', () => {
   });
 });
 
+describe('PaymentReconciler.runOnce — pass budget', () => {
+  beforeEach(() => {
+    reconcileMock.mockReset();
+    expireMock.mockReset();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('stops dispatching once the wall-clock deadline is spent', async () => {
+    jest.useFakeTimers({ now: new Date('2026-11-04T10:00:00Z') });
+    reconcileMock.mockImplementation(() => {
+      // Each provider call burns 4 s of the 10 s budget.
+      jest.advanceTimersByTime(4_000);
+      return Promise.resolve('still_pending');
+    });
+    const { reconciler } = build({
+      candidates: Array.from({ length: 10 }, (_, i) =>
+        attempt(`c${i}`, MINUTE),
+      ),
+    });
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary.deadlineReached).toBe(true);
+    expect(summary.checked).toBeLessThan(10);
+  });
+
+  it('reaches an attempt older than the newest batch on the next pass', async () => {
+    // A full newest-first page means older attempts exist that it cannot see.
+    reconcileMock.mockResolvedValue('still_pending');
+    const fullPage = Array.from({ length: 100 }, (_, i) =>
+      attempt(`new-${i}`, i * 1_000),
+    );
+    const { reconciler, db } = build({
+      candidates: fullPage,
+    });
+    // The tail query is the fifth select, after activation, expiry, pending and
+    // the recoverable page.
+    db.select.mockReturnValueOnce(chain([attempt('old-1', 20 * MINUTE)]));
+
+    const summary = await reconciler.runOnce();
+
+    expect(summary.checked).toBe(101);
+    expect(reconcileMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ paymentAttemptId: 'old-1' }),
+    );
+  });
+
+  it('does not query the tail when the newest page was not full', async () => {
+    reconcileMock.mockResolvedValue('still_pending');
+    const { reconciler, db } = build({ candidates: [attempt('only', MINUTE)] });
+
+    await reconciler.runOnce();
+
+    // activation, expiry, pending, recoverable — no tail query.
+    expect(db.select).toHaveBeenCalledTimes(4);
+  });
+
+  it('skips a provider that just errored instead of spending the budget on it', async () => {
+    const { reconciler, db } = build({
+      candidates: [attempt('a1', MINUTE, 'bakong')],
+    });
+    reconcileMock.mockResolvedValueOnce('error');
+
+    const first = await reconciler.runOnce();
+    expect(first.errors).toBe(1);
+
+    // Second pass: same provider. The recoverable tail is not due, so the
+    // pass makes three selects (activation, expiry, pending).
+    db.select
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([]))
+      .mockReturnValueOnce(chain([attempt('a2', MINUTE, 'bakong')]));
+    reconcileMock.mockClear();
+
+    const second = await reconciler.runOnce();
+
+    expect(second.skippedBackoff).toBe(1);
+    expect(reconcileMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('PaymentReconciler timer', () => {
   const BASE = 15_000;
   const IDLE = 60_000;
@@ -513,6 +700,11 @@ describe('PaymentReconciler timer', () => {
           if (key === 'payment.reconcileIdleIntervalMs') return IDLE;
           return undefined;
         }),
+      } as never,
+      {
+        sweep: jest
+          .fn()
+          .mockResolvedValue({ redriven: 0, exhausted: 0, purged: 0 }),
       } as never,
     );
     const original = reconciler.runOnce.bind(

@@ -151,9 +151,36 @@ describe('ListingExpiryService', () => {
     const where = dialect.sqlToQuery(recs[1].where[0] as never);
     expect(where.params).toEqual([
       'active',
-      now.toISOString(),
       since.toISOString(),
+      now.toISOString(),
     ]);
+  });
+
+  it('walks a full page into the next keyset page instead of loading the window', async () => {
+    const { service, notify, recs, queue } = setup();
+    const expiresAt = new Date(now.getTime() + DAY_MS);
+    const firstPage = Array.from({ length: 200 }, (_, i) => ({
+      id: `l${i}`,
+      userId: `u${i}`,
+      title: `T${i}`,
+      expiresAt,
+    }));
+    const secondPage = {
+      id: 'l200',
+      userId: 'u200',
+      title: 'T200',
+      expiresAt,
+    };
+    queue(firstPage, [], [secondPage], [], [], []);
+
+    const result = await service.sweep(now);
+
+    expect(result.expiring).toBe(201);
+    expect(notify).toHaveBeenCalledTimes(201);
+    // The second page is read with the keyset cursor, not from the top again.
+    const secondWhere = dialect.sqlToQuery(recs[2].where[0] as never);
+    expect(secondWhere.sql).toContain('"expires_at" >');
+    expect(secondWhere.sql).toContain('"id" >');
   });
 
   it('keeps sweeping when one notification fails', async () => {
@@ -192,5 +219,24 @@ describe('ListingExpiryService', () => {
     expect(
       (service as unknown as { db: { update?: unknown } }).db.update,
     ).toBeUndefined();
+  });
+
+  it('bounds the dedupe history to four days', async () => {
+    const { service, recs, queue } = setup();
+    const expiresAt = new Date(now.getTime() + DAY_MS);
+    queue(
+      [{ id: 'l1', userId: 'u1', title: 'Toy car', expiresAt }],
+      [],
+      [],
+      [],
+    );
+
+    await service.sweep(now);
+
+    const where = dialect.sqlToQuery(recs[1].where[0] as never);
+    expect(where.sql).toContain('"created_at" >=');
+    expect(where.params).toContain(
+      new Date(now.getTime() - 4 * DAY_MS).toISOString(),
+    );
   });
 });

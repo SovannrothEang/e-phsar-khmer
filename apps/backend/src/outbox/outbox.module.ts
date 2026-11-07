@@ -27,6 +27,12 @@ import { OutboxRetention } from './outbox-retention.service';
     OutboxWakeupListener,
     OutboxRetention,
   ],
-  exports: [OutboxService, OutboxRegistry, OutboxDispatcher, OutboxWorker],
+  exports: [
+    OutboxService,
+    OutboxRegistry,
+    OutboxDispatcher,
+    OutboxWorker,
+    OutboxRetention,
+  ],
 })
 export class OutboxModule {}

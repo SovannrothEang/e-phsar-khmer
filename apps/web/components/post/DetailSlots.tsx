@@ -1,22 +1,34 @@
 "use client";
 
 import { Suspense, use, type ComponentProps } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   FollowButton,
   FollowButtonPlaceholder,
 } from "@/components/profile/FollowButton";
 import { ApplyJobButton, ApplyJobButtonPlaceholder } from "./ApplyJobButton";
 import type { JobApplyState } from "./Post-Detail";
+import { loadFollowStatus } from "@/actions/follows";
 
 /**
- * The two pieces of the listing page that arrive after its first paint — the
- * viewer's follow state and the Apply control's résumé lookup. The server page
- * hands them over as promises; each slot shows a disabled stand-in with the
- * real control's chrome and (hidden) label until its value lands, then swaps
- * the real control in. The stand-ins live next to the controls they mirror so
- * the two cannot drift. A plain value (signed-out viewer, not a job, own ad)
- * renders at once.
+ * The two pieces of the listing page that depend on the viewer — the follow
+ * toggle's state and the Apply control's résumé lookup.
+ *
+ * The follow state is fetched by the browser after mount, so the server HTML
+ * for the listing is the same for every viewer and no per-viewer query holds
+ * up the response. Until it lands the slot shows the real control's chrome as
+ * a disabled stand-in, then swaps the button in. The Apply lookup stays a
+ * server promise: it needs the résumé, which the browser must not fetch.
  */
+
+/**
+ * `gcTime: 0` drops the answer when the slot unmounts, so moving between two
+ * ads by the same seller re-asks instead of reusing a value a follow/unfollow
+ * elsewhere has since changed. The mounted toggle owns the state optimistically,
+ * so nothing in-flight is affected.
+ */
+const followStatusKey = (userId: string) =>
+  ["user", "follow-status", userId] as const;
 
 const isPromise = <T,>(value: T | Promise<T>): value is Promise<T> =>
   typeof (value as { then?: unknown } | null)?.then === "function";
@@ -24,27 +36,38 @@ const isPromise = <T,>(value: T | Promise<T>): value is Promise<T> =>
 type FollowProps = Omit<
   ComponentProps<typeof FollowButton>,
   "initialFollowing"
-> & { initialFollowing: boolean | Promise<boolean> };
+>;
 
-function ResolvedFollow({
-  initialFollowing,
-  ...rest
-}: Omit<FollowProps, "initialFollowing"> & {
-  initialFollowing: Promise<boolean>;
-}) {
-  // `FollowButton` keeps its optimistic state from the first value it sees, so
-  // it is mounted only once the real answer is known.
-  return <FollowButton {...rest} initialFollowing={use(initialFollowing)} />;
-}
+export function FollowSlot({ userId, viewerId, ...rest }: FollowProps) {
+  // Nothing to ask for a signed-out viewer or the seller's own ad; the button
+  // itself renders the sign-in bounce or nothing at all.
+  const needsLookup = !!viewerId && viewerId !== userId;
+  const { data, isPending, isFetching } = useQuery({
+    queryKey: followStatusKey(userId),
+    queryFn: () => loadFollowStatus(userId),
+    enabled: needsLookup,
+    staleTime: 0,
+    gcTime: 0,
+  });
 
-export function FollowSlot({ initialFollowing, ...rest }: FollowProps) {
-  if (!isPromise(initialFollowing)) {
-    return <FollowButton {...rest} initialFollowing={initialFollowing} />;
+  // `isFetching` as well as `isPending`: a remount can start with a cached
+  // answer, and showing it before the background refetch lands is exactly the
+  // flash of a stale label this slot exists to avoid.
+  if (needsLookup && (isPending || isFetching)) {
+    return <FollowButtonPlaceholder className={rest.className} />;
   }
+
   return (
-    <Suspense fallback={<FollowButtonPlaceholder className={rest.className} />}>
-      <ResolvedFollow {...rest} initialFollowing={initialFollowing} />
-    </Suspense>
+    <FollowButton
+      {...rest}
+      // Keyed on the resolved value so the button is remounted (and re-seeded)
+      // if the answer changes under it. `FollowButton` keeps its own state and
+      // never re-reads `initialFollowing`.
+      key={`${userId}:${data ?? false}`}
+      userId={userId}
+      viewerId={viewerId}
+      initialFollowing={data ?? false}
+    />
   );
 }
 

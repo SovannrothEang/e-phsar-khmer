@@ -6,6 +6,11 @@ import DbImage, { isStorageObjectUrl } from "@/components/common/DbImage";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { signUpload, type UploadScope } from "@/actions/files";
+import {
+  IMMUTABLE_CACHE_CONTROL,
+  prepareImageForUpload,
+  UploadRejected,
+} from "@/lib/upload-image";
 import { cn } from "@/lib/utils";
 
 // Mirrors backend FilesService.validateImage (5MB, image/*).
@@ -61,7 +66,21 @@ export function ImageUpload({
 
     setUploading(true);
     try {
-      const signed = await signUpload(file.name, scope);
+      // Cap the long side and (when the browser can) re-encode to WebP before
+      // the bytes leave the device; a failure here uploads the original.
+      let prepared: Awaited<ReturnType<typeof prepareImageForUpload>>;
+      try {
+        prepared = await prepareImageForUpload(file);
+      } catch (error) {
+        toast.error(
+          error instanceof UploadRejected && error.reason === "too-large"
+            ? "Image must be 10MB or smaller"
+            : "Only image files are allowed",
+        );
+        return;
+      }
+
+      const signed = await signUpload(prepared.file.name, scope);
       if (!signed.success) {
         toast.error(signed.error);
         return;
@@ -69,8 +88,14 @@ export function ImageUpload({
 
       const res = await fetch(signed.data.signedUrl, {
         method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
+        body: prepared.file,
+        headers: {
+          "Content-Type": prepared.mime,
+          // Uploads are immutable (the object name carries a UUID): without
+          // this Supabase answers the default one-hour cache and every view
+          // re-downloads the photo.
+          "Cache-Control": IMMUTABLE_CACHE_CONTROL,
+        },
       });
       if (!res.ok) {
         toast.error("Upload failed");

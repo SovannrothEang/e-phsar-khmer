@@ -22,6 +22,8 @@ import { ListingsModule } from '../listings/listings.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminListingsController } from './admin-listings.controller';
 import { AdminListingsService } from './admin-listings.service';
+import { AdminSmsDeliveriesController } from './admin-sms-deliveries.controller';
+import { AdminSmsDeliveriesService } from './admin-sms-deliveries.service';
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { AdminListingsService } from './admin-listings.service';
     UserSubscriptionsController,
     ReportsController,
     AdminListingsController,
+    AdminSmsDeliveriesController,
   ],
   providers: [
     AdminService,
@@ -55,6 +58,7 @@ import { AdminListingsService } from './admin-listings.service';
     UserSubscriptionsService,
     ReportsService,
     AdminListingsService,
+    AdminSmsDeliveriesService,
   ],
   exports: [AdminService],
 })

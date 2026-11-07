@@ -6,6 +6,7 @@ import { EntitlementsService } from './entitlements.service';
 import { ENTITLEMENTS_QUEUE } from './entitlements.constants';
 import { EntitlementsProcessor } from './entitlements-sweep.processor';
 import { EntitlementsScheduler } from './entitlements.scheduler';
+import { backgroundProviders } from '../config/runtime-role';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { EntitlementsScheduler } from './entitlements.scheduler';
     SubscriptionActivationService,
     EntitlementsService,
     EntitlementsScheduler,
-    EntitlementsProcessor,
+    // No BullMQ worker in the api role — see config/runtime-role.ts.
+    ...backgroundProviders([EntitlementsProcessor]),
   ],
   exports: [
     SubscriptionActivationService,

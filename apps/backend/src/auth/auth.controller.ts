@@ -34,11 +34,14 @@ import { SocialLoginDto } from './dto/social-login.dto';
 import { LinkSocialProviderDto } from './dto/link-social-provider.dto';
 
 // Per-route limits on top of the global 100/min. Every route here is @Public,
-// so the throttler keys on IP: these bound password guessing (login,
-// otp/login, otp/verify) and SMS pumping (register, otp/request, otp/login —
-// each call sends a paid SMS).
-const SMS_LIMIT = { default: { limit: 5, ttl: 60_000 } };
-const CREDENTIAL_LIMIT = { default: { limit: 10, ttl: 60_000 } };
+// so the throttler keys on IP — and since the web calls the backend from its
+// own server, every web user shares the Next/Vercel egress IP. These limits are
+// therefore a site-wide ceiling, not a per-visitor one: sized so ordinary
+// traffic never reaches them, with the real brute-force control in
+// `LoginLockoutService` (per account) and the per-phone OTP limits in
+// `OtpSmsSender`. SMS stays tighter because each call costs a paid message.
+const SMS_LIMIT = { default: { limit: 30, ttl: 60_000 } };
+const CREDENTIAL_LIMIT = { default: { limit: 100, ttl: 60_000 } };
 
 @ApiTags('auth')
 @Controller('auth')

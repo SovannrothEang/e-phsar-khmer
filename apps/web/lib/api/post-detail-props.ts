@@ -3,7 +3,6 @@ import type { ComponentProps } from "react";
 import type PostDetail from "@/components/post/Post-Detail";
 import { buildRealDetailData } from "@/lib/api/categories";
 import { getAdvertisements } from "@/lib/api/advertisements";
-import { getFollowStatus } from "@/lib/api/users";
 import { loadJobApplyState } from "@/lib/api/job-apply";
 import { isJobApplyCandidate } from "@/lib/api/job-apply-candidate";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -17,9 +16,12 @@ type PostDetailProps = ComponentProps<typeof PostDetail>;
  * What must be on screen with the first byte is fetched in ONE wave: the
  * viewer, the banners and the listing (+ category tree for the breadcrumb)
  * start together instead of one after another. What can arrive a moment later
- * — whether the viewer follows the seller, and the résumé/application lookup
- * for an Apply control — is started here but returned as a promise, so the
- * page streams without waiting for it.
+ * — the résumé/application lookup for an Apply control — is started here but
+ * returned as a promise, so the page streams without waiting for it.
+ *
+ * The viewer's follow state deliberately does NOT travel with this response:
+ * a per-viewer value would make the listing HTML differ between visitors, so
+ * the browser asks for it after mount (`FollowSlot`).
  *
  * Returns null when the listing does not exist (draft, withdrawn, moderated,
  * unknown id). The caller turns that into `notFound()` BEFORE rendering: once
@@ -49,10 +51,6 @@ export async function loadPostDetailProps(
     real,
     banners,
     viewerId: viewer?.id,
-    // No lookup for a signed-out viewer or the seller themselves: the sidebar
-    // shows no Follow control for either, so the answer would go unused.
-    sellerFollowing:
-      viewer && viewer.id !== sellerId ? getFollowStatus(sellerId) : false,
     jobApply: isJobApplyCandidate(jobInput)
       ? loadJobApplyState(jobInput).catch(() => null)
       : null,

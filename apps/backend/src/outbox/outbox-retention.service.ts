@@ -62,6 +62,11 @@ export class OutboxRetention
       this.timer.unref();
     }, firstSweepMs);
     this.bootTimer.unref();
+    // Observable on purpose: "is retention armed on this instance?" is the
+    // first question when rows start accumulating.
+    this.logger.log(
+      `Outbox retention armed: every ${SWEEP_INTERVAL_MS / 60_000} min, first sweep in ~${Math.round(firstSweepMs / 1000)} s`,
+    );
   }
 
   onModuleDestroy(): void {
@@ -69,8 +74,25 @@ export class OutboxRetention
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** One sweep: deletes in batches until a batch comes back short. Never throws. */
+  /**
+   * Timer path: one sweep, never throws (a failed housekeeping run must not
+   * take the process down — the next tick retries the same predicate).
+   */
   async sweep(): Promise<number> {
+    try {
+      return await this.runOnce();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Outbox retention sweep failed: ${message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Cron path: one sweep that **throws** on failure, so the caller can answer
+   * non-2xx and the pinger retries. Also used by `sweep()`.
+   */
+  async runOnce(): Promise<number> {
     if (this.sweeping) return 0;
     this.sweeping = true;
     let total = 0;
@@ -88,9 +110,6 @@ export class OutboxRetention
           `Purged ${total} published outbox row(s) older than ${this.retentionDays}d`,
         );
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Outbox retention sweep failed: ${message}`);
     } finally {
       this.sweeping = false;
     }

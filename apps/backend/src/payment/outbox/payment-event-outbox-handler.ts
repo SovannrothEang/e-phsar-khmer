@@ -36,14 +36,32 @@ export class PaymentEventOutboxHandler implements OutboxHandler, OnModuleInit {
     const payload = event.payload as ProcessProviderEventJobData;
 
     try {
-      await this.queue.add(PAYMENT_EVENT_JOB, payload, {
-        jobId: payload.paymentProviderEventId,
-      });
+      // A fixed jobId makes a dispatcher retry idempotent. A re-drive must NOT
+      // reuse the dead-lettered job's id (BullMQ keeps failed jobs 14 days and
+      // treats a repeat add as a no-op), so its attempt number is part of it.
+      const jobId = payload.redriveAttempt
+        ? `${payload.paymentProviderEventId}-redrive-${payload.redriveAttempt}`
+        : payload.paymentProviderEventId;
+      await this.queue.add(PAYMENT_EVENT_JOB, payload, { jobId });
       return { status: 'published' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Could not publish event job ${event.id}: ${message}`);
       return { status: 'retry', error: message };
     }
+  }
+
+  /**
+   * The dispatcher could not publish this event to BullMQ within its retry
+   * budget. The provider event row is still `received`, and
+   * `ProviderEventRedrive.sweep()` is what re-enqueues it — so this hook only
+   * makes the abandonment visible. Payload is deliberately never logged: it is
+   * the provider's raw webhook body.
+   */
+  onAbandoned(event: OutboxEventRow, lastError: string): Promise<void> {
+    this.logger.error(
+      `Payment provider event outbox row ${event.id} abandoned after ${event.attempts} attempts: ${lastError}`,
+    );
+    return Promise.resolve();
   }
 }

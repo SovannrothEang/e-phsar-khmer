@@ -30,10 +30,52 @@ const baseEnvSchema = z.object({
   DATABASE_URL: z.string().refine((v) => v.startsWith('postgres'), {
     message: 'DATABASE_URL must start with postgres',
   }),
+  // Which shape this process runs: `api` serves HTTP and starts no BullMQ
+  // worker or background timer, `worker` is the same app plus those (it still
+  // serves HTTP, with a worker-sized pool), `all` is both — the default, and
+  // the single-process behaviour every local run and deploy had before this
+  // switch existed.
+  //
+  // Read from the raw process environment while the module graph is built
+  // (see `config/runtime-role.ts`), so on a host it must be a real environment
+  // variable, not a `.env` line: a value only `.env` knows about fails the boot
+  // through `assertRoleIsExported`.
+  APP_ROLE: z.enum(['api', 'worker', 'all']).default('all'),
   // postgres.js defaults this to 10, which the whole backend shares (every
   // module, not just chat) — too small once anything sends concurrent
   // queries, where requests start queueing for a free pool connection.
-  DATABASE_POOL_MAX: z.coerce.number().default(20),
+  //
+  // Optional so the default can follow APP_ROLE (api 5, worker 15, all 20 —
+  // see `config/configuration.ts`). Never above 20: every instance's pool is
+  // counted against the same Supabase project connection limit.
+  DATABASE_POOL_MAX: z.coerce.number().int().positive().max(20).optional(),
+  // Connection lifecycle. `idle_timeout` is what returns a connection to the
+  // pooler while an instance sits idle; without it a scaled-to-zero deploy
+  // holds its slots for as long as the process lives.
+  DATABASE_CONNECT_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(10),
+  DATABASE_IDLE_TIMEOUT_SECONDS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(60),
+  DATABASE_MAX_LIFETIME_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(1800),
+  // Off (0) by default, on purpose: these are sent as Postgres startup
+  // parameters, and Supabase's transaction-mode pooler rejects startup
+  // parameters it does not know. Enable them only for a direct connection.
+  DATABASE_STATEMENT_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .default(0),
+  DATABASE_LOCK_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(0),
   JWT_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_SECRET: z.string().min(16),
@@ -144,15 +186,30 @@ const baseEnvSchema = z.object({
   // Gap between passes while nothing is unresolved (no pending attempt, nothing
   // to activate or expire). Any activity returns to the interval above.
   PAYMENT_RECONCILE_IDLE_INTERVAL_MS: z.coerce.number().default(60_000),
-  // Providers the reconciler polls: only those with no webhook (Bakong). ABA
-  // PayWay is webhook-only — its expiry is `ABA_PAYWAY_LIFETIME_MINUTES`.
-  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong'),
+  // Providers the reconciler asks about. Bakong has no webhook at all; ABA is
+  // webhook-only, but its callback can be lost or arrive after we expired the
+  // attempt, so it is polled too as the recovery path. Cost: one provider call
+  // (`check_transaction`) per unresolved ABA attempt per pass — raise
+  // PAYMENT_RECONCILE_INTERVAL_MS / PAYMENT_RECONCILE_IDLE_INTERVAL_MS rather
+  // than dropping ABA from this list if that becomes the bill.
+  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong,aba_payway'),
   // A pending attempt this old that the provider still reports unpaid is
   // failed (the QR has long expired). 15 min vs. the 5 min QR lifetime.
   PAYMENT_PENDING_ABANDON_MS: z.coerce.number().default(15 * 60 * 1000),
   // How long after creation a failed-by-timeout attempt is still checked, so
   // a late-arriving payment is honoured instead of lost.
   PAYMENT_LATE_PAYMENT_GRACE_MS: z.coerce.number().default(24 * 60 * 60 * 1000),
+  // Shared secret for `POST /internal/payments/reconcile`, the wake-up an
+  // external pinger/cron calls when nobody is on a checkout page. Blank or
+  // absent disables the route (it answers 503) instead of failing the boot.
+  INTERNAL_RECONCILE_SECRET: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .transform((value) => value?.trim() || undefined)
+    .refine((value) => value === undefined || value.length >= 16, {
+      message: 'INTERNAL_RECONCILE_SECRET must be at least 16 characters',
+    }),
 
   // ABA PayWay gateway credentials. Optional so build/tests don't require
   // sandbox access — AbaPaywayProvider fails fast with a clear message if
@@ -243,6 +300,17 @@ const envSchema = baseEnvSchema.superRefine((env, ctx) => {
         message: `OTP_PROVIDER=plasgate requires ${missing.join(', ')} so codes can be delivered`,
       });
     }
+  }
+
+  // One secret for both token types would let a long-lived refresh token be
+  // presented as an access token (and vice versa), which defeats the shorter
+  // access lifetime and the refresh rotation that keys off `gen`.
+  if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_REFRESH_SECRET'],
+      message: 'JWT_REFRESH_SECRET must differ from JWT_SECRET',
+    });
   }
 });
 

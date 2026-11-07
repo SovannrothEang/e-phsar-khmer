@@ -18,7 +18,7 @@ export type SocialTarget = "user" | "admin";
 export type SocialCallbackMode = SocialTarget | "link";
 
 export type SocialStartResult =
-  | { success: true; url: string }
+  | { success: true; url: string; state: string }
   | { success: false; error: string };
 
 export type SocialCompleteResult =
@@ -40,3 +40,11 @@ export const SOCIAL_CLOSE_POLL_MS = 500;
 /** The per-flow nonce echoed in the link callback path. */
 export const SOCIAL_STATE_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The `state` the backend mints per login flow (24 random bytes, base64url).
+ * Shaped differently from the link nonce above because the two are produced by
+ * different sides: the link nonce is a UUID from this app, this one comes from
+ * `SocialStateService` and is consumed by the backend on the callback.
+ */
+export const SOCIAL_OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{32}$/;
