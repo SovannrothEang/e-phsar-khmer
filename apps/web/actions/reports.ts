@@ -1,6 +1,12 @@
 "use server";
 
-import { API_URL, ApiError, userServerFetch } from "@/lib/api/client";
+import {
+  API_URL,
+  ApiError,
+  serverFetch,
+  userServerFetch,
+} from "@/lib/api/client";
+import { getUserAccessToken, getUserRefreshToken } from "@/lib/auth/session";
 
 export interface PublicReportReason {
   id: string;
@@ -28,6 +34,25 @@ export async function getPublicReportReasons(
   }
 }
 
+/**
+ * The viewer's token, without forcing them to sign up twice.
+ *
+ * A signed-in marketplace user reports as themselves — even when a dashboard
+ * session also lives in this browser. A staff-only viewer (dashboard cookie,
+ * no user session) reports with the admin token, which is a normal
+ * authenticated account to the reports API. Only a visitor with neither
+ * session gets the 401 that the dialogs turn into "Sign in to report".
+ */
+async function reportFetch<T>(path: string, init: RequestInit) {
+  const [userAccess, userRefresh] = [
+    await getUserAccessToken(),
+    await getUserRefreshToken(),
+  ];
+  return userAccess || userRefresh
+    ? userServerFetch<T>(path, init)
+    : serverFetch<T>(path, init);
+}
+
 function toResult(err: unknown, fallback: string): ReportResult {
   if (err instanceof ApiError) {
     if (err.status === 401) {
@@ -51,7 +76,7 @@ export async function reportListing(input: {
   description?: string;
 }): Promise<ReportResult> {
   try {
-    await userServerFetch("/reports/listings", {
+    await reportFetch("/reports/listings", {
       method: "POST",
       body: JSON.stringify(input),
     });
@@ -68,7 +93,7 @@ export async function reportUser(input: {
   imagePaths?: string[];
 }): Promise<ReportResult> {
   try {
-    await userServerFetch("/reports/users", {
+    await reportFetch("/reports/users", {
       method: "POST",
       body: JSON.stringify(input),
     });
