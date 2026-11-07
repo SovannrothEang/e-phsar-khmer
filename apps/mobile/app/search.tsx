@@ -3,10 +3,11 @@ import ProductCard from "@/components/product/ProductCard";
 import { Colors } from "@/constants/Colors";
 import { fetchCategories } from "@/lib/api/listings";
 import { fetchFeed } from "@/lib/api/feed";
+import { firstParam } from "@/lib/feed-params";
 import { toCardProduct } from "@/lib/listing-card";
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,11 +19,26 @@ import {
 } from "react-native";
 
 export default function SearchScreen() {
+  const params = useLocalSearchParams();
+  // A category/subcategory/brand/type screen opens this with its own scope;
+  // the field then searches only inside that slice of the feed.
+  const scopedCategory = firstParam(params.categorySlug) ?? "";
+  const scopedSubcategory = firstParam(params.subcategorySlug) ?? "";
+  const scopedBrand = firstParam(params.brand) ?? "";
+  const scopedAttrKey = firstParam(params.attrKey) ?? "";
+  const scopedAttrValue = firstParam(params.attrValue) ?? "";
+  const scopeName = firstParam(params.scopeName) ?? "";
+  const isScoped =
+    !!scopedCategory ||
+    !!scopedSubcategory ||
+    !!scopedBrand ||
+    (!!scopedAttrKey && !!scopedAttrValue);
+
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [categorySlug, setCategorySlug] = useState("");
+  const [categorySlug, setCategorySlug] = useState(scopedCategory);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<React.ComponentRef<typeof TextInput>>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => inputRef.current?.focus(), 150);
@@ -42,14 +58,28 @@ export default function SearchScreen() {
   });
   const categories = categoriesQuery.data ?? [];
 
-  const hasFilter = debouncedQuery.length > 0 || categorySlug.length > 0;
+  const hasFilter =
+    debouncedQuery.length > 0 || categorySlug.length > 0 || isScoped;
 
   const results = useInfiniteQuery({
-    queryKey: ["search", debouncedQuery, categorySlug],
+    queryKey: [
+      "search",
+      debouncedQuery,
+      categorySlug,
+      scopedSubcategory,
+      scopedBrand,
+      scopedAttrKey,
+      scopedAttrValue,
+    ],
     queryFn: ({ pageParam }) =>
       fetchFeed({
         q: debouncedQuery || undefined,
         categorySlug: categorySlug || undefined,
+        subcategorySlug: scopedSubcategory || undefined,
+        ...(scopedBrand ? { brand: scopedBrand } : {}),
+        ...(scopedAttrKey && scopedAttrValue
+          ? { attrs: { [scopedAttrKey]: scopedAttrValue } }
+          : {}),
         cursor: pageParam,
         limit: 20,
         includeTotal: true,
@@ -93,7 +123,7 @@ export default function SearchScreen() {
           <Ionicons name="search" size={20} color={Colors.text.muted} />
           <TextInput
             ref={inputRef}
-            placeholder="Search products, jobs, cars..."
+            placeholder={scopeName || "Search products, jobs, cars..."}
             placeholderTextColor={Colors.text.muted}
             className="ml-2 flex-1 py-0.5 text-base text-neutral-text-main"
             value={query}
@@ -140,64 +170,71 @@ export default function SearchScreen() {
           </ScrollView>
         ) : (
           <View className="flex-1">
-            {/* Category facet */}
-            <View className="border-b border-neutral-border/10 bg-white py-2">
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
-              >
-                <TouchableOpacity
-                  onPress={() => setCategorySlug("")}
-                  className={`rounded-full px-3.5 py-1.5 ${
-                    categorySlug === ""
-                      ? "bg-sky-500"
-                      : "border border-neutral-border/40 bg-neutral-background"
-                  }`}
+            {/* Category facet — hidden when the opener already scoped this search. */}
+            {!isScoped && (
+              <View className="border-b border-neutral-border/10 bg-white py-2">
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
                 >
-                  <Text
-                    className={`text-xs font-semibold ${
+                  <TouchableOpacity
+                    onPress={() => setCategorySlug("")}
+                    className={`rounded-full px-3.5 py-1.5 ${
                       categorySlug === ""
-                        ? "text-white"
-                        : "text-neutral-text-sub"
+                        ? "bg-sky-500"
+                        : "border border-neutral-border/40 bg-neutral-background"
                     }`}
                   >
-                    All
-                  </Text>
-                </TouchableOpacity>
-                {categories.map((category) => {
-                  const selected = categorySlug === category.slug;
-                  return (
-                    <TouchableOpacity
-                      key={category.id}
-                      onPress={() =>
-                        setCategorySlug(selected ? "" : category.slug)
-                      }
-                      className={`rounded-full px-3.5 py-1.5 ${
-                        selected
-                          ? "bg-sky-500"
-                          : "border border-neutral-border/40 bg-neutral-background"
+                    <Text
+                      className={`text-xs font-semibold ${
+                        categorySlug === ""
+                          ? "text-white"
+                          : "text-neutral-text-sub"
                       }`}
                     >
-                      <Text
-                        className={`text-xs font-semibold ${
-                          selected ? "text-white" : "text-neutral-text-sub"
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {categories.map((category) => {
+                    const selected = categorySlug === category.slug;
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        onPress={() =>
+                          setCategorySlug(selected ? "" : category.slug)
+                        }
+                        className={`rounded-full px-3.5 py-1.5 ${
+                          selected
+                            ? "bg-sky-500"
+                            : "border border-neutral-border/40 bg-neutral-background"
                         }`}
                       >
-                        {category.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
+                        <Text
+                          className={`text-xs font-semibold ${
+                            selected ? "text-white" : "text-neutral-text-sub"
+                          }`}
+                        >
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             {/* Header info bar */}
             <View className="flex-row items-center justify-between border-b border-neutral-border/10 bg-neutral-background/30 px-4 py-3">
-              <Text className="text-sm font-medium text-neutral-text-sub">
+              <Text
+                className="flex-1 text-sm font-medium text-neutral-text-sub"
+                numberOfLines={1}
+              >
                 {results.isLoading
                   ? "Searching…"
-                  : `${total} result${total !== 1 ? "s" : ""} found`}
+                  : scopeName
+                    ? `${total} result${total !== 1 ? "s" : ""} in ${scopeName}`
+                    : `${total} result${total !== 1 ? "s" : ""} found`}
               </Text>
               {products.length > 0 && (
                 <TouchableOpacity

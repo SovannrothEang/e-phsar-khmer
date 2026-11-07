@@ -11,6 +11,13 @@ export interface BackendUser {
   lastName: string | null;
   gender: string | null;
   company: string | null;
+  dateOfBirth?: string | null;
+  yearOfBirth?: number | null;
+  provinceId?: string | null;
+  districtId?: string | null;
+  communeId?: string | null;
+  latitude?: string | number | null;
+  longitude?: string | number | null;
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   address: string | null;
@@ -111,6 +118,55 @@ export async function verifyPhoneOtp(input: {
     headers: await deviceHeaders(),
   });
   return data;
+}
+
+/**
+ * Password reset step 1: ask the backend to text a code to the phone on the
+ * account. It answers the same way whether the identifier matches an account
+ * or not, so success is not proof the account exists.
+ */
+export async function requestPasswordReset(identifier: string): Promise<void> {
+  await apiFetch<unknown>("/auth/password/reset/request", {
+    method: "POST",
+    body: { identifier },
+    auth: false,
+  });
+}
+
+/** The account a verified reset code belongs to, shown on the password step. */
+export interface ResetAccount {
+  username: string | null;
+  phone: string;
+  email: string | null;
+}
+
+/** Step 2: the SMS code trades for a short-lived reset token (not a session). */
+export async function verifyPasswordResetCode(
+  identifier: string,
+  token: string,
+): Promise<{ resetToken: string; account: ResetAccount | null }> {
+  const { data } = await apiFetch<{
+    resetToken: string;
+    /** Absent on backends deployed before the field existed. */
+    account?: ResetAccount;
+  }>("/auth/password/reset/verify", {
+    method: "POST",
+    body: { identifier, token },
+    auth: false,
+  });
+  return { resetToken: data.resetToken, account: data.account ?? null };
+}
+
+/** Step 3: set the new password. Success does not sign the user in. */
+export async function confirmPasswordReset(
+  resetToken: string,
+  newPassword: string,
+): Promise<void> {
+  await apiFetch<unknown>("/auth/password/reset/confirm", {
+    method: "POST",
+    body: { resetToken, newPassword },
+    auth: false,
+  });
 }
 
 export async function fetchMe(): Promise<BackendUser> {

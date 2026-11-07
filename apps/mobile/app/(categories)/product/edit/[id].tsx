@@ -214,7 +214,7 @@ const EditProductScreen = () => {
   return (
     <SafeAreaView className="bg-neutral-surface flex-1">
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Top PhsarKhmer Header */}
       <View className="flex-row items-center justify-between border-b border-neutral-border bg-white px-4 py-3 shadow-sm">

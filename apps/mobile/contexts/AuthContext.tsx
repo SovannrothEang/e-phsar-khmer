@@ -25,6 +25,9 @@ import React, {
 
 export interface UserProfile {
   name: string;
+  /** The account's own name fields; the resume builder prefills with them. */
+  firstName?: string;
+  lastName?: string;
   username?: string;
   email: string;
   phone: string;
@@ -81,7 +84,12 @@ const EMPTY_USER: UserProfile = {
  */
 export type PendingVerification =
   | { mode: "login"; phone: string; password: string }
-  | { mode: "register"; phone: string };
+  | {
+      mode: "register";
+      phone: string;
+      /** Collected on the "Create your account" step, applied at verification. */
+      profile?: { firstName: string; lastName: string; password: string };
+    };
 
 /** Supplied by the OTP screen when finishing a phone-only registration. */
 export interface OtpRegistrationDetails {
@@ -102,8 +110,22 @@ interface AuthContextType {
   /** The signed-in account's id (null when anonymous) — chat/E2E keys need it. */
   userId: string | null;
   pendingVerification: PendingVerification | null;
+  /** Carries the create-account fields from their screen to the OTP step. */
+  setRegistrationProfile: (profile: {
+    firstName: string;
+    lastName: string;
+    password: string;
+  }) => void;
   /** Phone-shaped identifiers take the OTP path; everything else is password login. */
   signIn: (identifier: string, password: string) => Promise<AuthOutcome>;
+  /**
+   * Password-only sign-in that never diverts to an OTP — used right after a
+   * password reset, where the phone was proved moments earlier.
+   */
+  signInWithPassword: (
+    identifier: string,
+    password: string,
+  ) => Promise<AuthOutcome>;
   signUp: (input: { phone: string }) => Promise<AuthOutcome>;
   /** `details` is required when the pending verification is a registration. */
   verifyOtp: (
@@ -253,6 +275,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [completeAuth],
   );
 
+  const setRegistrationProfile = useCallback(
+    (profile: { firstName: string; lastName: string; password: string }) => {
+      setPendingVerification((prev) =>
+        prev?.mode === "register" ? { ...prev, profile } : prev,
+      );
+    },
+    [],
+  );
+
+  const signInWithPassword = useCallback(
+    async (identifier: string, password: string): Promise<AuthOutcome> => {
+      const value = identifier.trim();
+      if (!value) return { kind: "error", message: "Enter your account." };
+      try {
+        const result = await loginWithPassword(value, password);
+        await completeAuth(result);
+        return { kind: "authenticated" };
+      } catch (error) {
+        return { kind: "error", message: authErrorMessage(error) };
+      }
+    },
+    [completeAuth],
+  );
+
   const signUp = useCallback(
     async (input: { phone: string }): Promise<AuthOutcome> => {
       const phone = normalizePhone(input.phone);
@@ -372,7 +418,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         userId,
         pendingVerification,
+        setRegistrationProfile,
         signIn,
+        signInWithPassword,
         signUp,
         verifyOtp,
         resendOtp,

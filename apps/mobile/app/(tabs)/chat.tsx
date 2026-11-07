@@ -25,6 +25,7 @@ import {
   AppState,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -124,6 +125,9 @@ export default function ChatScreen() {
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
   const [inboxError, setInboxError] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [thread, setThread] = useState<ActiveThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -146,17 +150,25 @@ export default function ChatScreen() {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const openedFromParams = useRef(false);
   /** Messages already re-tried after a backup restore, per thread open. */
   const retriedDecrypt = useRef<Set<string>>(new Set());
+
+  // Clear a previous engine error as soon as the signed-in user changes: the
+  // bootstrap effect below is async, so the reset is adjusted during render.
+  const engineKey = `${isAuthenticated}:${userId ?? ""}`;
+  const [engineKeySeen, setEngineKeySeen] = useState(engineKey);
+  if (engineKey !== engineKeySeen) {
+    setEngineKeySeen(engineKey);
+    setEngineError(null);
+  }
 
   // ── E2E device bootstrap ───────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     if (!isAuthenticated || !userId) return;
 
-    setEngineError(null);
     getE2eEngine(userId)
       .then((ready) => {
         if (!cancelled) setEngine(ready);
@@ -719,6 +731,14 @@ export default function ChatScreen() {
     );
   }
 
+  const visibleInbox = search.trim()
+    ? inbox.filter((item) =>
+        `${displayName(item.otherUser)} ${previewFor(item)}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()),
+      )
+    : inbox;
+
   // ── Inbox view ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView
@@ -726,9 +746,44 @@ export default function ChatScreen() {
       statusBarStyle="light-content"
       className="flex-1 bg-neutral-background"
     >
-      <View className="bg-primary px-4 py-4">
-        <Text className="text-xl font-bold text-white">Chats</Text>
+      <View className="flex-row items-center justify-between bg-primary px-4 py-3">
+        <Text className="text-xl font-bold text-white">Chat</Text>
+        <View className="flex-row items-center gap-4">
+          <TouchableOpacity
+            onPress={() => {
+              setSearchOpen((open) => !open);
+              if (searchOpen) setSearch("");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Search chats"
+          >
+            <Ionicons name="search" size={22} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setMenuOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Chat options"
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {searchOpen ? (
+        <View className="bg-white px-4 py-2 dark:bg-gray-900">
+          <View className="flex-row items-center rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-800">
+            <Ionicons name="search" size={18} color="#9CA3AF" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search chats"
+              placeholderTextColor="#9CA3AF"
+              autoFocus
+              className="ml-2 flex-1 p-0 text-base text-gray-900 dark:text-white"
+            />
+          </View>
+        </View>
+      ) : null}
 
       {inboxLoading ? (
         <View className="flex-1 items-center justify-center">
@@ -746,16 +801,18 @@ export default function ChatScreen() {
             <Text className="font-bold text-primary">Try again</Text>
           </TouchableOpacity>
         </View>
-      ) : inbox.length === 0 ? (
+      ) : visibleInbox.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="chatbubbles-outline" size={44} color="#9CA3AF" />
-          <Text className="mt-3 text-center text-neutral-text-sub">
-            No conversations yet. Message a seller from any ad.
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-gray-400/80">
+            <Ionicons name="information" size={32} color="white" />
+          </View>
+          <Text className="mt-3 text-center text-base text-gray-500">
+            {search.trim() ? "No Result!" : "No conversations yet"}
           </Text>
         </View>
       ) : (
         <ScrollView className="flex-1">
-          {inbox.map((item) => (
+          {visibleInbox.map((item) => (
             <TouchableOpacity
               key={item.id}
               onPress={() =>
@@ -815,6 +872,42 @@ export default function ChatScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* 3-dot action sheet */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setMenuOpen(false)}
+          className="flex-1 justify-end bg-black/40 p-4"
+        >
+          <View className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
+            <TouchableOpacity
+              onPress={() => {
+                setMenuOpen(false);
+                void loadInbox();
+              }}
+              className="items-center border-b border-gray-200/70 py-4 dark:border-gray-800"
+            >
+              <Text className="text-base font-medium text-primary">
+                Refresh
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            onPress={() => setMenuOpen(false)}
+            className="mt-2 items-center rounded-2xl bg-white py-4 dark:bg-gray-900"
+          >
+            <Text className="text-base font-semibold text-gray-500">
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -1,3 +1,4 @@
+import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
@@ -11,13 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 
 type ViewMode = "list" | "grid";
 
@@ -42,7 +37,9 @@ export default function BrandTypeScreen() {
   const typeId = pick("typeId");
   const attrKey = pick("attrKey");
   const attrValue = pick("attrValue");
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    params.view === "grid" ? "grid" : "list",
+  );
 
   const subQuery = useQuery({
     queryKey: ["subcategory", categoryId, subCategoryId],
@@ -69,14 +66,15 @@ export default function BrandTypeScreen() {
   const brandName = brand?.name || prettySlug(brandId);
   const typeName = attrValue || prettySlug(typeId);
 
+  const feedBrand = brand?.name;
   const feedQuery = useMemo(
     () => ({
       subcategorySlug: subCategoryId,
-      ...(brand?.name ? { brand: brand.name } : {}),
+      ...(feedBrand ? { brand: feedBrand } : {}),
       ...(attrKey && attrValue ? { attrs: { [attrKey]: attrValue } } : {}),
       ...feedQueryFromParams(params),
     }),
-    [subCategoryId, brand?.name, attrKey, attrValue, params],
+    [subCategoryId, feedBrand, attrKey, attrValue, params],
   );
 
   const toggleViewMode = () => {
@@ -103,33 +101,30 @@ export default function BrandTypeScreen() {
     );
   }
 
+  const screenTitle = `${subcategory?.name || subCategoryId} • ${brandName} • ${typeName}`;
+
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      <View className="bg-[#0EA5E9] px-4 pb-3 pt-3">
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="white" />
-          </TouchableOpacity>
-          <View className="flex-1 flex-row items-center rounded bg-white/20 px-3 py-2">
-            <Ionicons name="search" size={20} color="white" />
-            <TextInput
-              placeholder="Search..."
-              placeholderTextColor="white"
-              className="ml-2 flex-1 text-base text-white"
-              editable={false}
-            />
-          </View>
-          <TouchableOpacity onPress={openFilters}>
-            <Ionicons name="options-outline" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CategorySearchHeader
+        placeholder={screenTitle}
+        onSearchPress={() =>
+          router.push({
+            pathname: "/search",
+            params: {
+              categorySlug: categoryId,
+              subcategorySlug: subCategoryId,
+              ...(brand?.name ? { brand: brand.name } : {}),
+              ...(attrKey && attrValue ? { attrKey, attrValue } : {}),
+              scopeName: screenTitle,
+            },
+          } as never)
+        }
+        onFiltersPress={openFilters}
+      />
 
       <View className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between px-4 py-4">
-          <Text className="text-xl font-bold text-gray-900">
-            {subcategory?.name || subCategoryId} • {brandName} • {typeName}
-          </Text>
+        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
+          <Text className="text-xl font-bold text-gray-900">{screenTitle}</Text>
 
           <View className="flex-row gap-4">
             <TouchableOpacity onPress={toggleViewMode}>
@@ -144,7 +139,7 @@ export default function BrandTypeScreen() {
 
         <FilterChips
           categoryId={categoryId as string}
-          onLocationPress={openFilters}
+          subCategoryId={subCategoryId as string}
           onFiltersPress={openFilters}
         />
 

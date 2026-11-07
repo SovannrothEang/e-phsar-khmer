@@ -19,8 +19,15 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
     return (
       <View className="w-1/2 p-1.5">
         <View
-          className="rounded-3xl overflow-hidden shadow-sm"
-          style={{ height: total }}
+          className="rounded-lg overflow-hidden"
+          style={{
+            height: total,
+            elevation: 1,
+            shadowColor: "#0F172A",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 6,
+          }}
         >
           <LinearGradient
             colors={["#0EA5E9", "#6366F1", "#8B5CF6"]}
@@ -50,7 +57,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
             {/* Button */}
             <TouchableOpacity
               className="w-full rounded-2xl bg-white py-2.5 shadow-md"
-              onPress={() => router.push("/(tabs)/sell")}
+              onPress={() => router.push("/account/choose-category" as never)}
               activeOpacity={0.8}
             >
               <Text className="text-center text-xs font-bold text-sky-600 uppercase tracking-wide">
@@ -67,13 +74,13 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
   return (
     <View className="px-4 py-2">
       <View
-        className="rounded-3xl overflow-hidden"
+        className="rounded-lg overflow-hidden"
         style={{
-          elevation: 4,
-          shadowColor: "#6366F1",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 10,
+          elevation: 1,
+          shadowColor: "#0F172A",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 6,
         }}
       >
         <LinearGradient
@@ -98,7 +105,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
 
           <TouchableOpacity
             className="w-full rounded-2xl bg-white py-3 shadow-md flex-row items-center justify-center gap-2"
-            onPress={() => router.push("/(tabs)/sell")}
+            onPress={() => router.push("/account/choose-category" as never)}
             activeOpacity={0.8}
           >
             <Ionicons name="add-circle" size={18} color="#0EA5E9" />

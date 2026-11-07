@@ -580,9 +580,11 @@ export class AuthService {
    * proof for the password step. Supabase OTPs are single-use, so the code is
    * consumed here — the password is set by `confirmPasswordReset`.
    */
-  async verifyResetCode(
-    dto: VerifyResetCodeDto,
-  ): Promise<{ resetToken: string }> {
+  async verifyResetCode(dto: VerifyResetCodeDto): Promise<{
+    resetToken: string;
+    /** The account the code proved control of, shown on the password step. */
+    account: { username: string | null; phone: string; email: string | null };
+  }> {
     // The reset code is a credential: a locked identifier must not be able to
     // grind codes here either, and an unknown identifier locks the same way.
     await this.loginLockout.assertNotLocked(dto.identifier);
@@ -625,7 +627,14 @@ export class AuthService {
       { sub: target.userId, typ: PASSWORD_RESET_TYP },
       { expiresIn: PASSWORD_RESET_TTL_SECONDS },
     );
-    return { resetToken };
+    return {
+      resetToken,
+      account: {
+        username: target.username,
+        phone: target.phone,
+        email: target.email,
+      },
+    };
   }
 
   /**
@@ -749,9 +758,12 @@ export class AuthService {
    * and not banned. The E.164 phone is what Supabase must receive — rows are
    * stored as submitted, so older/admin ones may lack the `+`.
    */
-  private async resolveResetTarget(
-    rawIdentifier: string,
-  ): Promise<{ userId: string; phone: string } | null> {
+  private async resolveResetTarget(rawIdentifier: string): Promise<{
+    userId: string;
+    phone: string;
+    username: string | null;
+    email: string | null;
+  } | null> {
     const identifier = rawIdentifier.trim();
     if (identifier.length === 0) return null;
 
@@ -785,7 +797,12 @@ export class AuthService {
     if (!RESET_PHONE_PATTERN.test(phone)) return null;
     if (await isPhoneBanned(this.db, phone)) return null;
 
-    return { userId: user.id, phone };
+    return {
+      userId: user.id,
+      phone,
+      username: user.username,
+      email: user.email,
+    };
   }
 
   private invalidResetOtp(): UnauthorizedException {

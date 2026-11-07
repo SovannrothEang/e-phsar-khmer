@@ -1,3 +1,4 @@
+import BottomSheet from "@/components/common/BottomSheet";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { AppFooterDeviceInfo } from "@/components/common/AppFooterDeviceInfo";
 import { Colors } from "@/constants/Colors";
@@ -288,262 +289,58 @@ const SettingsScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
       >
-        {/* 2. Top Profile Card (Matching Screenshot 1) */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push("/(auth)/edit-profile")}
-          className={`mx-4 mt-4 mb-5 p-3.5 rounded-2xl flex-row items-center justify-between border shadow-2xs ${
-            isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
-          }`}
-        >
-          <View className="flex-row items-center gap-3.5">
-            <View
-              className={`w-14 h-14 rounded-full items-center justify-center overflow-hidden ${
-                isDark ? "bg-gray-800" : "bg-gray-200"
-              }`}
-            >
-              {user?.avatar ? (
-                <Image
-                  source={{ uri: user.avatar }}
-                  className="w-full h-full"
-                  resizeMode="cover"
-                />
-              ) : (
-                <Ionicons name="person" size={28} color="#9CA3AF" />
-              )}
-            </View>
-            <View>
-              <Text
-                className={`text-base font-bold ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {displayName}
-              </Text>
-              <Text className="text-xs text-gray-400 mt-0.5">
-                @{displayUsername}
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={19} color="#9CA3AF" />
-        </TouchableOpacity>
+        {/* The signed-in view gets its top gap from the profile card's `mt-4`. */}
+        {!isAuthenticated && <View className="h-4" />}
 
-        {/* 3. Section: Profile (Matching Screenshot 1) */}
-        <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
-          Profile
-        </Text>
-        <View
-          className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
-            isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
-          }`}
-        >
-          {/* Edit Profile */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/(auth)/edit-profile")}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-              isDark ? "border-gray-800" : "border-gray-100"
-            }`}
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Edit Profile
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          {/* Username */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => {
-              setNewUsername(displayUsername);
-              setEditUsernameVisible(true);
-            }}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-              isDark ? "border-gray-800" : "border-gray-100"
-            }`}
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="at-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Username
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-[14px] text-gray-400">
-                {displayUsername}
-              </Text>
-              <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Auto Update Profile Picture */}
-          <View className="px-4 py-2.5 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3 flex-1 pr-3">
-              <Ionicons
-                name="sync-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Auto Update Profile Picture
-              </Text>
-            </View>
-            <Switch
-              value={autoUpdateAvatar}
-              onValueChange={setAutoUpdateAvatar}
-              trackColor={{ false: "#D1D5DB", true: "#22C55E" }}
-              thumbColor="white"
-            />
-          </View>
-        </View>
-
-        {/* 4. Section: Security (Matching Screenshot 1) */}
-        <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
-          Security
-        </Text>
-        <View
-          className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
-            isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
-          }`}
-        >
-          {/* Activate Phone */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/account/change-phone" as never)}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-              isDark ? "border-gray-800" : "border-gray-100"
-            }`}
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="call-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Activate Phone
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-[14px] text-gray-400">{displayPhone}</Text>
-              <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Change Password */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/account/change-password" as never)}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-              isDark ? "border-gray-800" : "border-gray-100"
-            }`}
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Change Password
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-          </TouchableOpacity>
-
-          {/* Passkeys: deferred while web's Passkeys page stays a stub. */}
-          {false && (
+        {/* Account-only sections: signed-out visitors see App Setting + Support
+            (the reference Settings screen) and nothing that needs an account. */}
+        {isAuthenticated && (
+          <>
+            {/* 2. Top Profile Card (Matching Screenshot 1) */}
             <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() =>
-                Alert.alert(
-                  "Passkeys",
-                  "Passkey is enabled for biometric sign-in on this device.",
-                )
-              }
-              className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-                isDark ? "border-gray-800" : "border-gray-100"
+              activeOpacity={0.8}
+              onPress={() => router.push("/(auth)/edit-profile")}
+              className={`mx-4 mt-4 mb-5 p-3.5 rounded-2xl flex-row items-center justify-between border shadow-2xs ${
+                isDark
+                  ? "bg-gray-900 border-gray-800"
+                  : "bg-white border-gray-100"
               }`}
             >
-              <View className="flex-row items-center gap-3">
-                <Ionicons
-                  name="key-outline"
-                  size={20}
-                  color={isDark ? "#D1D5DB" : "#374151"}
-                />
-                <Text
-                  className={`text-[15px] font-medium ${
-                    isDark ? "text-white" : "text-gray-900"
+              <View className="flex-row items-center gap-3.5">
+                <View
+                  className={`w-14 h-14 rounded-full items-center justify-center overflow-hidden ${
+                    isDark ? "bg-gray-800" : "bg-gray-200"
                   }`}
                 >
-                  Passkeys
-                </Text>
+                  {user?.avatar ? (
+                    <Image
+                      source={{ uri: user.avatar }}
+                      className="w-full h-full"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons name="person" size={28} color="#9CA3AF" />
+                  )}
+                </View>
+                <View>
+                  <Text
+                    className={`text-base font-bold ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {displayName}
+                  </Text>
+                  <Text className="text-xs text-gray-400 mt-0.5">
+                    @{displayUsername}
+                  </Text>
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+              <Ionicons name="chevron-forward" size={19} color="#9CA3AF" />
             </TouchableOpacity>
-          )}
 
-          {/* Devices */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/account/devices" as never)}
-            className="px-4 py-3.5 flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="phone-portrait-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Devices
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-          </TouchableOpacity>
-        </View>
-
-        {false && (
-          <>
-            {/* Connected accounts are deferred: native OAuth needs a backend change. */}
-            {/* 5. Section: Connected Accounts (Matching Screenshot 2) */}
-            <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
-              Connected Accounts
+            {/* 3. Section: Profile (Matching Screenshot 1) */}
+            <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
+              Profile
             </Text>
             <View
               className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
@@ -552,221 +349,92 @@ const SettingsScreen = () => {
                   : "bg-white border-gray-100"
               }`}
             >
-              {/* Facebook */}
+              {/* Edit Profile */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={handleFacebookPress}
-                className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
+                onPress={() => router.push("/(auth)/edit-profile")}
+                className={`px-4 py-5 flex-row items-center justify-between border-b ${
                   isDark ? "border-gray-800" : "border-gray-100"
                 }`}
-              >
-                <View className="flex-row items-center gap-3">
-                  <Ionicons name="logo-facebook" size={22} color="#1877F2" />
-                  <Text
-                    className={`text-[15px] font-medium ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    Facebook
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  <Text
-                    className={`text-[14px] ${
-                      connectedFacebook
-                        ? isDark
-                          ? "text-gray-300"
-                          : "text-gray-700"
-                        : "text-sky-500 font-medium"
-                    }`}
-                  >
-                    {connectedFacebook || "Add"}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Google / Gmail (Matches Screenshot 2: Google -> Ban Sreypov >) */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleGooglePress}
-                disabled={connectingProvider !== null}
-                className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-                  isDark ? "border-gray-800" : "border-gray-100"
-                }`}
-              >
-                <View className="flex-row items-center gap-3">
-                  <Ionicons name="logo-google" size={20} color="#EA4335" />
-                  <Text
-                    className={`text-[15px] font-medium ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    Google
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  {connectingProvider === "google" ? (
-                    <ActivityIndicator size="small" color="#EA4335" />
-                  ) : (
-                    <Text
-                      className={`text-[14px] ${
-                        connectedGoogle
-                          ? isDark
-                            ? "text-gray-300"
-                            : "text-gray-700"
-                          : "text-sky-500 font-medium"
-                      }`}
-                    >
-                      {connectedGoogle || "Add"}
-                    </Text>
-                  )}
-                  <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Telegram */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleTelegramPress}
-                disabled={connectingProvider !== null}
-                className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-                  isDark ? "border-gray-800" : "border-gray-100"
-                }`}
-              >
-                <View className="flex-row items-center gap-3">
-                  <Ionicons name="paper-plane" size={19} color="#24A1DE" />
-                  <Text
-                    className={`text-[15px] font-medium ${
-                      isDark ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    Telegram
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  {connectingProvider === "telegram" ? (
-                    <ActivityIndicator size="small" color="#24A1DE" />
-                  ) : (
-                    <Text
-                      className={`text-[14px] ${
-                        connectedTelegram
-                          ? isDark
-                            ? "text-gray-300"
-                            : "text-gray-700"
-                          : "text-sky-500 font-medium"
-                      }`}
-                    >
-                      {connectedTelegram || "Add"}
-                    </Text>
-                  )}
-                  <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-                </View>
-              </TouchableOpacity>
-
-              {/* Apple */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleApplePress}
-                className="px-4 py-3.5 flex-row items-center justify-between"
               >
                 <View className="flex-row items-center gap-3">
                   <Ionicons
-                    name="logo-apple"
+                    name="person-outline"
                     size={22}
-                    color={isDark ? "white" : "black"}
+                    color={isDark ? "#D1D5DB" : "#374151"}
                   />
                   <Text
-                    className={`text-[15px] font-medium ${
+                    className={`text-[16px] font-medium ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Apple
+                    Edit Profile
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+              </TouchableOpacity>
+
+              {/* Username */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  setNewUsername(displayUsername);
+                  setEditUsernameVisible(true);
+                }}
+                className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                  isDark ? "border-gray-800" : "border-gray-100"
+                }`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <Ionicons
+                    name="at-outline"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#374151"}
+                  />
+                  <Text
+                    className={`text-[16px] font-medium ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Username
                   </Text>
                 </View>
                 <View className="flex-row items-center gap-1.5">
-                  <Text
-                    className={`text-[14px] ${
-                      connectedApple
-                        ? isDark
-                          ? "text-gray-300"
-                          : "text-gray-700"
-                        : "text-sky-500 font-medium"
-                    }`}
-                  >
-                    {connectedApple || "Add"}
+                  <Text className="text-[14px] text-gray-400">
+                    {displayUsername}
                   </Text>
                   <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
                 </View>
               </TouchableOpacity>
-            </View>
-          </>
-        )}
 
-        {/* 6. Section: Privacy & Data (Matching Screenshot 2) */}
-        <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
-          Privacy & Data
-        </Text>
-        <View
-          className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
-            isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
-          }`}
-        >
-          {/* Privacy */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/account/privacy" as never)}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
-              isDark ? "border-gray-800" : "border-gray-100"
-            }`}
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Privacy
-              </Text>
+              {/* Auto Update Profile Picture */}
+              <View className="px-4 py-2.5 flex-row items-center justify-between">
+                <View className="flex-row items-center gap-3 flex-1 pr-3">
+                  <Ionicons
+                    name="sync-outline"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#374151"}
+                  />
+                  <Text
+                    className={`text-[16px] font-medium ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Auto Update Profile Picture
+                  </Text>
+                </View>
+                <Switch
+                  value={autoUpdateAvatar}
+                  onValueChange={setAutoUpdateAvatar}
+                  trackColor={{ false: "#D1D5DB", true: "#22C55E" }}
+                  thumbColor="white"
+                />
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-          </TouchableOpacity>
 
-          {/* Delete account */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => router.push("/account/delete-account" as never)}
-            className="px-4 py-3.5 flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center gap-3">
-              <Ionicons
-                name="person-remove-outline"
-                size={20}
-                color={isDark ? "#D1D5DB" : "#374151"}
-              />
-              <Text
-                className={`text-[15px] font-medium ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                Delete account
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-          </TouchableOpacity>
-        </View>
-
-        {false && (
-          <>
-            {/* Billing & membership are deferred; mobile has no subscription surface yet. */}
-            {/* 7. Section: Billing & Membership (Matching Screenshot 2) */}
-            <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
-              Billing & Membership
+            {/* 4. Section: Security (Matching Screenshot 1) */}
+            <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
+              Security
             </Text>
             <View
               className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
@@ -775,69 +443,449 @@ const SettingsScreen = () => {
                   : "bg-white border-gray-100"
               }`}
             >
-              {/* Membership Information */}
+              {/* Activate Phone */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() =>
-                  Alert.alert(
-                    "Membership Information",
-                    `Current Plan: Free Seller Plan\nStatus: Active\nPosting Limit: Free Unlimited`,
-                  )
-                }
-                className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
+                onPress={() => router.push("/account/change-phone" as never)}
+                className={`px-4 py-5 flex-row items-center justify-between border-b ${
                   isDark ? "border-gray-800" : "border-gray-100"
                 }`}
               >
                 <View className="flex-row items-center gap-3">
                   <Ionicons
-                    name="ribbon-outline"
-                    size={20}
+                    name="call-outline"
+                    size={22}
                     color={isDark ? "#D1D5DB" : "#374151"}
                   />
                   <Text
-                    className={`text-[15px] font-medium ${
+                    className={`text-[16px] font-medium ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Membership Information
+                    Activate Phone
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="text-[14px] text-gray-400">
+                    {displayPhone}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Change Password */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push("/account/change-password" as never)}
+                className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                  isDark ? "border-gray-800" : "border-gray-100"
+                }`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#374151"}
+                  />
+                  <Text
+                    className={`text-[16px] font-medium ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Change Password
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
               </TouchableOpacity>
 
-              {/* Billing Address */}
+              {/* Passkeys: deferred while web's Passkeys page stays a stub. */}
+              {false && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    Alert.alert(
+                      "Passkeys",
+                      "Passkey is enabled for biometric sign-in on this device.",
+                    )
+                  }
+                  className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                    isDark ? "border-gray-800" : "border-gray-100"
+                  }`}
+                >
+                  <View className="flex-row items-center gap-3">
+                    <Ionicons
+                      name="key-outline"
+                      size={22}
+                      color={isDark ? "#D1D5DB" : "#374151"}
+                    />
+                    <Text
+                      className={`text-[16px] font-medium ${
+                        isDark ? "text-white" : "text-gray-900"
+                      }`}
+                    >
+                      Passkeys
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+
+              {/* Devices */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() =>
-                  Alert.alert(
-                    "Billing Address",
-                    `Address: ${user?.location || "Phnom Penh, Cambodia"}`,
-                  )
-                }
-                className="px-4 py-3.5 flex-row items-center justify-between"
+                onPress={() => router.push("/account/devices" as never)}
+                className="px-4 py-5 flex-row items-center justify-between"
               >
                 <View className="flex-row items-center gap-3">
                   <Ionicons
-                    name="receipt-outline"
-                    size={20}
+                    name="phone-portrait-outline"
+                    size={22}
                     color={isDark ? "#D1D5DB" : "#374151"}
                   />
                   <Text
-                    className={`text-[15px] font-medium ${
+                    className={`text-[16px] font-medium ${
                       isDark ? "text-white" : "text-gray-900"
                     }`}
                   >
-                    Billing Address
+                    Devices
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
+
+            {false && (
+              <>
+                {/* Connected accounts are deferred: native OAuth needs a backend change. */}
+                {/* 5. Section: Connected Accounts (Matching Screenshot 2) */}
+                <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
+                  Connected Accounts
+                </Text>
+                <View
+                  className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
+                    isDark
+                      ? "bg-gray-900 border-gray-800"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
+                  {/* Facebook */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleFacebookPress}
+                    className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                      isDark ? "border-gray-800" : "border-gray-100"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons
+                        name="logo-facebook"
+                        size={22}
+                        color="#1877F2"
+                      />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Facebook
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-1.5">
+                      <Text
+                        className={`text-[14px] ${
+                          connectedFacebook
+                            ? isDark
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                            : "text-sky-500 font-medium"
+                        }`}
+                      >
+                        {connectedFacebook || "Add"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color="#9CA3AF"
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Google / Gmail (Matches Screenshot 2: Google -> Ban Sreypov >) */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleGooglePress}
+                    disabled={connectingProvider !== null}
+                    className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                      isDark ? "border-gray-800" : "border-gray-100"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons name="logo-google" size={22} color="#EA4335" />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Google
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-1.5">
+                      {connectingProvider === "google" ? (
+                        <ActivityIndicator size="small" color="#EA4335" />
+                      ) : (
+                        <Text
+                          className={`text-[14px] ${
+                            connectedGoogle
+                              ? isDark
+                                ? "text-gray-300"
+                                : "text-gray-700"
+                              : "text-sky-500 font-medium"
+                          }`}
+                        >
+                          {connectedGoogle || "Add"}
+                        </Text>
+                      )}
+                      <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color="#9CA3AF"
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Telegram */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleTelegramPress}
+                    disabled={connectingProvider !== null}
+                    className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                      isDark ? "border-gray-800" : "border-gray-100"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons name="paper-plane" size={19} color="#24A1DE" />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Telegram
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-1.5">
+                      {connectingProvider === "telegram" ? (
+                        <ActivityIndicator size="small" color="#24A1DE" />
+                      ) : (
+                        <Text
+                          className={`text-[14px] ${
+                            connectedTelegram
+                              ? isDark
+                                ? "text-gray-300"
+                                : "text-gray-700"
+                              : "text-sky-500 font-medium"
+                          }`}
+                        >
+                          {connectedTelegram || "Add"}
+                        </Text>
+                      )}
+                      <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color="#9CA3AF"
+                      />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Apple */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleApplePress}
+                    className="px-4 py-5 flex-row items-center justify-between"
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons
+                        name="logo-apple"
+                        size={22}
+                        color={isDark ? "white" : "black"}
+                      />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Apple
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center gap-1.5">
+                      <Text
+                        className={`text-[14px] ${
+                          connectedApple
+                            ? isDark
+                              ? "text-gray-300"
+                              : "text-gray-700"
+                            : "text-sky-500 font-medium"
+                        }`}
+                      >
+                        {connectedApple || "Add"}
+                      </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={17}
+                        color="#9CA3AF"
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* 6. Section: Privacy & Data (Matching Screenshot 2) */}
+            <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
+              Privacy & Data
+            </Text>
+            <View
+              className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
+                isDark
+                  ? "bg-gray-900 border-gray-800"
+                  : "bg-white border-gray-100"
+              }`}
+            >
+              {/* Privacy */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push("/account/privacy" as never)}
+                className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                  isDark ? "border-gray-800" : "border-gray-100"
+                }`}
+              >
+                <View className="flex-row items-center gap-3">
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#374151"}
+                  />
+                  <Text
+                    className={`text-[16px] font-medium ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Privacy
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+              </TouchableOpacity>
+
+              {/* Delete account */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push("/account/delete-account" as never)}
+                className="px-4 py-5 flex-row items-center justify-between"
+              >
+                <View className="flex-row items-center gap-3">
+                  <Ionicons
+                    name="person-remove-outline"
+                    size={22}
+                    color={isDark ? "#D1D5DB" : "#374151"}
+                  />
+                  <Text
+                    className={`text-[16px] font-medium ${
+                      isDark ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    Delete account
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+
+            {false && (
+              <>
+                {/* Billing & membership are deferred; mobile has no subscription surface yet. */}
+                {/* 7. Section: Billing & Membership (Matching Screenshot 2) */}
+                <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
+                  Billing & Membership
+                </Text>
+                <View
+                  className={`mx-4 mb-5 rounded-2xl border shadow-2xs overflow-hidden ${
+                    isDark
+                      ? "bg-gray-900 border-gray-800"
+                      : "bg-white border-gray-100"
+                  }`}
+                >
+                  {/* Membership Information */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      Alert.alert(
+                        "Membership Information",
+                        `Current Plan: Free Seller Plan\nStatus: Active\nPosting Limit: Free Unlimited`,
+                      )
+                    }
+                    className={`px-4 py-5 flex-row items-center justify-between border-b ${
+                      isDark ? "border-gray-800" : "border-gray-100"
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons
+                        name="ribbon-outline"
+                        size={22}
+                        color={isDark ? "#D1D5DB" : "#374151"}
+                      />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Membership Information
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={17}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+
+                  {/* Billing Address */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      Alert.alert(
+                        "Billing Address",
+                        `Address: ${user?.location || "Phnom Penh, Cambodia"}`,
+                      )
+                    }
+                    className="px-4 py-5 flex-row items-center justify-between"
+                  >
+                    <View className="flex-row items-center gap-3">
+                      <Ionicons
+                        name="receipt-outline"
+                        size={22}
+                        color={isDark ? "#D1D5DB" : "#374151"}
+                      />
+                      <Text
+                        className={`text-[16px] font-medium ${
+                          isDark ? "text-white" : "text-gray-900"
+                        }`}
+                      >
+                        Billing Address
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={17}
+                      color="#9CA3AF"
+                    />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </>
         )}
 
         {/* 8. Section: App Setting (Matching Screenshot 3) */}
-        <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
+        <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
           App Setting
         </Text>
         <View
@@ -849,18 +897,18 @@ const SettingsScreen = () => {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => setLangModalVisible(true)}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
+            className={`px-4 py-5 flex-row items-center justify-between border-b ${
               isDark ? "border-gray-800" : "border-gray-100"
             }`}
           >
             <View className="flex-row items-center gap-3">
               <Ionicons
                 name="language-outline"
-                size={20}
+                size={22}
                 color={isDark ? "#D1D5DB" : "#374151"}
               />
               <Text
-                className={`text-[15px] font-medium ${
+                className={`text-[16px] font-medium ${
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -871,7 +919,7 @@ const SettingsScreen = () => {
               <Text className="text-[14px] text-gray-400">
                 {currentLanguageObj.nativeName}
               </Text>
-              <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
+              <Ionicons name="chevron-down" size={17} color="#9CA3AF" />
             </View>
           </TouchableOpacity>
 
@@ -879,30 +927,25 @@ const SettingsScreen = () => {
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => router.push("/(auth)/theme")}
-            className={`px-4 py-3.5 flex-row items-center justify-between border-b ${
+            className={`px-4 py-5 flex-row items-center justify-between border-b ${
               isDark ? "border-gray-800" : "border-gray-100"
             }`}
           >
             <View className="flex-row items-center gap-3">
               <Ionicons
                 name="color-palette-outline"
-                size={20}
+                size={22}
                 color={isDark ? "#D1D5DB" : "#374151"}
               />
               <Text
-                className={`text-[15px] font-medium ${
+                className={`text-[16px] font-medium ${
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
                 Theme
               </Text>
             </View>
-            <View className="flex-row items-center gap-1.5">
-              <Text className="text-[14px] text-gray-400">
-                {isDark ? "Dark Mode" : "Light Mode"}
-              </Text>
-              <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
-            </View>
+            <Ionicons name="chevron-forward" size={17} color="#9CA3AF" />
           </TouchableOpacity>
 
           {/* Notification */}
@@ -912,16 +955,16 @@ const SettingsScreen = () => {
               setLocalPrefs(preferences);
               setNotifModalVisible(true);
             }}
-            className="px-4 py-3.5 flex-row items-center justify-between"
+            className="px-4 py-5 flex-row items-center justify-between"
           >
             <View className="flex-row items-center gap-3">
               <Ionicons
                 name="notifications-outline"
-                size={20}
+                size={22}
                 color={isDark ? "#D1D5DB" : "#374151"}
               />
               <Text
-                className={`text-[15px] font-medium ${
+                className={`text-[16px] font-medium ${
                   isDark ? "text-white" : "text-gray-900"
                 }`}
               >
@@ -933,7 +976,7 @@ const SettingsScreen = () => {
         </View>
 
         {/* 9. Section: Support (Matching Screenshot 3 & 4) */}
-        <Text className="text-xs text-gray-500 font-normal px-5 mb-1.5">
+        <Text className="text-xs text-gray-500 font-normal px-5 mb-2.5">
           Support
         </Text>
         <View
@@ -964,7 +1007,7 @@ const SettingsScreen = () => {
                   );
                 }
               }}
-              className={`px-4 py-3.5 flex-row items-center justify-between ${
+              className={`px-4 py-5 flex-row items-center justify-between ${
                 index < array.length - 1
                   ? isDark
                     ? "border-b border-gray-800"
@@ -975,11 +1018,11 @@ const SettingsScreen = () => {
               <View className="flex-row items-center gap-3">
                 <Ionicons
                   name={item.icon as any}
-                  size={20}
+                  size={22}
                   color={isDark ? "#D1D5DB" : "#374151"}
                 />
                 <Text
-                  className={`text-[15px] font-medium ${
+                  className={`text-[16px] font-medium ${
                     isDark ? "text-white" : "text-gray-900"
                   }`}
                 >
@@ -992,273 +1035,256 @@ const SettingsScreen = () => {
         </View>
 
         {/* 10. Logout Button (Matching Screenshot 4) */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={handleLogoutPress}
-          className={`mx-4 py-3.5 rounded-2xl items-center justify-center border shadow-2xs mb-6 ${
-            isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
-          }`}
-        >
-          <Text
-            className={`font-semibold text-base ${
-              isAuthenticated ? "text-rose-500" : "text-primary"
+        {isAuthenticated && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleLogoutPress}
+            className={`mx-4 py-3.5 rounded-2xl items-center justify-center border shadow-2xs mb-6 ${
+              isDark
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white border-gray-100"
             }`}
           >
-            {isAuthenticated ? "Logout" : "Login or Register"}
-          </Text>
-        </TouchableOpacity>
+            <Text className="font-semibold text-base text-rose-500">
+              Logout
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* 11. Dynamic Device & IP Footer Info */}
         <AppFooterDeviceInfo
-          username={displayUsername}
-          version="2026.09.01"
+          username={isAuthenticated ? displayUsername : undefined}
           className="items-center pb-8 gap-0.5"
           textClassName="text-gray-400 text-xs font-normal text-center"
         />
       </ScrollView>
 
       {/* Language Selector Modal */}
-      <Modal
+      <BottomSheet
         visible={langModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setLangModalVisible(false)}
+        onClose={() => setLangModalVisible(false)}
       >
-        <View className="flex-1 bg-black/60 justify-end">
+        <View className={`p-5 gap-4 ${isDark ? "bg-gray-900" : "bg-white"}`}>
           <View
-            className={`rounded-t-3xl p-5 gap-4 ${
-              isDark ? "bg-gray-900" : "bg-white"
+            className={`flex-row items-center justify-between border-b pb-3 ${
+              isDark ? "border-gray-800" : "border-neutral-border"
             }`}
           >
-            <View
-              className={`flex-row items-center justify-between border-b pb-3 ${
-                isDark ? "border-gray-800" : "border-neutral-border"
+            <Text
+              className={`text-base font-bold ${
+                isDark ? "text-white" : "text-neutral-text-main"
               }`}
             >
-              <Text
-                className={`text-base font-bold ${
-                  isDark ? "text-white" : "text-neutral-text-main"
-                }`}
-              >
-                {t("selectLanguage")}
-              </Text>
-              <TouchableOpacity onPress={() => setLangModalVisible(false)}>
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={isDark ? "white" : Colors.text.primary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View className="gap-2 py-2">
-              {LANGUAGES.map((lang) => {
-                const isSelected = language === lang.code;
-                return (
-                  <TouchableOpacity
-                    key={lang.code}
-                    onPress={() => handleSelectLanguage(lang.code)}
-                    className={`flex-row items-center justify-between p-4 rounded-2xl border ${
-                      isSelected
-                        ? "border-primary bg-primary/10"
-                        : isDark
-                          ? "border-gray-800 bg-gray-800"
-                          : "border-neutral-border bg-neutral-background"
-                    }`}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <Image
-                        source={lang.flag}
-                        className="w-8 h-8 rounded-full"
-                        resizeMode="contain"
-                      />
-                      <View>
-                        <Text
-                          className={`text-base font-bold ${
-                            isDark ? "text-white" : "text-neutral-text-main"
-                          }`}
-                        >
-                          {lang.nativeName}
-                        </Text>
-                        <Text className="text-xs text-neutral-text-sub">
-                          {lang.name}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {isSelected && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={Colors.primary.DEFAULT}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+              {t("selectLanguage")}
+            </Text>
+            <TouchableOpacity onPress={() => setLangModalVisible(false)}>
+              <Ionicons
+                name="close"
+                size={24}
+                color={isDark ? "white" : Colors.text.primary}
+              />
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
 
-      {/* Notification Settings Modal */}
-      <Modal
-        visible={notifModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setNotifModalVisible(false)}
-      >
-        <View className="flex-1 bg-black/60 justify-end">
-          <View
-            className={`rounded-t-3xl p-5 ${
-              isDark ? "bg-gray-900" : "bg-white"
-            }`}
-          >
-            <View
-              className={`flex-row items-center justify-between pb-3 border-b ${
-                isDark ? "border-gray-800" : "border-neutral-border"
-              }`}
-            >
-              <View>
-                <Text
-                  className={`text-lg font-bold ${
-                    isDark ? "text-white" : "text-neutral-text-main"
+          <View className="gap-2 py-2">
+            {LANGUAGES.map((lang) => {
+              const isSelected = language === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  onPress={() => handleSelectLanguage(lang.code)}
+                  className={`flex-row items-center justify-between p-4 rounded-2xl border ${
+                    isSelected
+                      ? "border-primary bg-primary/10"
+                      : isDark
+                        ? "border-gray-800 bg-gray-800"
+                        : "border-neutral-border bg-neutral-background"
                   }`}
                 >
-                  Notification Settings
-                </Text>
-                <Text
-                  className={`text-xs ${
-                    isDark ? "text-gray-400" : "text-neutral-text-sub"
-                  }`}
-                >
-                  Configure your alert preferences
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setNotifModalVisible(false)}
-                className="p-1"
-              >
-                <Ionicons
-                  name="close"
-                  size={24}
-                  color={isDark ? "white" : Colors.text.primary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView className="max-h-[380px] my-3">
-              {[
-                {
-                  key: "pushEnabled",
-                  title: "Push Notifications",
-                  subtitle: "Enable all push alerts from PhsarKhmer",
-                  icon: "notifications",
-                },
-                {
-                  key: "priceDropAlerts",
-                  title: "Price Drop Alerts",
-                  subtitle: "Alerts when saved item prices drop",
-                  icon: "trending-down",
-                },
-                {
-                  key: "chatMessages",
-                  title: "Chat & Buyer Inquiries",
-                  subtitle: "Alerts for new buyer/seller messages",
-                  icon: "chatbubbles",
-                },
-                {
-                  key: "adStatusUpdates",
-                  title: "Listing Status & Expiry",
-                  subtitle: "Ad approvals, bumps, and expiry alerts",
-                  icon: "megaphone",
-                },
-                {
-                  key: "promotionsAndDeals",
-                  title: "Promotions & Discounts",
-                  subtitle: "Exclusive deals and marketing discounts",
-                  icon: "pricetag",
-                },
-                {
-                  key: "soundEnabled",
-                  title: "Notification Sound",
-                  subtitle: "Play sound when alert arrives",
-                  icon: "volume-high",
-                },
-              ].map((item) => (
-                <View
-                  key={item.key}
-                  className={`flex-row items-center justify-between py-3 border-b ${
-                    isDark ? "border-gray-800/80" : "border-neutral-border/60"
-                  }`}
-                >
-                  <View className="flex-row items-center gap-3 flex-1 pr-3">
-                    <View
-                      className={`w-9 h-9 rounded-xl items-center justify-center ${
-                        isDark ? "bg-gray-800" : "bg-sky-50"
-                      }`}
-                    >
-                      <Ionicons
-                        name={item.icon as any}
-                        size={18}
-                        color={Colors.primary.DEFAULT}
-                      />
-                    </View>
-                    <View className="flex-1">
+                  <View className="flex-row items-center gap-3">
+                    <Image
+                      source={lang.flag}
+                      className="w-8 h-8 rounded-full"
+                      resizeMode="contain"
+                    />
+                    <View>
                       <Text
-                        className={`text-sm font-semibold ${
+                        className={`text-base font-bold ${
                           isDark ? "text-white" : "text-neutral-text-main"
                         }`}
                       >
-                        {item.title}
+                        {lang.nativeName}
                       </Text>
-                      <Text
-                        className={`text-[11px] ${
-                          isDark ? "text-gray-400" : "text-neutral-text-sub"
-                        }`}
-                      >
-                        {item.subtitle}
+                      <Text className="text-xs text-neutral-text-sub">
+                        {lang.name}
                       </Text>
                     </View>
                   </View>
-                  <Switch
-                    value={
-                      localPrefs[item.key as keyof typeof localPrefs] as boolean
-                    }
-                    onValueChange={(val) =>
-                      setLocalPrefs((prev) => ({
-                        ...prev,
-                        [item.key]: val,
-                      }))
-                    }
-                    trackColor={{
-                      false: isDark ? "#374151" : "#E5E7EB",
-                      true: Colors.primary.DEFAULT,
-                    }}
-                    thumbColor="white"
-                  />
-                </View>
-              ))}
-            </ScrollView>
 
-            <TouchableOpacity
-              onPress={() => {
-                updatePreferences(localPrefs);
-                setNotifModalVisible(false);
-                Alert.alert(
-                  "Saved",
-                  "Your notification preferences have been updated.",
-                );
-              }}
-              className="bg-primary py-3.5 rounded-2xl items-center justify-center mt-2 shadow-sm"
-            >
-              <Text className="text-white text-base font-bold">
-                Save Preferences
-              </Text>
-            </TouchableOpacity>
+                  {isSelected && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={24}
+                      color={Colors.primary.DEFAULT}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
-      </Modal>
+      </BottomSheet>
+
+      {/* Notification Settings Modal */}
+      <BottomSheet
+        visible={notifModalVisible}
+        onClose={() => setNotifModalVisible(false)}
+      >
+        <View className={`p-5 ${isDark ? "bg-gray-900" : "bg-white"}`}>
+          <View
+            className={`flex-row items-center justify-between pb-3 border-b ${
+              isDark ? "border-gray-800" : "border-neutral-border"
+            }`}
+          >
+            <View>
+              <Text
+                className={`text-lg font-bold ${
+                  isDark ? "text-white" : "text-neutral-text-main"
+                }`}
+              >
+                Notification Settings
+              </Text>
+              <Text
+                className={`text-xs ${
+                  isDark ? "text-gray-400" : "text-neutral-text-sub"
+                }`}
+              >
+                Configure your alert preferences
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setNotifModalVisible(false)}
+              className="p-1"
+            >
+              <Ionicons
+                name="close"
+                size={24}
+                color={isDark ? "white" : Colors.text.primary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView className="max-h-[380px] my-3">
+            {[
+              {
+                key: "pushEnabled",
+                title: "Push Notifications",
+                subtitle: "Enable all push alerts from PhsarKhmer",
+                icon: "notifications",
+              },
+              {
+                key: "priceDropAlerts",
+                title: "Price Drop Alerts",
+                subtitle: "Alerts when saved item prices drop",
+                icon: "trending-down",
+              },
+              {
+                key: "chatMessages",
+                title: "Chat & Buyer Inquiries",
+                subtitle: "Alerts for new buyer/seller messages",
+                icon: "chatbubbles",
+              },
+              {
+                key: "adStatusUpdates",
+                title: "Listing Status & Expiry",
+                subtitle: "Ad approvals, bumps, and expiry alerts",
+                icon: "megaphone",
+              },
+              {
+                key: "promotionsAndDeals",
+                title: "Promotions & Discounts",
+                subtitle: "Exclusive deals and marketing discounts",
+                icon: "pricetag",
+              },
+              {
+                key: "soundEnabled",
+                title: "Notification Sound",
+                subtitle: "Play sound when alert arrives",
+                icon: "volume-high",
+              },
+            ].map((item) => (
+              <View
+                key={item.key}
+                className={`flex-row items-center justify-between py-3 border-b ${
+                  isDark ? "border-gray-800/80" : "border-neutral-border/60"
+                }`}
+              >
+                <View className="flex-row items-center gap-3 flex-1 pr-3">
+                  <View
+                    className={`w-9 h-9 rounded-xl items-center justify-center ${
+                      isDark ? "bg-gray-800" : "bg-sky-50"
+                    }`}
+                  >
+                    <Ionicons
+                      name={item.icon as any}
+                      size={18}
+                      color={Colors.primary.DEFAULT}
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      className={`text-sm font-semibold ${
+                        isDark ? "text-white" : "text-neutral-text-main"
+                      }`}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      className={`text-[11px] ${
+                        isDark ? "text-gray-400" : "text-neutral-text-sub"
+                      }`}
+                    >
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={
+                    localPrefs[item.key as keyof typeof localPrefs] as boolean
+                  }
+                  onValueChange={(val) =>
+                    setLocalPrefs((prev) => ({
+                      ...prev,
+                      [item.key]: val,
+                    }))
+                  }
+                  trackColor={{
+                    false: isDark ? "#374151" : "#E5E7EB",
+                    true: Colors.primary.DEFAULT,
+                  }}
+                  thumbColor="white"
+                />
+              </View>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            onPress={() => {
+              updatePreferences(localPrefs);
+              setNotifModalVisible(false);
+              Alert.alert(
+                "Saved",
+                "Your notification preferences have been updated.",
+              );
+            }}
+            className="bg-primary py-3.5 rounded-2xl items-center justify-center mt-2 shadow-sm"
+          >
+            <Text className="text-white text-base font-bold">
+              Save Preferences
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
 
       {/* Edit Username Modal */}
       <Modal

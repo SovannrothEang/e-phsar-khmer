@@ -21,6 +21,59 @@ How to use this file:
 
 ### Added
 
+- **Mobile Resume (CV) builder.** The account tab's `Resume (CV)` item now opens a real
+  8-step wizard at `/account/resume` instead of a placeholder alert. The entry screen offers
+  only **Create a New Resume** (no upload-existing-resume path) and lists the eight steps;
+  the wizard mirrors the web's `/resume` contract step for step: Personal Details, Summary,
+  Experience, Educations, Skill, Language, Hobbies & Interests, References. Each step saves
+  through `lib/api/resume.ts` (`PUT /resume/personal`, `PATCH /resume` for summary/hobbies,
+  per-entry `PUT`/`DELETE`), advances only after the API accepts, and uses the reference's
+  dark surfaces, floating-label fields, orange CTA, step pill, list editors (add/edit/delete
+  for Educations/Skills/Languages), native-style month-year and DOB wheel pickers
+  (Cancel/Done), iOS-style action-sheet pickers for the short choice lists (Education Level,
+  Degree, Skill/Language level; "Bachelor" displays while "Bachelor's Degree" is stored),
+  province → district → commune location drill-down, and the Resume Ready dialog
+  (Finish / Feedback). One Experience
+  and one Reference are edited per the approved design; phone is required; Skill/Language
+  levels are required (the `Missing info` pill remains for legacy empty-level rows). The photo
+  uploads through a `resume`-scope signed upload and is removed if it is never saved. An
+  existing resume now opens the completed-resume view directly (the prefilled wizard is
+  reached from its edit actions) and a failed `GET /resume` shows a
+  retry state instead of an empty builder. **Finish** opens the completed-resume view:
+  the personal block, the Completed Profile meter and missing-item chips, all eight sections
+  with edit/add links, entry 3-dot edit/delete menus, the CV / Resume card (signed open and
+  remove plus native upload/replace through `expo-file-system`'s `File.pickFileAsync` —
+  already installed, so no new dependency), and Job Preferences with
+  its own form. **Feedback** opens the reference's mood/section-notes screen and submits to
+  the public `POST /feedback` endpoint using the resume's contact details. Shared
+  `FloatingInput`/`DropdownField` gained a
+  filled/dark variant, `required` marks and a multiline height, with existing forms unchanged.
+  Verified: `pnpm --filter phsarkhmer exec tsc --noEmit`, `expo lint`, Prettier and
+  `git diff --check` all pass. The API/UI walk is still pending (no dev session was available
+  in this pass); see the todo entry for the walk-through checklist.
+
+- **Category feed Location chip.** The quick-filter row's `Location` chip now opens a
+  searchable slide-up drill-down (province → khan/district → sangkat/commune) instead of
+  navigating to the full Filters screen. Each step writes its slug into the route params
+  (clearing the deeper levels), so the feed refetches and the chip shows the deepest chosen
+  name; the sheet's back chevron walks up a level. `Filters` still opens the full screen.
+  Applies to the category, subcategory, brand and type feeds. `SelectionSheet` also resets its
+  list scroll position when the title changes, so each drill-down step starts at the top.
+
+- **Category feed Sort and Price chips.** `Sort` now opens the reference's radio sheet
+  (Latest Ads / Price: Low to High / Price: High to Low) and writes `sort` in place. `Price`
+  (or `Salary` on Jobs) opens a bottom sheet with Min/Max inputs and one orange **Apply
+  Filter** button, writing `minPrice`/`maxPrice` only when applied. Both slide up over the
+  feed; the full `Filters` chip still opens `/filters`. `SORT_OPTIONS` moved to
+  `lib/filter-options.ts` so the filter screen and the chip share one list. The chip row is
+  also larger and squarer (16px labels, `px-4 py-2`, 4px corners) per the captain's request;
+  the category search field matches (18px label, 22px icon, 2px corners).
+
+- **The password-reset step names the account.** `POST /auth/password/reset/verify` now also
+  returns `account: { username, phone, email }` for the account the code proved, so the mobile
+  forgot-password screen can show it above the new-password field. The field is additive and
+  older backends that omit it fall back to the identifier the user typed.
+
 - **ABA PayWay callback verified off the raw body (2026-11-04).** `main.ts` boots
   with `rawBody: true`, the webhook controller passes `@RawBody()` to the
   provider, and `signAbaPaywayCallbackRaw` canonicalizes the raw text with a
@@ -348,6 +401,30 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Changed
 
+- **Mobile realigned to the Expo SDK 58 package set so it runs in Expo Go 58.** The app moved
+  from Expo SDK 54 to SDK 58 for the user's physical-device Expo Go clients (Android 58.0.5,
+  iOS 58.0.7; Expo Go supports SDK 58 only): `expo` `~58.0.23`, `react-native` `0.88.1`,
+  `react`/`react-dom` `19.3.0`, `expo-router` `~58.0.30`, `typescript` `~6.0.3`,
+  `eslint-config-expo` `~58.0.4`. SDK 58 is New Architecture only and Android edge-to-edge is
+  always on, so `newArchEnabled` and `android.edgeToEdgeEnabled` were removed from `app.json`.
+  `@react-navigation/*` imports migrated to `expo-router` exports (`useIsFocused` and friends),
+  and the reanimated Babel plugin was removed because `babel-preset-expo` wires
+  `react-native-worklets`. RN 0.88 API migrations: ScrollView/TextInput refs now type the
+  instance (`React.ComponentRef`), `StyleSheet.absoluteFillObject` → `StyleSheet.absoluteFill`,
+  the `StatusBar` `backgroundColor`/`translucent` props are gone under forced edge-to-edge, and
+  `Appearance.setColorScheme(..., 'auto')` replaces `null`. React Compiler lint rules enabled by
+  `eslint-config-expo` 58 (react-hooks v7) were driven to 0 errors. `@types/react` was aligned
+  on 19.3.0 (Expo SDK 58's expected version) across `apps/mobile`, `apps/web` and `@repo/ui` so
+  the workspace resolves a single copy — a duplicate React-types copy produces unrelated `Ref`
+  types and broke `next build`; the web build is green after the alignment.
+  Verified — `pnpm --filter phsarkhmer exec tsc --noEmit` (0 errors), `expo lint` (0
+  errors), `npx expo-doctor` 20/20, `expo install --check` up to date, `expo export` Hermes
+  bundles for android and ios, and the Expo Go LAN manifest (`sdkVersion 58.0.0`,
+  `runtimeVersion exposdk:58.0.0`, LAN `hostUri`/`launchAsset` for both platforms).
+  `apps/web`'s `next build` is green with the single `@types/react` copy, and Prettier +
+  `git diff --check` are clean. The only unverified step is the physical-device Expo Go walk
+  (no device is attached to this machine).
+
 - **Bakong payments are polled on demand by one poller, not by a self-rescheduling chain** (`Plans.md`, "Bakong
   demand-driven polling"). Issuing a checkout now emits a local `payment.issued` event that arms
   `PaymentReconciler`: it checks every 5 s for the first minute, every 15 s while the checkout stays pending, and
@@ -441,6 +518,17 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   removed, and the undecryptable-message note now points at the backup passcode instead of another device.
 
 ### Fixed
+
+- **A client without the `expo-crypto` native module no longer blanks the mobile app.** `lib/e2e/random.ts`
+  imported `expo-crypto` at module scope to install the `globalThis.crypto.getRandomValues` polyfill, and
+  `lib/e2e/device.ts` → `contexts/AuthContext.tsx` → `app/_layout.tsx` pulled that chain into the root import
+  graph. In a client that lacks the native module (a client that does not match the project's SDK — the same
+  import graph resolves `ExpoSecureStore`, imported just before it) the throw during `_layout.tsx` evaluation
+  made expo-router report `Route … is missing the required default export` for every route. The module is now
+  required on the first `getRandomValues` call, so the app boots; encrypted chat fails with a named error and
+  one `[e2e] expo-crypto is unavailable` warning instead of taking the app down. Verified: `expo lint`,
+  `tsc --noEmit`, and the Android dev bundle (the `require` sits inside the loader, not at module scope).
+  Device-side encrypted chat still needs an Expo Go client that matches the project's SDK.
 
 - **Image uploads accept every advertised format, and failures say why.** The `product-images` bucket now allows
   `image/jpeg | image/jpg | image/png | image/gif | image/webp | image/heic | image/heif | image/x-adobe-dng | image/dng`

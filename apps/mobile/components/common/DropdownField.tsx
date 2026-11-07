@@ -1,164 +1,135 @@
+import ActionSheet from "@/components/common/ActionSheet";
+import { FieldError, FloatingLabel } from "@/components/common/FloatingInput";
+import SelectionSheet from "@/components/common/SelectionSheet";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useState } from "react";
+import { Text, TouchableOpacity, View } from "react-native";
 
 export interface DropdownOption {
   id: string;
   name: string;
+  image?: string | null;
 }
 
 interface DropdownFieldProps {
   label: string;
   value?: string;
-  placeholder?: string;
   options: DropdownOption[];
   onSelect: (option: DropdownOption) => void;
+  /** Enables the sheet's Clear action; omit when the field cannot be emptied. */
+  onClear?: () => void;
   disabled?: boolean;
+  /** Inline validation message — red border plus the message below the box. */
+  error?: string;
+  /** Trigger chevron; "forward" matches the summary cards (Product Specification). */
+  chevron?: "down" | "forward";
+  /** Accepted for call-site compatibility; the floating label replaces both. */
+  placeholder?: string;
   searchable?: boolean;
   required?: boolean;
-  error?: boolean;
+  /** "filled" is the resume wizard's dark surface; "outline" is the app default. */
+  variant?: "outline" | "filled";
+  /**
+   * "sheet" is the shared searchable bottom sheet (default); "actions" is the
+   * iOS-style action sheet used by the resume's short choice lists.
+   */
+  picker?: "sheet" | "actions";
 }
 
-/** A bordered select that opens a searchable bottom sheet. */
+/**
+ * A bordered select that opens the shared searchable bottom sheet. The label
+ * floats like the text inputs: centred while empty, small on top once a value
+ * is chosen (captain, 2026-11-04).
+ */
 function DropdownField({
   label,
   value,
-  placeholder,
   options,
   onSelect,
+  onClear,
   disabled = false,
-  searchable = false,
+  error,
+  chevron = "down",
   required = false,
-  error = false,
+  variant = "outline",
+  picker = "sheet",
 }: DropdownFieldProps) {
   const [visible, setVisible] = useState(false);
-  const [search, setSearch] = useState("");
 
   const selected = options.find((option) => option.id === value);
-  const filtered = useMemo(() => {
-    if (!search.trim()) return options;
-    const needle = search.toLowerCase();
-    return options.filter((option) =>
-      option.name.toLowerCase().includes(needle),
-    );
-  }, [options, search]);
+  const surface =
+    variant === "filled"
+      ? "bg-[#F2F2F7] dark:bg-[#3A3A3C]"
+      : "bg-white dark:bg-gray-900";
+  const border = error
+    ? "border border-red-400"
+    : variant === "filled"
+      ? "border border-transparent"
+      : disabled
+        ? "border border-neutral-border dark:border-gray-800"
+        : "border border-gray-200 dark:border-gray-700";
 
   return (
-    <>
+    <View>
       <TouchableOpacity
         onPress={() => !disabled && setVisible(true)}
         disabled={disabled}
-        className={`flex-row items-center justify-between rounded-lg border px-4 py-3 ${
-          error
-            ? "border-red-400 bg-white"
-            : disabled
-              ? "border-neutral-border bg-neutral-background"
-              : "border-neutral-border bg-white"
+        className={`h-14 flex-row items-center justify-end rounded-lg px-4 ${surface} ${border} ${
+          disabled ? "opacity-60" : ""
         }`}
       >
-        <View className="flex-1">
-          <Text className="text-xs text-neutral-text-muted">
-            {label}
-            {required ? <Text className="text-red-500"> *</Text> : null}
-          </Text>
+        <FloatingLabel label={label} active={!!selected} required={required} />
+        {selected ? (
           <Text
-            className={`text-base ${
-              selected ? "text-neutral-text-main" : "text-neutral-text-muted"
-            }`}
+            className="text-base text-gray-900 dark:text-white"
+            style={{ position: "absolute", left: 16, right: 44, top: 24 }}
             numberOfLines={1}
           >
-            {selected?.name || placeholder || `Select ${label}`}
+            {selected.name}
           </Text>
-        </View>
+        ) : null}
         <Ionicons
-          name="chevron-down"
+          name={chevron === "forward" ? "chevron-forward" : "chevron-down"}
           size={20}
           color={disabled ? "#D1D5DB" : Colors.text.muted}
         />
       </TouchableOpacity>
+      {error ? <FieldError message={error} /> : null}
 
-      <Modal
-        visible={visible}
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => setVisible(false)}
-      >
-        <Pressable
-          className="flex-1 justify-end bg-black/50"
-          onPress={() => setVisible(false)}
-        >
-          <Pressable
-            onPress={(event) => event.stopPropagation()}
-            className="max-h-[70%] w-full rounded-t-3xl bg-white pb-8"
-          >
-            <View className="items-center py-4">
-              <View className="h-1.5 w-12 rounded-full bg-gray-300" />
-            </View>
-            <Text className="border-b border-gray-100 px-4 pb-4 text-center text-lg font-bold text-gray-900">
-              {label}
-            </Text>
-
-            {searchable && (
-              <View className="border-b border-gray-100 px-4 py-3">
-                <View className="flex-row items-center rounded-xl bg-gray-100 px-3 py-2">
-                  <Ionicons name="search" size={18} color="#9CA3AF" />
-                  <TextInput
-                    value={search}
-                    onChangeText={setSearch}
-                    placeholder="Search"
-                    placeholderTextColor="#9CA3AF"
-                    className="ml-2 flex-1 py-0 text-base text-gray-900"
-                  />
-                </View>
-              </View>
-            )}
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {filtered.length === 0 ? (
-                <Text className="px-4 py-8 text-center text-sm text-neutral-text-muted">
-                  No options
-                </Text>
-              ) : (
-                filtered.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    onPress={() => {
-                      onSelect(option);
-                      setVisible(false);
-                    }}
-                    activeOpacity={0.7}
-                    className="flex-row items-center justify-between border-b border-gray-100 px-4 py-4"
-                  >
-                    <Text
-                      className={`text-base ${
-                        value === option.id
-                          ? "font-bold text-blue-500"
-                          : "text-gray-900"
-                      }`}
-                    >
-                      {option.name}
-                    </Text>
-                    {value === option.id && (
-                      <Ionicons name="checkmark" size={20} color="#3b82f6" />
-                    )}
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </>
+      {picker === "actions" ? (
+        <ActionSheet
+          visible={visible}
+          options={options}
+          onSelect={(option) => {
+            onSelect(option);
+            setVisible(false);
+          }}
+          onClose={() => setVisible(false)}
+        />
+      ) : (
+        <SelectionSheet
+          visible={visible}
+          title={label}
+          options={options}
+          value={value}
+          onSelect={(option) => {
+            onSelect(option);
+            setVisible(false);
+          }}
+          onClear={
+            onClear
+              ? () => {
+                  onClear();
+                  setVisible(false);
+                }
+              : undefined
+          }
+          onClose={() => setVisible(false)}
+          emptyLabel="No options"
+        />
+      )}
+    </View>
   );
 }
 

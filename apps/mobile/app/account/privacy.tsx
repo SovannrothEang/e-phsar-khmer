@@ -4,7 +4,7 @@ import { fetchMyProfile, updateMyProfile } from "@/lib/api/account";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -69,16 +69,21 @@ export default function PrivacyScreen() {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!query.data) return;
+  // Copy the saved privacy flags into the switches whenever a fresh profile
+  // snapshot arrives. The switches are derived state, so they are adjusted
+  // during render instead of being synced from an effect.
+  const profile = query.data;
+  const [syncedProfile, setSyncedProfile] = useState(profile);
+  if (profile && profile !== syncedProfile) {
+    setSyncedProfile(profile);
     setValues({
-      discoverableByGender: Boolean(query.data.discoverableByGender),
-      discoverableByDateOfBirth: Boolean(query.data.discoverableByDateOfBirth),
-      discoverableByPhone: Boolean(query.data.discoverableByPhone),
-      discoverableByEmail: Boolean(query.data.discoverableByEmail),
-      discoverableByLocation: Boolean(query.data.discoverableByLocation),
+      discoverableByGender: Boolean(profile.discoverableByGender),
+      discoverableByDateOfBirth: Boolean(profile.discoverableByDateOfBirth),
+      discoverableByPhone: Boolean(profile.discoverableByPhone),
+      discoverableByEmail: Boolean(profile.discoverableByEmail),
+      discoverableByLocation: Boolean(profile.discoverableByLocation),
     });
-  }, [query.data]);
+  }
 
   const save = async () => {
     setSaving(true);

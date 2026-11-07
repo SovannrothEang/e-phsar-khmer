@@ -1,4 +1,5 @@
 import BrandGrid from "@/components/category/BrandGrid";
+import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
@@ -11,30 +12,15 @@ import {
   fetchLinkedAttributes,
   fetchSubcategory,
 } from "@/lib/api/catalog";
+import { resolveTypeTiles } from "@/lib/category-types";
 import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 
 type ViewMode = "list" | "grid";
-
-/** The admin-managed attribute sets that act as a "type" tile list. */
-const TYPE_SETS: { set: string; key: string }[] = [
-  { set: "types", key: "type" },
-  { set: "bodytypes", key: "bodyType" },
-  { set: "vehicletypes", key: "vehicleType" },
-  { set: "jobtypes", key: "jobType" },
-  { set: "accessories", key: "accessory" },
-  { set: "networks", key: "network" },
-];
 
 export default function SubCategoryScreen() {
   const params = useLocalSearchParams();
@@ -44,7 +30,9 @@ export default function SubCategoryScreen() {
   const subCategoryId = Array.isArray(params.subCategoryId)
     ? params.subCategoryId[0]
     : params.subCategoryId;
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    params.view === "grid" ? "grid" : "list",
+  );
 
   const subQuery = useQuery({
     queryKey: ["subcategory", categoryId, subCategoryId],
@@ -67,26 +55,11 @@ export default function SubCategoryScreen() {
     enabled: !!subcategory?.id,
   });
 
-  const typeTiles = useMemo(() => {
-    const rows = attributesQuery.data ?? [];
-    const schemaKeys = new Set(
-      (subcategory?.fieldSchema ?? []).map((field) => field.key),
-    );
-    for (const candidate of TYPE_SETS) {
-      if (!schemaKeys.has(candidate.key)) continue;
-      const group = rows.filter((row) => row.type === candidate.set);
-      if (group.length === 0) continue;
-      return {
-        key: candidate.key,
-        rows: group.map((row) => ({
-          id: row.slug,
-          name: row.name,
-          image: row.image,
-        })),
-      };
-    }
-    return null;
-  }, [attributesQuery.data, subcategory?.fieldSchema]);
+  const fieldSchema = subcategory?.fieldSchema;
+  const typeTiles = useMemo(
+    () => resolveTypeTiles(attributesQuery.data ?? [], fieldSchema),
+    [attributesQuery.data, fieldSchema],
+  );
 
   const feedQuery = useMemo(
     () => ({
@@ -156,28 +129,23 @@ export default function SubCategoryScreen() {
 
   return (
     <SafeAreaView statusBarColor="#0EA5E9" statusBarStyle="light-content">
-      <View className="bg-[#0EA5E9] px-4 pb-3 pt-3">
-        <View className="flex-row items-center gap-3">
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={28} color="white" />
-          </TouchableOpacity>
-          <View className="flex-1 flex-row items-center rounded bg-white/20 px-3 py-2">
-            <Ionicons name="search" size={20} color="white" />
-            <TextInput
-              placeholder="Search..."
-              placeholderTextColor="white"
-              className="ml-2 flex-1 text-base text-white"
-              editable={false}
-            />
-          </View>
-          <TouchableOpacity onPress={openFilters}>
-            <Ionicons name="options-outline" size={28} color="white" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CategorySearchHeader
+        placeholder={subName}
+        onSearchPress={() =>
+          router.push({
+            pathname: "/search",
+            params: {
+              categorySlug: categoryId,
+              subcategorySlug: subCategoryId,
+              scopeName: subName,
+            },
+          } as never)
+        }
+        onFiltersPress={openFilters}
+      />
 
       <View className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between px-4 py-4">
+        <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
           <Text className="text-xl font-bold capitalize text-gray-900">
             {subName}
           </Text>
@@ -195,7 +163,7 @@ export default function SubCategoryScreen() {
 
         <FilterChips
           categoryId={categoryId as string}
-          onLocationPress={openFilters}
+          subCategoryId={subCategoryId as string}
           onFiltersPress={openFilters}
         />
 
