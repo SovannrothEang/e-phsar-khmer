@@ -2,13 +2,19 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  INestApplication,
   NotFoundException,
 } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import request from 'supertest';
+import type { App } from 'supertest/types';
 import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { BillingAddressesService } from './billing-addresses.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 jest.mock('bcrypt');
@@ -519,6 +525,72 @@ describe('UsersService updateProfile location validation', () => {
     await service.updateProfile('u1', { company: 'X' });
 
     expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('clears emailVerifiedAt when the address changes', async () => {
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([
+              {
+                ...fakeUser,
+                email: 'old@example.com',
+                emailVerifiedAt: new Date(),
+              },
+            ]),
+        }),
+      }),
+    });
+    let setData: Record<string, unknown> = {};
+    db.update.mockReturnValue({
+      set: (values: Record<string, unknown>) => {
+        setData = values;
+        return {
+          where: () => ({
+            returning: () =>
+              Promise.resolve([{ ...fakeUser, email: 'new@example.com' }]),
+          }),
+        };
+      },
+    });
+
+    await service.updateProfile('u1', { email: 'new@example.com' });
+
+    expect(setData.email).toBe('new@example.com');
+    expect(setData.emailVerifiedAt).toBeNull();
+  });
+
+  it('keeps emailVerifiedAt when the address is unchanged (case-insensitive)', async () => {
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([
+              {
+                ...fakeUser,
+                email: 'old@example.com',
+                emailVerifiedAt: new Date(),
+              },
+            ]),
+        }),
+      }),
+    });
+    let setData: Record<string, unknown> = {};
+    db.update.mockReturnValue({
+      set: (values: Record<string, unknown>) => {
+        setData = values;
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([{ ...fakeUser }]),
+          }),
+        };
+      },
+    });
+
+    await service.updateProfile('u1', { email: 'OLD@example.com' });
+
+    expect(setData).not.toHaveProperty('emailVerifiedAt');
   });
 
   it('accepts districtId that belongs to provided provinceId', async () => {
@@ -1654,6 +1726,8 @@ describe('UsersService self-service account changes', () => {
     it('stores a bcrypt hash of the new password', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$10$newhash');
+      const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+      service = makeService(db, {}, notifications);
       db.select.mockReturnValue({
         from: () => ({
           where: () => ({
@@ -1677,7 +1751,17 @@ describe('UsersService self-service account changes', () => {
 
       expect(bcrypt.hash).toHaveBeenCalledWith('password456', 10);
       expect(sets).toContainEqual(
-        expect.objectContaining({ passwordHash: '$2b$10$newhash' }),
+        expect.objectContaining({
+          passwordHash: '$2b$10$newhash',
+          // Every session and any outstanding reset proof minted before this
+          // change must stop working.
+          tokensValidAfter: expect.any(Date) as unknown as Date,
+        }),
+      );
+      // Same record the reset flow writes, so the owner can see why the other
+      // devices were signed out.
+      expect(notifications.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'security.password_changed' }),
       );
     });
   });
@@ -1937,5 +2021,123 @@ describe('UsersService verified account flag', () => {
 
     expect(me.authProviders).toEqual(['google', 'telegram']);
     expect(db.select).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('UsersService getPublicProfileById', () => {
+  const PROFILE_ID = '18d78b3e-1767-43b5-b4a0-947c2b5f8e1f';
+  const PRIVATE_ROW = {
+    ...fakeUser,
+    id: PROFILE_ID,
+    primaryPhone: '+85512345678',
+    email: 'victim@example.com',
+    role: 'admin' as const,
+    phoneVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  /** 1: the user row, 2-3: follow counts, 4: subscription probe. */
+  function makeProfileDb(rows: Record<string, unknown>[]) {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain(rows);
+      if (call === 4) return chain([{ id: 'sub-1' }]);
+      return chain([{ value: 0 }]);
+    });
+    return db;
+  }
+
+  it("does not expose another user's phone, email, role or moderation state", async () => {
+    const service = makeService(makeProfileDb([PRIVATE_ROW]));
+
+    const profile = await service.getPublicProfileById(PROFILE_ID);
+
+    expect(profile).toEqual({
+      id: PROFILE_ID,
+      username: fakeUser.username,
+      firstName: fakeUser.firstName,
+      lastName: fakeUser.lastName,
+      profilePhotoUrl: fakeUser.profilePhotoUrl,
+      coverPhotoUrl: fakeUser.coverPhotoUrl,
+      isVerified: true,
+      verifiedAccount: true,
+      createdAt: fakeUser.createdAt,
+      followers: 0,
+      following: 0,
+    });
+    for (const key of [
+      'primaryPhone',
+      'email',
+      'role',
+      'status',
+      'phoneVerifiedAt',
+      'emailVerifiedAt',
+      'passwordHash',
+    ]) {
+      expect(profile).not.toHaveProperty(key);
+    }
+  });
+
+  it('reuses the same projection as the username lookup', async () => {
+    const byId = await makeService(
+      makeProfileDb([PRIVATE_ROW]),
+    ).getPublicProfileById(PROFILE_ID);
+    const byUsername = await makeService(
+      makeProfileDb([PRIVATE_ROW]),
+    ).getPublicProfile('sokdara');
+
+    expect(byId).toEqual(byUsername);
+  });
+
+  it('is a 404 for an unknown id, like the username lookup', async () => {
+    const service = makeService(makeProfileDb([]));
+
+    await expect(service.getPublicProfileById(PROFILE_ID)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
+describe('UsersController GET /users/:id', () => {
+  const PROFILE_ID = '18d78b3e-1767-43b5-b4a0-947c2b5f8e1f';
+  const getPublicProfileById = jest.fn();
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [
+        { provide: UsersService, useValue: { getPublicProfileById } },
+        { provide: BillingAddressesService, useValue: {} },
+      ],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    getPublicProfileById.mockReset();
+  });
+
+  it('answers 400, not 500, for a non-UUID id', async () => {
+    await request(app.getHttpServer()).get('/users/not-a-uuid').expect(400);
+
+    expect(getPublicProfileById).not.toHaveBeenCalled();
+  });
+
+  it('serves the public projection instead of the full user row', async () => {
+    getPublicProfileById.mockResolvedValue({ id: PROFILE_ID });
+
+    await request(app.getHttpServer())
+      .get(`/users/${PROFILE_ID}`)
+      .expect(200)
+      .expect({ id: PROFILE_ID });
+
+    expect(getPublicProfileById).toHaveBeenCalledWith(PROFILE_ID);
   });
 });

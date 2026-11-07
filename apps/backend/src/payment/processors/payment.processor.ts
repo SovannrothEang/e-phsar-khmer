@@ -108,7 +108,9 @@ export class PaymentProcessor extends WorkerHost {
    * `attemptsMade < maxAttempts` check below is what distinguishes "will
    * retry" from "BullMQ has given up." Only `process-attempt` jobs carry
    * enough context to act on; a `process-provider-event` job exhausting its
-   * retries is left alone, staying `received` for an operator to investigate. Errors here are logged, not thrown — this runs
+   * retries; a `process-provider-event` job exhausting its retries is
+   * recovered by `ProviderEventRedrive` (re-enqueues up to 3 times), after
+   * which it stays `received` for an operator to investigate. Errors here are logged, not thrown — this runs
    * outside `process()`, so a throw would just be an unhandled rejection.
    */
   @OnWorkerEvent('failed')

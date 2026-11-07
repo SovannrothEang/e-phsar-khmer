@@ -28,7 +28,31 @@ export interface RecordLoginResult {
   isNewDevice: boolean;
   /** The row's revocation epoch; null when nothing was written. */
   sessionId: string | null;
+  /** The row's current refresh generation, for the tokens minted now. */
+  refreshEpoch: number;
 }
+
+/**
+ * Outcome of presenting a refresh token to `rotateRefreshToken`.
+ *
+ * - `rotated`: the presented generation was current; it has been replaced.
+ * - `grace`: it was the generation replaced seconds ago, so a second tab that
+ *   was already refreshing in parallel is let through.
+ * - `reuse`: the generation is older than that — treat the token as stolen.
+ * - `unknown`: no live row for that session (revoked, or never existed).
+ */
+export type RefreshRotation =
+  | { status: 'rotated'; epoch: number }
+  | { status: 'grace'; epoch: number }
+  | { status: 'reuse' }
+  | { status: 'unknown' };
+
+/**
+ * How long a just-replaced refresh generation is still honoured. Two tabs
+ * refreshing at the same moment are the normal case this protects; anything
+ * older is a replay.
+ */
+export const REFRESH_REUSE_GRACE_SECONDS = 30;
 
 /** Which row the caller is on: JWT `sid` first, legacy device id second. */
 export interface CurrentDeviceRef {
@@ -91,7 +115,8 @@ export class LoginDevicesService {
     userId: string,
     device: ClientDeviceInfo | null,
   ): Promise<RecordLoginResult> {
-    if (!device) return { isNewDevice: false, sessionId: null };
+    if (!device)
+      return { isNewDevice: false, sessionId: null, refreshEpoch: 0 };
 
     const suppliedName =
       device.name?.trim().slice(0, DEVICE_NAME_MAX_LENGTH) || null;
@@ -112,7 +137,10 @@ export class LoginDevicesService {
         .onConflictDoNothing({
           target: [userLoginDevices.userId, userLoginDevices.deviceId],
         })
-        .returning({ id: userLoginDevices.id });
+        .returning({
+          id: userLoginDevices.id,
+          refreshEpoch: userLoginDevices.refreshEpoch,
+        });
 
       if (!inserted) {
         // Known device, or a concurrent login won the insert race. Refresh
@@ -132,11 +160,15 @@ export class LoginDevicesService {
               eq(userLoginDevices.deviceId, device.id),
             ),
           )
-          .returning({ sessionId: userLoginDevices.sessionId });
+          .returning({
+            sessionId: userLoginDevices.sessionId,
+            refreshEpoch: userLoginDevices.refreshEpoch,
+          });
 
         return {
           isNewDevice: false,
           sessionId: row?.sessionId ?? null,
+          refreshEpoch: row?.refreshEpoch ?? 0,
         };
       }
 
@@ -157,7 +189,8 @@ export class LoginDevicesService {
         );
       }
 
-      if (firstDevice) return { isNewDevice: false, sessionId };
+      if (firstDevice)
+        return { isNewDevice: false, sessionId, refreshEpoch: 0 };
 
       try {
         await this.notifications.notify({
@@ -179,13 +212,80 @@ export class LoginDevicesService {
         );
       }
 
-      return { isNewDevice: true, sessionId };
+      return { isNewDevice: true, sessionId, refreshEpoch: 0 };
     } catch (err) {
       this.logger.warn(
         `Could not record the login device for user ${userId}: ${this.describeError(err)}`,
       );
-      return { isNewDevice: false, sessionId: null };
+      return { isNewDevice: false, sessionId: null, refreshEpoch: 0 };
     }
+  }
+
+  /**
+   * Advances the refresh generation for `sessionId` and reports what the
+   * presented generation meant.
+   *
+   * The bump is a single conditional UPDATE (`refresh_epoch = <presented>`),
+   * so two callbacks holding the same token cannot both rotate: exactly one
+   * wins, and the loser is either a lost race (`grace`) or a replay (`reuse`).
+   * A replay is answered by revoking the whole family — the point of rotation
+   * is that a stolen token is useless once the real client rotates, and this
+   * is where the stolen copy is detected.
+   */
+  async rotateRefreshToken(
+    userId: string,
+    sessionId: string,
+    presentedEpoch: number,
+  ): Promise<RefreshRotation> {
+    const [rotated] = await this.db
+      .update(userLoginDevices)
+      .set({
+        refreshEpoch: sql`${userLoginDevices.refreshEpoch} + 1`,
+        refreshRotatedAt: new Date(),
+        lastSeenAt: new Date(),
+      })
+      .where(
+        and(
+          eq(userLoginDevices.userId, userId),
+          eq(userLoginDevices.sessionId, sessionId),
+          isNull(userLoginDevices.revokedAt),
+          eq(userLoginDevices.refreshEpoch, presentedEpoch),
+        ),
+      )
+      .returning({ epoch: userLoginDevices.refreshEpoch });
+
+    if (rotated) return { status: 'rotated', epoch: rotated.epoch };
+
+    const [row] = await this.db
+      .select({
+        epoch: userLoginDevices.refreshEpoch,
+        rotatedAt: userLoginDevices.refreshRotatedAt,
+        revokedAt: userLoginDevices.revokedAt,
+      })
+      .from(userLoginDevices)
+      .where(
+        and(
+          eq(userLoginDevices.userId, userId),
+          eq(userLoginDevices.sessionId, sessionId),
+        ),
+      )
+      .limit(1);
+
+    if (!row || row.revokedAt) return { status: 'unknown' };
+
+    const withinGrace =
+      row.rotatedAt !== null &&
+      Date.now() - row.rotatedAt.getTime() <=
+        REFRESH_REUSE_GRACE_SECONDS * 1000;
+
+    if (presentedEpoch === row.epoch - 1 && withinGrace)
+      return { status: 'grace', epoch: row.epoch };
+
+    await this.revokeSession(userId, sessionId);
+    this.logger.warn(
+      `Refresh token reuse detected for user ${userId}; the session was revoked`,
+    );
+    return { status: 'reuse' };
   }
 
   /** Active rows, newest last-seen first. Also touches the current row. */
@@ -366,11 +466,16 @@ export class LoginDevicesService {
   async findSessionByDeviceId(
     userId: string,
     deviceId: string,
-  ): Promise<{ sessionId: string; revokedAt: Date | null } | null> {
+  ): Promise<{
+    sessionId: string;
+    revokedAt: Date | null;
+    refreshEpoch: number;
+  } | null> {
     const [row] = await this.db
       .select({
         sessionId: userLoginDevices.sessionId,
         revokedAt: userLoginDevices.revokedAt,
+        refreshEpoch: userLoginDevices.refreshEpoch,
       })
       .from(userLoginDevices)
       .where(

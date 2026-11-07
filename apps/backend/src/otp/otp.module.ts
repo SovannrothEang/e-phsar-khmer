@@ -6,9 +6,9 @@ import { OtpSmsSender } from './otp-sms-sender';
 
 /**
  * Own phone-OTP service (codes in `phone_otps`, delivered via PlasGate).
- * Used by `AuthService` only when `OTP_PROVIDER=plasgate` (default
- * `supabase`); see the module README. Imports
- * `NotificationsModule` only for the PlasGate client and SMS limiters.
+ * Used by `AuthService` only when `OTP_PROVIDER=plasgate` (the shipped
+ * default); see the module README. Imports `NotificationsModule` only for the
+ * PlasGate client and SMS limiters.
  */
 @Module({
   imports: [NotificationsModule],

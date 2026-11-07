@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   DEFAULT_RETRY_SECONDS,
   formatWait,
+  otpFailureMessage,
   parseOtpFailure,
   parseOtpSent,
 } from "./otp-errors.ts";
@@ -111,5 +112,49 @@ describe("formatWait", () => {
     assert.deepEqual(formatWait(120), { unit: "minutes", value: 2 });
     assert.deepEqual(formatWait(3601), { unit: "minutes", value: 61 });
     assert.deepEqual(formatWait(0), { unit: "seconds", value: 1 });
+  });
+});
+
+describe("otpFailureMessage", () => {
+  it("phrases a cooldown with the wait the API reported", () => {
+    assert.equal(
+      otpFailureMessage({
+        code: "cooldown",
+        retryAfterSeconds: 240,
+      }),
+      "Please wait 240 seconds before requesting another code.",
+    );
+    assert.equal(
+      otpFailureMessage({ code: "cooldown" }),
+      `Please wait ${DEFAULT_RETRY_SECONDS} seconds before requesting another code.`,
+    );
+  });
+
+  it("has a stable sentence for the daily cap and provider faults", () => {
+    assert.match(otpFailureMessage({ code: "daily_cap" }), /today's limit/);
+    assert.match(otpFailureMessage({ code: "send_failed" }), /could not send/);
+    assert.match(
+      otpFailureMessage({ code: "provider_unsupported" }),
+      /unavailable/,
+    );
+    assert.equal(
+      otpFailureMessage({ code: "invalid_credentials" }),
+      "Invalid phone number or password",
+    );
+  });
+
+  it("falls back to the backend message, then the caller's sentence", () => {
+    assert.equal(
+      otpFailureMessage({ code: "unknown", message: "INVALID_PHONE" }),
+      "INVALID_PHONE",
+    );
+    assert.equal(
+      otpFailureMessage({ code: "unknown", error: "raw error" }),
+      "raw error",
+    );
+    assert.equal(
+      otpFailureMessage({ code: "unknown" }, "Login failed."),
+      "Login failed.",
+    );
   });
 });

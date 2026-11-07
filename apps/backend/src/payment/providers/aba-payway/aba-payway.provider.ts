@@ -17,6 +17,7 @@ import {
   signAbaPayway,
   signAbaPaywayPurchase,
   verifyAbaPaywayCallbackSignature,
+  verifyAbaPaywayCallbackSignatureRaw,
 } from './aba-payway.signing';
 import {
   ABA_PAYWAY_API_OK,
@@ -221,9 +222,9 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     }
 
     let payload: Record<string, unknown>;
+    let text: string;
     try {
-      const text =
-        typeof rawBody === 'string' ? rawBody : rawBody.toString('utf-8');
+      text = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf-8');
       const parsed: unknown = JSON.parse(text);
       // Valid JSON but never a callback; `Object.keys(null)` would throw.
       if (
@@ -237,6 +238,13 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     } catch {
       return { valid: false, reason: 'Malformed JSON body' };
     }
+
+    // The raw body is what ABA signed, so verify that first: re-encoding a
+    // parsed payload turns 1.50 into 1.5 and \u00e9 into é, which would reject
+    // a genuine paid callback. The re-encoded form stays as a second attempt
+    // for a sender whose canonical form differs from its wire form.
+    if (verifyAbaPaywayCallbackSignatureRaw(text, this.apiKey(), received))
+      return { valid: true };
 
     return verifyAbaPaywayCallbackSignature(payload, this.apiKey(), received)
       ? { valid: true }

@@ -81,15 +81,22 @@ export default function Notifications() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
+  // The queue pages share these keys, so a reviewer on either surface sees the
+  // same rows. Polling (not a push) because an admin report is not a
+  // notification row — nothing emits an event this bell could subscribe to.
+  // `refetchIntervalInBackground` stays at its default false, so a hidden tab
+  // stops asking.
   const { data: userReports, isLoading: loadingUserReports } = useQuery({
     queryKey: ["admin", "reports", "users"],
     queryFn: getUserReports,
     retry: false,
+    refetchInterval: 60_000,
   });
   const { data: listingReports, isLoading: loadingListingReports } = useQuery({
     queryKey: ["admin", "reports", "listings"],
     queryFn: getListingReports,
     retry: false,
+    refetchInterval: 60_000,
   });
 
   const isLoading = loadingUserReports || loadingListingReports;

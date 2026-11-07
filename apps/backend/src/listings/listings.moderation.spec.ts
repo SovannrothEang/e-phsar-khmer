@@ -35,14 +35,19 @@ function makeService(db: DbMock, entitlements = makeEntitlements()) {
   const productsService = {
     getPublishedRefByModelId: jest.fn().mockResolvedValue(null),
   };
+  const notifications = {
+    notifyStaff: jest.fn().mockResolvedValue(undefined),
+    removeForListing: jest.fn().mockResolvedValue({ deleted: 0 }),
+  };
   const service = new ListingsService(
     db as never,
     {} as never,
     reactionsService as never,
     entitlements as never,
     productsService as never,
+    notifications as never,
   );
-  return { service, entitlements };
+  return { service, entitlements, notifications };
 }
 
 /** A select chain that resolves at `.limit()`. */
@@ -176,7 +181,7 @@ describe('ListingsService.publish from inactive', () => {
   });
 
   it('reactivates free while the window is open, keeping the expiry', async () => {
-    const { service, entitlements } = makeService(db);
+    const { service, entitlements, notifications } = makeService(db);
     const existing = listingRow({ status: 'inactive' });
     jest.spyOn(service, 'findById').mockResolvedValue(existing as never);
     const capture: Capture = {};
@@ -204,10 +209,16 @@ describe('ListingsService.publish from inactive', () => {
     expect(capture.values).not.toHaveProperty('expiresAt');
     expect(capture.values).not.toHaveProperty('renewCount');
     expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+    // Republishing clears the staff-hide notice that is now false.
+    expect(notifications.removeForListing).toHaveBeenCalledWith(
+      'l1',
+      ['listing.inactivated', 'listing.removed'],
+      'u1',
+    );
   });
 
   it('renews a lapsed inactive ad like any expired ad', async () => {
-    const { service, entitlements } = makeService(db);
+    const { service, entitlements, notifications } = makeService(db);
     const past = new Date(Date.now() - 40 * 86_400_000);
     const existing = listingRow({
       status: 'inactive',
@@ -236,6 +247,12 @@ describe('ListingsService.publish from inactive', () => {
       inactiveById: null,
       inactiveReason: null,
     });
+    // The staff-hide notice is stale on this path too.
+    expect(notifications.removeForListing).toHaveBeenCalledWith(
+      'l1',
+      ['listing.inactivated', 'listing.removed'],
+      'u1',
+    );
   });
 
   it('a permanently removed ad is still refused', async () => {
@@ -299,7 +316,7 @@ describe('ListingsService staff restore', () => {
   });
 
   it('restoreInactive brings the ad back live and clears the hide', async () => {
-    const { service, entitlements } = makeService(db);
+    const { service, entitlements, notifications } = makeService(db);
     const existing = listingRow({ status: 'inactive' });
     db.select.mockReturnValue(selectLimit([existing]));
     const capture: Capture = {};
@@ -316,6 +333,48 @@ describe('ListingsService staff restore', () => {
       inactiveReason: null,
     });
     expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+    expect(notifications.removeForListing).toHaveBeenCalledWith(
+      'l1',
+      ['listing.inactivated'],
+      'u1',
+    );
+  });
+
+  it('restoreModerated clears the removal notice', async () => {
+    const { service, notifications } = makeService(db);
+    const existing = listingRow({
+      status: 'deleted',
+      moderatedAt: new Date(),
+    });
+    db.select.mockReturnValue(selectLimit([existing]));
+    db.update.mockReturnValue(
+      updateReturning([{ ...existing, status: 'active' }]),
+    );
+
+    await service.restoreModerated('l1');
+
+    expect(notifications.removeForListing).toHaveBeenCalledWith(
+      'l1',
+      ['listing.removed'],
+      'u1',
+    );
+  });
+
+  it('still restores the ad when clearing the stale notice fails', async () => {
+    const { service, notifications } = makeService(db);
+    const existing = listingRow({
+      status: 'deleted',
+      moderatedAt: new Date(),
+    });
+    db.select.mockReturnValue(selectLimit([existing]));
+    db.update.mockReturnValue(
+      updateReturning([{ ...existing, status: 'active' }]),
+    );
+    notifications.removeForListing.mockRejectedValue(new Error('db down'));
+
+    await expect(service.restoreModerated('l1')).resolves.toMatchObject({
+      status: 'active',
+    });
   });
 
   it('restoreInactive lands a live legacy row as active, not draft', async () => {

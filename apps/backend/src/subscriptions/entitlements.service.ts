@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -13,6 +14,8 @@ import {
 } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
+import { NotificationsService } from '../notifications/notifications.service';
+import { quotedTitle } from '../notifications/notice-title';
 import { listings } from '../db/schema/listings.schema';
 import {
   categories,
@@ -90,6 +93,9 @@ export interface FreePlanView extends FreePlanSettings {
 
 const LIMIT_KEYS = ['photos', 'ads', 'renews', 'autoRenews', 'videos'] as const;
 
+/** Users reconciled per keyset page inside one sweep run. */
+const SWEEP_PAGE_SIZE = 200;
+
 /** A number from the purchase's offer snapshot, else the live package value. */
 function limitValue(
   snapshot: Record<string, unknown> | null,
@@ -122,7 +128,10 @@ interface Context {
 export class EntitlementsService {
   private readonly logger = new Logger(EntitlementsService.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /** Free-plan numbers and group scopes. Small tables, read whole. */
   async loadConfig(): Promise<AllowanceConfig> {
@@ -685,6 +694,24 @@ export class EntitlementsService {
         )
         .returning({ id: listings.id });
       restored = rows.length;
+
+      // The ad is visible again, so its "hidden while over the limit" notice
+      // is now wrong. Best-effort: reconcile's counts are the caller's
+      // contract. A failed delete leaves a stale row — it is logged, not
+      // retried, because the ad is no longer in `toRestore` on the next pass.
+      for (const row of rows) {
+        try {
+          await this.notifications.removeForListing(
+            row.id,
+            ['listing.restricted'],
+            userId,
+          );
+        } catch (err) {
+          this.logger.warn(
+            `Could not clear the restriction notice for listing ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
     }
     if (toRestrict.length > 0) {
       const rows = await this.db
@@ -697,8 +724,32 @@ export class EntitlementsService {
             eq(listings.status, 'active'),
           ),
         )
-        .returning({ id: listings.id });
+        .returning({ id: listings.id, title: listings.title });
       restricted = rows.length;
+
+      // The status guard above is the dedupe: each ad crosses active →
+      // restricted once, so one notice per transition needs no prior query.
+      // A failed send is logged and not retried — the transition will not
+      // recur, so the owner may miss the reason (outbox follow-up).
+      for (const row of rows) {
+        try {
+          await this.notifications.notify({
+            userId,
+            type: 'listing.restricted',
+            title: `Your ad ${quotedTitle(row.title)} is hidden while your plan is over its limit`,
+            body: 'It has not been deleted. Renew or upgrade your subscription and it will reappear automatically.',
+            data: {
+              listingId: row.id,
+              listingTitle: row.title,
+              action: 'restricted',
+            },
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Could not send the restriction notice for listing ${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
     }
     return { restricted, restored };
   }
@@ -718,7 +769,13 @@ export class EntitlementsService {
    * Periodic sweep, and the follow-up to an admin edit of a group's scope or
    * the free plan: every user holding restricted ads (maybe renewed), or more
    * live ads than the smallest allowance anywhere (maybe lapsed or moved).
-   * Returns how many users it looked at.
+   *
+   * Pages the candidate users by `userId` inside one run, so memory stays
+   * bounded no matter how many accounts there are. The cursor is local to the
+   * run on purpose: a process that restarts simply starts from the beginning,
+   * which re-checks the first page rather than skipping the rest — the earlier
+   * cross-run cursor did the opposite on a scale-to-zero host.
+   * Returns how many users this run reconciled.
    */
   async reconcileAll(): Promise<number> {
     const config = await this.loadConfig();
@@ -733,17 +790,38 @@ export class EntitlementsService {
       ...config.categoryCaps.values(),
       smallestPackage?.ads ?? config.free.otherAds,
     );
-    const candidates = await this.db
-      .select({ userId: listings.userId })
-      .from(listings)
-      .where(inArray(listings.status, ['active', 'restricted']))
-      .groupBy(listings.userId)
-      .having(
-        sql`count(*) filter (where ${listings.status} = 'restricted') > 0 or count(*) > ${floor}`,
-      );
-    for (const { userId } of candidates) {
-      await this.reconcileListingsSafely(userId);
+
+    let reconciled = 0;
+    let afterUserId: string | null = null;
+    // The keyset strictly advances on `user_id`, so this terminates when the
+    // candidate set is exhausted. No page cap: a cap would restart at the
+    // beginning on the next run and never reach the tail.
+    for (;;) {
+      const candidates = await this.db
+        .select({ userId: listings.userId })
+        .from(listings)
+        .where(
+          and(
+            inArray(listings.status, ['active', 'restricted']),
+            afterUserId ? gt(listings.userId, afterUserId) : undefined,
+          ),
+        )
+        .groupBy(listings.userId)
+        .having(
+          sql`count(*) filter (where ${listings.status} = 'restricted') > 0 or count(*) > ${floor}`,
+        )
+        .orderBy(asc(listings.userId))
+        .limit(SWEEP_PAGE_SIZE);
+
+      for (const { userId } of candidates) {
+        await this.reconcileListingsSafely(userId);
+        reconciled++;
+      }
+
+      if (candidates.length < SWEEP_PAGE_SIZE) break;
+      afterUserId = candidates[candidates.length - 1].userId;
     }
-    return candidates.length;
+
+    return reconciled;
   }
 }

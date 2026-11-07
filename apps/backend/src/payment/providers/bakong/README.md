@@ -120,7 +120,8 @@ something to look at.
   costs at most one sweep interval, never a payment.
 - **`PaymentReconciler`** (`../../reconciler/payment-reconciler.service.ts`)
   reads every unresolved attempt for `PAYMENT_RECONCILE_PROVIDERS` (default
-  `bakong`) straight from Postgres and settles through one idempotent path
+  `bakong,aba_payway`; ABA is the lost/late-callback recovery path) straight
+  from Postgres and settles through one idempotent path
   (`settleReconciledAttempt`). Pacing comes from `nextTickDelayMs`:
 
   | State seen by the last pass                    | Next pass in                                             |
@@ -149,6 +150,19 @@ something to look at.
   waiting no longer than 4 s. The response still comes from the database; it
   re-reads only if the check resolved something. On a serverless instance this
   is also what keeps the check running while a payer is on the page.
+- **External wake-up (serverless).** `POST /internal/payments/reconcile` runs one
+  `runOnce` pass for a caller holding `INTERNAL_RECONCILE_SECRET` in
+  `x-internal-secret` (constant-time compare; the route answers 503 when the
+  secret is unset, so it can never run unauthenticated). A 1–5 minute pinger or
+  cron is the cheapest way to keep a paid QR from waiting for the next request
+  that boots an instance; the pass is the same idempotent one the timer runs,
+  and overlapping calls share a single in-flight pass. **Trade-off:** a pinger
+  that fires every minute keeps an instance warm most of the day, so it
+  replaces rather than removes the idle-instance cost — an always-on worker
+  (option b in the plan) is the alternative if that matters more than the
+  price. On a **cold** instance the first pass also includes the 50-row
+  recoverable tail, so a 1-minute pinger pays up to ~150 serial provider calls
+  per wake-up; dedupe removes duplicate sweeps, not that cold-start cost.
 - **Legacy drain.** `PaymentPollOutboxHandler` and the `poll-attempt` job
   branch in `PaymentProcessor` are now no-ops that mark old
   `payment.attempt.poll_requested` rows / delayed jobs finished. They exist
@@ -254,7 +268,8 @@ Key properties this gives us:
 
 Polling cadence is not configured here. It belongs to the payment module's
 `PAYMENT_RECONCILE_*` variables — `PAYMENT_RECONCILER_ENABLED`,
-`PAYMENT_RECONCILE_PROVIDERS` (default `bakong`),
+`PAYMENT_RECONCILE_PROVIDERS` (default `bakong,aba_payway` — ABA is polled
+too, as the recovery path for a lost or late callback),
 `PAYMENT_RECONCILE_INTERVAL_MS` (15 s) and
 `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (60 s) — plus
 `PAYMENT_PENDING_ABANDON_MS` (15 min age backstop) and
@@ -331,8 +346,8 @@ failure points are independent and it's worth checking both when Bakong
   if Bakong refuses to pay an expired dynamic KHQR — not verified (`Plans.md`
   Task 1.3).
 - **ABA checkouts also arm the reconciler.** `payment.issued` is emitted for
-  any `pending` charge; for a webhook-only provider the pass finds no polled
-  candidates and goes back to sleep. Harmless, one cheap pass per checkout.
+  any `pending` charge; ABA is in the poll set too (recovery for a lost/late
+  callback), so a pass can ask ABA about its unresolved attempts as well.
 - **Deeplink generation isn't wired.** `bakong-khqr` can turn a KHQR string
   into an app-openable shortlink (`BakongKHQR.generateDeepLink`), which
   would be the natural value for `ChargeResult.redirectUrl` (the field

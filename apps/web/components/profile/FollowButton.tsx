@@ -11,7 +11,12 @@ import { followUser, unfollowUser } from "@/actions/follows";
 interface FollowButtonProps {
   /** The user being followed. */
   userId: string;
-  /** Server-rendered state — authoritative until the first click. */
+  /**
+   * The state this control starts from. On the profile page it is rendered by
+   * the server; on the listing detail page it is the answer the browser
+   * fetched after mount (`FollowSlot`), so the button is only mounted once
+   * that answer is known. Authoritative until the first click.
+   */
   initialFollowing: boolean;
   /** The signed-in viewer, or null/undefined when anonymous. */
   viewerId?: string | null;

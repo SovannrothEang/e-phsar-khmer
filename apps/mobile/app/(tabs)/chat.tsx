@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -33,7 +34,8 @@ import {
   View,
 } from "react-native";
 
-const POLL_MS = 3000;
+const POLL_BASE_MS = 3000;
+const POLL_MAX_MS = 30000;
 
 interface ActiveThread {
   id: string;
@@ -301,47 +303,80 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!thread || !engine) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
+    let active = AppState.currentState === "active";
+    // Narrowed once here: the inner functions are hoisted, so TypeScript no
+    // longer keeps the `if (!thread || !engine) return` narrowing inside them.
+    const threadId = thread.id;
+    const ready = engine;
 
-    const poll = async () => {
+    // 3s while healthy, doubling to 30s after consecutive failures, and no
+    // timer at all while the app is backgrounded. The old flat 3s interval
+    // kept a failed phone hammering the API (and burning battery) forever.
+    function schedule() {
+      if (cancelled || !active || timer) return;
+      const delay = Math.min(POLL_BASE_MS * 2 ** failures, POLL_MAX_MS);
+      timer = setTimeout(() => void poll(), delay);
+    }
+
+    async function poll() {
+      if (cancelled || !active) return;
+      timer = null;
       try {
         if (!latestCursor) {
-          const page = await fetchChatMessages(thread.id, { limit: 30 });
+          const page = await fetchChatMessages(threadId, { limit: 30 });
           const ordered = [...page.items].reverse();
           if (cancelled) return;
           setMessages((current) => (current.length === 0 ? ordered : current));
-          const outcomes = await decryptAndStore(engine, ordered);
-          await markChatRead(thread.id);
+          const outcomes = await decryptAndStore(ready, ordered);
+          await markChatRead(threadId);
           setLatestCursor(page.meta.latestCursor);
           setPeerLastReadAt(page.meta.peerLastReadAt);
           setThreadLoading(false);
           await retryWithBackup(ordered, outcomes);
-          return;
+        } else {
+          const page = await fetchChatMessages(threadId, {
+            after: latestCursor,
+            limit: 50,
+          });
+          if (cancelled) return;
+          if (page.items.length > 0) {
+            setMessages((current) => mergeMessages(current, page.items));
+            await decryptAndStore(ready, page.items);
+            await markChatRead(threadId);
+            setTimeout(
+              () => scrollRef.current?.scrollToEnd({ animated: true }),
+              80,
+            );
+          }
+          setLatestCursor(page.meta.latestCursor ?? latestCursor);
+          setPeerLastReadAt(page.meta.peerLastReadAt);
         }
-        const page = await fetchChatMessages(thread.id, {
-          after: latestCursor,
-          limit: 50,
-        });
-        if (cancelled) return;
-        if (page.items.length > 0) {
-          setMessages((current) => mergeMessages(current, page.items));
-          await decryptAndStore(engine, page.items);
-          await markChatRead(thread.id);
-          setTimeout(
-            () => scrollRef.current?.scrollToEnd({ animated: true }),
-            80,
-          );
-        }
-        setLatestCursor(page.meta.latestCursor ?? latestCursor);
-        setPeerLastReadAt(page.meta.peerLastReadAt);
+        failures = 0;
       } catch {
-        /* transient poll failure — the next tick retries */
+        failures += 1;
       }
-    };
+      schedule();
+    }
 
-    const timer = setInterval(() => void poll(), POLL_MS);
+    const subscription = AppState.addEventListener("change", (state) => {
+      const nextActive = state === "active";
+      if (nextActive === active) return;
+      active = nextActive;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      // Back in the foreground: fetch now instead of waiting out the backoff.
+      if (active) void poll();
+    });
+
+    schedule();
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
+      subscription.remove();
     };
   }, [thread, engine, latestCursor, decryptAndStore, retryWithBackup]);
 

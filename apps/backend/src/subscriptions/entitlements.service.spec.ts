@@ -1,6 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { EntitlementsService } from './entitlements.service';
 import { DEFAULT_FREE_PLAN } from './entitlements.constants';
+import type { NotificationPayload } from '../notifications/notification-channel.interface';
 
 // A drizzle-style query builder: every call chains, awaiting resolves `rows`.
 function query(rows: unknown[]) {
@@ -38,7 +39,7 @@ interface Setup {
  * Selects are issued in a fixed order: free settings, group scopes, free caps,
  * held subscriptions, then the call's own rows (live ads or renewal rows).
  */
-function makeService(setup: Setup, withLive = false) {
+function makeService(setup: Setup, withLive = false, calls = 1) {
   const select = jest.fn();
   const batches = [
     setup.settings ?? [],
@@ -47,22 +48,36 @@ function makeService(setup: Setup, withLive = false) {
     setup.held ?? [],
     ...(withLive ? [setup.live ?? []] : []),
   ];
-  for (const rows of batches) select.mockReturnValueOnce(query(rows));
+  for (let i = 0; i < calls; i++) {
+    for (const rows of batches) select.mockReturnValueOnce(query(rows));
+  }
   const returning = jest.fn().mockResolvedValue([]);
   const where = jest.fn<{ returning: typeof returning }, [unknown?]>(() => ({
     returning,
   }));
   const set = jest.fn(() => ({ where }));
   const update = jest.fn(() => ({ set }));
-  const service = new EntitlementsService({ select, update } as never);
-  return { service, update, set, where, returning, select };
+  const notifications = {
+    notify: jest.fn<Promise<void>, [NotificationPayload]>(),
+    removeForListing: jest.fn<
+      Promise<{ deleted: number }>,
+      [string, string[], string?]
+    >(),
+  };
+  notifications.notify.mockResolvedValue(undefined);
+  notifications.removeForListing.mockResolvedValue({ deleted: 0 });
+  const service = new EntitlementsService(
+    { select, update } as never,
+    notifications as never,
+  );
+  return { service, update, set, where, returning, select, notifications };
 }
 
 /** Explicit select batches, for `view()` whose read order is longer. */
 function makeServiceWith(batches: unknown[][]) {
   const select = jest.fn();
   for (const rows of batches) select.mockReturnValueOnce(query(rows));
-  return new EntitlementsService({ select } as never);
+  return new EntitlementsService({ select } as never, {} as never);
 }
 
 const future = new Date(Date.now() + 10 * 24 * 3600 * 1000);
@@ -297,7 +312,7 @@ describe('EntitlementsService.reconcileListings', () => {
       { caps, live },
       true,
     );
-    returning.mockResolvedValueOnce([{ id: 'c' }]);
+    returning.mockResolvedValueOnce([{ id: 'c', title: 'Old car' }]);
     const result = await service.reconcileListings('u1');
     expect(result).toEqual({ restricted: 1, restored: 0 });
     expect(update).toHaveBeenCalledTimes(1);
@@ -358,6 +373,99 @@ describe('EntitlementsService.reconcileListings', () => {
     await service.reconcileListings('u1');
     expect(update).not.toHaveBeenCalled();
   });
+
+  it('notifies the owner once for each ad it restricts', async () => {
+    // Newest → oldest; the first 2 stay, `c` is pushed over the cap.
+    const live = ['a', 'b', 'c'].map((id) => ({
+      id,
+      status: 'active',
+      ...cars,
+    }));
+    const { service, returning, notifications } = makeService(
+      { caps, live },
+      true,
+    );
+    returning.mockResolvedValueOnce([{ id: 'c', title: 'Old car' }]);
+
+    const result = await service.reconcileListings('u1');
+
+    expect(result).toEqual({ restricted: 1, restored: 0 });
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+    const [notice] = notifications.notify.mock.calls[0];
+    expect(notice.userId).toBe('u1');
+    expect(notice.type).toBe('listing.restricted');
+    expect(notice.title).toContain('is hidden while your plan is over');
+    expect(notice.title).toContain('Old car');
+    expect(notice.body).toContain('not been deleted');
+    expect(notice.data).toEqual({
+      listingId: 'c',
+      listingTitle: 'Old car',
+      action: 'restricted',
+    });
+  });
+
+  it('clears the restriction notice when an ad is restored, and sends none', async () => {
+    const live = [
+      { id: 'a', status: 'active', ...cars },
+      { id: 'b', status: 'active', ...cars },
+      { id: 'c', status: 'restricted', ...cars },
+    ];
+    const { service, returning, notifications } = makeService(
+      { scopes, caps, held: [autoSub], live },
+      true,
+    );
+    returning.mockResolvedValueOnce([{ id: 'c' }]);
+
+    const result = await service.reconcileListings('u1');
+
+    expect(result).toEqual({ restricted: 0, restored: 1 });
+    expect(notifications.removeForListing).toHaveBeenCalledWith(
+      'c',
+      ['listing.restricted'],
+      'u1',
+    );
+    expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing on a second reconcile that changes no status', async () => {
+    const live = ['a', 'b', 'c'].map((id) => ({
+      id,
+      status: 'active',
+      ...cars,
+    }));
+    const { service, returning, notifications } = makeService(
+      { caps, live },
+      true,
+      2,
+    );
+    returning
+      .mockResolvedValueOnce([{ id: 'c', title: 'Old car' }])
+      .mockResolvedValueOnce([]);
+
+    await service.reconcileListings('u1');
+    await service.reconcileListings('u1');
+
+    expect(notifications.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('still returns its counts when the notice fails', async () => {
+    const live = ['a', 'b', 'c'].map((id) => ({
+      id,
+      status: 'active',
+      ...cars,
+    }));
+    const { service, returning, notifications } = makeService(
+      { caps, live },
+      true,
+    );
+    returning.mockResolvedValueOnce([{ id: 'c', title: 'Old car' }]);
+    notifications.notify.mockRejectedValue(new Error('channel down'));
+
+    await expect(service.reconcileListings('u1')).resolves.toEqual({
+      restricted: 1,
+      restored: 0,
+    });
+  });
 });
 
 describe('EntitlementsService.freePlan', () => {
@@ -385,7 +493,7 @@ describe('EntitlementsService.freePlan', () => {
       [{ id: 'foods', name: 'Foods' }],
     ];
     for (const r of rows) select.mockReturnValueOnce(query(r));
-    const service = new EntitlementsService({ select } as never);
+    const service = new EntitlementsService({ select } as never, {} as never);
 
     const plan = await service.freePlan();
     expect(plan).toMatchObject({ photos: 8, renews: 5, otherAds: 5 });
@@ -394,5 +502,90 @@ describe('EntitlementsService.freePlan', () => {
       { key: 'sub:rent', name: 'vehicles-for-rent', ads: 2 },
       { key: 'cat:foods', name: 'Foods', ads: 50 },
     ]);
+  });
+});
+
+describe('EntitlementsService.reconcileAll', () => {
+  /**
+   * One select batch per run: loadConfig (settings, scopes, caps), the package
+   * minimum, then the candidate query whose `where`/`limit` are recorded.
+   */
+  function setup(pages: { userId: string }[][]) {
+    const select = jest.fn();
+    const wheres: unknown[] = [];
+    const limits: number[] = [];
+    for (const page of pages) {
+      select
+        .mockReturnValueOnce(query(settings))
+        .mockReturnValueOnce(query([]))
+        .mockReturnValueOnce(query(caps))
+        .mockReturnValueOnce(query([{ ads: 1 }]));
+      const candidates = query(page) as Record<string, jest.Mock>;
+      candidates.where = jest.fn((condition: unknown) => {
+        wheres.push(condition);
+        return candidates;
+      });
+      candidates.limit = jest.fn((n: number) => {
+        limits.push(n);
+        return candidates;
+      });
+      select.mockReturnValueOnce(candidates);
+    }
+    const service = new EntitlementsService({ select } as never, {} as never);
+    const reconciled = jest
+      .spyOn(service, 'reconcileListingsSafely')
+      .mockResolvedValue(undefined);
+    return { service, reconciled, wheres, limits };
+  }
+
+  it('reconciles every candidate user in one run', async () => {
+    const { service, reconciled, limits } = setup([
+      [{ userId: 'u001' }, { userId: 'u002' }],
+    ]);
+
+    await expect(service.reconcileAll()).resolves.toBe(2);
+
+    expect(reconciled).toHaveBeenCalledTimes(2);
+    expect(reconciled).toHaveBeenNthCalledWith(1, 'u001');
+    expect(reconciled).toHaveBeenNthCalledWith(2, 'u002');
+    // Plan 5.2 restored paging: a short page ends the run after one keyset page.
+    expect(limits).toEqual([200]);
+  });
+
+  it('walks a full page into the next keyset page instead of loading every user', async () => {
+    const select = jest
+      .fn()
+      .mockReturnValueOnce(query(settings))
+      .mockReturnValueOnce(query([]))
+      .mockReturnValueOnce(query(caps))
+      .mockReturnValueOnce(query([{ ads: 1 }]));
+    const fullPage = Array.from({ length: 200 }, (_, i) => ({
+      userId: `u${String(i).padStart(3, '0')}`,
+    }));
+    const first = query(fullPage) as Record<string, jest.Mock>;
+    const second = query([{ userId: 'z999' }]) as Record<string, jest.Mock>;
+    const limits: number[] = [];
+    const ordered: unknown[] = [];
+    for (const page of [first, second]) {
+      page.limit = jest.fn((n: number) => {
+        limits.push(n);
+        return page;
+      });
+      page.orderBy = jest.fn((...args: unknown[]) => {
+        ordered.push(args);
+        return page;
+      });
+    }
+    select.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    const service = new EntitlementsService({ select } as never, {} as never);
+    const reconciled = jest
+      .spyOn(service, 'reconcileListingsSafely')
+      .mockResolvedValue(undefined);
+
+    await expect(service.reconcileAll()).resolves.toBe(201);
+    expect(limits).toEqual([200, 200]);
+    expect(ordered).toHaveLength(2);
+    expect(reconciled).toHaveBeenCalledTimes(201);
   });
 });

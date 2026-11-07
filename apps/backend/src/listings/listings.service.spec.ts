@@ -8,6 +8,7 @@ import { ListingsService } from './listings.service';
 import { FilesService } from '../files/files.service';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { trendingEventScoreSql } from './trending';
+import type { NotificationPayload } from '../notifications/notification-channel.interface';
 
 function makeDb() {
   return {
@@ -29,12 +30,17 @@ function makeService(db: ReturnType<typeof makeDb>) {
     assertPublishedModel: jest.fn().mockResolvedValue(undefined),
     getPublishedRefByModelId: jest.fn().mockResolvedValue(null),
   };
+  const notifications = {
+    notifyStaff: jest.fn().mockResolvedValue(undefined),
+    removeForListing: jest.fn().mockResolvedValue({ deleted: 0 }),
+  };
   return new ListingsService(
     db as never,
     filesService as never,
     reactionsService as never,
     {} as never,
     productsService as never,
+    notifications as never,
   );
 }
 
@@ -871,6 +877,7 @@ describe('ListingsService plan enforcement', () => {
       {} as never,
       entitlements as never,
       {} as never,
+      {} as never,
     );
     jest.spyOn(service, 'findById').mockResolvedValue({
       userId: 'u1',
@@ -968,6 +975,7 @@ describe('ListingsService photo ownership', () => {
         real.isOwnedPath(path, userId),
       publicUrlFor: url,
     } as never,
+    {} as never,
     {} as never,
     {} as never,
     {} as never,
@@ -1332,6 +1340,10 @@ describe('ListingsService product spec attachment', () => {
       { countLikes: jest.fn().mockResolvedValue(0) } as never,
       entitlements as never,
       products as never,
+      {
+        notifyStaff: jest.fn().mockResolvedValue(undefined),
+        removeForListing: jest.fn().mockResolvedValue({ deleted: 0 }),
+      } as never,
     );
     return { db, service, products, entitlements };
   }
@@ -1504,6 +1516,7 @@ describe('ListingsService plan-aware create', () => {
       {} as never,
       entitlements as never,
       {} as never,
+      {} as never,
     );
 
     await expect(
@@ -1520,7 +1533,9 @@ describe('ListingsService plan-aware create', () => {
 
 describe('ListingsService update rules', () => {
   function setup(existing: Record<string, unknown> = {}) {
-    const returning = jest.fn().mockResolvedValue([{ id: 'l1' }]);
+    const returning = jest
+      .fn()
+      .mockResolvedValue([{ id: 'l1', title: 'A motorcycle' }]);
     const set = jest.fn(() => ({ where: () => ({ returning }) }));
     const tx = {
       update: () => ({ set }),
@@ -1552,16 +1567,30 @@ describe('ListingsService update rules', () => {
       isOwnedPath: () => true,
       publicUrlFor: (path: string) => path,
     };
+    const notifications = {
+      notifyStaff: jest.fn<
+        Promise<void>,
+        [Omit<NotificationPayload, 'userId'>]
+      >(),
+      removeForListing: jest.fn<
+        Promise<{ deleted: number }>,
+        [string, string[], string?]
+      >(),
+    };
+    notifications.notifyStaff.mockResolvedValue(undefined);
+    notifications.removeForListing.mockResolvedValue({ deleted: 0 });
     const service = new ListingsService(
       db as never,
       files as never,
       {} as never,
       entitlements as never,
       products as never,
+      notifications as never,
     );
     jest.spyOn(service, 'findById').mockResolvedValue({
       id: 'l1',
       userId: 'u1',
+      title: 'A motorcycle',
       categoryId: 'cat-1',
       subcategoryId: 'sub-1',
       status: 'active',
@@ -1575,7 +1604,7 @@ describe('ListingsService update rules', () => {
       moderatedAt: null,
       ...existing,
     } as never);
-    return { service, db, entitlements, products, set };
+    return { service, db, entitlements, products, set, notifications };
   }
 
   function mockCategoryPair(
@@ -1833,6 +1862,61 @@ describe('ListingsService update rules', () => {
       expect(updates).not.toHaveProperty(key);
     }
   });
+
+  it('signals staff when a published ad is edited', async () => {
+    const { service, notifications } = setup();
+
+    await service.update('u1', 'l1', { title: 'new title' } as never);
+
+    // The owner gets no notice of their own edit; staff get the audit signal.
+    const [payload] = notifications.notifyStaff.mock.calls[0];
+    expect(payload.type).toBe('listing.edited');
+    expect(payload.title).toBe('Listing edited after publication');
+    expect(payload.body).toBeTruthy();
+    expect(payload.data).toEqual({
+      listingId: 'l1',
+      listingTitle: 'A motorcycle',
+      ownerId: 'u1',
+      action: 'edited',
+    });
+  });
+
+  it('keeps a draft edit silent', async () => {
+    const { service, notifications } = setup({
+      status: 'draft',
+      publishedAt: null,
+      expiresAt: null,
+    });
+
+    await service.update('u1', 'l1', { title: 'new title' } as never);
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('keeps a non-content toggle silent', async () => {
+    const { service, notifications } = setup();
+
+    await service.update('u1', 'l1', { deliveryFree: false } as never);
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('keeps an edit of a withdrawn ad silent', async () => {
+    const { service, notifications } = setup({ status: 'deleted' });
+
+    await service.update('u1', 'l1', { title: 'new title' } as never);
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('does not fail the update when the staff signal fails', async () => {
+    const { service, notifications } = setup();
+    notifications.notifyStaff.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      service.update('u1', 'l1', { title: 'new title' } as never),
+    ).resolves.toMatchObject({ id: 'l1' });
+  });
 });
 
 describe('ListingsService.findMineById', () => {
@@ -1840,6 +1924,7 @@ describe('ListingsService.findMineById', () => {
     const db = makeDb();
     const service = new ListingsService(
       db as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

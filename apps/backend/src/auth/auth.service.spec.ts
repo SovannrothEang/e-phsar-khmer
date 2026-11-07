@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   HttpException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -7,10 +8,19 @@ import * as bcrypt from 'bcrypt';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { AuthService } from './auth.service';
+import { LoginLockoutService } from './login-lockout.service';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import type { UserRow } from '../db/schema/users.schema';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('bcrypt');
+
+/** Fixed `iat` for a reset proof, so a test can place `tokensValidAfter` around it. */
+const RESET_IAT_SECONDS = 1_700_000_000;
+
+/** Render a Drizzle condition so a test can pin the SQL bound itself. */
+const compileWhere = (where: unknown) =>
+  new PgDialect().sqlToQuery(where as never);
 
 function makeUser(overrides: Partial<UserRow> = {}): UserRow {
   return {
@@ -83,11 +93,16 @@ function makeConfigService(values: Record<string, string> = {}) {
 
 function makeLoginDevices() {
   return {
-    recordLogin: jest
-      .fn()
-      .mockResolvedValue({ isNewDevice: false, sessionId: null }),
+    recordLogin: jest.fn().mockResolvedValue({
+      isNewDevice: false,
+      sessionId: null,
+      refreshEpoch: 0,
+    }),
     findSessionByDeviceId: jest.fn().mockResolvedValue(null),
     touchActiveSession: jest.fn().mockResolvedValue(true),
+    rotateRefreshToken: jest
+      .fn()
+      .mockResolvedValue({ status: 'rotated', epoch: 1 }),
   };
 }
 
@@ -102,6 +117,7 @@ function makeOtpService() {
 function makeOtpSender() {
   return {
     issueAndSend: jest.fn(),
+    isConfigured: jest.fn().mockReturnValue(true),
     issueAndSendDetached: jest.fn().mockResolvedValue({
       result: { status: 'sent', retryAfterSeconds: 300 },
       delivery: Promise.resolve(),
@@ -117,6 +133,94 @@ function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
   };
 }
 
+/**
+ * In-memory stand-in for the handful of Redis commands `LoginLockoutService`
+ * issues. Expiry is evaluated against `clock`, so a test can age a lock
+ * without touching timers.
+ */
+class FakeLockoutRedis {
+  private readonly entries = new Map<
+    string,
+    { value: number; expiresAt: number | null }
+  >();
+  clock = 1_700_000_000_000;
+
+  advance(ms: number): void {
+    this.clock += ms;
+  }
+
+  incr(key: string): Promise<number> {
+    const entry = this.live(key);
+    const value = (entry?.value ?? 0) + 1;
+    this.entries.set(key, { value, expiresAt: entry?.expiresAt ?? null });
+    return Promise.resolve(value);
+  }
+
+  expire(key: string, seconds: number): Promise<number> {
+    const entry = this.live(key);
+    if (!entry) return Promise.resolve(0);
+    entry.expiresAt = this.clock + seconds * 1000;
+    return Promise.resolve(1);
+  }
+
+  pttl(key: string): Promise<number> {
+    const entry = this.live(key);
+    if (!entry) return Promise.resolve(-2);
+    return Promise.resolve(
+      entry.expiresAt === null ? -1 : entry.expiresAt - this.clock,
+    );
+  }
+
+  set(key: string, value: string, _mode: 'EX', seconds: number): Promise<'OK'> {
+    this.entries.set(key, {
+      value: Number(value),
+      expiresAt: this.clock + seconds * 1000,
+    });
+    return Promise.resolve('OK');
+  }
+
+  del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) {
+      if (this.entries.delete(key)) removed++;
+    }
+    return Promise.resolve(removed);
+  }
+
+  private live(
+    key: string,
+  ): { value: number; expiresAt: number | null } | null {
+    const entry = this.entries.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt !== null && entry.expiresAt <= this.clock) {
+      this.entries.delete(key);
+      return null;
+    }
+    return entry;
+  }
+}
+
+function makeLockout(redis = new FakeLockoutRedis()) {
+  return new LoginLockoutService(
+    redis as never,
+    {
+      get: () => 'test',
+    } as never,
+  );
+}
+
+/**
+ * Stand-in for `SocialStateService`. Defaults to "this flow is live", so the
+ * pre-existing callback tests keep exercising what they were written for; a
+ * test that cares about the gate overrides `consume`.
+ */
+function makeSocialState(accept = true) {
+  return {
+    issue: jest.fn().mockResolvedValue('s'.repeat(32)),
+    consume: jest.fn().mockResolvedValue(accept),
+  };
+}
+
 function makeService(
   db: ReturnType<typeof makeDb>,
   jwtService: ReturnType<typeof makeJwtService>,
@@ -124,6 +228,8 @@ function makeService(
   loginDevices = makeLoginDevices(),
   supabaseService = makeSupabase(),
   notifications = makeNotifications(),
+  loginLockout = makeLockout(),
+  socialState = makeSocialState(),
 ) {
   return new AuthService(
     db as never,
@@ -134,6 +240,8 @@ function makeService(
     makeOtpService() as never,
     makeOtpSender() as never,
     notifications as never,
+    loginLockout as never,
+    socialState as never,
   );
 }
 
@@ -185,6 +293,8 @@ describe('AuthService', () => {
         sub: 'user-uuid',
         role: 'user',
         sid: 'session-1',
+        // Generation 0 for a fresh session; every refresh bumps it.
+        gen: 0,
       });
     });
   });
@@ -290,6 +400,180 @@ describe('AuthService', () => {
   });
 });
 
+describe('AuthService per-account lockout', () => {
+  function makeUserLookup(user: UserRow | null) {
+    const db = makeDb();
+    db.select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve(user ? [user] : []),
+        }),
+      }),
+    });
+    return db;
+  }
+
+  async function failLogin(
+    service: AuthService,
+    identifier: string,
+  ): Promise<unknown> {
+    try {
+      await service.loginWithPassword({ identifier, password: 'wrong-pass' });
+      throw new Error('expected the login to fail');
+    } catch (err) {
+      return err;
+    }
+  }
+
+  it('locks the identifier after five failures with a 429 and retryAfterSeconds', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    const db = makeUserLookup(makeUser());
+    const redis = new FakeLockoutRedis();
+    const lockout = makeLockout(redis);
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      lockout,
+    );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await expect(
+        service.loginWithPassword({
+          // Mixed case on purpose: the lockout key is normalized.
+          identifier: attempt % 2 === 0 ? 'SokDara' : 'sokdara',
+          password: 'wrong-pass',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+
+    const locked = await failLogin(service, 'sokdara');
+    expect(locked).toBeInstanceOf(HttpException);
+    const exception = locked as HttpException;
+    expect(exception.getStatus()).toBe(429);
+    expect(exception.getResponse()).toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      retryAfterSeconds: 60,
+    });
+
+    // The lock is enforced BEFORE any credential work: no bcrypt call for the
+    // rejected attempt.
+    const compareCalls = (bcrypt.compare as jest.Mock).mock.calls.length;
+    await failLogin(service, 'SOKDARA');
+    expect((bcrypt.compare as jest.Mock).mock.calls.length).toBe(compareCalls);
+
+    // The lock expires on its own.
+    redis.advance(60_000);
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    await expect(
+      service.loginWithPassword({ identifier: 'sokdara', password: 'wrong' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('does not lock a different identifier', async () => {
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    const db = makeUserLookup(makeUser());
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await failLogin(service, 'victim');
+    }
+    await expect(failLogin(service, 'victim')).resolves.toBeInstanceOf(
+      HttpException,
+    );
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    await expect(
+      service.loginWithPassword({ identifier: 'bystander', password: 'pass' }),
+    ).resolves.toMatchObject({ accessToken: 'signed-token' });
+  });
+
+  it('resets the counter after a successful login', async () => {
+    const db = makeUserLookup(makeUser());
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await failLogin(service, 'testuser');
+    }
+
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    await service.loginWithPassword({
+      identifier: 'testuser',
+      password: 'pass',
+    });
+
+    // Four more failures would be the ninth inside the window: with the reset
+    // they are counted from zero, so no lock yet.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'wrong',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+  });
+
+  it('gives unknown identifiers the same lockout shape as real accounts', async () => {
+    const known = makeService(
+      makeUserLookup(makeUser()),
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+    const unknown = makeService(
+      makeUserLookup(null),
+      makeJwtService(),
+      makeConfigService(),
+      makeLoginDevices(),
+      makeSupabase(),
+      makeNotifications(),
+      makeLockout(),
+    );
+    (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await failLogin(known, 'testuser');
+      await failLogin(unknown, 'ghost');
+    }
+
+    const knownError = (await failLogin(known, 'testuser')) as HttpException;
+    const unknownError = (await failLogin(unknown, 'ghost')) as HttpException;
+
+    expect(knownError.getStatus()).toBe(429);
+    expect(unknownError.getStatus()).toBe(429);
+    expect(unknownError.getResponse()).toEqual(knownError.getResponse());
+    expect(unknownError.getResponse()).toMatchObject({
+      code: 'ACCOUNT_LOCKED',
+      retryAfterSeconds: 60,
+    });
+  });
+});
+
 describe('AuthService refresh', () => {
   const SID = '00000000-0000-4000-8000-000000000001';
 
@@ -315,7 +599,33 @@ describe('AuthService refresh', () => {
     return { service, jwtService, loginDevices };
   }
 
-  it('reissues tokens with the same sid and touches the row', async () => {
+  it('rotates the generation and reissues tokens with the same sid', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+
+    await service.refresh({ refreshToken: 'token' });
+
+    expect(loginDevices.rotateRefreshToken).toHaveBeenCalledWith(
+      'user-uuid',
+      SID,
+      1,
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toEqual({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+  });
+
+  it('treats a refresh token with no generation as the first one', async () => {
     const { service, jwtService, loginDevices } = makeRefreshService();
     jwtService.verifyAsync.mockResolvedValue({
       sub: 'user-uuid',
@@ -325,17 +635,47 @@ describe('AuthService refresh', () => {
 
     await service.refresh({ refreshToken: 'token' });
 
-    expect(loginDevices.touchActiveSession).toHaveBeenCalledWith(
+    expect(loginDevices.rotateRefreshToken).toHaveBeenCalledWith(
       'user-uuid',
       SID,
+      0,
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const firstCallPayload = jwtService.sign.mock.calls[0][0];
-    expect(firstCallPayload).toEqual({
+  });
+
+  it('rejects a replayed refresh token and keeps no session alive', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
       sub: 'user-uuid',
       role: 'user',
       sid: SID,
+      gen: 1,
     });
+    loginDevices.rotateRefreshToken.mockResolvedValue({ status: 'reuse' });
+
+    await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+      'Refresh token reused',
+    );
+    expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('reissues at the winning generation when a parallel refresh lost the race', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 'user-uuid',
+      role: 'user',
+      sid: SID,
+      gen: 1,
+    });
+    loginDevices.rotateRefreshToken.mockResolvedValue({
+      status: 'grace',
+      epoch: 2,
+    });
+
+    await service.refresh({ refreshToken: 'token' });
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const firstCallPayload = jwtService.sign.mock.calls[0][0];
+    expect(firstCallPayload).toMatchObject({ sid: SID, gen: 2 });
   });
 
   it('rejects a sid whose device row was revoked', async () => {
@@ -345,12 +685,30 @@ describe('AuthService refresh', () => {
       role: 'user',
       sid: SID,
     });
-    loginDevices.touchActiveSession.mockResolvedValue(false);
+    loginDevices.rotateRefreshToken.mockResolvedValue({ status: 'unknown' });
 
     await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
       'Session revoked',
     );
     expect(jwtService.sign).not.toHaveBeenCalled();
+  });
+
+  it('rejects a negative or fractional generation before querying', async () => {
+    const { service, jwtService, loginDevices } = makeRefreshService();
+
+    for (const gen of [-1, 1.5]) {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-uuid',
+        role: 'user',
+        sid: SID,
+        gen,
+      });
+
+      await expect(service.refresh({ refreshToken: 'token' })).rejects.toThrow(
+        'Invalid session',
+      );
+    }
+    expect(loginDevices.rotateRefreshToken).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed sid before querying', async () => {
@@ -395,7 +753,6 @@ describe('AuthService refresh', () => {
     const firstCallPayload = jwtService.sign.mock.calls[0][0];
     expect(firstCallPayload).toMatchObject({ sid: SID });
   });
-
   it('rejects a legacy token whose known device row was revoked', async () => {
     const { service, jwtService, loginDevices } = makeRefreshService();
     jwtService.verifyAsync.mockResolvedValue({
@@ -463,6 +820,8 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       makeOtpService() as never,
       makeOtpSender() as never,
       notifications as never,
+      makeLockout() as never,
+      makeSocialState() as never,
     );
   }
 
@@ -1172,11 +1531,13 @@ describe('AuthService social login', () => {
         values: jest.fn(() => chain),
         onConflictDoUpdate: jest.fn(() => chain),
         onConflictDoNothing: jest.fn(() => chain),
-        returning: jest
-          .fn()
-          .mockResolvedValue([
-            opts.createdUser ?? makeUser({ email: 'new@example.com' }),
-          ]),
+        returning: jest.fn().mockResolvedValue([
+          opts.createdUser ??
+            makeUser({
+              email: 'new@example.com',
+              emailVerifiedAt: new Date(),
+            }),
+        ]),
       };
       return chain;
     });
@@ -1237,6 +1598,7 @@ describe('AuthService social login', () => {
   const googleDto = {
     provider: 'google' as const,
     accessToken: 'supabase-access-token',
+    state: 's'.repeat(32),
   };
 
   it('forwards the redirectTo to Supabase when the origin is allowed', async () => {
@@ -1311,6 +1673,52 @@ describe('AuthService social login', () => {
     await expect(service.getSocialAuthUrl('github')).rejects.toThrow(
       'UNSUPPORTED_PROVIDER',
     );
+  });
+
+  it('returns the minted state beside the authorize URL', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const socialState = makeSocialState();
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService({ frontendOrigins: ['http://localhost:3001'] }),
+      undefined,
+      supabase,
+      undefined,
+      undefined,
+      socialState,
+    );
+
+    const result = await service.getSocialAuthUrl(
+      'google',
+      'http://localhost:3001/en/auth/callback/google',
+    );
+
+    expect(socialState.issue).toHaveBeenCalledWith('google');
+    expect(result).toEqual({
+      url: 'https://supabase.example/auth/v1/authorize?provider=google',
+      state: 's'.repeat(32),
+    });
+  });
+
+  it('rejects a callback whose state was never minted here', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+      undefined,
+      undefined,
+      makeSocialState(false),
+    );
+
+    await expect(service.handleSocialCallback(googleDto)).rejects.toThrow(
+      'INVALID_OAUTH_STATE',
+    );
+    // The provider call is never reached: an unproven flow costs no lookups.
+    expect(supabase.getUser).not.toHaveBeenCalled();
   });
 
   it('rejects a token whose identity does not match the claimed provider', async () => {
@@ -1415,7 +1823,10 @@ describe('AuthService social login', () => {
     const supabase = makeSocialSupabase(
       makeSocialUser({ email: 'Staff@Example.com' }),
     );
-    const existing = makeUser({ email: 'staff@example.com' });
+    const existing = makeUser({
+      email: 'staff@example.com',
+      emailVerifiedAt: new Date('2026-01-01T00:00:00Z'),
+    });
     const db = makeSocialDb({ providerUser: null, emailUser: existing });
     const service = makeService(
       db,
@@ -1429,6 +1840,101 @@ describe('AuthService social login', () => {
 
     expect(result.user.id).toBe(existing.id);
     // The email match wins; only the provider link is inserted.
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('user mode refuses to link an account whose local email is unverified', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    // An attacker can write any email through PATCH /users/me: this row holds
+    // the victim's address but never proved it.
+    const unverified = makeUser({
+      email: 'staff@example.com',
+      emailVerifiedAt: null,
+    });
+    const db = makeSocialDb({ providerUser: null, emailUser: unverified });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const thrown = await service
+      .handleSocialCallback(googleDto)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    const response = (thrown as ConflictException).getResponse() as {
+      code: string;
+      message: string;
+    };
+    expect(response.code).toBe('EMAIL_LINK_REQUIRED');
+    expect(response.message).toContain('link this provider from Settings');
+    // Neither the provider link nor a second user row is written.
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('stamps a brand-new social account email as verified', async () => {
+    const supabase = makeSocialSupabase(
+      makeSocialUser({ email: 'new@example.com' }),
+    );
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: null,
+      createdUser: makeUser({
+        id: 'created-user',
+        email: 'new@example.com',
+        emailVerifiedAt: new Date(),
+      }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await service.handleSocialCallback(googleDto);
+
+    // The row insert (index 0) carries the stamp; the provider link is the
+    // second insert and must not touch it.
+    const values = (db.insert.mock.results[0].value as { values: jest.Mock })
+      .values;
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'new@example.com',
+        emailVerifiedAt: expect.any(Date) as unknown as Date,
+      }),
+    );
+  });
+
+  it('refuses when a concurrent first login owns the email unverified', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: null, // the SELECT missed it; the upsert finds it
+      createdUser: makeUser({
+        id: 'unverified-owner',
+        email: 'staff@example.com',
+        emailVerifiedAt: null,
+      }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const thrown = await service
+      .handleSocialCallback(googleDto)
+      .catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    // Only the user upsert ran; no provider link was written.
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
@@ -1455,7 +1961,11 @@ describe('AuthService social login', () => {
 
   it('user mode creates an account when no link or email matched', async () => {
     const supabase = makeSocialSupabase(makeSocialUser());
-    const created = makeUser({ email: 'staff@example.com' });
+    const created = makeUser({
+      email: 'staff@example.com',
+      // A new social row is stamped verified from the provider's confirmed email.
+      emailVerifiedAt: new Date(),
+    });
     const db = makeSocialDb({
       providerUser: null,
       emailUser: null,
@@ -1861,6 +2371,7 @@ describe('AuthService password reset', () => {
       (otp.service ?? makeOtpService()) as never,
       (otp.sender ?? makeOtpSender()) as never,
       notifications as never,
+      makeLockout() as never,
     );
   }
 
@@ -1888,14 +2399,25 @@ describe('AuthService password reset', () => {
   function mockTransaction(
     db: ReturnType<typeof makeDb>,
     returnedRows: { id: string }[],
+    tokensValidAfter: Date | null = null,
   ) {
-    const capture: { set?: Record<string, unknown> } = {};
+    const capture: { set?: Record<string, unknown>; where?: unknown } = {};
     const tx = {
+      select: jest.fn(() => ({
+        from: () => ({
+          where: () => ({
+            limit: () => Promise.resolve([{ tokensValidAfter }]),
+          }),
+        }),
+      })),
       update: jest.fn(() => ({
         set: (values: Record<string, unknown>) => {
           capture.set = values;
           return {
-            where: () => ({ returning: () => Promise.resolve(returnedRows) }),
+            where: (where: unknown) => {
+              capture.where = where;
+              return { returning: () => Promise.resolve(returnedRows) };
+            },
           };
         },
       })),
@@ -2052,6 +2574,7 @@ describe('AuthService password reset', () => {
       jwt.verifyAsync.mockResolvedValue({
         sub: userId,
         typ: 'password_reset',
+        iat: RESET_IAT_SECONDS,
       });
       return jwt;
     }
@@ -2159,6 +2682,84 @@ describe('AuthService password reset', () => {
 
       expect(loginDevices.revokeAll).not.toHaveBeenCalled();
     });
+
+    it('refuses a proof that a later password change already spent', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const db = makeDb();
+      mockTransaction(
+        db,
+        [{ id: 'user-uuid' }],
+        new Date((RESET_IAT_SECONDS + 1) * 1000),
+      );
+      const loginDevices = { ...makeLoginDevices(), revokeAll: jest.fn() };
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        loginDevices,
+        makeValidJwt(),
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(loginDevices.revokeAll).not.toHaveBeenCalled();
+    });
+
+    it('accepts a proof minted after the last password change', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hash');
+      const db = makeDb();
+      const { capture } = mockTransaction(
+        db,
+        [{ id: 'user-uuid' }],
+        new Date((RESET_IAT_SECONDS - 60) * 1000),
+      );
+      const service = makeResetService(
+        db,
+        makeResetSupabase(),
+        undefined,
+        makeValidJwt(),
+      );
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).resolves.toEqual({ reset: true });
+
+      // The pre-read alone is not the guarantee: the UPDATE must carry the same
+      // bound so a concurrent second confirm loses at the database.
+      const { sql } = compileWhere(capture.where);
+      expect(sql).toContain('tokens_valid_after');
+      // Pin the `is null` ARM, not just any `is null` (deleted_at has one too):
+      // without it a first-time reset compares NULL and would 401 for everyone.
+      expect(sql).toMatch(/tokens_valid_after" is null/);
+      expect(sql).toMatch(/<=/);
+    });
+
+    it('refuses a proof with no issued-at claim', async () => {
+      const db = makeDb();
+      const jwt = makeJwtService();
+      jwt.verifyAsync.mockResolvedValue({
+        sub: 'user-uuid',
+        typ: 'password_reset',
+      });
+      const service = makeResetService(db, makeResetSupabase(), undefined, jwt);
+
+      await expect(
+        service.confirmPasswordReset({
+          resetToken: 'reset-token',
+          newPassword: 'newpass123',
+        }),
+      ).rejects.toThrow('INVALID_RESET_TOKEN');
+
+      expect(bcrypt.hash).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('plasgate provider', () => {
@@ -2240,6 +2841,51 @@ describe('AuthService password reset', () => {
       await expect(
         service.requestPasswordReset({ identifier: 'sokdara' }),
       ).resolves.toEqual({ otpSent: true });
+    });
+
+    it('answers the same 503 for known and unknown identifiers when the sender is unconfigured', async () => {
+      const { supabase, otpService, otpSender } = providerReset();
+      otpSender.isConfigured.mockReturnValue(false);
+
+      const knownDb = makeDb();
+      mockLookups(knownDb, [makeUser({ primaryPhone: PHONE })]);
+      const known = makeResetService(
+        knownDb,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      const unknownDb = makeDb();
+      mockLookups(unknownDb, []);
+      const unknown = makeResetService(
+        unknownDb,
+        supabase,
+        undefined,
+        makeJwtService(),
+        makeNotifications(),
+        { provider: 'plasgate', service: otpService, sender: otpSender },
+      );
+
+      const settle = async (service: ReturnType<typeof makeResetService>) => {
+        try {
+          await service.requestPasswordReset({ identifier: 'sokdara' });
+          return null;
+        } catch (err) {
+          return err as ServiceUnavailableException;
+        }
+      };
+
+      const knownResult = await settle(known);
+      const unknownResult = await settle(unknown);
+
+      expect(knownResult).toBeInstanceOf(ServiceUnavailableException);
+      expect(knownResult?.getStatus()).toBe(503);
+      expect(knownResult?.getResponse()).toEqual(unknownResult?.getResponse());
+      expect(otpSender.issueAndSendDetached).not.toHaveBeenCalled();
+      expect(supabase.signInWithOtp).not.toHaveBeenCalled();
     });
 
     it('verifies the code through OtpService and mints the reset proof', async () => {
@@ -2345,6 +2991,7 @@ describe('AuthService phone OTP (provider switch)', () => {
       otpService as never,
       otpSender as never,
       { notify: jest.fn() } as never,
+      makeLockout() as never,
     );
     return { db, service, otpService, otpSender, supabase };
   }

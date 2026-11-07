@@ -85,6 +85,24 @@ function categoryFor(type: string): NotificationCategory {
   return "security";
 }
 
+/**
+ * The signed-in user's own ads, where a removed/inactive ad is still visible.
+ * `?tab=all` because the screen defaults to the `active` tab, which would hide
+ * exactly the ad the notice is about.
+ */
+const MY_ADS_ROUTE = "/account/my-ads?tab=all";
+
+/**
+ * A public product page 404s once the ad is gone, so the notices that mean
+ * "this ad is no longer public" must land on My Ads instead. The countdown
+ * notices still point at the (still public) ad.
+ */
+const MY_ADS_NOTICE_TYPES = [
+  "listing.removed",
+  "listing.inactivated",
+  "listing.restricted",
+];
+
 function actionFor(
   type: string,
   data: Record<string, unknown>,
@@ -94,6 +112,9 @@ function actionFor(
 
   if (type.startsWith("follow.") && username) {
     return { actionText: "View Profile", actionRoute: `/user/${username}` };
+  }
+  if (MY_ADS_NOTICE_TYPES.includes(type)) {
+    return { actionText: "View My Ads", actionRoute: MY_ADS_ROUTE };
   }
   if (type.startsWith("listing.") && listingId) {
     return { actionText: "View Ad", actionRoute: `/product/${listingId}` };

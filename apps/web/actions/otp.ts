@@ -7,6 +7,11 @@ import type { DeviceIdentity } from "@/lib/device";
 import { setUserDeviceId, setUserSession } from "@/lib/auth/session";
 import { redirect as i18nRedirect } from "@/i18n/routing";
 import { getLocale } from "next-intl/server";
+import {
+  parseOtpFailure,
+  parseOtpSent,
+  type OtpErrorCode,
+} from "@/lib/otp-errors";
 
 interface OtpVerifyResponse {
   accessToken: string;
@@ -23,62 +28,74 @@ interface Envelope<T> {
   error?: { code?: string; message?: string };
 }
 
+/** Result of any OTP-send endpoint (request, resend). */
+export type OtpSendActionResult =
+  | { success: true; retryAfterSeconds: number }
+  | {
+      success: false;
+      /** Raw backend message when it has one; map `code` for the rest. */
+      error?: string;
+      code: OtpErrorCode;
+      /** Present for a cooldown/429 — drive the countdown from it. */
+      retryAfterSeconds?: number;
+    };
+
+/**
+ * Shared reader for every send-shaped endpoint: success carries the API's own
+ * wait, failures carry a stable code (lib/otp-errors.ts) plus whatever wait
+ * the body or the `Retry-After` header reported.
+ */
+async function parseSendResponse(res: Response): Promise<OtpSendActionResult> {
+  const body = await res.json().catch(() => null);
+  if (res.ok) {
+    const sent = parseOtpSent(body);
+    if (sent) {
+      return { success: true, retryAfterSeconds: sent.retryAfterSeconds };
+    }
+  }
+  const failure = parseOtpFailure(
+    res.status,
+    body,
+    res.headers.get("retry-after"),
+  );
+  return {
+    success: false,
+    code: failure.code,
+    ...(failure.message !== undefined ? { error: failure.message } : {}),
+    ...(failure.retryAfterSeconds !== undefined
+      ? { retryAfterSeconds: failure.retryAfterSeconds }
+      : {}),
+  };
+}
+
 /** Ask the backend to re-send the OTP to `phone` (E.164). */
-export async function requestOtp(
-  phone: string,
-): Promise<{ success: boolean; error?: string }> {
+export async function requestOtp(phone: string): Promise<OtpSendActionResult> {
   const res = await fetch(`${API_URL}/auth/otp/request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone }),
     cache: "no-store",
   });
-  const body = (await res.json().catch(() => null)) as Envelope<{
-    otpSent: boolean;
-  }> | null;
-
-  if (!res.ok || !body?.success) {
-    return {
-      success: false,
-      error: body?.error?.message ?? "Failed to send code",
-    };
-  }
-
-  return { success: true };
+  return parseSendResponse(res);
 }
 
 /**
  * Login step 1: validate phone + password; the backend sends the OTP only
- * after the password checks out.
+ * after the password checks out. Same send-shaped answer as `requestOtp`, so
+ * the countdown and the cooldown/daily-cap copy come from the API, not from a
+ * hard-coded 60 s.
  */
 export async function requestLoginOtp(
   phone: string,
   password: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<OtpSendActionResult> {
   const res = await fetch(`${API_URL}/auth/otp/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone, password }),
     cache: "no-store",
   });
-  const body = (await res.json().catch(() => null)) as Envelope<{
-    otpSent: boolean;
-  }> | null;
-
-  if (!res.ok || !body?.success) {
-    // Same contract as actions/login.ts: the domain string rides in `message`,
-    // while `code` is only the HTTP status name.
-    const code = body?.error?.message ?? body?.error?.code;
-    return {
-      success: false,
-      error:
-        code === "INVALID_CREDENTIALS"
-          ? "Invalid phone number or password"
-          : (body?.error?.message ?? "Failed to send code"),
-    };
-  }
-
-  return { success: true };
+  return parseSendResponse(res);
 }
 
 /** Verify the 6-digit OTP; on success the user session cookies are set. */

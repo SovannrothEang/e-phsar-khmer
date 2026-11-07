@@ -1,4 +1,33 @@
 {
+  "ForgotPassword": {
+    "title": "Forgot Password / Account",
+    "description": "Enter the phone number you registered on PhsarKhmer and we will send a code to set a new password.",
+    "phoneLabel": "Phone Number",
+    "phonePlaceholder": "+85512345678",
+    "phoneHint": "The number must be in international format, e.g. +85512345678.",
+    "invalidPhone": "Please enter a valid phone number, e.g. +85512345678.",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "sentTo": "We sent a code to {phone}.",
+    "codeDescription": "Enter the code below together with your new password.",
+    "codeLabel": "Verification code",
+    "newPasswordLabel": "New password",
+    "newPasswordHint": "At least 8 characters.",
+    "reset": "Reset password",
+    "resetting": "Resetting…",
+    "resendIn": "Resend in {seconds}s",
+    "resend": "Resend code",
+    "useDifferentNumber": "Use a different number",
+    "cooldown": "Please wait {seconds} seconds before trying again.",
+    "dailyCap": "You have reached today's limit for codes. Try again tomorrow.",
+    "sendFailed": "We could not send the code. Please try again.",
+    "providerUnsupported": "Password reset is not available right now. Please try again later.",
+    "invalidCode": "That code is not valid or has expired.",
+    "passwordRule": "The password must be at least 8 characters.",
+    "errorTitle": "Password reset failed!",
+    "unknownError": "Something went wrong. Please try again.",
+    "success": "Your password has been reset. Please sign in."
+  },
   "HomePage": {
     "welcome": {
       "title": "Welcome to PhsarKhmer, the biggest online market in Cambodia."

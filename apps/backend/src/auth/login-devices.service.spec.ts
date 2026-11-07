@@ -82,6 +82,7 @@ describe('LoginDevicesService', () => {
       await expect(service.recordLogin('user-1', null)).resolves.toEqual({
         isNewDevice: false,
         sessionId: null,
+        refreshEpoch: 0,
       });
 
       expect(db.insert).not.toHaveBeenCalled();
@@ -105,7 +106,11 @@ describe('LoginDevicesService', () => {
           id: 'device-12345678',
           name: 'Chrome on Linux',
         }),
-      ).resolves.toEqual({ isNewDevice: false, sessionId: 'sid-1' });
+      ).resolves.toEqual({
+        isNewDevice: false,
+        sessionId: 'sid-1',
+        refreshEpoch: 0,
+      });
 
       expect(setData).toMatchObject({
         lastSeenAt: expect.any(Date) as unknown as Date,
@@ -252,7 +257,11 @@ describe('LoginDevicesService', () => {
           id: 'device-12345678',
           name: 'Chrome on Linux',
         }),
-      ).resolves.toEqual({ isNewDevice: false, sessionId: null });
+      ).resolves.toEqual({
+        isNewDevice: false,
+        sessionId: null,
+        refreshEpoch: 0,
+      });
     });
 
     it('falls back to "Unknown device" for a blank name', async () => {
@@ -487,6 +496,107 @@ describe('LoginDevicesService', () => {
       await expect(service.revokeSession('user-1', 'sid-1')).resolves.toEqual({
         revoked: 0,
       });
+    });
+  });
+
+  describe('rotateRefreshToken', () => {
+    const SID = '00000000-0000-4000-8000-000000000001';
+
+    it('bumps the generation when the presented one is current', async () => {
+      const { db, service } = makeService();
+      let setData: Row = {};
+      db.update.mockReturnValue(
+        updateChain([{ epoch: 2 }], (d) => (setData = d)),
+      );
+
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 1),
+      ).resolves.toEqual({ status: 'rotated', epoch: 2 });
+
+      // lastSeenAt is refreshed here rather than by a separate heartbeat call:
+      // the conditional UPDATE is the only write this path may make.
+      expect(setData).toMatchObject({
+        refreshRotatedAt: expect.any(Date) as unknown as Date,
+        lastSeenAt: expect.any(Date) as unknown as Date,
+      });
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('lets a just-replaced generation through inside the grace window', async () => {
+      const { db, service } = makeService();
+      db.update.mockReturnValueOnce(updateChain([]));
+      db.select.mockReturnValue(
+        selectChain([{ epoch: 2, rotatedAt: new Date(), revokedAt: null }]),
+      );
+
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 1),
+      ).resolves.toEqual({ status: 'grace', epoch: 2 });
+
+      // No second write: the winner's bump stands, and the caller reissues at
+      // the current generation instead of revoking a live session.
+      expect(db.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('revokes the whole family when an older generation comes back', async () => {
+      const { db, service } = makeService();
+      db.update
+        .mockReturnValueOnce(updateChain([]))
+        .mockReturnValueOnce(updateChain([{ id: 'row-1' }]));
+      db.select.mockReturnValue(
+        selectChain([
+          {
+            epoch: 5,
+            rotatedAt: new Date(Date.now() - 120_000),
+            revokedAt: null,
+          },
+        ]),
+      );
+
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 1),
+      ).resolves.toEqual({ status: 'reuse' });
+
+      // The second UPDATE is the revoke: a stolen token is worthless once the
+      // real client has rotated past it.
+      expect(db.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a replay outside the grace window as reuse even one generation back', async () => {
+      const { db, service } = makeService();
+      db.update
+        .mockReturnValueOnce(updateChain([]))
+        .mockReturnValueOnce(updateChain([{ id: 'row-1' }]));
+      db.select.mockReturnValue(
+        selectChain([
+          {
+            epoch: 2,
+            rotatedAt: new Date(Date.now() - 31_000),
+            revokedAt: null,
+          },
+        ]),
+      );
+
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 1),
+      ).resolves.toEqual({ status: 'reuse' });
+    });
+
+    it('reports unknown for a session with no row or a revoked one', async () => {
+      const { db, service } = makeService();
+      db.update.mockReturnValueOnce(updateChain([]));
+      db.select.mockReturnValueOnce(selectChain([]));
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 0),
+      ).resolves.toEqual({ status: 'unknown' });
+
+      db.update.mockReturnValueOnce(updateChain([]));
+      db.select.mockReturnValueOnce(
+        selectChain([{ epoch: 1, rotatedAt: null, revokedAt: new Date() }]),
+      );
+      await expect(
+        service.rotateRefreshToken('user-1', SID, 1),
+      ).resolves.toEqual({ status: 'unknown' });
     });
   });
 

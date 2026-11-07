@@ -5,16 +5,21 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LoginDevicesService } from './login-devices.service';
+import { LoginLockoutService } from './login-lockout.service';
+import { SocialStateService } from './social-state.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
+import { ThrottlerStorageModule } from '../common/throttler/throttler-storage.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { SupabaseStrategy } from './strategies/supabase.strategy';
 
 @Module({
   imports: [
     PassportModule,
     NotificationsModule,
     OtpModule,
+    // Shares the throttler's single dedicated Redis connection with the
+    // account lockout instead of opening another one.
+    ThrottlerStorageModule,
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -23,7 +28,13 @@ import { SupabaseStrategy } from './strategies/supabase.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LoginDevicesService, JwtStrategy, SupabaseStrategy],
+  providers: [
+    AuthService,
+    LoginDevicesService,
+    LoginLockoutService,
+    SocialStateService,
+    JwtStrategy,
+  ],
   exports: [AuthService, LoginDevicesService, JwtModule],
 })
 export class AuthModule {}

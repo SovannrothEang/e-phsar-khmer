@@ -40,3 +40,4 @@ export * from './processing/fail-payment-attempt.use-case';
 export * from './processing/expire-payment-attempt.use-case';
 export * from './processing/fail-abandoned-payment-job.use-case';
 export * from './processing/enqueue-payment-settled-event.use-case';
+export * from './processing/admin-override-payment.use-case';

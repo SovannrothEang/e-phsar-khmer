@@ -2,8 +2,11 @@ import { createHmac } from 'node:crypto';
 import {
   signAbaPayway,
   signAbaPaywayCallback,
+  signAbaPaywayCallbackRaw,
   signAbaPaywayPurchase,
+  splitTopLevelJsonObject,
   verifyAbaPaywayCallbackSignature,
+  verifyAbaPaywayCallbackSignatureRaw,
 } from './aba-payway.signing';
 
 describe('signAbaPayway', () => {
@@ -260,5 +263,88 @@ describe('verifyAbaPaywayCallbackSignature', () => {
         signature,
       ),
     ).toBe(false);
+  });
+});
+
+describe('signAbaPaywayCallbackRaw', () => {
+  const RAW =
+    '{ "status": 0, "payment_amount": 1.50, "note": "caf\\u00e9", "apv": null, ' +
+    '"nested": {"b": 2, "a": [1, 2]}, "tran_id": "T1" }';
+
+  it('signs the values as ABA wrote them, not as a re-encode would', () => {
+    // Same rule as the parsed form — sort keys, concatenate — but `1.50`
+    // stays `1.50`, `\u00e9` becomes the character it encodes, `null` stays
+    // `null`, and a nested object keeps its own source text.
+    const expected = createHmac('sha512', 'secret')
+      .update('null{"b": 2, "a": [1, 2]}caf\u00e91.500T1', 'utf-8')
+      .digest('base64');
+
+    expect(signAbaPaywayCallbackRaw(RAW, 'secret')).toBe(expected);
+  });
+
+  it('accepts the signature it produced, from a Buffer body too', () => {
+    const signature = signAbaPaywayCallbackRaw(RAW, 'secret') as string;
+    expect(signAbaPaywayCallbackRaw(RAW, 'secret')).not.toBeNull();
+    expect(
+      verifyAbaPaywayCallbackSignatureRaw(
+        Buffer.from(RAW, 'utf-8').toString('utf-8'),
+        'secret',
+        signature,
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects the parsed-form signature when the raw representation differs', () => {
+    // The re-encoded payload has 1.5, so its signature is not the raw one.
+    const parsedSignature = signAbaPaywayCallback(
+      JSON.parse(RAW) as Record<string, unknown>,
+      'secret',
+    );
+    expect(
+      verifyAbaPaywayCallbackSignatureRaw(RAW, 'secret', parsedSignature),
+    ).toBe(false);
+  });
+
+  it('rejects a tampered value and a wrong key', () => {
+    const signature = signAbaPaywayCallbackRaw(RAW, 'secret') as string;
+    const tampered = RAW.replace('1.50', '9.50');
+    expect(
+      verifyAbaPaywayCallbackSignatureRaw(tampered, 'secret', signature),
+    ).toBe(false);
+    expect(
+      verifyAbaPaywayCallbackSignatureRaw(RAW, 'wrong-secret', signature),
+    ).toBe(false);
+  });
+
+  it('answers null/false for a body that is not one JSON object', () => {
+    for (const bad of ['', 'null', '[]', '{"a":1', '{"a":1} trailing']) {
+      expect(signAbaPaywayCallbackRaw(bad, 'secret')).toBeNull();
+      expect(
+        verifyAbaPaywayCallbackSignatureRaw(bad, 'secret', 'anything'),
+      ).toBe(false);
+    }
+  });
+});
+
+describe('splitTopLevelJsonObject', () => {
+  it('keeps member order and exact value text', () => {
+    expect(splitTopLevelJsonObject('{"b": 1e3, "a": "x\\"y"}')).toEqual([
+      { key: 'b', raw: '1e3' },
+      { key: 'a', raw: '"x\\"y"' },
+    ]);
+  });
+
+  it('handles nested objects, arrays and trailing whitespace', () => {
+    expect(
+      splitTopLevelJsonObject(' {"a":{"b":[1,{"c":2}]}, "d":true} '),
+    ).toEqual([
+      { key: 'a', raw: '{"b":[1,{"c":2}]}' },
+      { key: 'd', raw: 'true' },
+    ]);
+  });
+
+  it('accepts an empty object and rejects an empty body', () => {
+    expect(splitTopLevelJsonObject('{}')).toEqual([]);
+    expect(splitTopLevelJsonObject('')).toBeNull();
   });
 });

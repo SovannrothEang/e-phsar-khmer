@@ -1,9 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { stableStringify } from '../common/stable-stringify.util';
 import { DRIZZLE, type DbClient } from '../db/drizzle.provider';
 import { notifications, smsDeliveries } from '../db/schema';
+import { users } from '../db/schema/users.schema';
 import type { PaginatedResponse } from '../common/types/api-response.types';
 import { OutboxService } from '../outbox/outbox.service';
 import {
@@ -30,23 +31,25 @@ export class NotificationsService {
   ) {}
 
   /**
-   * Fires every registered channel. Left as a plain `Promise.all` rather
-   * than `allSettled` on purpose: today's only channel (`InAppNotificationChannel`)
-   * is the durable record itself, so its failure has to propagate — the
-   * caller (an `OutboxHandler`) reports `retry` and the outbox's own backoff
-   * tries again. A future best-effort channel (e.g. push) that shouldn't
-   * block persistence on a transient failure should catch its own errors
-   * inside `send()` rather than change this method's error semantics.
+   * Fires every registered channel, durable first.
+   *
+   * The in-app channel is the durable record itself and is always first in
+   * `NOTIFICATION_CHANNELS`. It must commit before the realtime channel is
+   * allowed to publish: a push tells a client to re-read, and a subscriber
+   * that refetches before the row is visible would show stale state and never
+   * be retried. A durable failure still propagates (the caller — an
+   * `OutboxHandler` — reports `retry`), while a best-effort channel must catch
+   * its own errors inside `send()`.
    *
    * SMS is NOT one of these channels and never runs inline: `data.sendSms
    * === true` only enqueues a durable `notification.sms.requested` outbox
    * event (`SmsOutboxHandler` in `./sms/` delivers it later, independently
-   * of this call). The in-app/realtime row this method writes is wholly
-   * unaffected by whether SMS is sendable, configured or even attempted —
-   * that decoupling is the entire point of moving it off this call stack.
+   * of this call).
    */
   async notify(payload: NotificationPayload): Promise<void> {
-    await Promise.all(this.channels.map((channel) => channel.send(payload)));
+    const [durable, ...bestEffort] = this.channels;
+    if (durable) await durable.send(payload);
+    await Promise.all(bestEffort.map((channel) => channel.send(payload)));
 
     if (payload.data?.sendSms === true) {
       // Best-effort: the in-app row above is already committed, and a caller
@@ -61,6 +64,42 @@ export class NotificationsService {
         );
       }
     }
+  }
+
+  /**
+   * Fans one payload out to every active staff member (`admin`/`super_admin`).
+   * Staff notices are a normal notification per recipient, so the in-app feed
+   * and realtime push work unchanged; there is no separate staff feed.
+   *
+   * Each recipient is attempted independently: one failure is logged and the
+   * rest still go out. The staff lookup itself can reject, so a caller that
+   * must not fail (e.g. a report insert) still wraps this call.
+   */
+  async notifyStaff(
+    payload: Omit<NotificationPayload, 'userId'>,
+  ): Promise<void> {
+    const staff = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          inArray(users.role, ['admin', 'super_admin']),
+          eq(users.status, 'active'),
+          isNull(users.deletedAt),
+        ),
+      );
+
+    await Promise.all(
+      staff.map(async (member) => {
+        try {
+          await this.notify({ userId: member.id, ...payload });
+        } catch (err) {
+          this.logger.warn(
+            `Could not notify staff ${member.id} (${payload.type}): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }),
+    );
   }
 
   private async enqueueSms(payload: NotificationPayload): Promise<void> {
@@ -201,6 +240,36 @@ export class NotificationsService {
     const rows = await this.db
       .delete(notifications)
       .where(and(eq(notifications.id, id), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+    return { deleted: rows.length };
+  }
+
+  /**
+   * Deletes the notices about one listing — used when the state that produced
+   * them is undone (an ad restored or republished) so the feed stops claiming
+   * it was removed. `types` is explicit because a caller clears only the
+   * notice kinds it knows are stale.
+   *
+   * `data->>'listingId'` is the key every listing producer already writes, so
+   * no schema change is needed. When `userId` is given it is part of the WHERE
+   * too: a foreign owner's notices are never touched.
+   */
+  async removeForListing(
+    listingId: string,
+    types: string[],
+    userId?: string,
+  ): Promise<{ deleted: number }> {
+    if (types.length === 0) return { deleted: 0 };
+
+    const conditions = [
+      inArray(notifications.type, types),
+      sql`${notifications.data}->>'listingId' = ${listingId}`,
+    ];
+    if (userId) conditions.push(eq(notifications.userId, userId));
+
+    const rows = await this.db
+      .delete(notifications)
+      .where(and(...conditions))
       .returning({ id: notifications.id });
     return { deleted: rows.length };
   }

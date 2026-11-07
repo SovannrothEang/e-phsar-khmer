@@ -1,7 +1,14 @@
 import { createHmac } from 'node:crypto';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import type { App } from 'supertest/types';
 import { AbaPaywayWebhookController } from './aba-payway-webhook.controller';
 import { AbaPaywayProvider } from '../providers/aba-payway/aba-payway.provider';
+import { PaymentEffectRunner } from '../payment-effect-runner.service';
+import { ResponseInterceptor } from '../../common/interceptors/response.interceptor';
+import { SKIP_ENVELOPE_KEY } from '../../common/decorators/skip-envelope.decorator';
 
 /**
  * Real provider + real controller, fully offline: same mocks as
@@ -23,6 +30,11 @@ jest.mock('../../utils/api-client', () => ({
     post: (...args: unknown[]) =>
       (mockNetworkPost as (...a: unknown[]) => never)(...args),
   })),
+}));
+// `@nestjs/throttler` is ESM-only under Jest; the decorator's own behaviour is
+// covered by Nest, the controller only needs it applied.
+jest.mock('@nestjs/throttler', () => ({
+  SkipThrottle: () => () => undefined,
 }));
 jest.mock('effect', () => ({ Effect: { runPromise: jest.fn() } }));
 jest.mock(
@@ -115,6 +127,17 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+describe('AbaPaywayWebhookController ack contract', () => {
+  it('opts the whole controller out of the response envelope', () => {
+    // The global ResponseInterceptor reads this key; without it the ack would
+    // reach ABA as `{ success: true, data: { code: 0 } }` and look like a
+    // failure.
+    expect(
+      Reflect.getMetadata(SKIP_ENVELOPE_KEY, AbaPaywayWebhookController),
+    ).toBe(true);
+  });
+});
+
 describe('AbaPaywayWebhookController.webhook', () => {
   it('stores a correctly signed callback and acks with a top-level code 0', async () => {
     const { controller, effectRunner } = build();
@@ -123,7 +146,8 @@ describe('AbaPaywayWebhookController.webhook', () => {
       [SIG]: abaSignature(callback),
     });
 
-    expect(ack).toEqual({ code: 0, message: 'Received' });
+    // Exactly ABA's contract — no `message`, no envelope (see spec.md).
+    expect(ack).toEqual({ code: 0 });
     expect(mockFindAttempt).toHaveBeenCalledWith({
       provider: 'aba_payway',
       providerAttemptId: callback.tran_id,
@@ -147,6 +171,24 @@ describe('AbaPaywayWebhookController.webhook', () => {
       FAKE_OUTBOX,
       expect.objectContaining({ paymentAttemptId: undefined }),
     );
+  });
+
+  it('verifies the raw request bytes, not a re-encoded body', async () => {
+    const { controller } = build();
+    const raw =
+      '{"tran_id":"T1","payment_amount":1.50,"status":0,"apv":"123456"}';
+    // Signed over the raw text, which no JSON re-encode can reproduce.
+    const signature = createHmac('sha512', API_KEY)
+      .update('1234561.500T1', 'utf-8')
+      .digest('base64');
+
+    await expect(
+      controller.webhook(
+        JSON.parse(raw) as Record<string, unknown>,
+        { [SIG]: signature },
+        Buffer.from(raw, 'utf-8'),
+      ),
+    ).resolves.toEqual({ code: 0 });
   });
 
   it('rejects a bad signature with 401 and writes nothing', async () => {
@@ -222,5 +264,58 @@ describe('AbaPaywayWebhookController.webhook', () => {
         payload: ambiguous,
       }),
     );
+  });
+});
+
+describe('AbaPaywayWebhookController over HTTP', () => {
+  it('answers exactly { code: 0 } with no response envelope', async () => {
+    const effectRunner = {
+      run: jest.fn().mockResolvedValue({ id: 'attempt-1' }),
+      runDurably: jest.fn().mockResolvedValue(undefined),
+    };
+    const provider = {
+      name: 'aba_payway',
+      verifyWebhookSignature: jest.fn(() => ({ valid: true })),
+      parseWebhookEvent: jest.fn(() => ({
+        providerEventId: 'evt-1',
+        eventType: 'payment.notify',
+        providerAttemptId: 'attempt-1',
+        status: 'succeeded',
+      })),
+    };
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AbaPaywayWebhookController],
+      providers: [
+        { provide: PaymentEffectRunner, useValue: effectRunner },
+        { provide: AbaPaywayProvider, useValue: provider },
+      ],
+    }).compile();
+
+    const app = moduleRef.createNestApplication({ rawBody: true });
+    // Exactly how main.ts wires it: the global interceptor must honour the
+    // controller's `@SkipEnvelope()`.
+    app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
+    await app.init();
+
+    try {
+      const raw = '{"tran_id":"x","status":0,"payment_amount":1.50}';
+      const res = await request(app.getHttpServer() as App)
+        .post('/payments/webhooks/aba-payway')
+        .set('Content-Type', 'application/json')
+        .send(raw)
+        .expect(200);
+
+      expect(res.body).toEqual({ code: 0 });
+      expect(effectRunner.runDurably).toHaveBeenCalledTimes(1);
+      // `rawBody: true` on the app is what the signature depends on: the
+      // provider must receive the bytes, not a re-encoded object.
+      const firstArg = (
+        provider.verifyWebhookSignature.mock.calls as unknown as [Buffer][]
+      )[0][0];
+      expect(Buffer.isBuffer(firstArg)).toBe(true);
+      expect(firstArg.toString('utf-8')).toBe(raw);
+    } finally {
+      await app.close();
+    }
   });
 });

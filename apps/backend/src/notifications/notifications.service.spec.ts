@@ -119,6 +119,124 @@ describe('NotificationsService deletes', () => {
   });
 });
 
+describe('NotificationsService.notifyStaff', () => {
+  /** `.select().from(users).where(…) → rows`; captures the WHERE. */
+  function staffQuery(capture: { where?: unknown }, rows: { id: string }[]) {
+    return {
+      from: () => ({
+        where: (where: unknown) => {
+          capture.where = where;
+          return Promise.resolve(rows);
+        },
+      }),
+    };
+  }
+
+  it('fans out to every active admin and super admin', async () => {
+    const db = makeDb();
+    const capture: { where?: unknown } = {};
+    db.select.mockReturnValue(
+      staffQuery(capture, [{ id: 'a1' }, { id: 'a2' }]),
+    );
+    const channel = { send: jest.fn().mockResolvedValue(undefined) };
+    const service = makeService(db, [channel]);
+
+    await service.notifyStaff({ type: 'report.created', title: 'New report' });
+
+    expect(channel.send).toHaveBeenCalledTimes(2);
+    expect(channel.send).toHaveBeenCalledWith({
+      userId: 'a1',
+      type: 'report.created',
+      title: 'New report',
+    });
+    expect(channel.send).toHaveBeenCalledWith({
+      userId: 'a2',
+      type: 'report.created',
+      title: 'New report',
+    });
+
+    const { sql, params } = compileWhere(capture.where);
+    expect(sql).toContain('"role" in');
+    expect(sql).toContain('deleted_at');
+    expect(params).toEqual(
+      expect.arrayContaining(['admin', 'super_admin', 'active']),
+    );
+  });
+
+  it('still notifies the rest when one recipient fails', async () => {
+    const db = makeDb();
+    db.select.mockReturnValue(staffQuery({}, [{ id: 'a1' }, { id: 'a2' }]));
+    const channel = {
+      send: jest.fn((payload: { userId: string }) =>
+        payload.userId === 'a1'
+          ? Promise.reject(new Error('channel down'))
+          : Promise.resolve(),
+      ),
+    };
+    const service = makeService(db, [channel]);
+
+    await expect(
+      service.notifyStaff({ type: 'report.created', title: 'New report' }),
+    ).resolves.toBeUndefined();
+    expect(channel.send).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('NotificationsService.removeForListing', () => {
+  let db: ReturnType<typeof makeDb>;
+  let service: NotificationsService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  it('deletes only the given types for that listing and owner', async () => {
+    const capture: { where?: unknown } = {};
+    db.delete.mockReturnValue(
+      deleteQuery(capture, [{ id: 'n1' }, { id: 'n2' }]),
+    );
+
+    await expect(
+      service.removeForListing(
+        'l1',
+        ['listing.removed', 'listing.inactivated'],
+        'u1',
+      ),
+    ).resolves.toEqual({ deleted: 2 });
+
+    const { sql, params } = compileWhere(capture.where);
+    expect(sql).toContain('"type" in');
+    expect(sql).toContain("->>'listingId'");
+    expect(params).toEqual(
+      expect.arrayContaining([
+        'listing.removed',
+        'listing.inactivated',
+        'l1',
+        'u1',
+      ]),
+    );
+  });
+
+  it('leaves the owner out of the WHERE when userId is omitted', async () => {
+    const capture: { where?: unknown } = {};
+    db.delete.mockReturnValue(deleteQuery(capture, [{ id: 'n1' }]));
+
+    await service.removeForListing('l1', ['listing.removed']);
+
+    const { sql, params } = compileWhere(capture.where);
+    expect(sql).not.toContain('user_id');
+    expect(params).toEqual(expect.arrayContaining(['listing.removed', 'l1']));
+  });
+
+  it('deletes nothing when no type is given', async () => {
+    await expect(service.removeForListing('l1', [])).resolves.toEqual({
+      deleted: 0,
+    });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
+});
+
 describe('NotificationsService.notify — SMS enqueue', () => {
   const basePayload = {
     userId: 'u1',

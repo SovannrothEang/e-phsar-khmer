@@ -15,6 +15,9 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+/** Five minutes, as agreed for the public category tree (task 1.2). */
+const CATEGORY_TREE_REVALIDATE_S = 300;
+
 /**
  * The seller card's identity.
  *
@@ -303,11 +306,21 @@ interface Envelope<T> {
   data?: T;
 }
 
-async function getJson<T>(path: string, locale: string): Promise<T | null> {
+async function getJson<T>(
+  path: string,
+  locale: string,
+  options?: { revalidate?: number },
+): Promise<T | null> {
   try {
     const res = await fetch(`${API_URL}${path}`, {
       headers: { "Accept-Language": locale },
-      cache: "no-store",
+      // `no-store` is the default: a listing edit must show on the next load.
+      // The few reads that opt in pass `revalidate` instead (the fetch cache
+      // keys on the URL, the headers and these options, so `en` and `km`
+      // responses cannot collide).
+      ...(options?.revalidate !== undefined
+        ? { next: { revalidate: options.revalidate } }
+        : { cache: "no-store" as const }),
     });
     if (!res.ok) return null;
     const body = (await res.json()) as Envelope<T>;
@@ -405,6 +418,11 @@ export const getListingById = cache(
  * posted in under it (the profile's drill-down, both levels). Scoping here
  * rather than in a second endpoint keeps the translated-name resolution in the
  * one service that already owns it.
+ *
+ * The public tree is the same for every visitor and is the slowest single call
+ * on the detail page (~1 s), so it is reused for five minutes; a rename can
+ * take that long to appear. The seller-scoped tree is per-account and stays
+ * `no-store`.
  */
 export async function getAllCategories(
   locale: string,
@@ -413,6 +431,7 @@ export async function getAllCategories(
   return getJson<BackendCategory[]>(
     `/categories${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`,
     locale,
+    userId ? undefined : { revalidate: CATEGORY_TREE_REVALIDATE_S },
   );
 }
 

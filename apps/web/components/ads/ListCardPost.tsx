@@ -89,9 +89,10 @@ export function ListCardPost({ post }: { post: Post }) {
               alt={post.title}
               fill
               className="object-cover rounded-l-sm"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              // A fixed 200 px column at every breakpoint — the old
+              // 33vw/50vw guess asked for a 640 px variant of a 200 px box.
+              sizes="200px"
               loading="eager"
-              unoptimized
               fallback={emptyPhoto}
             />
           ) : (

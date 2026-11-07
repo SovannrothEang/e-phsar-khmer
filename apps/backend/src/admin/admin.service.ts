@@ -368,7 +368,12 @@ export class AdminService {
     if (dto.status !== undefined) patch.status = dto.status;
     if (dto.firstName !== undefined) patch.firstName = dto.firstName;
     if (dto.lastName !== undefined) patch.lastName = dto.lastName;
-    if (dto.email !== undefined) patch.email = dto.email;
+    if (dto.email !== undefined) {
+      patch.email = dto.email;
+      // An admin edit is not a verification: any email change drops the proof
+      // (conservative even when the value is unchanged).
+      patch.emailVerifiedAt = null;
+    }
     if (dto.password)
       patch.passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     if (dto.phones?.[0]) patch.primaryPhone = dto.phones[0];

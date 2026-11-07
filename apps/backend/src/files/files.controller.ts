@@ -20,7 +20,14 @@ import { FilesService, STAFF_SCOPES } from './files.service';
 const isStaff = (user: RequestUser) =>
   user.role === 'admin' || user.role === 'super_admin';
 
-class SignUploadDto {
+/**
+ * Upload scopes for the public default bucket only. CVs are deliberately not
+ * here: they live in the private `resume-files` bucket and are signed by
+ * `POST /resume/attachments/sign`, which applies the PDF/Word checks this
+ * bucket needs. A `resume` scope here would land the file in the public bucket
+ * under the `listings` allow-list with no MIME or size restriction of its own.
+ */
+export class SignUploadDto {
   @IsString()
   @MaxLength(200)
   filename: string;
@@ -31,7 +38,6 @@ class SignUploadDto {
     'listing',
     'chat',
     'report',
-    'resume',
     'category',
     'subcategory',
     'brand',
@@ -46,7 +52,6 @@ class SignUploadDto {
     | 'listing'
     | 'chat'
     | 'report'
-    | 'resume'
     | 'category'
     | 'subcategory'
     | 'brand'
