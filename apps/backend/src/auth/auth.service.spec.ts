@@ -1998,7 +1998,10 @@ describe('AuthService password reset', () => {
 
       await expect(
         service.verifyResetCode({ identifier: 'sokdara', token: '654321' }),
-      ).resolves.toEqual({ resetToken: 'signed-token' });
+      ).resolves.toEqual({
+        resetToken: 'signed-token',
+        account: { username: 'testuser', phone: PHONE, email: null },
+      });
 
       expect(supabase.verifyOtp).toHaveBeenCalledWith(PHONE, '654321', {
         devBypass: false,
@@ -2260,7 +2263,10 @@ describe('AuthService password reset', () => {
 
       await expect(
         service.verifyResetCode({ identifier: 'sokdara', token: '654321' }),
-      ).resolves.toEqual({ resetToken: 'signed-token' });
+      ).resolves.toEqual({
+        resetToken: 'signed-token',
+        account: { username: 'testuser', phone: PHONE, email: null },
+      });
 
       expect(otpService.verify).toHaveBeenCalledWith(
         PHONE,

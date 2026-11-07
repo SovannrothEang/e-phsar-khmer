@@ -69,6 +69,11 @@ How to use this file:
   also larger and squarer (16px labels, `px-4 py-2`, 4px corners) per the captain's request;
   the category search field matches (18px label, 22px icon, 2px corners).
 
+- **The password-reset step names the account.** `POST /auth/password/reset/verify` now also
+  returns `account: { username, phone, email }` for the account the code proved, so the mobile
+  forgot-password screen can show it above the new-password field. The field is additive and
+  older backends that omit it fall back to the identifier the user typed.
+
 - **Users can edit their own ads (web).** Manage Ads now offers **Edit ad** on the Active,
   Expired and Hidden tabs; `/post/edit/[id]` reuses the real post form with every value
   prefilled (photos, attributes, place cascade, contact, product link). Saving PATCHes the
