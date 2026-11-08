@@ -1,0 +1,18 @@
+fix(web): stop the dead admin session from firing a 401 on every render
+
+The public layout validates the admin cookie pair on every render through
+`getModeratorSession`, which called `GET /users/me` whenever either admin
+cookie existed. With a dead pair — no access token but a refresh token left, or
+an expired access token — that was a guaranteed 401 per render, and the 401
+path tried to clear the cookies with `cookies().delete()` inside a Server
+Component render, where Next forbids cookie writes. The cleanup threw, the
+`catch {}` swallowed it, and the stale pair stayed forever: a permanent stream
+of `GET /api/v1/users/me 401` warnings that no page could heal.
+
+- `getModeratorSession` now requires a complete pair with an unexpired access
+  token before it spends a request (it cannot persist a refresh during a
+  render, so refreshing there was never viable)
+- `lib/auth/jwt-exp.ts` decodes `exp` without verifying — the API still
+  verifies the signature; this only decides whether a call is worth making
+- `proxy.ts` deletes an admin pair that can no longer authenticate, so the
+  state heals on the next navigation instead of sticking

@@ -1,13 +1,45 @@
 import createMiddleware from "next-intl/middleware";
 import { NextRequest, NextResponse } from "next/server";
 import { routing } from "./i18n/routing";
-import { ACCESS_TOKEN_COOKIE } from "./lib/auth/session";
+import {
+  ACCESS_TOKEN_COOKIE,
+  ADMIN_ACCESS_TOKEN_COOKIE,
+  ADMIN_REFRESH_TOKEN_COOKIE,
+} from "./lib/auth/session";
+import { isJwtExpired } from "./lib/auth/jwt-exp";
 
 const intlMiddleware = createMiddleware(routing);
 
 const LOCALE_RE = new RegExp(`^/(en|km)(?=/wanderer(?:/|$))`);
 
+/**
+ * Drops an admin cookie pair that can no longer authenticate.
+ *
+ * The public layout validates the admin pair on every render, and a render
+ * cannot write cookies (`cookies().delete` throws there), so a stale pair used
+ * to make every page do one doomed `GET /users/me` forever. The proxy CAN
+ * write them, which makes the dead state self-healing: no cookie, no request.
+ */
+function clearDeadAdminCookies(
+  req: NextRequest,
+  res: NextResponse,
+): NextResponse {
+  const access = req.cookies.get(ADMIN_ACCESS_TOKEN_COOKIE)?.value;
+  const refresh = req.cookies.get(ADMIN_REFRESH_TOKEN_COOKIE)?.value;
+  const dead = !access || !refresh || isJwtExpired(access);
+  if (!dead) return res;
+  if (!access && !refresh) return res;
+
+  res.cookies.delete(ADMIN_ACCESS_TOKEN_COOKIE);
+  res.cookies.delete(ADMIN_REFRESH_TOKEN_COOKIE);
+  return res;
+}
+
 export default function proxy(req: NextRequest): NextResponse {
+  return clearDeadAdminCookies(req, route(req));
+}
+
+function route(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
   const host = req.headers.get("host") || "";
 
