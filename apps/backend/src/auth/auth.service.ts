@@ -58,6 +58,7 @@ import { OtpSmsSender } from '../otp/otp-sms-sender';
 import type { OtpSendResult } from '../otp/otp-sms-sender';
 import type { OtpPurpose } from '../otp/otp.types';
 import { isIssuedBeforeCutoff } from './token-cutoff.util';
+import { SettingsService } from '../settings/settings.service';
 
 /** Response of every "send me a code" endpoint. */
 export interface OtpRequestResult {
@@ -126,6 +127,8 @@ export class AuthService {
     private readonly notifications: NotificationsService,
     private readonly loginLockout: LoginLockoutService,
     private readonly socialState: SocialStateService,
+    // Only for the support contacts carried by the suspension refusal.
+    private readonly settings: SettingsService,
   ) {}
 
   async loginWithPassword(
@@ -195,8 +198,7 @@ export class AuthService {
     // account and a token if that filter is ever lifted. Recovery goes through
     // findRecoverable() above, which is deliberate about which rows qualify.
     if (user.deletedAt) throw new UnauthorizedException('Account deactivated');
-    if (user.status !== 'active')
-      throw new UnauthorizedException('Account suspended');
+    if (user.status !== 'active') throw await this.suspendedRefusal(user);
 
     await this.loginLockout.reset(dto.identifier);
     return this.finishLogin(user, device);
@@ -279,7 +281,7 @@ export class AuthService {
     // This endpoint bypasses loginWithPassword, so it needs its own
     // suspension guard — otherwise a suspended account could mint tokens
     // through the OTP login flow.
-    if (existing) this.assertAccountActive(existing);
+    if (existing) await this.assertAccountActive(existing);
 
     // A legacy bare account (created before passwords were required) is
     // COMPLETED in place: possessing the OTP proves phone ownership, so the
@@ -397,7 +399,7 @@ export class AuthService {
       dto.phone,
       insertExtras,
     );
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     // Both the fresh-insert and the existing-login branch land here with
     // `user.primaryPhone === dto.phone` (mirrorSupabaseUser resolves the
     // phone-provider row by that number), and the OTP round trip above is
@@ -915,7 +917,7 @@ export class AuthService {
             },
             dto.provider,
           );
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     return this.finishLogin(user, device);
   }
 
@@ -1165,7 +1167,7 @@ export class AuthService {
       });
     }
 
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     return this.finishLogin(user, device);
   }
 
@@ -1308,10 +1310,30 @@ export class AuthService {
    * `refresh` check inline; the alternate providers (OTP verify, social,
    * Telegram) do not, and a suspended account must not mint a session through
    * any of them.
+   *
+   * The refusal carries the stored reason and the support channels: a
+   * suspended account cannot log in to read an in-app notice, so the login
+   * error is the only surface where it can learn why and who to contact. It is
+   * thrown after the credential check on every path, so it never reveals
+   * whether an identifier exists.
    */
-  private assertAccountActive(user: UserRow): void {
-    if (user.status !== 'active' || user.deletedAt)
-      throw new UnauthorizedException('Account suspended');
+  private async assertAccountActive(user: UserRow): Promise<void> {
+    if (user.status !== 'active' || user.deletedAt) {
+      throw await this.suspendedRefusal(user);
+    }
+  }
+
+  private async suspendedRefusal(user: UserRow): Promise<ForbiddenException> {
+    // Settings reads never throw (SettingsService falls back to defaults), so
+    // a broken settings row cannot turn a refusal into a 500.
+    const support = await this.settings.supportContacts();
+    return new ForbiddenException({
+      code: 'ACCOUNT_SUSPENDED',
+      message: user.statusReason ?? 'This account is suspended.',
+      // The exception filter only forwards `code` and `details`, so the
+      // structured payload the client needs lives there.
+      details: { reason: user.statusReason, support },
+    });
   }
 
   /**

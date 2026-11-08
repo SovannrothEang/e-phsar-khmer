@@ -21,4 +21,5 @@ export * from './login-devices.schema';
 export * from './billing-addresses.schema';
 export * from './sms-deliveries.schema';
 export * from './phone-otps.schema';
+export * from './app-settings.schema';
 export * from '../../payment/entity';

@@ -1224,13 +1224,28 @@ describe('ListingsService expiry', () => {
   }
 
   /** findPublicById = the joined detail read, then the photos read. */
-  function mockPublicDetail(row: Record<string, unknown>) {
-    let call = 0;
-    db.select.mockImplementation(() => {
-      call++;
-      return call === 1
-        ? chain([{ listing: row, sellerUsername: 'seller' }], {})
-        : chain([], {});
+  // Call 1 is the listing row (findById), call 2 is the owner's status — a
+  // suspended owner's ad is hidden by a read rule, call 3+ is photos/reactions.
+  function mockPublicDetail(
+    row: Record<string, unknown>,
+    ownerStatus: 'active' | 'suspended' | 'deleted' = 'active',
+  ) {
+    let first = true;
+    db.select.mockImplementation((projection?: unknown) => {
+      // The owner-status read is the only select whose projection has a
+      // "status" key; the listing, photo and reaction reads do not.
+      if (
+        projection &&
+        typeof projection === 'object' &&
+        'status' in (projection as Record<string, unknown>)
+      ) {
+        return chain([{ status: ownerStatus }], {});
+      }
+      if (first) {
+        first = false;
+        return chain([{ listing: row, sellerUsername: 'seller' }], {});
+      }
+      return chain([], {});
     });
   }
 

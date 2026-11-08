@@ -2,20 +2,19 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
-import { users, userPhones } from '../../db/schema/users.schema';
+import { users } from '../../db/schema/users.schema';
 import { listings } from '../../db/schema/listings.schema';
 import {
-  bannedPhones,
   reportReasons,
   userReports,
   listingReports,
 } from '../../db/schema/reports.schema';
-import { normalizePhoneE164 } from '../../reports/phone-ban.util';
 import type {
   ReportReasonRow,
   UserReportRow,
@@ -26,6 +25,8 @@ import { ListingsService } from '../../listings/listings.service';
 import { AdminService } from '../admin.service';
 import { AdminListingsService } from '../admin-listings.service';
 import { FilesService } from '../../files/files.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { SettingsService } from '../../settings/settings.service';
 import type {
   CreateReportReasonDto,
   UpdateReportReasonDto,
@@ -44,12 +45,16 @@ function nameOf(u: {
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly listingsService: ListingsService,
     private readonly adminService: AdminService,
     private readonly files: FilesService,
     private readonly adminListings: AdminListingsService,
+    private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   // ── Reasons ───────────────────────────────────────────────
@@ -147,90 +152,127 @@ export class ReportsService {
    * plain admin cannot suspend staff). Moving an approved report back to
    * rejected/pending does NOT reinstate the account — that is an explicit
    * status change on the Users page.
+   *
+   * The approval no longer bans the account's phone numbers: suspension is
+   * the consequence, and it is the outcome an admin can lift. `banned_phones`
+   * still blocks registration, it simply has no writer on this path.
    */
   async updateUserReportStatus(
     id: string,
     dto: UpdateReportStatusDto,
     reviewer: RequestUser,
   ) {
-    return this.db.transaction(async (tx) => {
-      const [report] = await tx
-        .select()
-        .from(userReports)
-        .where(eq(userReports.id, id))
-        .limit(1)
-        .for('update');
-      if (!report) throw new NotFoundException('User report not found');
+    const { updated, approvedNow, targetUserId } = await this.db.transaction(
+      async (tx) => {
+        const [found] = await tx
+          .select({ report: userReports, reason: reportReasons.reason })
+          .from(userReports)
+          .leftJoin(reportReasons, eq(reportReasons.id, userReports.reasonId))
+          .where(eq(userReports.id, id))
+          .limit(1)
+          .for('update', { of: userReports });
+        if (!found) throw new NotFoundException('User report not found');
+        const { report } = found;
 
-      const [row] = await tx
-        .update(userReports)
-        .set({ status: dto.status, reviewedById: reviewer.id })
-        .where(eq(userReports.id, id))
-        .returning();
-
-      if (dto.status === 'approved' && report.status !== 'approved') {
-        await this.adminService.authorizeManage(
-          tx,
-          reviewer,
-          report.targetUserId,
-          { status: 'suspended' },
-        );
-        await tx
-          .update(users)
-          .set({ status: 'suspended', updatedAt: new Date() })
-          .where(eq(users.id, report.targetUserId));
-
-        // The ban is keyed on the number, not the account: it must outlive
-        // the 90-day hard purge so the same numbers can never register again.
-        const [target] = await tx
-          .select({ primaryPhone: users.primaryPhone })
-          .from(users)
-          .where(eq(users.id, report.targetUserId))
-          .limit(1);
-        const extraPhones = await tx
-          .select({ phone: userPhones.phone })
-          .from(userPhones)
-          .where(eq(userPhones.userId, report.targetUserId));
-
-        const phones = [
-          ...new Set(
-            [target?.primaryPhone, ...extraPhones.map((p) => p.phone)]
-              .filter(
-                (phone): phone is string =>
-                  typeof phone === 'string' && phone.length > 0,
-              )
-              .map(normalizePhoneE164),
-          ),
-        ];
-        if (phones.length > 0) {
-          await tx
-            .insert(bannedPhones)
-            .values(
-              phones.map((phone) => ({
-                phone,
-                userId: report.targetUserId,
-                reportId: report.id,
-                bannedById: reviewer.id,
-              })),
-            )
-            // A number already banned by an earlier report stays banned.
-            .onConflictDoNothing({ target: bannedPhones.phone });
-        }
-
-        // Every other open report against this account is settled by the
-        // same decision.
-        await tx
+        const [row] = await tx
           .update(userReports)
-          .set({ status: 'approved', reviewedById: reviewer.id })
+          .set({ status: dto.status, reviewedById: reviewer.id })
+          .where(eq(userReports.id, id))
+          .returning();
+
+        const isApproval =
+          dto.status === 'approved' && report.status !== 'approved';
+        if (isApproval) {
+          await this.adminService.authorizeManage(
+            tx,
+            reviewer,
+            report.targetUserId,
+            { status: 'suspended' },
+          );
+          await this.adminService.suspendAccount(
+            tx,
+            report.targetUserId,
+            found.reason ? `Reported: ${found.reason}` : 'Reported account',
+            reviewer.id,
+          );
+
+          // Every other open report against this account is settled by the
+          // same decision.
+          await tx
+            .update(userReports)
+            .set({ status: 'approved', reviewedById: reviewer.id })
+            .where(
+              and(
+                eq(userReports.targetUserId, report.targetUserId),
+                eq(userReports.status, 'pending'),
+              ),
+            );
+        }
+        return {
+          updated: row,
+          approvedNow: isApproval,
+          targetUserId: report.targetUserId,
+        };
+      },
+    );
+
+    if (approvedNow) {
+      await this.adminService.announceSuspension(targetUserId);
+      await this.alertIfThresholdReached(targetUserId);
+    }
+    return updated;
+  }
+
+  /**
+   * The account's approved-report count — account reports plus approved
+   * reports on the ads it owns — against the configured threshold.
+   *
+   * This is a triage signal and nothing else: it notifies staff and returns.
+   * Suspending, hiding or deleting stays a human decision, so a coordinated
+   * group can never get an account punished by filing reports.
+   *
+   * Best-effort by design: the approval has already committed, and a notice
+   * that could not be delivered must not turn a correct decision into a 500.
+   */
+  private async alertIfThresholdReached(targetUserId: string): Promise<void> {
+    try {
+      const [[accountReports], [postReports], threshold] = await Promise.all([
+        this.db
+          .select({ value: count() })
+          .from(userReports)
           .where(
             and(
-              eq(userReports.targetUserId, report.targetUserId),
-              eq(userReports.status, 'pending'),
+              eq(userReports.targetUserId, targetUserId),
+              eq(userReports.status, 'approved'),
             ),
-          );
-      }
-      return row;
-    });
+          ),
+        this.db
+          .select({ value: count() })
+          .from(listingReports)
+          .innerJoin(listings, eq(listings.id, listingReports.listingId))
+          .where(
+            and(
+              eq(listings.userId, targetUserId),
+              eq(listingReports.status, 'approved'),
+            ),
+          ),
+        this.settings.suspensionThreshold(),
+      ]);
+
+      const approved = (accountReports?.value ?? 0) + (postReports?.value ?? 0);
+      if (approved < threshold) return;
+
+      await this.notifications.notifyStaff({
+        type: 'report.threshold',
+        title: 'Account reached the report threshold',
+        body: `${approved} approved reports (threshold ${threshold}). Review the account on the Users page.`,
+        data: { targetUserId, approvedReports: approved, threshold },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not alert staff about reports for ${targetUserId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   async removeUserReport(id: string): Promise<{ id: string }> {

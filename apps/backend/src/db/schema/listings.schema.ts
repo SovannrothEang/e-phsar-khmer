@@ -127,6 +127,12 @@ export const listings = pgTable(
       onDelete: 'set null',
     }),
     moderationReason: varchar('moderation_reason', { length: 500 }),
+    // Permanent delete, distinct from moderation: stamped by the owner's
+    // DELETE or an admin removal and never cleared. `publish` and every
+    // restore path refuse a stamped row. The row itself stays on purpose — a
+    // real DELETE would cascade `listing_reports` away and retroactively
+    // lower the approved-report count the account threshold reads.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     // Staff "set inactive" — hidden from the marketplace but owned by the
     // seller again: they are notified with the reason, can edit the ad, and
     // republish it. Deliberately separate from the moderation trio above,

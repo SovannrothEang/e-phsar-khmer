@@ -10,6 +10,8 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -25,6 +27,12 @@ const SignInScreen = () => {
   const [identifierError, setIdentifierError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // A suspended account cannot sign in, so this dialog is its only surface for
+  // the reason and the appeal channels.
+  const [suspended, setSuspended] = useState<{
+    reason: string | null;
+    support: { email?: string; telegram?: string; phone?: string };
+  } | null>(null);
 
   const handleSignIn = async () => {
     const value = identifier.trim();
@@ -66,6 +74,10 @@ const SignInScreen = () => {
         pathname: "/(auth)/otp",
         params: { mode: "login" },
       } as never);
+      return;
+    }
+    if (result.kind === "suspended") {
+      setSuspended({ reason: result.reason, support: result.support });
       return;
     }
     setPasswordError(result.message);
@@ -167,6 +179,66 @@ const SignInScreen = () => {
           <SocialAuthSection gap={40} />
         </View>
       </ScrollView>
+
+      {/* Only shown after a 403 ACCOUNT_SUSPENDED: the backend refuses every
+          sign-in for a suspended account, so this dialog is where the reason
+          and the appeal channels live. */}
+      <Modal
+        visible={suspended !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuspended(null)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/50 px-6">
+          <View className="w-full rounded-md bg-white dark:bg-gray-900 p-5 gap-3">
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">
+              This account is suspended
+            </Text>
+            <Text className="text-sm text-gray-600 dark:text-gray-300">
+              {suspended?.reason ??
+                "An administrator has suspended this account. You cannot sign in until it is reviewed."}
+            </Text>
+            {(() => {
+              const support = suspended?.support ?? {};
+              const rows = [
+                support.email ? ["Email", support.email] : null,
+                support.telegram ? ["Telegram", support.telegram] : null,
+                support.phone ? ["Phone", support.phone] : null,
+              ].filter((row): row is [string, string] => row !== null);
+              if (rows.length === 0) {
+                return (
+                  <Text className="text-sm text-gray-600 dark:text-gray-300">
+                    Contact support through the app&apos;s help channels to
+                    request a review.
+                  </Text>
+                );
+              }
+              return (
+                <View className="gap-1">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Contact us to resolve it:
+                  </Text>
+                  {rows.map(([label, value]) => (
+                    <Text
+                      key={label}
+                      className="text-sm text-gray-600 dark:text-gray-300"
+                    >
+                      {label}: {value}
+                    </Text>
+                  ))}
+                </View>
+              );
+            })()}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSuspended(null)}
+              className="mt-2 h-[44px] items-center justify-center rounded-[4px] bg-secondary-orange"
+            >
+              <Text className="text-white font-bold text-base">Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
