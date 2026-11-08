@@ -1,7 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, Trash2, BadgeCheck, UserRound } from "lucide-react";
+import {
+  BadgeCheck,
+  Eye,
+  RotateCcw,
+  ShieldOff,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,12 +19,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useRouter } from "next/navigation";
+import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "next-intl";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { getAdminUsers, type AdminUsersResult } from "@/actions/admin-users";
-import { deleteUser } from "@/actions/user";
+import {
+  getAdminUsers,
+  type AdminUsersResult,
+  type GetAdminUsersParams,
+} from "@/actions/admin-users";
+import { deleteUser, restoreUserAccess, suspendUser } from "@/actions/user";
 import { User } from "@/types/user";
 import { AdminPage } from "@/components/dashboard/admin-page";
 import {
@@ -29,6 +40,34 @@ import {
   formatCount,
   type AdminColumn,
 } from "@/components/dashboard/admin-table";
+import { publicSiteOrigin } from "@/lib/site";
+
+const PAGE_SIZE = 20;
+
+/**
+ * Tabs → backend filters. Only the account status is filtered server-side; the
+ * page used to bucket Premium/Normal client-side over whatever single page had
+ * been fetched, so those counts were never the real totals and search could not
+ * see past the first 100 rows.
+ *
+ * `deleted` is included because a soft-deleted account lives for 90 days
+ * before the purge, and staff need to find it in the meantime.
+ */
+const TABS: Record<
+  string,
+  Omit<GetAdminUsersParams, "page" | "q" | "pageSize">
+> = {
+  active: { status: "active" },
+  suspended: { status: "suspended" },
+  deleted: { status: "deleted" },
+};
+
+/** Soft tones, matching the other admin tables (not solid fills). */
+const STATUS_TONE: Record<string, string> = {
+  active: "border-emerald-500 bg-emerald-50 text-emerald-700",
+  suspended: "border-amber-500 bg-amber-50 text-amber-700",
+  deleted: "border-red-500 bg-red-50 text-red-700",
+};
 
 /** Stored numbers are already E.164 ("+855…"); the old `+{phone}` produced "++855…". */
 function formatPhone(value: string): string {
@@ -60,75 +99,129 @@ export default function UserPage({
   initialData?: AdminUsersResult;
 }) {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: () => getAdminUsers(),
-    initialData,
-  });
-  const users = data?.users;
-
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [tab, setTab] = useState("all");
-
-  const router = useRouter();
   const locale = useLocale();
+
+  const [tab, setTab] = useState("active");
+  const [searchInput, setSearchInput] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [suspendTarget, setSuspendTarget] = useState<User | null>(null);
+  const [reason, setReason] = useState("");
+  const [restoreTarget, setRestoreTarget] = useState<User | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
+  const query: GetAdminUsersParams = {
+    ...TABS[tab],
+    q: q || undefined,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+
+  // Server-side paging + search: a search now covers every account, not just
+  // the first page the browser happened to have.
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "users", query],
+    queryFn: () => getAdminUsers(query),
+    // Only the default view has a server-rendered first page.
+    initialData: tab === "active" && page === 1 && !q ? initialData : undefined,
+    placeholderData: (prev) => prev,
+  });
+  const rows = data?.users ?? [];
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+
+  // Tab counts: one pageSize=1 call per status under the current search, so the
+  // badges agree with what the tab will show.
+  const { data: tabCounts = {} } = useQuery({
+    queryKey: ["admin", "users-counts", q ?? ""],
+    queryFn: async () => {
+      // allSettled: one preset failing must not zero the other badges.
+      const results = await Promise.allSettled(
+        Object.keys(TABS).map(async (key) => {
+          const result = await getAdminUsers({
+            ...TABS[key],
+            q: q || undefined,
+            page: 1,
+            pageSize: 1,
+          });
+          return [key, result.total] as const;
+        }),
+      );
+      const counts: Record<string, number> = {};
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          const [key, total] = result.value;
+          counts[key] = total;
+        }
+      }
+      return counts;
+    },
+  });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "users-counts"] });
+  };
+
+  const suspendMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
+      suspendUser(userId, reason),
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.error ?? "Failed to suspend user");
+        return;
+      }
+      toast.success(
+        "Account suspended. Their sessions are revoked and they see your reason when they sign in.",
+      );
+      setSuspendTarget(null);
+      setReason("");
+      refresh();
+    },
+    onError: () => toast.error("Failed to suspend user"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (userId: string) => restoreUserAccess(userId),
+    onSuccess: (res) => {
+      if (!res.success) {
+        toast.error(res.error ?? "Failed to restore access");
+        return;
+      }
+      toast.success("Access restored — the account can sign in again.");
+      setRestoreTarget(null);
+      refresh();
+    },
+    onError: () => toast.error("Failed to restore access"),
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (userId: string) => deleteUser({ userId }),
     onSuccess: (res) => {
-      if (res.success) {
-        queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-        toast.success("User deleted");
-      } else {
+      if (!res.success) {
         toast.error(res.error ?? "Failed to delete user");
+        return;
       }
+      toast.success("User deleted");
+      setDeleteTarget(null);
+      refresh();
     },
     onError: () => toast.error("Failed to delete user"),
-    onSettled: () => {
-      setIsDeleteDialogOpen(false);
-      setSelectedUser(null);
-    },
   });
 
-  // The adapter asks the API for role=user; the guard stays as a belt-and-braces
-  // filter so a staff row can never appear in a customer table.
-  const customerUsers = useMemo(
-    () =>
-      (users ?? []).filter(
-        (user) => user.role !== "admin" && user.role !== "super_admin",
-      ),
-    [users],
-  );
-  const premiumCount = customerUsers.filter(
-    (user) => user.accountType === "Premium",
-  ).length;
-  const normalCount = customerUsers.filter(
-    (user) => user.accountType === "Normal",
-  ).length;
-
-  const filteredUsers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return customerUsers.filter((user) => {
-      if (tab === "premium" && user.accountType !== "Premium") return false;
-      if (tab === "normal" && user.accountType !== "Normal") return false;
-      if (!query) return true;
-      return [
-        user.userId,
-        user.name,
-        user.username,
-        user.email,
-        user.accountType,
-        user.role,
-        ...user.networks.map(formatPhone),
-        ...user.networks,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [customerUsers, searchQuery, tab]);
+  const openProfile = (user: User) => {
+    if (!user.username) {
+      toast.error("This account has no username yet");
+      return;
+    }
+    // The public profile lives on the MARKETPLACE origin: this dashboard runs
+    // on the admin host, which 404s every non-/wanderer path.
+    window.open(
+      `${publicSiteOrigin(window.location.origin)}/${locale}/${user.username}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   const columns = useMemo<AdminColumn<User>[]>(
     () => [
@@ -184,6 +277,30 @@ export default function UserPage({
         },
       },
       {
+        key: "status",
+        header: "Status",
+        sortValue: (user) => user.accountStatus,
+        cell: (user) => (
+          <div className="flex flex-col gap-1">
+            <Badge
+              variant="outline"
+              className={STATUS_TONE[user.accountStatus] ?? ""}
+            >
+              {user.accountStatus}
+            </Badge>
+            {user.statusReason ? (
+              // The reason staff typed is what the account is shown at sign-in.
+              <span
+                className="type-meta text-muted-foreground line-clamp-2 max-w-[16rem]"
+                title={user.statusReason}
+              >
+                {user.statusReason}
+              </span>
+            ) : null}
+          </div>
+        ),
+      },
+      {
         key: "verified",
         header: "Verified",
         sortValue: (user) => (user.isVerified ? 1 : 0),
@@ -218,67 +335,107 @@ export default function UserPage({
           <RowActions
             id={user.userId}
             actions={[
-              {
-                label: "View",
-                icon: <Eye className="mr-2 size-4" />,
-                onSelect: () => {
-                  if (!user.username) {
-                    toast.error("This account has no username yet");
-                    return;
-                  }
-                  router.push(`/${locale}/${user.username}`);
-                },
-              },
+              ...(user.accountStatus === "deleted"
+                ? []
+                : [
+                    {
+                      label: "View profile",
+                      icon: <Eye className="mr-2 size-4" />,
+                      onSelect: () => openProfile(user),
+                    },
+                  ]),
+              // Suspending is what an approved report does; restoring is the
+              // lift, and until now it had no UI at all.
+              ...(user.accountStatus === "active"
+                ? [
+                    {
+                      label: "Suspend",
+                      icon: <ShieldOff className="mr-2 size-4" />,
+                      tone: "danger" as const,
+                      onSelect: () => {
+                        setSuspendTarget(user);
+                        setReason("");
+                      },
+                    },
+                  ]
+                : user.accountStatus === "suspended"
+                  ? [
+                      {
+                        label: "Restore access",
+                        icon: <RotateCcw className="mr-2 size-4" />,
+                        tone: "success" as const,
+                        onSelect: () => setRestoreTarget(user),
+                      },
+                    ]
+                  : []),
               {
                 label: "Delete",
                 icon: <Trash2 className="mr-2 size-4" />,
-                tone: "danger",
-                onSelect: () => {
-                  setSelectedUser(user);
-                  setIsDeleteDialogOpen(true);
-                },
+                tone: "danger" as const,
+                onSelect: () => setDeleteTarget(user),
               },
             ]}
           />
         ),
       },
     ],
-    [locale, router],
+    // `openProfile` only reads props/states above; the columns rebuild when the
+    // locale changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale],
   );
 
-  const handleDelete = () => {
-    if (!selectedUser) return;
-    deleteMutation.mutate(selectedUser.userId);
-  };
+  const busy =
+    suspendMutation.isPending ||
+    restoreMutation.isPending ||
+    deleteMutation.isPending;
 
   return (
     <>
       <AdminPage
         title="Users"
-        description="Manage your users and accounts"
+        description="Search every account, suspend one, or give a suspended account its access back"
         toolbar={
-          <AdminSearch
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search name, username, email, phone, ID..."
-          />
+          <form
+            className="w-full max-w-sm"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setQ(searchInput.trim());
+              setPage(1);
+            }}
+          >
+            <AdminSearch
+              value={searchInput}
+              onChange={setSearchInput}
+              placeholder="Search name, username, email, phone… (Enter)"
+            />
+          </form>
         }
       >
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            setTab(value);
+            setPage(1);
+          }}
+        >
           <TabsList>
-            <TabsTrigger value="all" className="cursor-pointer">
-              All Users
-            </TabsTrigger>
-            <TabsTrigger value="premium" className="cursor-pointer">
-              Premium
-              <Badge className="ml-1.5 bg-blue-500 type-meta text-white">
-                {formatCount(premiumCount)}
+            <TabsTrigger value="active" className="cursor-pointer">
+              Active
+              <Badge className="ml-1.5 bg-emerald-500 type-meta text-white">
+                {formatCount(tabCounts.active ?? 0)}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="normal" className="cursor-pointer">
-              Normal
-              <Badge className="ml-1.5 bg-slate-500 type-meta text-white">
-                {formatCount(normalCount)}
+            <TabsTrigger value="suspended" className="cursor-pointer">
+              Suspended
+              <Badge className="ml-1.5 bg-amber-500 type-meta text-white">
+                {formatCount(tabCounts.suspended ?? 0)}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="deleted" className="cursor-pointer">
+              Deleted
+              <Badge className="ml-1.5 bg-red-500 type-meta text-white">
+                {formatCount(tabCounts.deleted ?? 0)}
               </Badge>
             </TabsTrigger>
           </TabsList>
@@ -286,42 +443,142 @@ export default function UserPage({
 
         <AdminTable
           columns={columns}
-          rows={filteredUsers}
+          rows={rows}
           rowKey={(user) => user.userId}
           isLoading={isLoading}
-          pageSize={20}
-          resetKey={`${searchQuery}:${tab}`}
+          resetKey={`${q}:${tab}`}
           emptyTitle="No users found"
-          emptyHint={
-            searchQuery ? `No results for "${searchQuery}"` : undefined
-          }
+          emptyHint={q ? `No results for "${q}"` : undefined}
+          serverPagination={{
+            page,
+            totalPages,
+            total: data?.total ?? 0,
+            onPageChange: setPage,
+            totalLabel: "users",
+          }}
         />
       </AdminPage>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      {/* Suspend: the reason is required because it is the only thing the
+          account can read when it is refused at sign-in. */}
+      <Dialog
+        open={suspendTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSuspendTarget(null);
+            setReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Suspend account</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold">{suspendTarget?.name}</span> is
+              signed out of every device immediately, cannot sign in, and their
+              ads stop showing in the marketplace. Nothing is deleted — you can
+              restore access at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Why? The account sees this when it tries to sign in."
+            maxLength={500}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              className="h-9 rounded-sm cursor-pointer"
+              onClick={() => setSuspendTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-9 rounded-sm cursor-pointer text-white bg-amber-600 hover:bg-amber-700 hover:text-white"
+              disabled={busy || reason.trim().length < 3}
+              onClick={() =>
+                suspendTarget &&
+                suspendMutation.mutate({
+                  userId: suspendTarget.userId,
+                  reason: reason.trim(),
+                })
+              }
+            >
+              {suspendMutation.isPending ? "Suspending…" : "Suspend"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restore access</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold">{restoreTarget?.name}</span> can
+              sign in again and their ads become visible. Their old sessions are
+              already revoked, so they have to sign in once more.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              className="h-9 rounded-sm cursor-pointer"
+              onClick={() => setRestoreTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-9 rounded-sm cursor-pointer"
+              disabled={busy}
+              onClick={() =>
+                restoreTarget && restoreMutation.mutate(restoreTarget.userId)
+              }
+            >
+              {restoreMutation.isPending ? "Restoring…" : "Restore access"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete User{" "}
+              Are you sure you want to delete{" "}
               <span className="font-semibold text-red-500">
-                {selectedUser?.name}
+                {deleteTarget?.name}
               </span>
-              ? This action cannot be undone.
+              ? The account is closed for 90 days and then removed for good, and
+              its phone numbers are released. Prefer <b>Suspend</b> when you
+              want the account back.
             </DialogDescription>
           </DialogHeader>
-
           <div className="flex justify-end gap-2">
             <Button
               className="h-9 rounded-sm cursor-pointer"
-              onClick={() => setIsDeleteDialogOpen(false)}
+              onClick={() => setDeleteTarget(null)}
             >
               Cancel
             </Button>
             <Button
               className="h-9 text-white bg-red-500 rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
+              disabled={busy}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.userId)
+              }
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>

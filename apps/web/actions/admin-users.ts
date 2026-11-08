@@ -7,11 +7,15 @@ import type { User } from "@/types/user";
 export interface AdminUsersResult {
   users: User[];
   total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface GetAdminUsersParams {
   q?: string;
   role?: "user" | "admin" | "super_admin";
+  /** Account state. Omitted = every state. */
+  status?: "active" | "suspended" | "deleted";
   page?: number;
   pageSize?: number;
 }
@@ -19,16 +23,25 @@ export interface GetAdminUsersParams {
 export async function getAdminUsers(
   params?: GetAdminUsersParams,
 ): Promise<AdminUsersResult> {
+  const page = params?.page ?? 1;
+  const pageSize = params?.pageSize ?? 20;
   const sp = new URLSearchParams();
   if (params?.q) sp.set("q", params.q);
+  // Only the Users page filters by status; the Team feed leaves it out.
+  if (params?.status) sp.set("status", params.status);
   sp.set("role", params?.role ?? "user");
-  sp.set("page", String(params?.page ?? 1));
-  sp.set("pageSize", String(params?.pageSize ?? 100));
+  sp.set("page", String(page));
+  sp.set("pageSize", String(pageSize));
 
   const { data, meta } = await serverFetch<BackendUser[]>(
     `/admin/users?${sp.toString()}`,
   );
-  return { users: data.map(toUiUser), total: meta?.total ?? data.length };
+  return {
+    users: data.map(toUiUser),
+    total: meta?.total ?? data.length,
+    page,
+    pageSize,
+  };
 }
 
 /** The staff tiers the Team page lists; customers belong to the Users page. */
@@ -51,5 +64,7 @@ export async function getTeamUsers(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  return { users, total: users.length };
+  // The team list is small enough to page client-side; the metadata exists to
+  // satisfy the shared result shape.
+  return { users, total: users.length, page: 1, pageSize: users.length };
 }
