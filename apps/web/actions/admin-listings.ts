@@ -29,6 +29,8 @@ export interface AdminListingRow {
   moderationReason: string | null;
   inactiveAt: string | null;
   inactiveReason: string | null;
+  /** Set on a permanent delete; the dashboard must not offer Restore. */
+  deletedAt: string | null;
 }
 
 export interface AdminListingsQuery {

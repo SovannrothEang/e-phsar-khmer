@@ -5,7 +5,7 @@ import { Loader2Icon } from "lucide-react";
 import { loginSchema } from "@/schemas/login";
 import { useAppForm } from "@/components/form/hooks";
 import { login } from "@/actions/login";
-import type { SuspendedLogin } from "@/actions/login";
+
 import { startSocialLogin } from "@/actions/social";
 import {
   SOCIAL_CLOSE_POLL_MS,
@@ -23,14 +23,8 @@ import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   FieldDescription,
@@ -54,7 +48,7 @@ export function LoginForm({
     null,
   );
   // Set when the backend refuses a sign-in with 403 ACCOUNT_SUSPENDED.
-  const [suspended, setSuspended] = useState<SuspendedLogin | null>(null);
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const closePoll = useRef<number | null>(null);
 
   useEffect(() => {
@@ -172,13 +166,6 @@ export function LoginForm({
       }
     },
   });
-
-  const support = suspended?.support ?? {};
-  const contactRows = [
-    support.email ? { label: "Email", value: support.email } : null,
-    support.telegram ? { label: "Telegram", value: support.telegram } : null,
-    support.phone ? { label: "Phone", value: support.phone } : null,
-  ].filter((row): row is { label: string; value: string } => row !== null);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -328,50 +315,7 @@ export function LoginForm({
         .
       </FieldDescription>
 
-      {/*
-        A suspended account cannot sign in, so this dialog is the only place it
-        can read why and who to contact. The channels come from the runtime
-        settings, so a channel that is not configured is simply absent.
-      */}
-      <Dialog
-        open={suspended !== null}
-        onOpenChange={(open) => {
-          if (!open) setSuspended(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>This account is suspended</DialogTitle>
-            <DialogDescription>
-              {suspended?.reason ??
-                "An administrator has suspended this account. You cannot sign in until it is reviewed."}
-            </DialogDescription>
-          </DialogHeader>
-          {contactRows.length > 0 ? (
-            <div className="flex flex-col gap-2 text-sm">
-              <p className="font-medium">Contact us to resolve it:</p>
-              <ul className="flex flex-col gap-1">
-                {contactRows.map((row) => (
-                  <li key={row.label}>
-                    <span className="text-muted-foreground">{row.label}:</span>{" "}
-                    <span className="break-all">{row.value}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Contact support through the app&apos;s help channels to request a
-              review.
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSuspended(null)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </div>
   );
 }

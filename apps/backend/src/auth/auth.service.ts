@@ -178,6 +178,10 @@ export class AuthService {
         throw new UnauthorizedException('INVALID_CREDENTIALS');
       }
 
+      // A soft-deleted row can ALSO be suspended (self-delete keeps the
+      // phone, and staff can suspend such a row). Reviving it would clear a
+      // suspension nobody lifted, so the refusal wins.
+      await this.assertNotSuspended(recoverable);
       const revived = await this.revive(recoverable.id);
       await this.loginLockout.reset(dto.identifier);
       return this.finishLogin(revived, device);
@@ -278,11 +282,6 @@ export class AuthService {
       .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
       .limit(1);
 
-    // This endpoint bypasses loginWithPassword, so it needs its own
-    // suspension guard — otherwise a suspended account could mint tokens
-    // through the OTP login flow.
-    if (existing) await this.assertAccountActive(existing);
-
     // A legacy bare account (created before passwords were required) is
     // COMPLETED in place: possessing the OTP proves phone ownership, so the
     // submitted password (and names) become the account's. An account that
@@ -334,6 +333,14 @@ export class AuthService {
         throw new UnauthorizedException('Invalid or expired OTP');
       supabaseUser = data.user;
     }
+
+    // This endpoint bypasses loginWithPassword, so it needs its own
+    // suspension guard — otherwise a suspended account could mint tokens
+    // through the OTP login flow. Checked HERE, after the password and the
+    // OTP: asserting it any earlier let anyone who knows a phone number read
+    // the moderation reason and learn that the number belongs to an account.
+    if (existing) await this.assertAccountActive(existing);
+    if (recoverable) await this.assertNotSuspended(recoverable);
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
@@ -1287,12 +1294,27 @@ export class AuthService {
     return row ?? null;
   }
 
-  /** Clears the deletion. Idempotent — a concurrent sign-in may have won the race. */
+  /**
+   * Clears the deletion. Idempotent — a concurrent sign-in may have won the
+   * race. Deliberately does NOT touch `status`: a row can be soft-deleted and
+   * suspended at the same time, and only staff lift a suspension, so the
+   * `status: 'active'` this used to write turned a deleted-then-suspended
+   * account back into a live one.
+   */
   private async revive(userId: string): Promise<UserRow> {
     const [row] = await this.db
       .update(users)
+      // Only `deleted` rows can be revived; a suspended one is refused by the
+      // caller's `assertAccountActive` and this condition keeps a direct
+      // caller from clearing it.
       .set({ status: 'active', deletedAt: null })
-      .where(and(eq(users.id, userId), isNotNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.id, userId),
+          isNotNull(users.deletedAt),
+          eq(users.status, 'deleted'),
+        ),
+      )
       .returning();
     if (row) return row;
 
@@ -1302,6 +1324,10 @@ export class AuthService {
       .where(eq(users.id, userId))
       .limit(1);
     if (!current) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    // The update above cannot clear a suspension (its WHERE requires
+    // `status='deleted'`), so a suspended row must not fall through to token
+    // issuance through the race-loser path.
+    await this.assertNotSuspended(current);
     return current;
   }
 
@@ -1321,6 +1347,15 @@ export class AuthService {
     if (user.status !== 'active' || user.deletedAt) {
       throw await this.suspendedRefusal(user);
     }
+  }
+
+  /**
+   * A revival candidate is soft-deleted by definition, so it can never pass
+   * `assertAccountActive`. The one state that must still block it is a
+   * suspension: reviving would clear a decision nobody lifted.
+   */
+  private async assertNotSuspended(user: UserRow): Promise<void> {
+    if (user.status === 'suspended') throw await this.suspendedRefusal(user);
   }
 
   private async suspendedRefusal(user: UserRow): Promise<ForbiddenException> {

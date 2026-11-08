@@ -46,6 +46,8 @@ export interface AdminListingRow {
   moderationReason: string | null;
   inactiveAt: Date | null;
   inactiveReason: string | null;
+  /** Set on a permanent delete: the dashboard must not offer Restore. */
+  deletedAt: Date | null;
 }
 
 /**
@@ -110,6 +112,9 @@ export class AdminListingsService {
           moderationReason: listings.moderationReason,
           inactiveAt: listings.inactiveAt,
           inactiveReason: listings.inactiveReason,
+          // The admin table needs this to tell a legacy restorable removal
+          // from a permanent one (2026-11-08).
+          deletedAt: listings.deletedAt,
         })
         .from(listings)
         .leftJoin(users, eq(users.id, listings.userId))
@@ -231,7 +236,10 @@ export class AdminListingsService {
         : {
             type: 'listing.inactivated',
             title: `Your ad ${quoted} was set inactive`,
-            body: `Reason: ${why}. It is hidden from the marketplace. Edit it and publish again once the issue is fixed. ${this.renewalHint(row)}`,
+            // The owner cannot lift this any more (2026-11-08): `publish`
+            // answers LISTING_INACTIVE_BY_STAFF, so promising "edit it and
+            // publish again" would hand the seller a 403.
+            body: `Reason: ${why}. It is hidden from the marketplace and only an administrator can make it visible again. Edit it if something needs fixing, then contact support to have it reviewed.`,
             data: {
               listingId: row.id,
               listingTitle: row.title,
@@ -248,13 +256,5 @@ export class AdminListingsService {
         `Moderation notice for listing ${row.id} failed: ${String(error)}`,
       );
     }
-  }
-
-  /** Whether republishing will be free or spend one of the plan's renewals. */
-  private renewalHint(row: ListingRow): string {
-    const open = row.expiresAt !== null && row.expiresAt.getTime() > Date.now();
-    return open
-      ? 'Republishing is free while your 30-day window is still open.'
-      : 'Your 30-day window has lapsed; republishing uses one renewal.';
   }
 }

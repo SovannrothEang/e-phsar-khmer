@@ -88,10 +88,11 @@ export async function login(
         },
       };
     }
-    // The backend sends the HTTP status name in `code` ("UNAUTHORIZED") and the
-    // domain string in `message` ("INVALID_CREDENTIALS") — matching the code
-    // here could never be true, so the raw "INVALID_CREDENTIALS" leaked to the
-    // user. Match the message.
+    // The filter forwards a thrower's custom `code` when one is passed (that is
+    // what the ACCOUNT_SUSPENDED branch above relies on) and the HTTP status
+    // name otherwise. A plain credential failure carries no custom code: the
+    // domain string "INVALID_CREDENTIALS" arrives in `message`, which is why
+    // this matches on the message.
     const code = body?.error?.message ?? body?.error?.code;
     return {
       success: false as const,

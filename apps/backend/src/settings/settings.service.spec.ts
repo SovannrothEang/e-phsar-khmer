@@ -39,7 +39,7 @@ describe('SettingsService', () => {
     const { db } = makeDb([[]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.suspensionThreshold()).resolves.toBe(3);
+    await expect(service.reportAlertThreshold()).resolves.toBe(3);
   });
 
   it('returns every unset contact channel as absent', async () => {
@@ -53,7 +53,7 @@ describe('SettingsService', () => {
     const { db } = makeDb([[{ value: 5 }]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.suspensionThreshold()).resolves.toBe(5);
+    await expect(service.reportAlertThreshold()).resolves.toBe(5);
   });
 
   it('falls back and warns instead of throwing on an unreadable value', async () => {
@@ -61,7 +61,7 @@ describe('SettingsService', () => {
     const { db } = makeDb([[{ value: 'not-a-number' }]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.suspensionThreshold()).resolves.toBe(3);
+    await expect(service.reportAlertThreshold()).resolves.toBe(3);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -91,7 +91,7 @@ describe('SettingsService', () => {
     const service = new SettingsService(db as never);
 
     await expect(
-      service.set('reports.account_suspension_threshold', 0, 'admin-1'),
+      service.set('reports.alert_threshold', 0, 'admin-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(written).toHaveLength(0);
   });
@@ -100,10 +100,10 @@ describe('SettingsService', () => {
     const { db, written } = makeDb();
     const service = new SettingsService(db as never);
 
-    await service.set('reports.account_suspension_threshold', 4, 'admin-1');
+    await service.set('reports.alert_threshold', 4, 'admin-1');
 
     expect(written[0]).toMatchObject({
-      key: 'reports.account_suspension_threshold',
+      key: 'reports.alert_threshold',
       value: 4,
       updatedById: 'admin-1',
     });

@@ -334,7 +334,11 @@ export default function AdminListingsPage() {
           <RowActions
             id={row.id}
             actions={
-              row.moderatedAt
+              // A delete is permanent (2026-11-08): only a legacy removal
+              // (moderated before the marker column existed, so no deletedAt)
+              // or a staff inactivation can still come back. Offering Restore
+              // on a permanent removal would be a dead button.
+              row.moderatedAt && !row.deletedAt
                 ? [
                     {
                       label: "Restore",
@@ -488,8 +492,9 @@ export default function AdminListingsPage() {
             <DialogTitle>Remove listing</DialogTitle>
             <DialogDescription>
               &quot;{removing?.title}&quot; will be hidden everywhere and the
-              seller won&apos;t be able to republish it. You can restore it
-              later.
+              seller won&apos;t be able to republish it.{" "}
+              <strong>This cannot be undone.</strong> Use &quot;Set
+              inactive&quot; instead when the ad should stay recoverable.
             </DialogDescription>
           </DialogHeader>
           <Textarea

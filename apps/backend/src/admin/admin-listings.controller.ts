@@ -61,7 +61,10 @@ export class AdminListingsController {
   }
 
   @Post(':id/restore')
-  @ApiOperation({ summary: 'Undo a take-down or an inactivation' })
+  @ApiOperation({
+    summary:
+      'Undo an inactivation (a removal is permanent and answers 400 LISTING_DELETED_PERMANENTLY)',
+  })
   restore(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.restore(id);
   }

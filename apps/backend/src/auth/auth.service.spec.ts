@@ -242,7 +242,13 @@ function makeService(
     notifications as never,
     loginLockout as never,
     socialState as never,
+    makeSettings() as never,
   );
+}
+
+/** Runtime settings: the suspension refusal reads the support channels. */
+function makeSettings() {
+  return { supportContacts: jest.fn().mockResolvedValue({}) };
 }
 
 describe('AuthService', () => {
@@ -822,6 +828,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       notifications as never,
       makeLockout() as never,
       makeSocialState() as never,
+      makeSettings() as never,
     );
   }
 

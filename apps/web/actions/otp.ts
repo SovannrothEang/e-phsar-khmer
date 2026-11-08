@@ -25,7 +25,19 @@ interface OtpVerifyResponse {
 interface Envelope<T> {
   success?: boolean;
   data?: T;
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; details?: unknown };
+}
+
+/** The contact channels a suspended account can appeal through. */
+interface SuspensionSupport {
+  email?: string;
+  telegram?: string;
+  phone?: string;
+}
+
+interface SuspendedOtp {
+  reason: string | null;
+  support: SuspensionSupport;
 }
 
 /** Result of any OTP-send endpoint (request, resend). */
@@ -151,8 +163,24 @@ export async function verifyOtp(
     .catch(() => null)) as Envelope<OtpVerifyResponse> | null;
 
   if (!res.ok || !body?.success || !body.data) {
+    // A suspended account is not a code problem: the OTP form must show the
+    // same dialog the password form shows, with the reason and the contacts.
+    if (body?.error?.code === "ACCOUNT_SUSPENDED") {
+      const details = (body.error.details ?? {}) as {
+        reason?: string | null;
+        support?: SuspensionSupport;
+      };
+      return {
+        success: false as const,
+        error: body.error.message ?? "This account is suspended.",
+        suspended: {
+          reason: details.reason ?? body.error.message ?? null,
+          support: details.support ?? {},
+        } satisfies SuspendedOtp,
+      };
+    }
     return {
-      success: false,
+      success: false as const,
       error: body?.error?.message ?? "Invalid or expired code",
     };
   }

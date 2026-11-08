@@ -54,7 +54,7 @@ function setup(found: unknown[]) {
   };
   const notifications = { notifyStaff: jest.fn().mockResolvedValue(undefined) };
   const settings = {
-    suspensionThreshold: jest.fn().mockResolvedValue(3),
+    reportAlertThreshold: jest.fn().mockResolvedValue(3),
   };
   const service = new ReportsService(
     db as never,
@@ -69,6 +69,7 @@ function setup(found: unknown[]) {
     service,
     tx,
     sets,
+    db,
     listings,
     admin,
     adminListings,
@@ -240,17 +241,52 @@ describe('ReportsService.updateUserReportStatus', () => {
     expect(tx.insert).toBeUndefined();
   });
 
-  it('alerts staff once the account reaches the threshold', async () => {
-    const { service, notifications, settings } = setup([pending]);
-    settings.suspensionThreshold.mockResolvedValue(0);
+  it('alerts staff with the summed count once the threshold is reached', async () => {
+    const { service, notifications, settings, db } = setup([pending]);
+    settings.reportAlertThreshold.mockResolvedValue(3);
+    // account reports = 2, approved reports on the owner's ads = 1
+    db.select
+      .mockImplementationOnce(() => chain([{ value: 2 }]))
+      .mockImplementationOnce(() => chain([{ value: 1 }]));
+
     await service.updateUserReportStatus(
       'r1',
       { status: 'approved' },
       reviewer,
     );
+
     expect(notifications.notifyStaff).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'report.threshold' }),
+      expect.objectContaining({
+        type: 'report.threshold',
+        data: { targetUserId: 'u9', approvedReports: 3, threshold: 3 },
+      }),
     );
+  });
+
+  it('stays silent while the account is below the threshold', async () => {
+    const { service, notifications, settings, db } = setup([pending]);
+    settings.reportAlertThreshold.mockResolvedValue(3);
+    db.select
+      .mockImplementationOnce(() => chain([{ value: 1 }]))
+      .mockImplementationOnce(() => chain([{ value: 0 }]));
+
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('never alerts on a rejection', async () => {
+    const { service, notifications } = setup([pending]);
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'rejected' },
+      reviewer,
+    );
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
   });
 
   it('propagates a policy refusal (e.g. an admin reporting staff)', async () => {

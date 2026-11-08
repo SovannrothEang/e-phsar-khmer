@@ -705,12 +705,13 @@ export class ListingsService {
         ...this.liveConditions(),
         ...resolved.geo,
         ...this.feedConditions(query, { fuzzy }),
+        // A suspended seller's ads are hidden by a read rule, never by a write:
+        // reinstatement makes them visible again with no data change. In
+        // `common` — not `full` — so the total and the facet counts apply the
+        // same rule as the rows (every query below joins `users`).
+        eq(users.status, 'active'),
       ];
       const full = [...common, ...this.categoryConditions(resolved)];
-      // A suspended seller's ads are hidden by a read rule, never by a write:
-      // reinstatement makes them visible again with no data change. The feed
-      // already joins `users` for `sellerUsername`, so this costs nothing.
-      full.push(eq(users.status, 'active'));
       if (query.userId) full.push(eq(listings.userId, query.userId));
       const pageWhere = cursor
         ? [...full, cursorPredicate(cursor, ordering)]
@@ -1366,6 +1367,10 @@ export class ListingsService {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(listings)
+      // Required by the suspended-owner predicate in `common`; without it the
+      // count is invalid SQL ("missing FROM-clause entry for table users"),
+      // which is what broke every `includeTotal` search.
+      .leftJoin(users, eq(users.id, listings.userId))
       .where(and(...conditions));
     return row?.count ?? 0;
   }
@@ -1386,6 +1391,7 @@ export class ListingsService {
         .select({ slug: categories.slug, count })
         .from(listings)
         .innerJoin(categories, eq(listings.categoryId, categories.id))
+        .leftJoin(users, eq(users.id, listings.userId))
         .where(and(...common))
         .groupBy(categories.id)
         .orderBy(categories.sortOrder, categories.slug),
@@ -1397,6 +1403,7 @@ export class ListingsService {
               subcategories,
               eq(listings.subcategoryId, subcategories.id),
             )
+            .leftJoin(users, eq(users.id, listings.userId))
             .where(
               and(...common, eq(listings.categoryId, resolved.facetCategoryId)),
             )
@@ -1593,10 +1600,11 @@ export class ListingsService {
   }
 
   /**
-   * Staff hide — reversible by the owner. Unlike `moderate`, the row stays the
-   * owner's: it remains editable and `publish` reactivates it (free while its
-   * 30-day window is still open). A permanently removed row or an ad that was
-   * never published cannot be inactivated.
+   * Staff hide — reversible by STAFF only. Unlike `moderate`, the row stays the
+   * owner's and remains editable, but `publish` refuses it with
+   * `LISTING_INACTIVE_BY_STAFF`; `restoreInactive` is the only way back. A
+   * permanently removed row or an ad that was never published cannot be
+   * inactivated.
    */
   async inactivate(
     id: string,
@@ -1640,7 +1648,8 @@ export class ListingsService {
   }
 
   /**
-   * Staff undo of an inactivation (the owner's own path is `publish`). Same
+   * Staff undo of an inactivation — the only door, since 2026-11-08 the owner
+   * cannot republish a staff-hidden ad. Same
    * status derivation as `restoreModerated`.
    */
   async restoreInactive(id: string): Promise<ListingRow> {

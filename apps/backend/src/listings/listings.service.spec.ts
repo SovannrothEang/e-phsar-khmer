@@ -556,6 +556,22 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(calls[0][0]).toHaveProperty('sellerVerifiedAccount');
   });
 
+  it('hides a suspended seller from the feed page, the total and the facets', async () => {
+    // The predicate lives in `common`, so every query built from it must
+    // reference `users` — and each of those queries must therefore JOIN it.
+    const cats = [{ slug: 'cars-and-vehicles', count: 1 }];
+    const [page, count, facets] = queue([], [{ count: 1 }], [cats]);
+    await service.findFeed({ includeTotal: true, includeFacets: true });
+
+    expect(whereOf(page).sql).toContain('"users"."status"');
+    expect(whereOf(count).sql).toContain('"users"."status"');
+    // The count is the query that shipped broken: it selected from `listings`
+    // with no `users` in FROM, so Postgres rejected it with 42P01. Every
+    // query built from the shared predicate must therefore join the table.
+    expect(count.leftJoin?.[0]).toBeDefined();
+    expect(facets.leftJoin?.[0]).toBeDefined();
+  });
+
   it('filters price on the final (discounted) price', async () => {
     const [page] = queue([]);
     await service.findFeed({ minPrice: 100, maxPrice: 500 });

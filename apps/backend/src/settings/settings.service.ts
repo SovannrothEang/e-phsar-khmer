@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { appSettings } from '../db/schema/app-settings.schema';
@@ -59,14 +59,14 @@ export class SettingsService {
     const [row] = await executor
       .select({ value: appSettings.value })
       .from(appSettings)
-      .where(inArray(appSettings.key, [key]))
+      .where(eq(appSettings.key, key))
       .limit(1);
 
     return this.parse(key, row?.value) as T;
   }
 
-  async suspensionThreshold(executor: DbExecutor = this.db): Promise<number> {
-    return this.get<number>('reports.account_suspension_threshold', executor);
+  async reportAlertThreshold(executor: DbExecutor = this.db): Promise<number> {
+    return this.get<number>('reports.alert_threshold', executor);
   }
 
   /** Only the channels that are actually configured; empty strings are dropped. */

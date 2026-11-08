@@ -256,7 +256,7 @@ export class ReportsService {
               eq(listingReports.status, 'approved'),
             ),
           ),
-        this.settings.suspensionThreshold(),
+        this.settings.reportAlertThreshold(),
       ]);
 
       const approved = (accountReports?.value ?? 0) + (postReports?.value ?? 0);

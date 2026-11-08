@@ -9,7 +9,7 @@ import { z } from 'zod';
  * written by an older deploy, not a TypeScript literal.
  */
 export const SETTING_DEFINITIONS = {
-  'reports.account_suspension_threshold': {
+  'reports.alert_threshold': {
     schema: z.coerce.number().int().min(1).max(100),
     default: 3,
   },
