@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { PaymentsController } from './payment.controller';
 import { AbaPaywayWebhookController } from './webhooks/aba-payway-webhook.controller';
+import { InternalReconcileController } from './internal/internal-reconcile.controller';
 import { PAYMENT_GATEWAY_PROVIDERS, PaymentGatewayRegistry } from './providers';
 import { AbaPaywayProvider } from './providers/aba-payway/aba-payway.provider';
 import { BakongProvider } from './providers/bakong/bakong.provider';
@@ -15,10 +16,12 @@ import { PaymentPollOutboxHandler } from './outbox/payment-poll-outbox-handler';
 import { PaymentSettledOutboxHandler } from './outbox/payment-settled-outbox-handler';
 import { PaymentProcessor } from './processors/payment.processor';
 import { PaymentReconciler } from './reconciler/payment-reconciler.service';
+import { ProviderEventRedrive } from './reconciler/provider-event-redrive.service';
 import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconciler.service';
 import { OutboxModule } from '../outbox/outbox.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
+import { backgroundProviders } from '../config/runtime-role';
 
 @Module({
   imports: [
@@ -49,7 +52,13 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     NotificationsModule,
     SubscriptionsCoreModule,
   ],
-  controllers: [PaymentsController, AbaPaywayWebhookController],
+  controllers: [
+    PaymentsController,
+    AbaPaywayWebhookController,
+    // The external pinger/cron wake-up for a provider with no webhook; the
+    // secret header is the whole auth (see the controller's doc comment).
+    InternalReconcileController,
+  ],
   providers: [
     PaymentGatewayRegistry,
     AbaPaywayProvider,
@@ -70,11 +79,16 @@ import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.mod
     PaymentEventOutboxHandler,
     PaymentPollOutboxHandler,
     // Consumes the BullMQ job kinds — the first @Processor in this repo.
-    PaymentProcessor,
+    // Dropped entirely in the api role: a @Processor opens a blocking Redis
+    // connection even when it never runs a job (see config/runtime-role.ts).
+    ...backgroundProviders([PaymentProcessor]),
     // The one poller for a provider with no webhook, armed by payment.issued:
     // settles any unresolved attempt straight from Postgres, so a payment made
     // while the app was down still activates. See reconciler/payment-reconciler.service.ts.
     PaymentReconciler,
+    // Re-drives provider events whose BullMQ job dead-lettered, and purges
+    // ingestion rows past the 30-day dedupe window. Called from the reconciler.
+    ProviderEventRedrive,
     // Lets a payer's own GET /payments/:id nudge a settle along (throttled).
     PaymentOnDemandReconciler,
     // Consumes the business-level payment.succeeded event — notifies the

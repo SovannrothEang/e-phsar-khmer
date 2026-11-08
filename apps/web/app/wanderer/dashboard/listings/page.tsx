@@ -334,16 +334,13 @@ export default function AdminListingsPage() {
           <RowActions
             id={row.id}
             actions={
-              row.moderatedAt
-                ? [
-                    {
-                      label: "Restore",
-                      icon: <RotateCcw className="mr-2 size-4" />,
-                      tone: "success",
-                      onSelect: () => void restore(row),
-                    },
-                  ]
-                : row.status === "inactive"
+              // A delete is permanent (2026-11-08): only a legacy removal
+              // (moderated before the marker column existed, so no deletedAt)
+              // or a staff inactivation can still come back. Offering Restore
+              // on a permanent removal would be a dead button.
+              row.deletedAt
+                ? []
+                : row.moderatedAt
                   ? [
                       {
                         label: "Restore",
@@ -351,31 +348,40 @@ export default function AdminListingsPage() {
                         tone: "success",
                         onSelect: () => void restore(row),
                       },
-                      {
-                        label: "Remove",
-                        icon: <ShieldOff className="mr-2 size-4" />,
-                        tone: "danger",
-                        onSelect: () => setRemoving(row),
-                      },
                     ]
-                  : [
-                      {
-                        label: "View listing",
-                        icon: <Eye className="mr-2 size-4" />,
-                        onSelect: () =>
-                          window.open(
-                            viewHref(row),
-                            "_blank",
-                            "noopener,noreferrer",
-                          ),
-                      },
-                      {
-                        label: "Remove",
-                        icon: <ShieldOff className="mr-2 size-4" />,
-                        tone: "danger",
-                        onSelect: () => setRemoving(row),
-                      },
-                    ]
+                  : row.status === "inactive"
+                    ? [
+                        {
+                          label: "Restore",
+                          icon: <RotateCcw className="mr-2 size-4" />,
+                          tone: "success",
+                          onSelect: () => void restore(row),
+                        },
+                        {
+                          label: "Remove",
+                          icon: <ShieldOff className="mr-2 size-4" />,
+                          tone: "danger",
+                          onSelect: () => setRemoving(row),
+                        },
+                      ]
+                    : [
+                        {
+                          label: "View listing",
+                          icon: <Eye className="mr-2 size-4" />,
+                          onSelect: () =>
+                            window.open(
+                              viewHref(row),
+                              "_blank",
+                              "noopener,noreferrer",
+                            ),
+                        },
+                        {
+                          label: "Remove",
+                          icon: <ShieldOff className="mr-2 size-4" />,
+                          tone: "danger",
+                          onSelect: () => setRemoving(row),
+                        },
+                      ]
             }
           />
         ),
@@ -488,8 +494,9 @@ export default function AdminListingsPage() {
             <DialogTitle>Remove listing</DialogTitle>
             <DialogDescription>
               &quot;{removing?.title}&quot; will be hidden everywhere and the
-              seller won&apos;t be able to republish it. You can restore it
-              later.
+              seller won&apos;t be able to republish it.{" "}
+              <strong>This cannot be undone.</strong> Use &quot;Set
+              inactive&quot; instead when the ad should stay recoverable.
             </DialogDescription>
           </DialogHeader>
           <Textarea

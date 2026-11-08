@@ -4,6 +4,11 @@
  * and its poll chain can die — so the reconciler keeps asking about it for a
  * grace window and settles it if the money turns out to have arrived.
  *
+ * `EXPIRED` is the same situation from the other side: it is the failure we
+ * stamp on a webhook-only attempt (ABA) whose checkout passed `expires_at`
+ * without a callback. ABA can still report the payment afterwards (a delayed
+ * or lost callback), so money can land after we gave up.
+ *
  * Deliberately excludes `CHARGE_GATEWAY_ERROR` (no QR/charge ever existed, so
  * there is nothing a payer could have paid) and `PROVIDER_NOT_REGISTERED` /
  * `GATEWAY_NOT_CONFIGURED` (config problems the reconciler cannot resolve).
@@ -11,6 +16,7 @@
 export const RECOVERABLE_FAILURE_CODES = [
   'POLL_EXPIRED',
   'POLL_GATEWAY_ERROR',
+  'EXPIRED',
 ] as const;
 
 export interface ReconcilableAttempt {

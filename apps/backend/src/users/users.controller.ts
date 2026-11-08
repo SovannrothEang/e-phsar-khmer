@@ -304,8 +304,12 @@ export class UsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  getUser(@Param('id') id: string) {
-    return this.usersService.findById(id);
+  @ApiOperation({
+    summary: 'Get a public profile by user ID',
+    description:
+      'Requires auth, but serves only the public-profile shape — never phone, email, role or moderation state.',
+  })
+  getUser(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.getPublicProfileById(id);
   }
 }

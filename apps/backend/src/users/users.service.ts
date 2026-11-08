@@ -84,7 +84,8 @@ export interface FollowUserItem {
  * Everything the public profile page renders. Deliberately an explicit
  * allow-list rather than `PublicUser`: this shape is served to anonymous
  * callers, so phone, email, role, status and moderation fields must never be
- * part of it — the same over-exposure `GET /users/:id` is already flagged for.
+ * part of it. `GET /users/:id` serves the same projection to signed-in
+ * callers, because a seller's id is public in listings.
  */
 export interface PublicProfile {
   id: string;
@@ -188,7 +189,9 @@ export class UsersService {
 
     let currentUser: UserRow | undefined;
 
-    if (hasLocationChange || hasNameChange) {
+    const hasEmailChange = dto.email !== undefined;
+
+    if (hasLocationChange || hasNameChange || hasEmailChange) {
       [currentUser] = await this.db
         .select()
         .from(users)
@@ -221,7 +224,15 @@ export class UsersService {
       }
     }
     if (dto.company !== undefined) updateData.company = dto.company;
-    if (dto.email !== undefined) updateData.email = dto.email;
+    if (dto.email !== undefined) {
+      updateData.email = dto.email;
+      // Verification belongs to the address it was granted for. Changing (or
+      // clearing) the email drops the proof, so a social login can never link
+      // on the strength of a flag left over from a previous address.
+      const next = (dto.email ?? '').trim().toLowerCase();
+      const current = (currentUser?.email ?? '').trim().toLowerCase();
+      if (next !== current) updateData.emailVerifiedAt = null;
+    }
     if (dto.provinceId !== undefined) updateData.provinceId = dto.provinceId;
     if (dto.districtId !== undefined) updateData.districtId = dto.districtId;
     if (dto.communeId !== undefined) updateData.communeId = dto.communeId;
@@ -945,6 +956,21 @@ export class UsersService {
 
   /** The public profile, looked up by handle. */
   async getPublicProfile(username: string): Promise<PublicProfile> {
+    return this.loadPublicProfile({ username });
+  }
+
+  /** The same projection, looked up by id for `GET /users/:id`. */
+  async getPublicProfileById(id: string): Promise<PublicProfile> {
+    return this.loadPublicProfile({ id });
+  }
+
+  /**
+   * One allow-list projection for both public reads, so `GET /users/:id`
+   * cannot drift back into serving the full user row.
+   */
+  private async loadPublicProfile(
+    match: { id: string } | { username: string },
+  ): Promise<PublicProfile> {
     const [user] = await this.db
       .select({
         id: users.id,
@@ -962,7 +988,9 @@ export class UsersService {
       // user report must take the profile down, not just block its login.
       .where(
         and(
-          eq(users.username, username),
+          'id' in match
+            ? eq(users.id, match.id)
+            : eq(users.username, match.username),
           isNull(users.deletedAt),
           eq(users.status, 'active'),
         ),

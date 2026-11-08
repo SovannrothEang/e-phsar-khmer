@@ -148,6 +148,20 @@ describe('AbaPaywayProvider.verifyWebhookSignature', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('accepts a signature computed over the raw bytes when the wire form differs', () => {
+    // `1.50` with its trailing zero exists only on the wire — the parsed form
+    // is `1.5` — so this signature only verifies if the raw body is used.
+    // Keys sorted: payment_amount, status, tran_id.
+    const raw = '{"tran_id":"T1","payment_amount":1.50,"status":0}';
+    const signature = createHmac('sha512', API_KEY)
+      .update('1.500T1', 'utf-8')
+      .digest('base64');
+
+    expect(
+      makeProvider().verifyWebhookSignature(raw, { [SIG]: signature }),
+    ).toEqual({ valid: true });
+  });
+
   it('is independent of key order and of 10.50 vs 10.5 in the raw text', () => {
     const raw =
       '{"status":"0","payment_amount":10.50,"tran_id":"T1","apv":"1"}';

@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/Colors";
+import { useColorScheme } from "nativewind";
 import { StatusBar, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,23 +13,28 @@ interface SafeAreaViewProps {
 const SafeAreaView = ({
   children,
   className = "",
-  statusBarColor = Colors.neutral.surface,
-  statusBarStyle = "dark-content",
+  statusBarColor,
+  statusBarStyle,
 }: SafeAreaViewProps) => {
   const insets = useSafeAreaInsets();
+  const { colorScheme } = useColorScheme();
+  const isDark = colorScheme === "dark";
+  // Match the header/page background in dark mode instead of a white strip.
+  const barColor =
+    statusBarColor ?? (isDark ? "#111827" : Colors.neutral.surface);
+  const barStyle =
+    statusBarStyle ?? (isDark ? "light-content" : "dark-content");
 
   return (
     <View className={`flex-1 bg-background ${className}`}>
-      <StatusBar
-        barStyle={statusBarStyle}
-        backgroundColor="transparent"
-        translucent={true}
-      />
+      {/* RN 0.88 / SDK 58 edge-to-edge no longer lets the app paint the
+          system status bar; the colored inset below provides the backdrop. */}
+      <StatusBar barStyle={barStyle} />
       {/* Colored background for status bar area */}
       <View
         style={{
           height: insets.top,
-          backgroundColor: statusBarColor,
+          backgroundColor: barColor,
         }}
       />
       {/* Content area */}

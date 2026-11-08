@@ -12,6 +12,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [FilesModule, NotificationsModule],
   controllers: [UsersController],
   providers: [UsersService, BillingAddressesService, AccountPurgeService],
-  exports: [UsersService],
+  exports: [UsersService, AccountPurgeService],
 })
 export class UsersModule {}

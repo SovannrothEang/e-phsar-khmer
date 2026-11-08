@@ -74,12 +74,13 @@ export type Post = {
   expiresInDays?: number;
   /**
    * Staff "set inactive" reason — Manage Ads shows it so the owner knows what
-   * to fix before republishing. Null/absent on every public feed row.
+   * was wrong. Lifting the hide is staff work (the owner cannot republish an
+   * inactive ad). Null/absent on every public feed row.
    */
   inactiveReason?: string | null;
   /**
-   * Staff "set inactive" — the ad stays in the Active tab, flagged on the row;
-   * the owner's fix is to edit and republish it.
+   * Staff "set inactive" — the ad stays in the Active tab, flagged on the row,
+   * and only staff can make it visible again.
    */
   inactive?: boolean;
 };

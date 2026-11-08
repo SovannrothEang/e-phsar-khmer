@@ -5,6 +5,7 @@ import { Loader2Icon } from "lucide-react";
 import { loginSchema } from "@/schemas/login";
 import { useAppForm } from "@/components/form/hooks";
 import { login } from "@/actions/login";
+
 import { startSocialLogin } from "@/actions/social";
 import {
   SOCIAL_CLOSE_POLL_MS,
@@ -22,6 +23,8 @@ import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   FieldDescription,
@@ -44,6 +47,8 @@ export function LoginForm({
   const [socialPending, setSocialPending] = useState<SocialProvider | null>(
     null,
   );
+  // Set when the backend refuses a sign-in with 403 ACCOUNT_SUSPENDED.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const closePoll = useRef<number | null>(null);
 
   useEffect(() => {
@@ -149,7 +154,11 @@ export function LoginForm({
         // E2E device is registered by the provider on the destination page.
         const result = await login(value, device ?? undefined);
         if (result && !result.success) {
-          toast.error(result.error || "Login failed.");
+          if ("suspended" in result && result.suspended) {
+            setSuspended(result.suspended);
+          } else {
+            toast.error(result.error || "Login failed.");
+          }
         }
       } catch (error) {
         if (isServerRedirect(error)) return;
@@ -305,6 +314,8 @@ export function LoginForm({
         </Link>
         .
       </FieldDescription>
+
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </div>
   );
 }

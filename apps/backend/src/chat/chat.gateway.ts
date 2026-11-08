@@ -8,6 +8,7 @@ import {
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { ValidationError } from 'class-validator';
@@ -23,6 +24,7 @@ import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { users } from '../db/schema/users.schema';
 import { LoginDevicesService } from '../auth/login-devices.service';
+import { isIssuedBeforeCutoff } from '../auth/token-cutoff.util';
 import { ConnectionRegistry } from './connection-registry';
 import type { ConnectionInfo } from './connection-registry';
 import { ChatService } from './chat.service';
@@ -55,6 +57,11 @@ export class ChatGateway
   // into someone else's inbox) and had no gate at all before this.
   private static readonly SEND_LIMIT = 30;
   private static readonly SEND_WINDOW_MS = 60_000;
+  // A backpressured socket is holding this much unsent output (one message
+  // frame is a few KB). Past it the peer is gone or can't read fast enough to
+  // ever catch up, so the connection is evicted instead of growing the
+  // process's memory — the client reconnects and gets its catch-up delta.
+  private static readonly MAX_BUFFERED_BYTES = 1_048_576;
 
   private readonly conns = new WeakMap<WebSocket, ConnectionInfo>();
   private readonly sendTimestamps = new Map<string, number[]>();
@@ -67,6 +74,7 @@ export class ChatGateway
     private readonly pubsub: ChatPubSubService,
     private readonly loginDevices: LoginDevicesService,
     @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit() {
@@ -77,39 +85,79 @@ export class ChatGateway
   }
 
   private deliverLocal(event: ChatPushEvent) {
-    if (!this.registry.isOnline(event.targetUserId)) return;
+    const conns = this.registry.connectionsFor(event.targetUserId);
+    if (conns.length === 0) return;
+    // A suspension ends the session, so there is nothing to deliver: close
+    // every socket this user holds on this instance and stop tracking it.
+    if (event.type === 'session_ended') {
+      for (const conn of conns) {
+        this.evictSocket(conn, event.payload.reason);
+      }
+      return;
+    }
     const frame = JSON.stringify(
       'payload' in event
         ? { type: event.type, payload: event.payload }
         : { type: event.type },
     );
-    for (const conn of this.registry.connectionsFor(event.targetUserId)) {
-      conn.socket.send(frame);
+    // One socket per tab, and a user can have several tabs open. A socket that
+    // died without a close frame, or a slow consumer whose send buffer keeps
+    // growing, must not throw here and drop the frame for the other tabs.
+    for (const conn of conns) {
+      if (conn.socket.readyState !== conn.socket.OPEN) continue;
+      if (conn.socket.bufferedAmount > ChatGateway.MAX_BUFFERED_BYTES) {
+        this.evictSocket(conn, 'Send buffer exceeded');
+        continue;
+      }
+      try {
+        conn.socket.send(frame);
+      } catch (err) {
+        this.logger.warn(`Dropped chat push to ${conn.userId}: ${String(err)}`);
+        this.evictSocket(conn, 'Send failed');
+      }
     }
+  }
+
+  /** Close a broken/slow socket and stop targeting it in this process. */
+  private evictSocket(conn: ConnectionInfo, reason: string) {
+    try {
+      conn.socket.close(4008, reason);
+    } catch {
+      // Already closing — remove it either way.
+    }
+    this.registry.remove(conn.userId, conn);
+    this.conns.delete(conn.socket);
   }
 
   async handleConnection(socket: WebSocket, req: IncomingMessage) {
     try {
-      // Browser WS API cannot set headers. Four fallbacks:
-      // 1. ?ticket= short-lived WS ticket (POST /chats/ws-ticket) — the only
-      //    one that works when the backend is on a different origin than the
-      //    web app (tunnels, separate API domain): cookies don't cross hosts
-      // 2. ?token= query param (explicit)
-      // 3. Authorization header (non-browser clients)
-      // 4. user_access_token httpOnly cookie (same-host WS upgrades send cookies)
+      // Browser WS API cannot set headers, so the browser path is the
+      // short-lived ticket from POST /chats/ws-ticket in the query string.
+      // A full access token is never accepted as a WS credential: `typ: 'ws'`
+      // is enforced below for every source. The old cookie path is gone too —
+      // it carried a full access token and no in-repo client uses it
+      // (use-chat-ws.ts always fetches a ticket).
       const url = new URL(
         req.url ?? '/',
         `http://${req.headers.host ?? 'localhost'}`,
       );
-      const ticket = url.searchParams.get('ticket');
-      const token =
-        ticket ??
-        url.searchParams.get('token') ??
-        this.extractBearerToken(req.headers.authorization) ??
-        this.extractCookieToken(req.headers.cookie);
 
-      if (!token) {
-        socket.close(4001, 'Missing token');
+      // Origin gate before any JWT/DB work. A browser WebSocket upgrade is not
+      // covered by CORS, so without this a foreign page could open a socket
+      // with the visitor's cookies. Absent Origin (native apps, non-browser
+      // clients) is allowed: the ticket is the credential, and it cannot be
+      // obtained by a cross-site page.
+      if (!this.isOriginAllowed(req.headers.origin)) {
+        socket.close(4001, 'Origin not allowed');
+        return;
+      }
+
+      const ticket =
+        url.searchParams.get('ticket') ??
+        this.extractBearerToken(req.headers.authorization);
+
+      if (!ticket) {
+        socket.close(4001, 'Missing ticket');
         return;
       }
 
@@ -117,22 +165,43 @@ export class ChatGateway
         sub: string;
         typ?: string;
         sid?: string;
-      }>(token);
-      if (ticket && claims.typ !== WS_TICKET_TYP) {
+        iat?: number;
+      }>(ticket);
+      if (claims.typ !== WS_TICKET_TYP) {
         socket.close(4001, 'Invalid ticket');
         return;
       }
 
       // Parity with the REST JwtStrategy: signature/expiry alone isn't
       // enough — a soft-deleted user must not keep a working socket until
-      // their access token happens to expire.
+      // their ticket happens to expire.
       const [user] = await this.db
-        .select({ id: users.id })
+        .select({
+          id: users.id,
+          status: users.status,
+          tokensValidAfter: users.tokensValidAfter,
+        })
         .from(users)
         .where(and(eq(users.id, claims.sub), isNull(users.deletedAt)))
         .limit(1);
       if (!user) {
         socket.close(4001, 'Invalid session');
+        return;
+      }
+
+      // Parity with the REST JwtStrategy, which rejects any non-active status
+      // on every request. Until 2026-11-08 this check was missing here, so a
+      // socket outlived a suspension for as long as its ticket lived.
+      if (user.status !== 'active') {
+        socket.close(4001, 'Account suspended');
+        return;
+      }
+
+      // A password reset bumps tokensValidAfter. The ticket may have been
+      // minted seconds before the reset, so the cutoff must be applied here,
+      // in the same row lookup that already proves the user still exists.
+      if (isIssuedBeforeCutoff(claims.iat, user.tokensValidAfter)) {
+        socket.close(4001, 'Session revoked');
         return;
       }
 
@@ -173,10 +242,16 @@ export class ChatGateway
     return header.slice(7);
   }
 
-  private extractCookieToken(cookieHeader: string | undefined): string | null {
-    if (!cookieHeader) return null;
-    const match = cookieHeader.match(/(?:^|;\s*)user_access_token=([^;]+)/);
-    return match?.[1] ?? null;
+  /**
+   * Exact match against the same `frontendOrigins` list CORS uses in
+   * `main.ts`. An unset/empty list rejects every browser Origin on purpose
+   * (fail closed): a deployment that wants browser sockets must configure
+   * FRONTEND_ORIGINS, while native clients send no Origin at all.
+   */
+  private isOriginAllowed(origin: string | undefined): boolean {
+    if (!origin) return true;
+    const allowed = this.config.get<string[]>('frontendOrigins') ?? [];
+    return allowed.includes(origin);
   }
 
   handleDisconnect(socket: WebSocket) {

@@ -76,6 +76,11 @@ export class AccountPurgeService implements OnModuleInit, OnModuleDestroy {
     );
     this.bootTimer.unref?.();
     this.timer = setInterval(() => void this.sweep(), intervalMs);
+    // Observable on purpose: "is the purge armed on this instance?" is the
+    // first question when a closed account is still present past its window.
+    this.logger.log(
+      `Account purge armed: every ${Math.round(intervalMs / 60_000)} min, first sweep in ~1 min`,
+    );
   }
 
   onModuleDestroy(): void {

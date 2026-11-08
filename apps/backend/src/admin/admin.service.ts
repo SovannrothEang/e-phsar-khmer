@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -24,6 +26,8 @@ import {
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { users, userPhones } from '../db/schema/users.schema';
+import { userLoginDevices } from '../db/schema/login-devices.schema';
+import { ChatPubSubService } from '../chat/chat-pubsub.service';
 import type { UserRow } from '../db/schema/users.schema';
 import { listings } from '../db/schema/listings.schema';
 import { userSubscriptions } from '../db/schema/subscriptions.schema';
@@ -72,7 +76,12 @@ export interface TimeseriesPoint {
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbClient) {}
+  private readonly logger = new Logger(AdminService.name);
+
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbClient,
+    private readonly pubsub: ChatPubSubService,
+  ) {}
 
   private toPublic(user: UserRow): PublicUser {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -360,21 +369,41 @@ export class AdminService {
     dto: UpdateUserDto,
     requester: RequestUser,
   ): Promise<PublicUser> {
+    // A suspension with no stated reason is not appealable — the login refusal
+    // renders `statusReason`, so an empty one is a 400 at the boundary rather
+    // than a blocked account with nothing to read.
+    const suspending = dto.status === 'suspended';
+    const statusReason = dto.statusReason?.trim() || null;
+    if (suspending && !statusReason) {
+      throw new BadRequestException('STATUS_REASON_REQUIRED');
+    }
+
     // Who may change what is decided in the transaction below, against the
     // locked target row (authorizeManage).
     const patch: Partial<UserRow> = {};
     if (dto.username !== undefined) patch.username = dto.username;
     if (dto.role !== undefined) patch.role = dto.role;
-    if (dto.status !== undefined) patch.status = dto.status;
+    if (dto.status !== undefined && !suspending) patch.status = dto.status;
+    if (suspending) {
+      // Applied by `suspendAccount` below, which owns the status, the reason
+      // triple and the session revocation as one unit.
+      patch.status = undefined;
+    }
     if (dto.firstName !== undefined) patch.firstName = dto.firstName;
     if (dto.lastName !== undefined) patch.lastName = dto.lastName;
-    if (dto.email !== undefined) patch.email = dto.email;
+    if (dto.email !== undefined) {
+      patch.email = dto.email;
+      // An admin edit is not a verification: any email change drops the proof
+      // (conservative even when the value is unchanged).
+      patch.emailVerifiedAt = null;
+    }
     if (dto.password)
       patch.passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     if (dto.phones?.[0]) patch.primaryPhone = dto.phones[0];
 
+    let updatedPublic: PublicUser;
     try {
-      return await this.db.transaction(async (tx) => {
+      updatedPublic = await this.db.transaction(async (tx) => {
         await this.authorizeManage(tx, requester, id, {
           role: dto.role,
           status: dto.status,
@@ -382,6 +411,26 @@ export class AdminService {
 
         if (Object.keys(patch).length > 0) {
           await tx.update(users).set(patch).where(eq(users.id, id));
+        }
+
+        // Suspension is a session-ending state: `suspendAccount` moves the
+        // bearer cutoff and revokes every device row in this same
+        // transaction, so access tokens, refresh chains and sid-less legacy
+        // tokens all die on their next request.
+        if (suspending) {
+          await this.suspendAccount(tx, id, statusReason!, requester.id);
+        } else if (dto.status === 'active') {
+          // Reinstating clears the triple: a stale "why you were suspended"
+          // must not survive on an active account. The who/when/why of a past
+          // suspension is deliberately not kept — there is no appeal record.
+          await tx
+            .update(users)
+            .set({
+              statusReason: null,
+              suspendedAt: null,
+              suspendedById: null,
+            })
+            .where(eq(users.id, id));
         }
 
         if (dto.phones) {
@@ -410,6 +459,67 @@ export class AdminService {
       }
       throw err;
     }
+
+    // After the commit, never inside it: a suspension that rolled back must not
+    // close the account's sockets. Best-effort — the socket layer is an
+    // optimisation over REST refusal, and the next request fails anyway.
+    if (suspending) await this.announceSuspension(id);
+    return updatedPublic;
+  }
+
+  /**
+   * Tells every instance to close this account's live sockets. The handshake
+   * check only refuses new connections, so a socket opened before the
+   * suspension would otherwise keep sending chat messages.
+   */
+  async announceSuspension(userId: string): Promise<void> {
+    try {
+      await this.pubsub.publish({
+        targetUserId: userId,
+        type: 'session_ended',
+        payload: { reason: 'Account suspended' },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not close sockets for suspended ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Ends an account's access in one place: status, the reason triple, the
+   * bearer cutoff and every device row. Callers pass their own transaction so
+   * a suspension commits with whatever justified it (an admin edit, an
+   * approved report). Reinstatement is not symmetric — it is a status write
+   * plus clearing the triple, and deliberately keeps no appeal history.
+   */
+  async suspendAccount(
+    tx: DbExecutor,
+    targetUserId: string,
+    reason: string,
+    actorId: string,
+  ): Promise<void> {
+    const now = new Date();
+    await tx
+      .update(users)
+      .set({
+        status: 'suspended',
+        statusReason: reason,
+        suspendedAt: now,
+        suspendedById: actorId,
+        tokensValidAfter: now,
+        updatedAt: now,
+      })
+      .where(eq(users.id, targetUserId));
+    await tx
+      .update(userLoginDevices)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(userLoginDevices.userId, targetUserId),
+          isNull(userLoginDevices.revokedAt),
+        ),
+      );
   }
 
   async deleteUser(

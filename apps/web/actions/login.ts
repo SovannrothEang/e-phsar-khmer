@@ -19,6 +19,19 @@ interface LoginResponse {
   newDevice?: boolean;
 }
 
+/** The contact channels a suspended account can appeal through. */
+export interface SuspensionSupport {
+  email?: string;
+  telegram?: string;
+  phone?: string;
+}
+
+export interface SuspendedLogin {
+  /** The staff-written reason, when the suspension recorded one. */
+  reason: string | null;
+  support: SuspensionSupport;
+}
+
 export async function login(
   unsafeData: z.infer<typeof loginSchema>,
   device?: DeviceIdentity,
@@ -54,17 +67,35 @@ export async function login(
   const body = (await res.json().catch(() => null)) as {
     success?: boolean;
     data?: LoginResponse;
-    error?: { code?: string; message?: string };
+    error?: { code?: string; message?: string; details?: unknown };
   } | null;
 
   if (!res.ok || !body?.success || !body.data) {
-    // The backend sends the HTTP status name in `code` ("UNAUTHORIZED") and the
-    // domain string in `message` ("INVALID_CREDENTIALS") — matching the code
-    // here could never be true, so the raw "INVALID_CREDENTIALS" leaked to the
-    // user. Match the message.
+    // A suspension is not a credential problem: the account is blocked and
+    // the only way forward is contacting staff, so it is returned as its own
+    // shape for the form to render a dialog instead of a toast.
+    if (body?.error?.code === "ACCOUNT_SUSPENDED") {
+      const details = (body.error.details ?? {}) as {
+        reason?: string | null;
+        support?: SuspensionSupport;
+      };
+      return {
+        success: false as const,
+        error: body.error.message ?? "This account is suspended.",
+        suspended: {
+          reason: details.reason ?? body.error.message ?? null,
+          support: details.support ?? {},
+        },
+      };
+    }
+    // The filter forwards a thrower's custom `code` when one is passed (that is
+    // what the ACCOUNT_SUSPENDED branch above relies on) and the HTTP status
+    // name otherwise. A plain credential failure carries no custom code: the
+    // domain string "INVALID_CREDENTIALS" arrives in `message`, which is why
+    // this matches on the message.
     const code = body?.error?.message ?? body?.error?.code;
     return {
-      success: false,
+      success: false as const,
       error:
         code === "INVALID_CREDENTIALS"
           ? "Invalid username or password"

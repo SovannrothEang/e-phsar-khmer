@@ -13,6 +13,7 @@ import {
   ListingExpiryProcessor,
   ListingExpiryScheduler,
 } from './listing-expiry.processor';
+import { backgroundProviders } from '../config/runtime-role';
 
 @Module({
   imports: [
@@ -33,7 +34,8 @@ import {
     ListingsService,
     ListingExpiryService,
     ListingExpiryScheduler,
-    ListingExpiryProcessor,
+    // No BullMQ worker in the api role — see config/runtime-role.ts.
+    ...backgroundProviders([ListingExpiryProcessor]),
   ],
   exports: [ListingsService],
 })

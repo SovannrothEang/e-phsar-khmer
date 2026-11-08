@@ -12,11 +12,13 @@ import {
   asc,
   desc,
   eq,
+  gt,
   gte,
   inArray,
   isNotNull,
   lt,
   notInArray,
+  or,
 } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
@@ -27,6 +29,7 @@ import { paymentAttempts, paymentTransactions } from '../entity';
 import { PAYMENT_ISSUED_EVENT } from '../payment.constants';
 import { PaymentGatewayRegistry } from '../providers/payment-gateway.registry';
 import { RECOVERABLE_FAILURE_CODES, nextTickDelayMs } from './reconcile-policy';
+import { ProviderEventRedrive } from './provider-event-redrive.service';
 import { runExpireAttempt, runReconcileAttempt } from './run-reconcile-attempt';
 import type { ReconcileAttemptResult } from './run-reconcile-attempt';
 
@@ -35,9 +38,10 @@ const FAST_INTERVAL_MS = 5 * 1000;
 /** How long after issue the fast spacing applies before relaxing to the base one. */
 const FAST_WINDOW_MS = 60 * 1000;
 /**
- * How often attempts we gave up on (`POLL_EXPIRED` / `POLL_GATEWAY_ERROR`) are
- * re-asked about. They are not a payer watching a screen, so they never ride
- * the tight loop: late money is picked up within this, not within seconds.
+ * How often attempts we gave up on (`POLL_EXPIRED` / `POLL_GATEWAY_ERROR` /
+ * a clock expiry, `EXPIRED`) are re-asked about. They are not a payer watching
+ * a screen, so they never ride the tight loop: late money is picked up within
+ * this, not within seconds.
  */
 const RECOVERABLE_INTERVAL_MS = 5 * 60 * 1000;
 /** Most attempts looked at per tick — bounds provider calls per cycle. */
@@ -53,6 +57,25 @@ const RECOVERABLE_LIMIT = 50;
  * grace.
  */
 const EXPIRY_GRACE_MS = 30 * 1000;
+/**
+ * Wall-clock budget for one pass. A provider that answers slowly must not
+ * stretch a tick past the next one: whatever is left is picked up by the next
+ * pass, which is why the cursor below matters.
+ */
+const PASS_DEADLINE_MS = 10 * 1000;
+/** Candidates in flight at once. Small on purpose: each one is a provider call. */
+const PASS_CONCURRENCY = 3;
+/**
+ * How long a provider is skipped after one of its attempts errored. A provider
+ * outage otherwise turns every pending attempt into a timeout on every pass.
+ */
+const PROVIDER_BACKOFF_MS = 60 * 1000;
+/**
+ * How many older pending attempts the keyset tail looks at per pass. The
+ * newest-first page above serves the payers watching a screen; this one walks
+ * the rest oldest-first so a full page of new checkouts cannot starve them.
+ */
+const TAIL_LIMIT = 50;
 
 export interface ReconcileSummary {
   /** Unresolved attempts in view this pass. Zero means an empty system. */
@@ -67,10 +90,20 @@ export interface ReconcileSummary {
   pending: number;
   /** Age of the newest of those, `null` when none. */
   newestPendingAgeMs: number | null;
+  /** Stale provider events re-enqueued for processing this pass. */
+  providerEventsRedriven: number;
+  /** Stale provider events that spent their whole re-drive budget. */
+  providerEventsExhausted: number;
+  /** Provider event rows deleted by the hourly retention sweep. */
+  providerEventsPurged: number;
+  /** The pass ran out of its wall-clock budget with candidates left over. */
+  deadlineReached: boolean;
+  /** Candidates skipped because their provider is backing off after an error. */
+  skippedBackoff: number;
 }
 
 /**
- * The one poller for a provider with no webhook (Bakong), and the guarantee
+ * The one poller for a provider's unresolved attempts, and the guarantee
  * behind "money taken ⇒ plan activated", whatever the app was doing when the
  * payer paid.
  *
@@ -90,7 +123,8 @@ export interface ReconcileSummary {
  * on another instance is found by this one's next safety sweep.
  *
  * It also revisits attempts we ourselves failed by timeout (`POLL_EXPIRED` /
- * `POLL_GATEWAY_ERROR`) for a grace window, on the slow
+ * `POLL_GATEWAY_ERROR` for a polled provider, `EXPIRED` for a webhook-only one
+ * whose callback never arrived) for a grace window, on the slow
  * `RECOVERABLE_INTERVAL_MS` cadence, so money that arrives late still counts —
  * an attempt is never failed *because* we couldn't see the payment.
  */
@@ -105,10 +139,20 @@ export class PaymentReconciler
   private enabled = false;
   private stopped = false;
   private running = false;
+  /** Shared by the timer tick and the internal wake-up so they never overlap. */
+  private inFlight: Promise<ReconcileSummary> | null = null;
   /** `arm()` arrived mid-pass, whose scan may predate the new attempt. */
   private rearmRequested = false;
   /** When the recoverable-failed tail was last re-asked about. */
   private lastRecoverableCheckAt = 0;
+  /**
+   * Keyset position for the oldest-first tail: the last row the previous pass
+   * looked at. `null` means "start from the oldest again", which is what a
+   * short page sets.
+   */
+  private pendingCursor: { createdAt: Date; id: string } | null = null;
+  /** Provider name → epoch ms before which its attempts are skipped. */
+  private readonly providerBackoffUntil = new Map<string, number>();
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -116,6 +160,7 @@ export class PaymentReconciler
     private readonly outbox: OutboxService,
     private readonly activation: SubscriptionActivationService,
     private readonly configService: ConfigService,
+    private readonly providerEventRedrive: ProviderEventRedrive,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -155,8 +200,11 @@ export class PaymentReconciler
    */
   arm(): void {
     if (!this.enabled || this.stopped) return;
-    if (this.running) {
+    if (this.running || this.inFlight) {
       this.rearmRequested = true;
+      // If the in-flight pass was started by the internal wake-up, no tick is
+      // waiting to consume the flag — queue one so the new attempt is seen soon.
+      this.schedule(FAST_INTERVAL_MS, { onlyIfSooner: true });
       return;
     }
     this.schedule(FAST_INTERVAL_MS, { onlyIfSooner: true });
@@ -189,7 +237,7 @@ export class PaymentReconciler
     this.running = true;
     let nextDelayMs = this.intervalMs();
     try {
-      const summary = await this.runOnce();
+      const summary = await this.runExclusive();
       const didWork = Boolean(
         summary.settled ||
         summary.activated ||
@@ -214,6 +262,11 @@ export class PaymentReconciler
           `Reconcile: checked ${summary.checked}, settled ${summary.settled}, activated ${summary.activated}, abandoned ${summary.abandoned}, errors ${summary.errors}`,
         );
       }
+      // A truncated pass means work is waiting: do not fall back to the idle
+      // interval just because the processed subset happened to settle.
+      if (summary.deadlineReached) {
+        nextDelayMs = Math.min(nextDelayMs, this.intervalMs());
+      }
     } catch (err) {
       this.logger.error(
         `Reconcile tick failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -226,6 +279,21 @@ export class PaymentReconciler
       }
       if (!this.stopped) this.schedule(nextDelayMs);
     }
+  }
+
+  /**
+   * One pass, deduplicated: the internal wake-up can land while the boot tick
+   * is still running (it fires unawaited), and a pinger must not turn that into
+   * two provider sweeps. A second caller gets the in-flight promise; once it
+   * settles the field clears, so a failure is not sticky.
+   */
+  runExclusive(): Promise<ReconcileSummary> {
+    if (!this.inFlight) {
+      this.inFlight = this.runOnce().finally(() => {
+        this.inFlight = null;
+      });
+    }
+    return this.inFlight;
   }
 
   /**
@@ -244,7 +312,15 @@ export class PaymentReconciler
       errors: 0,
       pending: 0,
       newestPendingAgeMs: null,
+      providerEventsRedriven: 0,
+      providerEventsExhausted: 0,
+      providerEventsPurged: 0,
+      deadlineReached: false,
+      skippedBackoff: 0,
     };
+    // One pass gets a bounded slice of wall clock: a provider that answers
+    // slowly must not make the tick longer than the tick interval.
+    const deadline = Date.now() + PASS_DEADLINE_MS;
 
     // Last hop first: a payment that already settled but whose purchase never
     // activated (the `payment.succeeded` event was consumed by an instance
@@ -252,14 +328,20 @@ export class PaymentReconciler
     summary.activated = await this.activateSettledPurchases();
     summary.abandoned += await this.expireWebhookAttempts();
 
+    const now = Date.now();
+    // Housekeeping for events whose BullMQ job dead-lettered (and for the
+    // ingestion table's own retention). Independent of which providers are
+    // polled, so it runs before the provider gate below.
+    await this.sweepProviderEvents(summary, now);
+
     const providers = this.providers();
     if (providers.length === 0) return summary;
 
-    const now = Date.now();
     const since = new Date(now - this.latePaymentGraceMs());
     const candidateColumns = {
       id: paymentAttempts.id,
       createdAt: paymentAttempts.createdAt,
+      provider: paymentAttempts.provider,
     };
     const baseFilter = and(
       inArray(paymentAttempts.provider, providers),
@@ -302,27 +384,155 @@ export class PaymentReconciler
     summary.candidates = pending.length + recoverable.length;
 
     // Pending first: those are the payers still waiting.
-    for (const candidate of pending) {
-      const outcome = await this.reconcileCandidate(candidate.id, summary);
-      // Still unpaid (or the provider hiccuped): keep the loop tight.
-      if (outcome === 'still_pending' || outcome === 'error') {
-        const ageMs = now - candidate.createdAt.getTime();
-        summary.pending += 1;
-        summary.newestPendingAgeMs = Math.min(
-          summary.newestPendingAgeMs ?? ageMs,
-          ageMs,
-        );
+    await this.processCandidates(pending, summary, deadline, {
+      countPending: true,
+    });
+
+    // The newest-first page serves the payers watching a screen. When it came
+    // back full, older pending attempts exist that it never reached, so walk
+    // them oldest-first from a keyset cursor; a short page means the whole set
+    // was covered and the cursor wraps on the next pass.
+    if (pending.length === BATCH_LIMIT) {
+      const tail = await this.tailPending(
+        baseFilter,
+        pending.map((candidate) => candidate.id),
+      );
+      summary.candidates += tail.length;
+      await this.processCandidates(tail, summary, deadline);
+      // Advance only for rows this pass actually finished. A pass that ran out
+      // of budget re-reads the same page instead of skipping it.
+      if (!summary.deadlineReached) {
+        const last = tail[tail.length - 1];
+        this.pendingCursor =
+          tail.length < TAIL_LIMIT || !last
+            ? null
+            : { createdAt: last.createdAt, id: last.id };
       }
     }
-    for (const candidate of recoverable) {
-      await this.reconcileCandidate(candidate.id, summary);
-    }
+
+    await this.processCandidates(recoverable, summary, deadline);
 
     // Settling enqueued `payment.succeeded` rows (activation + notification);
     // wake the outbox rather than leave them to its poll fallback.
     if (summary.settled > 0) this.outbox.wakeupAfterCommit();
 
     return summary;
+  }
+
+  /**
+   * Isolated so a housekeeping failure (a Redis outage while re-driving, a
+   * retention delete timing out) never stops the payment sweep that follows.
+   */
+  private async sweepProviderEvents(
+    summary: ReconcileSummary,
+    now: number,
+  ): Promise<void> {
+    try {
+      const sweep = await this.providerEventRedrive.sweep(now);
+      summary.providerEventsRedriven = sweep.redriven;
+      summary.providerEventsExhausted = sweep.exhausted;
+      summary.providerEventsPurged = sweep.purged;
+    } catch (err) {
+      this.logger.warn(
+        `Provider event sweep failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Runs candidates with a small concurrency and a shared deadline. A worker
+   * stops taking new work once the budget is spent; whatever is left is picked
+   * up by the next pass (the tail cursor guarantees it is not the same set).
+   */
+  private async processCandidates(
+    candidates: { id: string; createdAt: Date; provider: string }[],
+    summary: ReconcileSummary,
+    deadline: number,
+    options: { countPending?: boolean } = {},
+  ): Promise<void> {
+    const queue = [...candidates];
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const candidate = queue.shift();
+        if (!candidate) return;
+        if (Date.now() >= deadline) {
+          summary.deadlineReached = true;
+          return;
+        }
+        const backoffUntil = this.providerBackoffUntil.get(candidate.provider);
+        if (backoffUntil && backoffUntil > Date.now()) {
+          summary.skippedBackoff += 1;
+          continue;
+        }
+        const outcome = await this.reconcileCandidate(candidate.id, summary);
+        if (outcome === 'error' && candidate.provider) {
+          // One timeout is a signal about the provider, not about this
+          // attempt: stop asking it for a while so a slow provider cannot
+          // spend the whole budget on every pass.
+          this.providerBackoffUntil.set(
+            candidate.provider,
+            Date.now() + PROVIDER_BACKOFF_MS,
+          );
+        }
+        if (
+          options.countPending &&
+          (outcome === 'still_pending' || outcome === 'error')
+        ) {
+          const ageMs = Date.now() - candidate.createdAt.getTime();
+          summary.pending += 1;
+          summary.newestPendingAgeMs = Math.min(
+            summary.newestPendingAgeMs ?? ageMs,
+            ageMs,
+          );
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(PASS_CONCURRENCY, queue.length) }, worker),
+    );
+  }
+
+  /**
+   * Oldest-first keyset page over the pending attempts the newest-first page
+   * did not reach. `excludeIds` are the rows this pass already handled, so a
+   * pending set of exactly `BATCH_LIMIT` does not make the tail re-ask them.
+   * The caller advances the cursor after the page is processed.
+   */
+  private async tailPending(
+    baseFilter: ReturnType<typeof and>,
+    excludeIds: string[],
+  ): Promise<{ id: string; createdAt: Date; provider: string }[]> {
+    const cursor = this.pendingCursor;
+    const afterCursor = cursor
+      ? or(
+          gt(paymentAttempts.createdAt, cursor.createdAt),
+          and(
+            eq(paymentAttempts.createdAt, cursor.createdAt),
+            gt(paymentAttempts.id, cursor.id),
+          ),
+        )
+      : undefined;
+
+    return this.db
+      .select({
+        id: paymentAttempts.id,
+        createdAt: paymentAttempts.createdAt,
+        provider: paymentAttempts.provider,
+      })
+      .from(paymentAttempts)
+      .where(
+        and(
+          baseFilter,
+          eq(paymentAttempts.status, 'pending'),
+          afterCursor,
+          excludeIds.length > 0
+            ? notInArray(paymentAttempts.id, excludeIds)
+            : undefined,
+        ),
+      )
+      .orderBy(asc(paymentAttempts.createdAt), asc(paymentAttempts.id))
+      .limit(TAIL_LIMIT);
   }
 
   private async reconcileCandidate(
@@ -406,9 +616,12 @@ export class PaymentReconciler
 
   /**
    * Fails pending attempts whose stored `expiresAt` has passed, for providers
-   * that are NOT polled (webhook-only, i.e. ABA): the provider refuses payment
-   * after its lifetime, so there is nothing to ask — this only closes our side.
-   * Database only, never a provider call.
+   * that are NOT polled: a provider rejects payment after the checkout's
+   * lifetime, so there is nothing to ask — this only closes our side. With the
+   * default `PAYMENT_RECONCILE_PROVIDERS` (both providers) this selects
+   * nothing; it still covers a provider left out of the poll set, whose lost
+   * callback would otherwise stay `pending` forever. Database only, never a
+   * provider call.
    */
   private async expireWebhookAttempts(): Promise<number> {
     const polled = this.providers();

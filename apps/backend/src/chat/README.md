@@ -143,9 +143,9 @@ sequenceDiagram
     participant Reg as ConnectionRegistry
     participant HB as HeartbeatService
 
-    Client->>WS: connect (?token= | Authorization header | user_access_token cookie)
-    WS->>WS: jwtService.verify(token) — signature + expiry
-    WS->>WS: DB check: user exists and is not soft-deleted (parity with JwtStrategy)
+    Client->>WS: connect (?ticket= or Authorization: Bearer ticket)
+    WS->>WS: Origin allowlist + jwtService.verify(ticket) - typ 'ws', signature, expiry
+    WS->>WS: DB check: user exists, not soft-deleted, not before tokensValidAfter
     WS->>Reg: add(userId, connection)
     loop every 30s
         HB->>Client: ping
@@ -225,9 +225,9 @@ the socket was down is not replayed.
   `sendTimestamps` map is in-memory, so under multiple backend instances a
   user connected round-robin (or reconnecting) could get up to
   `SEND_LIMIT × instance count` sends per window rather than a strict global
-  30/min. The REST route's throttle has the same per-instance-storage
-  caveat today (no `ThrottlerStorageRedisService` configured) — both would
-  need a shared counter (e.g. Redis) to be exact under horizontal scale.
+  30/min. The REST throttler now uses a shared Redis store
+  (`RedisThrottlerStorage`), so only the WS counter still needs one to be exact
+  under horizontal scale.
   Non-issue at MVP scale; worth revisiting alongside the REST throttle if a
   real multi-instance deployment lands.
 - **`inbox_update` / `unread_count` are unauthenticated "refetch" signals,

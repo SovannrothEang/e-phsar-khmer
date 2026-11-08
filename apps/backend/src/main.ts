@@ -1,14 +1,38 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  assertRoleIsExported,
+  runsBackgroundWork,
+  type AppRole,
+} from './config/runtime-role';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Keep the request bytes the client sent: the ABA PayWay webhook signature
+    // is computed over them, and a re-encoded body turns `1.50` into `1.5`.
+    rawBody: true,
+  });
+
+  // `APP_ROLE` picks the provider list while the modules are imported, but
+  // `ConfigModule` validates whatever `.env` supplied afterwards. A value only
+  // `.env` knows about would wire one shape and budget another, so boot refuses
+  // it instead of running a shape nobody asked for.
+  const configService = app.get(ConfigService);
+  const appRole = configService.get<AppRole>('appRole') ?? 'all';
+  assertRoleIsExported(appRole);
+
+  // Vercel terminates TLS and forwards exactly one hop, so the client address
+  // is the last X-Forwarded-For entry. Without this Express reports the
+  // proxy's address for every request, and the IP-keyed throttler puts all
+  // clients in one bucket (and rotating the proxy IP would bypass it).
+  app.set('trust proxy', 1);
 
   // Without this, SIGTERM (every Vercel scale-down and redeploy) killed the
   // process with no lifecycle hooks: BullMQ workers never closed (an active
@@ -39,13 +63,25 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
+  app.useGlobalInterceptors(new ResponseInterceptor(app.get(Reflector)));
 
   const rawOrigins = process.env.FRONTEND_ORIGINS ?? '';
   const frontendOrigins = rawOrigins
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // `origin: true` reflects whatever origin asks, so with credentials on it
+  // grants every site a logged-in context. That is tolerable while developing
+  // against arbitrary localhost ports; in production it is a misconfiguration
+  // (a forgotten env var), so boot fails loudly rather than silently opening
+  // the API to any origin.
+  if (isProduction && frontendOrigins.length === 0) {
+    throw new Error(
+      'FRONTEND_ORIGINS must list the allowed browser origins in production: CORS with credentials cannot default to every origin. Set it to a comma-separated list, e.g. "https://phsarkhmer.com".',
+    );
+  }
 
   app.enableCors({
     origin: frontendOrigins.length ? frontendOrigins : true,
@@ -54,22 +90,36 @@ async function bootstrap() {
 
   app.useWebSocketAdapter(new WsAdapter(app));
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('PhsarKhmer.com API')
-    .setDescription('E-Market API — PhsarKhmer.com marketplace')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  // The schema enumerates every route and DTO shape; keep it off the public
+  // production surface (it is still mounted for local/dev and E2E runs).
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('PhsarKhmer.com API')
+      .setDescription('E-Market API — PhsarKhmer.com marketplace')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0', () => {
     console.log(
       `🚀 Server listening on port ${process.env.PORT ?? 3000} (env: ${
         process.env.NODE_ENV ?? 'development'
+      }, role: ${appRole}, background work: ${
+        runsBackgroundWork(appRole) ? 'on' : 'off'
       })`,
     );
   });
 }
 
-void bootstrap();
+// A boot-time configuration error (e.g. missing FRONTEND_ORIGINS in
+// production) must stop the process with a readable message, not leave a
+// rejected promise whose default report buries the reason.
+void bootstrap().catch((err: unknown) => {
+  console.error(
+    `Fatal error during boot: ${err instanceof Error ? err.message : String(err)}`,
+  );
+  process.exit(1);
+});

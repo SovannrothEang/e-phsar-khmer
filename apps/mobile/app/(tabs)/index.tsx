@@ -4,8 +4,9 @@ import SafeAreaView from "@/components/common/SafeAreaView";
 import HomeBanner from "@/components/home/HomeBanner";
 import LatestAds from "@/components/home/LatestAds";
 import NearbySection from "@/components/home/NearbySection";
-import TrendingStrip from "@/components/home/TrendingStrip";
 import { Colors } from "@/constants/Colors";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { fetchAdvertisements } from "@/lib/api/advertisements";
 import { fetchCategories } from "@/lib/api/listings";
 import { categoryImage } from "@/lib/category-images";
@@ -22,6 +23,8 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 const HomeScreen = () => {
+  const { isAuthenticated } = useAuth();
+  const { toggleTheme } = useTheme();
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
     queryFn: fetchCategories,
@@ -37,26 +40,21 @@ const HomeScreen = () => {
   const banners = bannersQuery.data ?? [];
 
   return (
-    <SafeAreaView className="bg-slate-50 dark:bg-gray-950">
-      <NavBar onSearchPress={() => router.push("/search")} />
+    <SafeAreaView className="bg-white dark:bg-gray-950">
+      <NavBar
+        onThemeToggle={isAuthenticated ? toggleTheme : undefined}
+        onQRCodePress={() => router.push("/scan")}
+        onSearchPress={() => router.push("/search")}
+      />
       <FeedScrollView
         contentContainerStyle={{ paddingBottom: 32 }}
         showsVerticalScrollIndicator={false}
-        className="bg-slate-50 dark:bg-gray-950"
+        className="bg-white dark:bg-gray-950"
       >
         <HomeBanner banners={banners} />
 
         {/* Main Category Grid */}
-        <View
-          className="mx-3 mt-4 rounded-3xl border border-gray-100 bg-white px-1 pb-2 pt-4 dark:border-gray-800 dark:bg-gray-900"
-          style={{
-            elevation: 2,
-            shadowColor: "#0F172A",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 8,
-          }}
-        >
+        <View className="bg-white px-1 pb-2 pt-7 dark:bg-gray-900">
           {categoriesQuery.isLoading ? (
             <View className="items-center py-6">
               <ActivityIndicator color={Colors.primary.DEFAULT} />
@@ -118,9 +116,6 @@ const HomeScreen = () => {
 
         {/* Nearby Deals Banner Section */}
         <NearbySection />
-
-        {/* Engagement-ranked strip */}
-        <TrendingStrip />
 
         {/* Latest Ads Listing Feed */}
         <LatestAds />

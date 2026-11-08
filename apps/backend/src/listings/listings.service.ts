@@ -705,6 +705,11 @@ export class ListingsService {
         ...this.liveConditions(),
         ...resolved.geo,
         ...this.feedConditions(query, { fuzzy }),
+        // A suspended seller's ads are hidden by a read rule, never by a write:
+        // reinstatement makes them visible again with no data change. In
+        // `common` — not `full` — so the total and the facet counts apply the
+        // same rule as the rows (every query below joins `users`).
+        eq(users.status, 'active'),
       ];
       const full = [...common, ...this.categoryConditions(resolved)];
       if (query.userId) full.push(eq(listings.userId, query.userId));
@@ -870,7 +875,13 @@ export class ListingsService {
       .leftJoin(eventScores, eq(eventScores.listingId, listings.id))
       .leftJoin(likeScores, eq(likeScores.listingId, listings.id))
       .leftJoin(saveScores, eq(saveScores.listingId, listings.id))
-      .where(and(...this.liveConditions(), sql`${trendScore} > 0`))
+      .where(
+        and(
+          ...this.liveConditions(),
+          eq(users.status, 'active'),
+          sql`${trendScore} > 0`,
+        ),
+      )
       .orderBy(desc(trendScore), desc(listings.createdAt), desc(listings.id))
       .limit(limit);
 
@@ -880,7 +891,7 @@ export class ListingsService {
     const fillCount = limit - ranked.length;
     let filled: typeof ranked = [];
     if (fillCount > 0) {
-      const conditions = [...this.liveConditions()];
+      const conditions = [...this.liveConditions(), eq(users.status, 'active')];
       if (ranked.length > 0) {
         conditions.push(
           notInArray(
@@ -938,8 +949,9 @@ export class ListingsService {
     if (query.status === 'active') {
       // "Active" means live right now, not merely the stored word: an ad past
       // its 30-day window belongs to the Expired tab below. Staff-inactive ads
-      // stay in this tab too, flagged on the row: the owner's fix is to edit
-      // and republish, not to hunt for a separate tab (captain, 2026-11-03).
+      // stay in this tab too, flagged on the row — since 2026-11-08 the owner
+      // cannot republish one (that is staff-only), so the flag tells them to
+      // contact support rather than to edit and republish.
       conditions.push(
         or(eq(listings.status, 'inactive'), and(...this.liveConditions()))!,
       );
@@ -1073,38 +1085,30 @@ export class ListingsService {
         message: 'This ad was removed by an administrator.',
       });
     }
+    // A delete is final: the owner's own and an admin's alike. This is checked
+    // before anything else so no plan, renewal or notice logic runs for a row
+    // that can never come back.
+    if (existing.deletedAt) {
+      throw new ForbiddenException({
+        code: 'LISTING_DELETED_PERMANENTLY',
+        message: 'This ad was deleted and cannot be republished.',
+      });
+    }
 
     const now = new Date();
     const lapsed =
       existing.expiresAt !== null &&
       existing.expiresAt.getTime() <= now.getTime();
-    // Staff set it inactive: republishing is the owner's fix. While the
-    // original 30-day window is still open it is free — the admin action is
-    // not a renewal the owner bought, so no renewal is spent and the expiry is
-    // unchanged. Once the window has lapsed the normal renewal path below
-    // applies like any other expired ad.
-    const inactive = existing.status === 'inactive';
-    if (inactive && !lapsed) {
-      // Hiding the ad freed its plan slot, so reactivating must re-claim one.
-      await this.entitlements.assertCanHoldAnotherAd(userId, existing);
-      const [row] = await this.db
-        .update(listings)
-        .set({
-          status: 'active',
-          inactiveAt: null,
-          inactiveById: null,
-          inactiveReason: null,
-          updatedAt: now,
-        })
-        .where(eq(listings.id, id))
-        .returning();
-      await this.clearListingNotices(
-        id,
-        ['listing.inactivated', 'listing.removed'],
-        userId,
-      );
-      await this.entitlements.reconcileListingsSafely(userId);
-      return { ...row, photos: existing.photos };
+    // Staff set it inactive: lifting that is staff work too (2026-11-08). The
+    // owner used to republish a hidden ad themselves, which made `inactive` an
+    // advisory nudge while `delete` became permanent — an inversion, since the
+    // reversible state was the one with fewer consequences.
+    if (existing.status === 'inactive') {
+      throw new ForbiddenException({
+        code: 'LISTING_INACTIVE_BY_STAFF',
+        message:
+          'This ad was hidden by an administrator. Contact support to have it reviewed.',
+      });
     }
     // A restricted ad whose 30-day window is still open cannot be re-published
     // into a full plan; once it lapses it is a renewal like any expired ad.
@@ -1149,8 +1153,8 @@ export class ListingsService {
           publishedAt: existing.publishedAt ?? now,
           expiresAt,
           renewCount: isRenewal ? existing.renewCount + 1 : existing.renewCount,
-          // A lapsed inactive ad republishes through this path; clear the
-          // staff-hide fields either way (a no-op for every other ad).
+          // Defensive: `inactive` rows are refused above, so these are already
+          // null. Kept so a future publish path cannot inherit stale details.
           inactiveAt: null,
           inactiveById: null,
           inactiveReason: null,
@@ -1163,16 +1167,6 @@ export class ListingsService {
       }
       return row;
     });
-
-    // A lapsed inactive ad republishes through this path too, so the staff
-    // hide notice is stale either way.
-    if (inactive) {
-      await this.clearListingNotices(
-        id,
-        ['listing.inactivated', 'listing.removed'],
-        userId,
-      );
-    }
 
     // The count check above is not atomic with the write; settling here keeps
     // two parallel publishes from leaving the user over their allowance.
@@ -1373,6 +1367,10 @@ export class ListingsService {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(listings)
+      // Required by the suspended-owner predicate in `common`; without it the
+      // count is invalid SQL ("missing FROM-clause entry for table users"),
+      // which is what broke every `includeTotal` search.
+      .leftJoin(users, eq(users.id, listings.userId))
       .where(and(...conditions));
     return row?.count ?? 0;
   }
@@ -1393,6 +1391,7 @@ export class ListingsService {
         .select({ slug: categories.slug, count })
         .from(listings)
         .innerJoin(categories, eq(listings.categoryId, categories.id))
+        .leftJoin(users, eq(users.id, listings.userId))
         .where(and(...common))
         .groupBy(categories.id)
         .orderBy(categories.sortOrder, categories.slug),
@@ -1404,6 +1403,7 @@ export class ListingsService {
               subcategories,
               eq(listings.subcategoryId, subcategories.id),
             )
+            .leftJoin(users, eq(users.id, listings.userId))
             .where(
               and(...common, eq(listings.categoryId, resolved.facetCategoryId)),
             )
@@ -1444,7 +1444,9 @@ export class ListingsService {
 
     const [updated] = await this.db
       .update(listings)
-      .set({ status: 'deleted', updatedAt: new Date() })
+      // `deletedAt` is the permanent marker: the row survives (report history,
+      // applications and chat cards reference it) but nothing restores it.
+      .set({ status: 'deleted', deletedAt: new Date(), updatedAt: new Date() })
       .where(eq(listings.id, id))
       .returning();
 
@@ -1470,6 +1472,19 @@ export class ListingsService {
   async findPublicById(id: string): Promise<ListingWithPhotos> {
     const listing = await this.findById(id);
     if (listing.moderatedAt) throw new NotFoundException('Listing not found');
+    // A deleted ad is gone for everyone, permanently (2026-11-08).
+    if (listing.deletedAt) throw new NotFoundException('Listing not found');
+    // A suspended owner's ads are hidden by a read rule, not by a write. One
+    // primary-key read is cheaper than widening the `ListingWithPhotos`
+    // contract that every owner/admin surface shares.
+    const [owner] = await this.db
+      .select({ status: users.status })
+      .from(users)
+      .where(eq(users.id, listing.userId))
+      .limit(1);
+    if (!owner || owner.status !== 'active') {
+      throw new NotFoundException('Listing not found');
+    }
     // The public detail must not serve what the marketplace already hides:
     // a never-published draft, an ad its owner withdrew, one hidden for
     // exceeding its plan's allowance, or one staff set inactive. (Moderated
@@ -1491,8 +1506,8 @@ export class ListingsService {
   }
 
   /**
-   * Staff take-down. Accepts the caller's transaction so approving a report
-   * and removing its listing commit together.
+   * Staff take-down, permanent. Accepts the caller's transaction so approving
+   * a report and removing its listing commit together.
    */
   async moderate(
     id: string,
@@ -1504,6 +1519,7 @@ export class ListingsService {
       .update(listings)
       .set({
         status: 'deleted',
+        deletedAt: new Date(),
         moderatedAt: new Date(),
         moderatedById: moderatorId,
         moderationReason: reason?.slice(0, 500) ?? null,
@@ -1541,10 +1557,10 @@ export class ListingsService {
   }
 
   /**
-   * Undoes a take-down. The ad comes back live if its 30-day window is still
-   * open, otherwise as expired (a never-published draft stays a draft) — then
-   * plan reconciliation runs, since a restored live ad takes one of the
-   * owner's slots and may push another (or itself) into 'restricted'.
+   * Undoes a take-down. Refuses a permanently deleted row — `moderate` stamps
+   * `deletedAt`, so this is now the explicit "why you cannot restore" guard
+   * rather than a live undo path. `inactive` is the only reversible staff
+   * state.
    */
   async restoreModerated(id: string): Promise<ListingRow> {
     const [existing] = await this.db
@@ -1553,6 +1569,9 @@ export class ListingsService {
       .where(eq(listings.id, id))
       .limit(1);
     if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.deletedAt) {
+      throw new BadRequestException('LISTING_DELETED_PERMANENTLY');
+    }
     if (!existing.moderatedAt) {
       throw new BadRequestException('LISTING_NOT_MODERATED');
     }
@@ -1581,10 +1600,11 @@ export class ListingsService {
   }
 
   /**
-   * Staff hide — reversible by the owner. Unlike `moderate`, the row stays the
-   * owner's: it remains editable and `publish` reactivates it (free while its
-   * 30-day window is still open). A permanently removed row or an ad that was
-   * never published cannot be inactivated.
+   * Staff hide — reversible by STAFF only. Unlike `moderate`, the row stays the
+   * owner's and remains editable, but `publish` refuses it with
+   * `LISTING_INACTIVE_BY_STAFF`; `restoreInactive` is the only way back. A
+   * permanently removed row or an ad that was never published cannot be
+   * inactivated.
    */
   async inactivate(
     id: string,
@@ -1628,7 +1648,8 @@ export class ListingsService {
   }
 
   /**
-   * Staff undo of an inactivation (the owner's own path is `publish`). Same
+   * Staff undo of an inactivation — the only door, since 2026-11-08 the owner
+   * cannot republish a staff-hidden ad. Same
    * status derivation as `restoreModerated`.
    */
   async restoreInactive(id: string): Promise<ListingRow> {
@@ -1638,6 +1659,9 @@ export class ListingsService {
       .where(eq(listings.id, id))
       .limit(1);
     if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.deletedAt) {
+      throw new BadRequestException('LISTING_DELETED_PERMANENTLY');
+    }
     if (existing.status !== 'inactive') {
       throw new BadRequestException('LISTING_NOT_MODERATED');
     }
@@ -1671,11 +1695,18 @@ export class ListingsService {
    */
   async restoreStaffHidden(id: string): Promise<ListingRow> {
     const [existing] = await this.db
-      .select({ moderatedAt: listings.moderatedAt, status: listings.status })
+      .select({
+        moderatedAt: listings.moderatedAt,
+        deletedAt: listings.deletedAt,
+        status: listings.status,
+      })
       .from(listings)
       .where(eq(listings.id, id))
       .limit(1);
     if (!existing) throw new NotFoundException('Listing not found');
+    if (existing.deletedAt) {
+      throw new BadRequestException('LISTING_DELETED_PERMANENTLY');
+    }
     if (existing.moderatedAt) return this.restoreModerated(id);
     if (existing.status === 'inactive') return this.restoreInactive(id);
     throw new BadRequestException('LISTING_NOT_MODERATED');

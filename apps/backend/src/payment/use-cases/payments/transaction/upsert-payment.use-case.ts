@@ -17,7 +17,7 @@ export interface UpsertPaymentInput {
   expectedVersion: number;
   status?: (typeof paymentTransactionStatusEnum.enumValues)[number];
   description?: string;
-  completedAt?: Date;
+  completedAt?: Date | null;
   expiresAt?: Date | null;
 }
 

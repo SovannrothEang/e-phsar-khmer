@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import DbImage from "@/components/common/DbImage";
+import { getImageProps } from "next/image";
 import { PostSocialActions } from "./PostSocialActions";
 import Lightbox, { FullscreenRef } from "yet-another-react-lightbox";
 import Thumbnails from "yet-another-react-lightbox/plugins/thumbnails";
@@ -12,6 +13,52 @@ import "yet-another-react-lightbox/plugins/thumbnails.css";
 import type { Post } from "@/lib/posts";
 
 const MAX_THUMBS = 7;
+
+/**
+ * `sizes` per gallery slot. The detail page gives this gallery the content
+ * column (≈760 px from 1280 up, full width on a phone), so the single image and
+ * each collage main fill that column while a strip tile is a fraction of it.
+ * Without these the browser assumes 100vw and downloads a 1920 px variant for a
+ * 250 px tile — the optimizer exists but was being asked the wrong question.
+ */
+const GALLERY_FULL_SIZES =
+  "(max-width: 768px) 100vw, (max-width: 1280px) 60vw, 760px";
+const GALLERY_HALF_SIZES = "(max-width: 768px) 50vw, 380px";
+const GALLERY_TILE_SIZES =
+  "(max-width: 768px) 33vw, (max-width: 1280px) 20vw, 250px";
+const GALLERY_STRIP_SIZES = "(max-width: 640px) 130px, 155px";
+
+/** The lightbox thumbnail strip renders at 56 px; 96 covers a 2× screen. */
+const LIGHTBOX_THUMBNAIL_WIDTH = 96;
+
+/**
+ * The lightbox's own thumbnail strip: `yet-another-react-lightbox` looks for a
+ * per-slide `thumbnail` URL before falling back to the full-size `src`, so a
+ * strip of 8 photos no longer downloads 8 originals to paint eight 56 px
+ * squares. `getImageProps` is Next's non-component entry point to the same
+ * `/_next/image` URL the components get, so this stays one optimizer contract
+ * instead of a hand-built query string. The slide itself is untouched: zoom
+ * still opens the full picture.
+ *
+ * `quality: 50` is not a preference: `next.config.ts` whitelists
+ * `qualities: [25, 50, 75, 100]` and the optimizer answers 400 for anything
+ * else (verified against the built server — `q=60` is rejected).
+ */
+function thumbnailUrl(src: string): string | undefined {
+  try {
+    const { props } = getImageProps({
+      src,
+      width: LIGHTBOX_THUMBNAIL_WIDTH,
+      height: Math.round(LIGHTBOX_THUMBNAIL_WIDTH * 0.75),
+      quality: 50,
+      alt: "",
+    });
+    return typeof props.src === "string" ? props.src : undefined;
+  } catch {
+    // A source the optimizer refuses simply keeps the slide's own src.
+    return undefined;
+  }
+}
 
 export default function PostImage({
   post,
@@ -38,7 +85,7 @@ export default function PostImage({
   const images = post?.images ?? [];
   const slides = images
     .filter((src) => typeof src === "string" && src.length > 0)
-    .map((src) => ({ src }));
+    .map((src) => ({ src, thumbnail: thumbnailUrl(src) }));
 
   const fullscreenRef = useRef<FullscreenRef>(null);
   const count = images.length;
@@ -83,9 +130,8 @@ export default function PostImage({
               src={src}
               alt={`post-${idx}`}
               fill
-              sizes="155px"
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_STRIP_SIZES}
               loading={idx === 0 ? "eager" : "lazy"}
             />
           </button>
@@ -108,7 +154,8 @@ export default function PostImage({
             alt="post-0"
             fill
             className="object-cover"
-            unoptimized
+            sizes={GALLERY_FULL_SIZES}
+            preload
             loading="eager"
           />
           {overlayButtons}
@@ -134,7 +181,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_HALF_SIZES}
+              preload
               loading="eager"
             />
           </div>
@@ -147,7 +195,7 @@ export default function PostImage({
               alt="post-1"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_HALF_SIZES}
             />
           </div>
         </div>
@@ -165,7 +213,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -182,7 +231,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -202,7 +251,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -219,7 +269,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -239,7 +289,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -256,7 +307,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -276,7 +327,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -293,7 +345,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -313,7 +365,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -330,7 +383,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -350,7 +403,8 @@ export default function PostImage({
               alt="post-0"
               fill
               className="object-cover"
-              unoptimized
+              sizes={GALLERY_FULL_SIZES}
+              preload
               loading="eager"
             />
             {overlayButtons}
@@ -367,7 +421,7 @@ export default function PostImage({
                   alt={`post-${i}`}
                   fill
                   className="object-cover"
-                  unoptimized
+                  sizes={GALLERY_TILE_SIZES}
                 />
               </div>
             ))}
@@ -390,7 +444,8 @@ export default function PostImage({
             alt="post-0"
             fill
             className="object-cover"
-            unoptimized
+            sizes={GALLERY_FULL_SIZES}
+            preload
             loading="eager"
           />
           {overlayButtons}
@@ -412,7 +467,6 @@ export default function PostImage({
                   fill
                   sizes="18vw"
                   className="object-cover"
-                  unoptimized
                 />
 
                 {showOverlay && (

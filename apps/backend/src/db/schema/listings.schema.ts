@@ -27,9 +27,9 @@ export const listingStatusEnum = pgEnum('listing_status', [
   // back to 'active' once the owner's allowance covers it again.
   'restricted',
   // Hidden by staff ("set inactive"): still the owner's ad, never a plan
-  // decision. The owner is notified with the reason, may edit it, and
-  // republishes it (free while its 30-day window is still open). Permanent
-  // removal keeps `moderatedAt` and `status='deleted'`.
+  // decision. The owner is notified with the reason and may edit it, but only
+  // staff can lift it (2026-11-08 — the owner republish is gone). Permanent
+  // removal keeps `moderatedAt` + `deletedAt` and nothing restores it.
   'inactive',
 ]);
 export const discountTypeEnum = pgEnum('discount_type', ['percent', 'amount']);
@@ -127,11 +127,17 @@ export const listings = pgTable(
       onDelete: 'set null',
     }),
     moderationReason: varchar('moderation_reason', { length: 500 }),
-    // Staff "set inactive" — hidden from the marketplace but owned by the
-    // seller again: they are notified with the reason, can edit the ad, and
-    // republish it. Deliberately separate from the moderation trio above,
-    // which stays the permanent-removal lock (owner cannot edit or republish
-    // until staff restore). The two states never coexist.
+    // Permanent delete, distinct from moderation: stamped by the owner's
+    // DELETE or an admin removal and never cleared. `publish` and every
+    // restore path refuse a stamped row. The row itself stays on purpose — a
+    // real DELETE would cascade `listing_reports` away and retroactively
+    // lower the approved-report count the account threshold reads.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    // Staff "set inactive" — hidden from the marketplace but still the
+    // seller's: they are notified with the reason and can edit it, but the
+    // lift is staff-only. Deliberately separate from the moderation trio
+    // above, which is the permanent-removal lock. The two states never
+    // coexist.
     inactiveAt: timestamp('inactive_at', { withTimezone: true }),
     inactiveById: uuid('inactive_by_id').references(() => users.id, {
       onDelete: 'set null',
@@ -153,6 +159,12 @@ export const listings = pgTable(
     index('listings_created_at_idx').on(t.createdAt),
     // Matches the (createdAt, id) cursor tie-break used by the public feed
     index('listings_status_created_at_idx').on(t.status, t.createdAt, t.id),
+    // The hourly expiry sweep and the derived-expiry filters both read live
+    // rows by their expiry. Partial because a listing without an expiry (a
+    // draft, or one that never had a window) is never a sweep candidate.
+    index('listings_status_expires_at_idx')
+      .on(t.status, t.expiresAt)
+      .where(sql`${t.expiresAt} is not null`),
     index('listings_province_id_idx').on(t.provinceId),
     index('listings_district_id_idx').on(t.districtId),
     index('listings_commune_id_idx').on(t.communeId),

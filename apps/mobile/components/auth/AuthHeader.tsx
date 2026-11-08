@@ -1,7 +1,11 @@
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Dimensions, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+/** The branding header fills this share of the window, status bar included. */
+const BRANDING_HEADER_RATIO = 0.3;
 
 interface AuthHeaderProps {
   /** Renders the PhsarKhmer wordmark block instead of a page title. */
@@ -26,6 +30,13 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({
 }) => {
   const router = useRouter();
   const handleBack = onBack ?? (() => router.back());
+  const insets = useSafeAreaInsets();
+  // `screen` (not `window`) so the share includes the system bars the user
+  // sees in a screenshot. `SafeAreaView` already paints the status-bar inset
+  // blue, so only the header's own share is set here.
+  const brandingHeight =
+    Math.round(Dimensions.get("screen").height * BRANDING_HEADER_RATIO) -
+    insets.top;
 
   const backButton = showBack ? (
     <TouchableOpacity
@@ -40,7 +51,10 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({
 
   if (branding) {
     return (
-      <View className="bg-primary px-4 pt-3 pb-8">
+      <View
+        className="bg-primary px-4 pt-3"
+        style={{ minHeight: brandingHeight }}
+      >
         <View className="flex-row items-center justify-between">
           {backButton ?? <View />}
           <View className="flex-row items-center gap-4">
@@ -63,7 +77,9 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({
           </View>
         </View>
 
-        <View className="items-center mt-3">
+        {/* Centred in the space left under the back/settings row, so the
+            wordmark sits in the middle of the blue block rather than its top. */}
+        <View className="flex-1 items-center justify-center">
           <Text className="text-white text-4xl font-extrabold tracking-tight">
             PhsarKhmer
           </Text>

@@ -4,6 +4,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 type AnySupabaseClient = SupabaseClient;
 
+/**
+ * One year, in seconds, for objects that never change in place: the name
+ * carries a UUID, so a re-upload writes a new key. Supabase's default is one
+ * hour, which re-fetched every listing photo on every page after a while.
+ */
+export const IMMUTABLE_UPLOAD_CACHE_SECONDS = '31536000';
+
 export interface OtpCallOptions {
   /**
    * Honour the DEV_OTP_TOKEN bypass. Defaults to `true` for the register /
@@ -100,6 +107,10 @@ export class SupabaseService {
     return this.adminClient.storage.from(bucket).upload(path, file, {
       contentType,
       upsert: true,
+      // Uploads are immutable — the object name carries a UUID and a replaced
+      // photo is a new object, never an overwrite in practice — so let the CDN
+      // and the browser keep them for a year instead of an hour.
+      cacheControl: IMMUTABLE_UPLOAD_CACHE_SECONDS,
     }) as Promise<{ data: unknown; error: unknown }>;
   }
 

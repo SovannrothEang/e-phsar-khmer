@@ -1,0 +1,2 @@
+ALTER TABLE "user_login_devices" ADD COLUMN "refresh_epoch" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "user_login_devices" ADD COLUMN "refresh_rotated_at" timestamp with time zone;

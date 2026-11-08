@@ -1,6 +1,8 @@
 import { AuthField } from "@/components/auth/AuthField";
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { SocialAuthSection } from "@/components/auth/SocialAuthSection";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,7 +12,6 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -26,6 +27,9 @@ const SignInScreen = () => {
   const [identifierError, setIdentifierError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // A suspended account cannot sign in, so this dialog is its only surface for
+  // the reason and the appeal channels.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
 
   const handleSignIn = async () => {
     const value = identifier.trim();
@@ -69,14 +73,15 @@ const SignInScreen = () => {
       } as never);
       return;
     }
+    if (result.kind === "suspended") {
+      setSuspended({ reason: result.reason, support: result.support });
+      return;
+    }
     setPasswordError(result.message);
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      "Forgot Password",
-      "Password reset isn't available yet. Please contact support for help.",
-    );
+    router.push("/(auth)/forgot-password");
   };
 
   return (
@@ -88,13 +93,14 @@ const SignInScreen = () => {
       <AuthHeader title="Login" />
 
       <ScrollView
-        className="flex-1 px-5 py-6"
-        contentContainerStyle={{ paddingBottom: 60 }}
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingVertical: 24 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar */}
-        <View className="items-center mb-7">
+        {/* Avatar — 24dp above (the content padding) and 24dp below, so it
+            sits centred between the header and the first field. */}
+        <View className="items-center mb-6">
           <View
             className="items-center justify-center rounded-full"
             style={{
@@ -138,7 +144,7 @@ const SignInScreen = () => {
 
           <TouchableOpacity
             onPress={handleForgotPassword}
-            className="self-end -mt-1"
+            className="self-end"
             accessibilityRole="button"
           >
             <Text className="text-primary font-semibold text-sm">
@@ -151,7 +157,7 @@ const SignInScreen = () => {
             disabled={isLoading}
             activeOpacity={0.8}
             accessibilityRole="button"
-            className={`bg-secondary-orange py-4 rounded-xl items-center justify-center mt-1 shadow-xs ${
+            className={`bg-secondary-orange h-[44px] rounded-[4px] items-center justify-center mt-[24px] shadow-xs ${
               isLoading ? "opacity-60" : ""
             }`}
           >
@@ -161,19 +167,17 @@ const SignInScreen = () => {
               <Text className="text-white font-bold text-base">Submit</Text>
             )}
           </TouchableOpacity>
-
-          <View className="flex-row justify-center items-center gap-1">
-            <Text className="text-sm text-neutral-text-sub dark:text-gray-400">
-              Don&apos;t have an account?
-            </Text>
-            <TouchableOpacity onPress={() => router.push("/(auth)/sign-up")}>
-              <Text className="text-primary font-bold text-sm">Register</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
-        <SocialAuthSection />
+        {/* One even rhythm above/below the divider, Telegram and the circles.
+            Welcome's `space-evenly` lands near 48dp on a tall phone; here a
+            fixed 40dp reads closer to it on shorter screens. */}
+        <View className="mt-[40px]">
+          <SocialAuthSection gap={40} />
+        </View>
       </ScrollView>
+
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </SafeAreaView>
   );
 };

@@ -33,10 +33,10 @@ Cross-cutting mechanisms: **none**. No transactional outbox and no BullMQ queue 
 
 | Scope                                                                                              | Folder                  |
 | -------------------------------------------------------------------------------------------------- | ----------------------- |
-| User scopes: `avatar`, `cover`, `listing`, `chat`, `report` (and `resume`)                         | `{scope}/{userId}/`     |
+| User scopes: `avatar`, `cover`, `listing`, `chat`, `report`                                        | `{scope}/{userId}/`     |
 | Staff scopes: `category`, `subcategory`, `brand`, `model`, `product`, `attribute`, `advertisement` | `{scope}/` (staff only) |
 
-`DELETE /files` accepts up to 50 paths. Non-staff callers may delete only objects inside their own folders (`isOwnedPath` recognizes the five public-bucket user scopes and rejects `..` traversal); `resume` attachment deletion is owned by the resume module's own service.
+`DELETE /files` accepts up to 50 paths. Non-staff callers may delete only objects inside their own folders (`isOwnedPath` recognizes the five public-bucket user scopes and rejects `..` traversal); CV attachments live in the private `resume-files` bucket and are owned by the resume module's own service (`POST /resume/attachments/sign`).
 
 The bucket's allow-list and 50 MB cap are **Supabase-side settings** (Dashboard → Storage → the bucket → Edit bucket), not application code — the backend only signs. Until 2026-11-02 the bucket allowed only jpeg/png/webp at 5 MB, so the listing form's promised gif/heic/heif/dng uploads failed at Storage with `415 invalid_mime_type` (or `413` above 5 MB). Widening the bucket is what makes the advertised formats work.
 
@@ -94,4 +94,4 @@ Verification recipe (2026-11-02): mint a dev-OTP user session, sign a `listing` 
 - **HEIC/HEIF/DNG do not render in Chromium.** Uploads succeed, but Chrome/Edge cannot decode them in `<img>`, so the preview and public listing show the app's no-image state there; Safari renders HEIC. Converting to WebP client-side would need a decoder dependency, which the repo does not carry.
 - **The server-side multipart path still enforces 5 MB and its own type list** (`jpeg/png/webp/gif/avif`). That contract is separate from the bucket: feedback images and avatar/cover uploads are unaffected by the 50 MB widening.
 - **Cleanup wiring is incomplete.** Not wired for admin user soft-delete, chat images (no message-delete endpoint by design) or listing soft-delete (restore must work); objects under the old flat `listing/…` paths are never cleaned.
-- **Stale doc references.** `ARCHITECTURE.md` §Files lists an older scope set (missing `report`, `resume`, `product`, `advertisement`); this README is the current contract.
+- **Stale doc references.** `ARCHITECTURE.md` §Files lists an older scope set (missing `report`, `product`, `advertisement`); this README is the current contract. `resume` was removed from `/files/sign` on 2026-11-03 (it had no MIME/size check there and fell into the public bucket); CVs use `POST /resume/attachments/sign` against the private `resume-files` bucket.

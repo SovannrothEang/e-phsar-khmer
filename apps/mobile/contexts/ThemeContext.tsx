@@ -24,7 +24,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (isAutoTheme) {
-      Appearance.setColorScheme(null);
+      Appearance.setColorScheme("auto");
       const systemScheme = Appearance.getColorScheme();
       const newTheme = systemScheme === "dark" ? "dark" : "light";
       setThemeState(newTheme);
@@ -51,7 +51,7 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const setAutoTheme = (enabled: boolean) => {
     setIsAutoTheme(enabled);
     if (enabled) {
-      Appearance.setColorScheme(null);
+      Appearance.setColorScheme("auto");
       const systemScheme = Appearance.getColorScheme();
       const newTheme = systemScheme === "dark" ? "dark" : "light";
       setThemeState(newTheme);

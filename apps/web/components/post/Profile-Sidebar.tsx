@@ -39,7 +39,6 @@ export default function ProfileSidebar({
   listingId,
   listing,
   viewerId,
-  initialFollowing = false,
 }: {
   userId: string;
   user: User;
@@ -49,9 +48,6 @@ export default function ProfileSidebar({
   /** Signed-in viewer's id, if any — when it matches `userId` this is the
    *  viewer's own ad, so follow/message actions don't make sense. */
   viewerId?: string | null;
-  /** Whether `viewerId` already follows the seller (a promise while the lookup
-   *  is still running — the Follow control shows a placeholder until it lands). */
-  initialFollowing?: boolean | Promise<boolean>;
 }) {
   const t = useTranslations("Post");
   const format = useFormatter();
@@ -176,7 +172,6 @@ export default function ProfileSidebar({
             <FollowSlot
               key={userId}
               userId={userId}
-              initialFollowing={initialFollowing}
               viewerId={viewerId}
               variant="compact"
               className="bg-card text-foreground hover:bg-gray-100 h-7 mt-9 rounded-sm flex items-center cursor-pointer"

@@ -25,16 +25,17 @@ export const NoImageCell = () => (
  * (default: nothing) unless the DB points at a Storage object that actually
  * loads — never a static stand-in, never a broken <img> glyph.
  *
- * `unoptimized` defaults to true: the Storage hostname is not in
- * `next.config` remotePatterns, and next/image validates the hostname even for
- * a plain <img> pass-through — a Storage URL without it throws and takes the
- * whole page to the error boundary.
+ * Optimized by default: `next.config.ts` lists the Storage hostname in
+ * `remotePatterns` and enables `image/avif` + `image/webp`, so a card, hero or
+ * thumbnail gets a sized WebP/AVIF instead of the original upload. Pass
+ * `unoptimized` only for a caller whose source cannot go through the
+ * optimizer (an animated GIF, a `blob:` URL).
  */
 export default function DbImage({
   fallback = null,
   alt,
   src,
-  unoptimized = true,
+  unoptimized = false,
   ...props
 }: ImageProps & { fallback?: ReactNode }) {
   // The failure is remembered per `src`, not as a plain boolean: a boolean
@@ -43,6 +44,9 @@ export default function DbImage({
   // (the new object never even gets a request). Keyed by src, a new value
   // retries once, while the same failing src stays failed — no retry loop.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  // Same reasoning for the load state: the shimmer belongs to the src that is
+  // still arriving, not to the component instance.
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const srcKey = typeof src === "string" ? src : null;
 
   if (
@@ -59,6 +63,11 @@ export default function DbImage({
       src={srcKey}
       alt={alt}
       unoptimized={unoptimized}
+      // The shimmer is painted as the <img> element's own background (see
+      // `globals.css`), so no wrapper is needed and `fill` keeps working:
+      // until the decoded image covers the box, the background shows through.
+      data-dbimg={loadedSrc === srcKey ? "loaded" : "pending"}
+      onLoad={() => setLoadedSrc(srcKey)}
       onError={() => setFailedSrc(srcKey)}
     />
   );

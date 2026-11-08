@@ -22,7 +22,7 @@ const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
   const displayBrands = brands.slice(0, 9);
 
   return (
-    <View className="px-2 pt-2 pb-2 bg-gray-50">
+    <View className="px-2 pt-2 pb-2">
       <View className="flex-row flex-wrap">
         {displayBrands.map((brand) => (
           <TouchableOpacity

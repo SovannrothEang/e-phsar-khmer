@@ -22,8 +22,10 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   Text,
@@ -32,7 +34,8 @@ import {
   View,
 } from "react-native";
 
-const POLL_MS = 3000;
+const POLL_BASE_MS = 3000;
+const POLL_MAX_MS = 30000;
 
 interface ActiveThread {
   id: string;
@@ -122,6 +125,9 @@ export default function ChatScreen() {
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
   const [inboxError, setInboxError] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [thread, setThread] = useState<ActiveThread | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -144,17 +150,25 @@ export default function ChatScreen() {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const openedFromParams = useRef(false);
   /** Messages already re-tried after a backup restore, per thread open. */
   const retriedDecrypt = useRef<Set<string>>(new Set());
+
+  // Clear a previous engine error as soon as the signed-in user changes: the
+  // bootstrap effect below is async, so the reset is adjusted during render.
+  const engineKey = `${isAuthenticated}:${userId ?? ""}`;
+  const [engineKeySeen, setEngineKeySeen] = useState(engineKey);
+  if (engineKey !== engineKeySeen) {
+    setEngineKeySeen(engineKey);
+    setEngineError(null);
+  }
 
   // ── E2E device bootstrap ───────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     if (!isAuthenticated || !userId) return;
 
-    setEngineError(null);
     getE2eEngine(userId)
       .then((ready) => {
         if (!cancelled) setEngine(ready);
@@ -289,47 +303,80 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!thread || !engine) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let failures = 0;
+    let active = AppState.currentState === "active";
+    // Narrowed once here: the inner functions are hoisted, so TypeScript no
+    // longer keeps the `if (!thread || !engine) return` narrowing inside them.
+    const threadId = thread.id;
+    const ready = engine;
 
-    const poll = async () => {
+    // 3s while healthy, doubling to 30s after consecutive failures, and no
+    // timer at all while the app is backgrounded. The old flat 3s interval
+    // kept a failed phone hammering the API (and burning battery) forever.
+    function schedule() {
+      if (cancelled || !active || timer) return;
+      const delay = Math.min(POLL_BASE_MS * 2 ** failures, POLL_MAX_MS);
+      timer = setTimeout(() => void poll(), delay);
+    }
+
+    async function poll() {
+      if (cancelled || !active) return;
+      timer = null;
       try {
         if (!latestCursor) {
-          const page = await fetchChatMessages(thread.id, { limit: 30 });
+          const page = await fetchChatMessages(threadId, { limit: 30 });
           const ordered = [...page.items].reverse();
           if (cancelled) return;
           setMessages((current) => (current.length === 0 ? ordered : current));
-          const outcomes = await decryptAndStore(engine, ordered);
-          await markChatRead(thread.id);
+          const outcomes = await decryptAndStore(ready, ordered);
+          await markChatRead(threadId);
           setLatestCursor(page.meta.latestCursor);
           setPeerLastReadAt(page.meta.peerLastReadAt);
           setThreadLoading(false);
           await retryWithBackup(ordered, outcomes);
-          return;
+        } else {
+          const page = await fetchChatMessages(threadId, {
+            after: latestCursor,
+            limit: 50,
+          });
+          if (cancelled) return;
+          if (page.items.length > 0) {
+            setMessages((current) => mergeMessages(current, page.items));
+            await decryptAndStore(ready, page.items);
+            await markChatRead(threadId);
+            setTimeout(
+              () => scrollRef.current?.scrollToEnd({ animated: true }),
+              80,
+            );
+          }
+          setLatestCursor(page.meta.latestCursor ?? latestCursor);
+          setPeerLastReadAt(page.meta.peerLastReadAt);
         }
-        const page = await fetchChatMessages(thread.id, {
-          after: latestCursor,
-          limit: 50,
-        });
-        if (cancelled) return;
-        if (page.items.length > 0) {
-          setMessages((current) => mergeMessages(current, page.items));
-          await decryptAndStore(engine, page.items);
-          await markChatRead(thread.id);
-          setTimeout(
-            () => scrollRef.current?.scrollToEnd({ animated: true }),
-            80,
-          );
-        }
-        setLatestCursor(page.meta.latestCursor ?? latestCursor);
-        setPeerLastReadAt(page.meta.peerLastReadAt);
+        failures = 0;
       } catch {
-        /* transient poll failure — the next tick retries */
+        failures += 1;
       }
-    };
+      schedule();
+    }
 
-    const timer = setInterval(() => void poll(), POLL_MS);
+    const subscription = AppState.addEventListener("change", (state) => {
+      const nextActive = state === "active";
+      if (nextActive === active) return;
+      active = nextActive;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      // Back in the foreground: fetch now instead of waiting out the backoff.
+      if (active) void poll();
+    });
+
+    schedule();
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
+      subscription.remove();
     };
   }, [thread, engine, latestCursor, decryptAndStore, retryWithBackup]);
 
@@ -684,6 +731,14 @@ export default function ChatScreen() {
     );
   }
 
+  const visibleInbox = search.trim()
+    ? inbox.filter((item) =>
+        `${displayName(item.otherUser)} ${previewFor(item)}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase()),
+      )
+    : inbox;
+
   // ── Inbox view ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView
@@ -691,9 +746,44 @@ export default function ChatScreen() {
       statusBarStyle="light-content"
       className="flex-1 bg-neutral-background"
     >
-      <View className="bg-primary px-4 py-4">
-        <Text className="text-xl font-bold text-white">Chats</Text>
+      <View className="flex-row items-center justify-between bg-primary px-4 py-3">
+        <Text className="text-xl font-bold text-white">Chat</Text>
+        <View className="flex-row items-center gap-4">
+          <TouchableOpacity
+            onPress={() => {
+              setSearchOpen((open) => !open);
+              if (searchOpen) setSearch("");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Search chats"
+          >
+            <Ionicons name="search" size={22} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setMenuOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Chat options"
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {searchOpen ? (
+        <View className="bg-white px-4 py-2 dark:bg-gray-900">
+          <View className="flex-row items-center rounded-lg bg-gray-100 px-3 py-2 dark:bg-gray-800">
+            <Ionicons name="search" size={18} color="#9CA3AF" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search chats"
+              placeholderTextColor="#9CA3AF"
+              autoFocus
+              className="ml-2 flex-1 p-0 text-base text-gray-900 dark:text-white"
+            />
+          </View>
+        </View>
+      ) : null}
 
       {inboxLoading ? (
         <View className="flex-1 items-center justify-center">
@@ -711,16 +801,18 @@ export default function ChatScreen() {
             <Text className="font-bold text-primary">Try again</Text>
           </TouchableOpacity>
         </View>
-      ) : inbox.length === 0 ? (
+      ) : visibleInbox.length === 0 ? (
         <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="chatbubbles-outline" size={44} color="#9CA3AF" />
-          <Text className="mt-3 text-center text-neutral-text-sub">
-            No conversations yet. Message a seller from any ad.
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-gray-400/80">
+            <Ionicons name="information" size={32} color="white" />
+          </View>
+          <Text className="mt-3 text-center text-base text-gray-500">
+            {search.trim() ? "No Result!" : "No conversations yet"}
           </Text>
         </View>
       ) : (
         <ScrollView className="flex-1">
-          {inbox.map((item) => (
+          {visibleInbox.map((item) => (
             <TouchableOpacity
               key={item.id}
               onPress={() =>
@@ -780,6 +872,42 @@ export default function ChatScreen() {
           ))}
         </ScrollView>
       )}
+
+      {/* 3-dot action sheet */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setMenuOpen(false)}
+          className="flex-1 justify-end bg-black/40 p-4"
+        >
+          <View className="overflow-hidden rounded-2xl bg-white dark:bg-gray-900">
+            <TouchableOpacity
+              onPress={() => {
+                setMenuOpen(false);
+                void loadInbox();
+              }}
+              className="items-center border-b border-gray-200/70 py-4 dark:border-gray-800"
+            >
+              <Text className="text-base font-medium text-primary">
+                Refresh
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            onPress={() => setMenuOpen(false)}
+            className="mt-2 items-center rounded-2xl bg-white py-4 dark:bg-gray-900"
+          >
+            <Text className="text-base font-semibold text-gray-500">
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

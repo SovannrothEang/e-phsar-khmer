@@ -54,16 +54,14 @@ export function ManageAdActions({
   post: Post;
   /** A hidden ad has no public page and cannot be renewed until a slot frees. */
   hidden?: boolean;
-  /** A staff-inactive ad: no public page; the owner fixes and republishes. */
+  /** A staff-inactive ad: no public page, and only staff can lift it. */
   inactive?: boolean;
-  /** Called after a successful renew/republish/delete so the list reloads. */
+  /** Called after a successful renew/delete so the list reloads. */
   onChanged: () => void;
 }) {
   const t = useTranslations("Me.manageAds");
   const tShare = useTranslations("Share");
-  const [confirm, setConfirm] = useState<
-    "renew" | "republish" | "delete" | null
-  >(null);
+  const [confirm, setConfirm] = useState<"renew" | "delete" | null>(null);
   // Closing must not clear `confirm`: the dialog keeps rendering its content
   // through the close animation, and clearing it flipped the title/button to
   // the "Renew" fallback for a moment (captain, 2026-11-03).
@@ -77,8 +75,8 @@ export function ManageAdActions({
   async function run() {
     if (!confirm || pending) return;
     setPending(true);
-    // Renew, republish-from-inactive and first publish all go through the
-    // same backend door; the backend decides whether it spends a renewal.
+    // Renew (including a first publish) goes through the same backend door;
+    // the backend decides whether it spends a renewal.
     const result =
       confirm === "delete"
         ? await deleteMyListing(id)
@@ -89,13 +87,7 @@ export function ManageAdActions({
       toast.error(result.error ?? t("actionError"));
       return;
     }
-    toast.success(
-      confirm === "delete"
-        ? t("deleted")
-        : confirm === "republish"
-          ? t("republished")
-          : t("renewed"),
-    );
+    toast.success(confirm === "delete" ? t("deleted") : t("renewed"));
     setDialogOpen(false);
     onChanged();
   }
@@ -159,16 +151,22 @@ export function ManageAdActions({
                   {t("edit")}
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={ITEM}
-                onSelect={() => {
-                  setConfirm(inactive ? "republish" : "renew");
-                  setDialogOpen(true);
-                }}
-              >
-                <RefreshCw size={16} />
-                {inactive ? t("republish") : t("renew")}
-              </DropdownMenuItem>
+              {/* A staff-inactive ad is not the owner's to republish any
+                  more (2026-11-08): the backend answers
+                  LISTING_INACTIVE_BY_STAFF and only staff can lift it, so the
+                  row badge carries the reason and support is the next step. */}
+              {!inactive && (
+                <DropdownMenuItem
+                  className={ITEM}
+                  onSelect={() => {
+                    setConfirm("renew");
+                    setDialogOpen(true);
+                  }}
+                >
+                  <RefreshCw size={16} />
+                  {t("renew")}
+                </DropdownMenuItem>
+              )}
               {!inactive && (
                 <DropdownMenuItem
                   className={ITEM}
@@ -195,9 +193,9 @@ export function ManageAdActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* One confirm dialog serves renew/republish/delete, with the wording
-          swapped; `confirm` survives the close so the animation never falls
-          back to the wrong label. */}
+      {/* One confirm dialog serves renew/delete, with the wording swapped;
+          `confirm` survives the close so the animation never falls back to the
+          wrong label. */}
       <Dialog
         open={dialogOpen}
         onOpenChange={(open) => {
@@ -210,18 +208,10 @@ export function ManageAdActions({
         >
           <DialogHeader>
             <DialogTitle>
-              {confirm === "delete"
-                ? t("deleteTitle")
-                : confirm === "republish"
-                  ? t("republishTitle")
-                  : t("renewTitle")}
+              {confirm === "delete" ? t("deleteTitle") : t("renewTitle")}
             </DialogTitle>
             <DialogDescription>
-              {confirm === "delete"
-                ? t("deleteBody")
-                : confirm === "republish"
-                  ? t("republishBody")
-                  : t("renewBody")}
+              {confirm === "delete" ? t("deleteBody") : t("renewBody")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -243,11 +233,7 @@ export function ManageAdActions({
               onClick={() => void run()}
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              {confirm === "delete"
-                ? t("delete")
-                : confirm === "republish"
-                  ? t("republish")
-                  : t("renew")}
+              {confirm === "delete" ? t("delete") : t("renew")}
             </Button>
           </div>
         </DialogContent>

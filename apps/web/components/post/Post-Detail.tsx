@@ -125,7 +125,6 @@ function isListingStatus(value: string): value is ListingContext["status"] {
 export default function PostDetail({
   real,
   viewerId,
-  sellerFollowing = false,
   jobApply = null,
   banners = [],
 }: {
@@ -133,9 +132,6 @@ export default function PostDetail({
   /** Signed-in viewer's id, if any — lets the sidebar tell "your ad" apart
    *  from a stranger's and hide seller-contact actions accordingly. */
   viewerId?: string | null;
-  /** Whether that viewer already follows the seller — seeds the sidebar toggle.
-   *  A promise while the lookup is still running; the page does not wait for it. */
-  sellerFollowing?: boolean | Promise<boolean>;
   /** Present only when this viewer may apply to *this* job listing. A promise
    *  while the résumé/application lookup is still running. */
   jobApply?: JobApplyState | null | Promise<JobApplyState | null>;
@@ -435,7 +431,6 @@ export default function PostDetail({
                 listingId={listingContext.id}
                 listing={listingContext}
                 viewerId={viewerId}
-                initialFollowing={sellerFollowing}
               />
             </div>
           </aside>

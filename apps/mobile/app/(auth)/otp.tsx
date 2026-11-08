@@ -1,17 +1,18 @@
-import { AuthField } from "@/components/auth/AuthField";
 import { AuthHeader } from "@/components/auth/AuthHeader";
+import { OtpCodeInput } from "@/components/auth/OtpCodeInput";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -25,14 +26,13 @@ export default function OtpScreen() {
   const { pendingVerification, verifyOtp, resendOtp } = useAuth();
 
   const [code, setCode] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // The OTP verify is a sign-in, so a suspension can surface here too — this
+  // screen is then the only page the blocked user can see.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const [isResending, setIsResending] = useState(false);
-  const inputRef = useRef<TextInput>(null);
 
   // `pendingVerification` lives in memory only, so a reload loses it. The
   // route param is the fallback that keeps the "expired" screen honest.
@@ -46,34 +46,31 @@ export default function OtpScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    const focus = setTimeout(() => inputRef.current?.focus(), 250);
-    return () => clearTimeout(focus);
-  }, []);
-
   const handleSubmit = async () => {
     setError("");
     if (code.trim().length < 4) {
       setError("Enter the code from the SMS.");
       return;
     }
-    if (isRegister) {
-      if (!firstName.trim()) {
-        setError("Enter your first name.");
-        return;
-      }
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
-        return;
-      }
+    const profile =
+      pendingVerification?.mode === "register"
+        ? pendingVerification.profile
+        : undefined;
+    if (isRegister && !profile) {
+      setError("Start again from the register screen.");
+      return;
     }
     setIsLoading(true);
-    const result = isRegister
-      ? await verifyOtp(code, { password, firstName, lastName })
+    const result = profile
+      ? await verifyOtp(code, profile)
       : await verifyOtp(code);
     setIsLoading(false);
     if (result.kind === "authenticated") {
-      router.replace("/(tabs)/account");
+      router.replace("/(tabs)");
+      return;
+    }
+    if (result.kind === "suspended") {
+      setSuspended({ reason: result.reason, support: result.support });
       return;
     }
     if (result.kind === "error") setError(result.message);
@@ -143,83 +140,47 @@ export default function OtpScreen() {
       statusBarStyle="light-content"
       className={`${isDark ? "bg-gray-950" : "bg-neutral-background"} flex-1`}
     >
-      <AuthHeader title="Verification Code" />
+      <AuthHeader title="Confirm Phone" />
 
       <ScrollView
-        className="flex-1 px-5 py-6"
-        contentContainerStyle={{ paddingBottom: 60 }}
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingVertical: 24 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <Text
-          className={`text-center text-sm leading-6 ${
-            isDark ? "text-gray-300" : "text-neutral-text-sub"
-          }`}
-        >
-          {isRegister ? "Confirm your new account" : "Confirm your login"} for
-        </Text>
-        <Text
-          className={`mt-1 text-center text-base font-bold ${
+          className={`text-center text-[26px] font-bold ${
             isDark ? "text-white" : "text-neutral-text-main"
           }`}
         >
           {pendingVerification.phone}
         </Text>
 
-        <View className="mt-8">
-          <AuthField
-            label="6-digit code"
+        <Text
+          className={`mt-4 text-center text-sm leading-6 ${
+            isDark ? "text-gray-300" : "text-neutral-text-sub"
+          }`}
+        >
+          We have just sent a verification code via{" "}
+          <Text className="text-primary font-semibold">SMS</Text> to this phone
+          number{" "}
+          <Text className="text-primary font-semibold">
+            {pendingVerification.phone}
+          </Text>
+          . Please enter the code you received from{" "}
+          <Text className="text-primary font-semibold">SMS</Text> here.
+        </Text>
+
+        <View className="mt-7">
+          <OtpCodeInput
             value={code}
-            onChangeText={(value) => {
-              setCode(value.replace(/[^0-9]/g, ""));
+            onChange={(next) => {
+              setCode(next);
               if (error) setError("");
             }}
-            placeholder="000000"
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            autoComplete="one-time-code"
-            maxLength={8}
-            inputRef={inputRef}
-            inputClassName="text-center text-2xl font-bold tracking-[10px]"
+            error={Boolean(error)}
           />
         </View>
-
-        {isRegister ? (
-          <View className="mt-6 gap-4">
-            <Text
-              className={`text-sm font-semibold ${
-                isDark ? "text-gray-200" : "text-neutral-text-main"
-              }`}
-            >
-              Create your account
-            </Text>
-            <AuthField
-              label="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder="First name"
-              autoCapitalize="words"
-              maxLength={100}
-            />
-            <AuthField
-              label="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder="Last name (optional)"
-              autoCapitalize="words"
-              maxLength={100}
-            />
-            <AuthField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              placeholder="At least 8 characters"
-              secure
-              autoCapitalize="none"
-              autoComplete="new-password"
-            />
-          </View>
-        ) : null}
 
         {error ? (
           <View className="mt-3 flex-row items-center gap-1.5">
@@ -233,45 +194,48 @@ export default function OtpScreen() {
           disabled={isLoading}
           activeOpacity={0.8}
           accessibilityRole="button"
-          className={`mt-6 items-center justify-center rounded-xl bg-secondary-orange py-4 shadow-xs ${
+          className={`mt-6 items-center justify-center rounded-[4px] bg-secondary-orange h-[44px] shadow-xs ${
             isLoading ? "opacity-60" : ""
           }`}
         >
           {isLoading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-base font-bold text-white">
-              {isRegister ? "Create account" : "Sign in"}
-            </Text>
+            <Text className="text-base font-bold text-white">Verify</Text>
           )}
         </TouchableOpacity>
 
-        <View className="mt-6 items-center">
+        <View className="mt-8 items-center">
+          <Text
+            className={`text-sm ${
+              isDark ? "text-gray-300" : "text-neutral-text-main"
+            }`}
+          >
+            Don&apos;t receive the code?
+          </Text>
           {secondsLeft > 0 ? (
-            <Text
-              className={`text-sm ${
-                isDark ? "text-gray-400" : "text-neutral-text-sub"
-              }`}
-            >
-              Resend code in {secondsLeft}s
+            <Text className="mt-3 text-sm text-neutral-text-muted">
+              Resend ( {secondsLeft} )
             </Text>
           ) : (
             <TouchableOpacity
               onPress={handleResend}
               disabled={isResending}
-              className="py-2"
+              className="mt-3 py-1"
             >
               {isResending ? (
                 <ActivityIndicator color={Colors.primary.DEFAULT} />
               ) : (
                 <Text className="text-sm font-semibold text-primary">
-                  Resend code
+                  Resend
                 </Text>
               )}
             </TouchableOpacity>
           )}
         </View>
       </ScrollView>
+
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </SafeAreaView>
   );
 }

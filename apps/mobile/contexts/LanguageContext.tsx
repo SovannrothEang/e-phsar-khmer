@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { setApiLocale } from "@/lib/api/client";
 
-export type LanguageCode = "en" | "km" | "zh" | "ko";
+export type LanguageCode = "en" | "km";
 
 export interface LanguageOption {
   code: LanguageCode;
@@ -22,18 +22,6 @@ export const LANGUAGES: LanguageOption[] = [
     name: "Khmer",
     nativeName: "ខ្មែរ",
     flag: require("@/assets/images/kh-language.png"),
-  },
-  {
-    code: "zh",
-    name: "Chinese",
-    nativeName: "中文",
-    flag: require("@/assets/images/zh-language.png"),
-  },
-  {
-    code: "ko",
-    name: "Korean",
-    nativeName: "한국인",
-    flag: require("@/assets/images/ko-language.png"),
   },
 ];
 

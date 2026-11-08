@@ -36,9 +36,14 @@ export interface ProfilePatch {
   lastName?: string;
   gender?: "male" | "female" | null;
   dateOfBirth?: string | null;
+  yearOfBirth?: number | null;
   company?: string | null;
   email?: string | null;
+  provinceId?: string | null;
+  districtId?: string | null;
+  communeId?: string | null;
   address?: string | null;
+  updateAdsContact?: boolean;
   discoverableByGender?: boolean;
   discoverableByDateOfBirth?: boolean;
   discoverableByPhone?: boolean;
@@ -121,6 +126,25 @@ export async function deleteMyAccount(password: string): Promise<void> {
 export async function fetchMyPhones(): Promise<MyPhone[]> {
   const { data } = await apiFetch<MyPhone[]>("/users/me/phones");
   return data ?? [];
+}
+
+export async function addMyPhone(phone: string): Promise<MyPhone> {
+  const { data } = await apiFetch<MyPhone>("/users/me/phones", {
+    method: "POST",
+    body: { phone },
+  });
+  return data;
+}
+
+export async function updateMyPhone(
+  phoneId: string,
+  phone: string,
+): Promise<MyPhone> {
+  const { data } = await apiFetch<MyPhone>(`/users/me/phones/${phoneId}`, {
+    method: "PATCH",
+    body: { phone },
+  });
+  return data;
 }
 
 export async function requestPhoneChange(phone: string): Promise<void> {
