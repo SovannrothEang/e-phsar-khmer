@@ -15,7 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -1304,15 +1304,18 @@ export class AuthService {
   private async revive(userId: string): Promise<UserRow> {
     const [row] = await this.db
       .update(users)
-      // Only `deleted` rows can be revived; a suspended one is refused by the
-      // caller's `assertAccountActive` and this condition keeps a direct
-      // caller from clearing it.
+      // Clearing the marker must never lift a suspension (the callers refuse a
+      // suspended row first; this is the second lock). Any other status may be
+      // revived — an admin can set `active` without clearing `deletedAt`,
+      // and requiring exactly `deleted` there stranded the account: the update
+      // matched nothing, the login "succeeded", and every later request 401'd
+      // on the marker this could no longer clear.
       .set({ status: 'active', deletedAt: null })
       .where(
         and(
           eq(users.id, userId),
           isNotNull(users.deletedAt),
-          eq(users.status, 'deleted'),
+          ne(users.status, 'suspended'),
         ),
       )
       .returning();
@@ -1324,10 +1327,13 @@ export class AuthService {
       .where(eq(users.id, userId))
       .limit(1);
     if (!current) throw new UnauthorizedException('INVALID_CREDENTIALS');
-    // The update above cannot clear a suspension (its WHERE requires
-    // `status='deleted'`), so a suspended row must not fall through to token
-    // issuance through the race-loser path.
+    // The update above cannot clear a suspension, so a suspended row must not
+    // fall through to token issuance through the race-loser path.
     await this.assertNotSuspended(current);
+    // Still soft-deleted means the update matched nothing: handing out tokens
+    // here would answer "success" and then 401 every request, forever.
+    if (current.deletedAt)
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
     return current;
   }
 

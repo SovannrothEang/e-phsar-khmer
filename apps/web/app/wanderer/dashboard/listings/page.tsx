@@ -338,16 +338,9 @@ export default function AdminListingsPage() {
               // (moderated before the marker column existed, so no deletedAt)
               // or a staff inactivation can still come back. Offering Restore
               // on a permanent removal would be a dead button.
-              row.moderatedAt && !row.deletedAt
-                ? [
-                    {
-                      label: "Restore",
-                      icon: <RotateCcw className="mr-2 size-4" />,
-                      tone: "success",
-                      onSelect: () => void restore(row),
-                    },
-                  ]
-                : row.status === "inactive"
+              row.deletedAt
+                ? []
+                : row.moderatedAt
                   ? [
                       {
                         label: "Restore",
@@ -355,31 +348,40 @@ export default function AdminListingsPage() {
                         tone: "success",
                         onSelect: () => void restore(row),
                       },
-                      {
-                        label: "Remove",
-                        icon: <ShieldOff className="mr-2 size-4" />,
-                        tone: "danger",
-                        onSelect: () => setRemoving(row),
-                      },
                     ]
-                  : [
-                      {
-                        label: "View listing",
-                        icon: <Eye className="mr-2 size-4" />,
-                        onSelect: () =>
-                          window.open(
-                            viewHref(row),
-                            "_blank",
-                            "noopener,noreferrer",
-                          ),
-                      },
-                      {
-                        label: "Remove",
-                        icon: <ShieldOff className="mr-2 size-4" />,
-                        tone: "danger",
-                        onSelect: () => setRemoving(row),
-                      },
-                    ]
+                  : row.status === "inactive"
+                    ? [
+                        {
+                          label: "Restore",
+                          icon: <RotateCcw className="mr-2 size-4" />,
+                          tone: "success",
+                          onSelect: () => void restore(row),
+                        },
+                        {
+                          label: "Remove",
+                          icon: <ShieldOff className="mr-2 size-4" />,
+                          tone: "danger",
+                          onSelect: () => setRemoving(row),
+                        },
+                      ]
+                    : [
+                        {
+                          label: "View listing",
+                          icon: <Eye className="mr-2 size-4" />,
+                          onSelect: () =>
+                            window.open(
+                              viewHref(row),
+                              "_blank",
+                              "noopener,noreferrer",
+                            ),
+                        },
+                        {
+                          label: "Remove",
+                          icon: <ShieldOff className="mr-2 size-4" />,
+                          tone: "danger",
+                          onSelect: () => setRemoving(row),
+                        },
+                      ]
             }
           />
         ),

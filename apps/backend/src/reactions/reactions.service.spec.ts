@@ -310,6 +310,21 @@ describe('ReactionsService', () => {
       expect(order.sql).toContain('"id" desc');
     });
 
+    it('both lists also hide a suspended seller', async () => {
+      const sink = wireCapture();
+
+      await service.listLikedListings('u1', {});
+      const liked = compile(sink.wheres);
+      expect(liked.sql).toContain('"users"."status"');
+      expect(liked.params).toContain('active');
+
+      const savedSink = wireCapture();
+      await service.listSavedListings('u1', {});
+      const saved = compile(savedSink.wheres);
+      expect(saved.sql).toContain('"users"."status"');
+      expect(saved.params).toContain('active');
+    });
+
     it('listSavedListings pins the same filter and ordering', async () => {
       const sink = wireCapture();
 

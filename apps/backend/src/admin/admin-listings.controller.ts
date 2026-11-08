@@ -37,7 +37,7 @@ export class AdminListingsController {
   @Post(':id/remove')
   @ApiOperation({
     summary:
-      'Take a listing down (hidden everywhere; the owner cannot republish)',
+      'Take a listing down permanently — cannot be undone (the owner cannot republish)',
   })
   remove(
     @CurrentUser() user: RequestUser,
@@ -50,7 +50,7 @@ export class AdminListingsController {
   @Post(':id/inactivate')
   @ApiOperation({
     summary:
-      'Hide a listing until its owner fixes and republishes it (the seller is notified)',
+      'Hide a listing until staff restores it (the seller is notified; the owner cannot republish)',
   })
   inactivate(
     @CurrentUser() user: RequestUser,

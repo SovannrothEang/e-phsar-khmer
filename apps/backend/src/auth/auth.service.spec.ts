@@ -1292,6 +1292,89 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
     });
   });
 
+  describe('suspension refusal', () => {
+    it('refuses a suspended account after a correct password', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const suspended = makeUser({
+        primaryPhone: PHONE,
+        status: 'suspended',
+        statusReason: 'Reported: Scam',
+      });
+      const db = makeDb();
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([suspended]) }),
+        }),
+      }));
+      const service = makeService(db, makeJwtService(), makeConfigService());
+
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'ACCOUNT_SUSPENDED',
+          details: { reason: 'Reported: Scam' },
+        },
+      });
+    });
+
+    it('hides the suspension behind the password check', async () => {
+      // A wrong password must look like any other bad credential: the refusal
+      // cannot be used to discover that an identifier belongs to an account.
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      const suspended = makeUser({ primaryPhone: PHONE, status: 'suspended' });
+      const db = makeDb();
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([suspended]) }),
+        }),
+      }));
+      const service = makeService(db, makeJwtService(), makeConfigService());
+
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'wrong-password',
+        }),
+      ).rejects.toThrow('INVALID_CREDENTIALS');
+    });
+
+    it('refuses a suspended account on the OTP path only after the code checks out', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const suspended = makeUser({
+        primaryPhone: PHONE,
+        status: 'suspended',
+        statusReason: 'Reported: Scam',
+      });
+      let selectCall = 0;
+      const db = makeDb();
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup; 2: the existing-account lookup.
+        const rows = selectCall === 1 ? [] : [suspended];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      const service = makeAuthService(db, makeSupabase());
+
+      await expect(
+        service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '000000',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'ACCOUNT_SUSPENDED' },
+      });
+    });
+  });
+
   describe('verifyPhoneOtp — an account inside its recovery window', () => {
     it('revives it instead of creating a second account for the number', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -1416,6 +1499,63 @@ describe('AuthService reactivation on password login', () => {
     }));
     return sets;
   }
+
+  it('refuses a suspended account even though it is also soft-deleted', async () => {
+    // Self-delete keeps the phone, and staff can suspend such a row. Reviving
+    // it would erase a suspension nobody lifted.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const suspended = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'suspended',
+      statusReason: 'Reported: Scam',
+    });
+    const db = makeDb();
+    mockReactivation(db, suspended);
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({
+        identifier: 'testuser',
+        password: 'password123',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'ACCOUNT_SUSPENDED' },
+    });
+  });
+
+  it('does not report success while the deletion marker survives', async () => {
+    // The UPDATE matched nothing (status is not revivable) — handing out
+    // tokens would answer "success" and then 401 every request forever.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const stranded = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'deleted',
+    });
+    const db = makeDb();
+    mockReactivation(db, stranded);
+    // The revival UPDATE returns no row, so `revive` re-reads the row.
+    db.update.mockImplementation(() => ({
+      set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
+    }));
+    let selectCall = 0;
+    db.select.mockImplementation(() => {
+      selectCall++;
+      const rows = selectCall === 1 ? [] : [stranded];
+      return {
+        from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }),
+      };
+    });
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({
+        identifier: 'testuser',
+        password: 'password123',
+      }),
+    ).rejects.toThrow('INVALID_CREDENTIALS');
+  });
 
   it('clears the deletion and signs the owner back in', async () => {
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);

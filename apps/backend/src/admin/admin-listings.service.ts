@@ -174,9 +174,9 @@ export class AdminListingsService {
   }
 
   /**
-   * Hide the ad until its owner fixes and republishes it. Unlike `remove`,
-   * the owner keeps control: the ad stays editable and `publish` reactivates
-   * it (free while its 30-day window is still open).
+   * Hide the ad until staff restores it. Unlike `remove` the row is not
+   * deleted: the owner can still edit it, but `publish` refuses it with
+   * `LISTING_INACTIVE_BY_STAFF` — lifting the hide is staff work.
    */
   async inactivate(id: string, moderatorId: string, reason: string) {
     const existing = await this.moderationState(id);
