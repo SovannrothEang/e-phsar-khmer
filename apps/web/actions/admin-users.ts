@@ -16,6 +16,10 @@ export interface GetAdminUsersParams {
   role?: "user" | "admin" | "super_admin";
   /** Account state. Omitted = every state. */
   status?: "active" | "suspended" | "deleted";
+  /** Derived from an active subscription. */
+  accountType?: "premium" | "normal";
+  /** Has a verified phone or email. */
+  verified?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -29,6 +33,9 @@ export async function getAdminUsers(
   if (params?.q) sp.set("q", params.q);
   // Only the Users page filters by status; the Team feed leaves it out.
   if (params?.status) sp.set("status", params.status);
+  if (params?.accountType) sp.set("accountType", params.accountType);
+  if (params?.verified !== undefined)
+    sp.set("verified", String(params.verified));
   sp.set("role", params?.role ?? "user");
   sp.set("page", String(page));
   sp.set("pageSize", String(pageSize));

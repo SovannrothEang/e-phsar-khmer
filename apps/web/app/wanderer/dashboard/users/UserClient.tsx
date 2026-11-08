@@ -32,6 +32,7 @@ import { deleteUser, restoreUserAccess, suspendUser } from "@/actions/user";
 import { User } from "@/types/user";
 import { AdminPage } from "@/components/dashboard/admin-page";
 import {
+  AdminFilter,
   AdminSearch,
   AdminTable,
   DateCell,
@@ -104,6 +105,8 @@ export default function UserPage({
   const [tab, setTab] = useState("active");
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
+  const [accountType, setAccountType] = useState("all");
+  const [verified, setVerified] = useState("all");
   const [page, setPage] = useState(1);
 
   const [suspendTarget, setSuspendTarget] = useState<User | null>(null);
@@ -114,6 +117,9 @@ export default function UserPage({
   const query: GetAdminUsersParams = {
     ...TABS[tab],
     q: q || undefined,
+    accountType:
+      accountType === "all" ? undefined : (accountType as "premium" | "normal"),
+    verified: verified === "all" ? undefined : verified === "yes",
     page,
     pageSize: PAGE_SIZE,
   };
@@ -133,7 +139,7 @@ export default function UserPage({
   // Tab counts: one pageSize=1 call per status under the current search, so the
   // badges agree with what the tab will show.
   const { data: tabCounts = {} } = useQuery({
-    queryKey: ["admin", "users-counts", q ?? ""],
+    queryKey: ["admin", "users-counts", q ?? "", accountType, verified],
     queryFn: async () => {
       // allSettled: one preset failing must not zero the other badges.
       const results = await Promise.allSettled(
@@ -141,6 +147,11 @@ export default function UserPage({
           const result = await getAdminUsers({
             ...TABS[key],
             q: q || undefined,
+            accountType:
+              accountType === "all"
+                ? undefined
+                : (accountType as "premium" | "normal"),
+            verified: verified === "all" ? undefined : verified === "yes",
             page: 1,
             pageSize: 1,
           });
@@ -396,20 +407,46 @@ export default function UserPage({
         title="Users"
         description="Search every account, suspend one, or give a suspended account its access back"
         toolbar={
-          <form
-            className="w-full max-w-sm"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setQ(searchInput.trim());
-              setPage(1);
-            }}
-          >
-            <AdminSearch
-              value={searchInput}
-              onChange={setSearchInput}
-              placeholder="Search name, username, email, phone… (Enter)"
+          <>
+            <form
+              className="w-full max-w-sm"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setQ(searchInput.trim());
+                setPage(1);
+              }}
+            >
+              <AdminSearch
+                value={searchInput}
+                onChange={setSearchInput}
+                placeholder="Search name, username, email, phone… (Enter)"
+              />
+            </form>
+            <AdminFilter
+              value={accountType}
+              onChange={(value) => {
+                setAccountType(value);
+                setPage(1);
+              }}
+              allLabel="All accounts"
+              options={[
+                { value: "premium", label: "Premium" },
+                { value: "normal", label: "Normal" },
+              ]}
             />
-          </form>
+            <AdminFilter
+              value={verified}
+              onChange={(value) => {
+                setVerified(value);
+                setPage(1);
+              }}
+              allLabel="Any verification"
+              options={[
+                { value: "yes", label: "Verified" },
+                { value: "no", label: "Unverified" },
+              ]}
+            />
+          </>
         }
       >
         <Tabs
