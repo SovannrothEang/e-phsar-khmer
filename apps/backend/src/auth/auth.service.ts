@@ -1296,10 +1296,14 @@ export class AuthService {
 
   /**
    * Clears the deletion. Idempotent — a concurrent sign-in may have won the
-   * race. Deliberately does NOT touch `status`: a row can be soft-deleted and
-   * suspended at the same time, and only staff lift a suspension, so the
-   * `status: 'active'` this used to write turned a deleted-then-suspended
-   * account back into a live one.
+   * race.
+   *
+   * It does write `status: 'active'`, and that is safe ONLY because the WHERE
+   * excludes `suspended`: the predicate, not the setter, is what keeps a
+   * suspension intact. A row can be soft-deleted and suspended at once (a
+   * self-delete keeps the phone, and staff can suspend such a row), and only
+   * staff may lift that. Removing the predicate to "simplify" this would turn
+   * a suspended account back into a live one.
    */
   private async revive(userId: string): Promise<UserRow> {
     const [row] = await this.db

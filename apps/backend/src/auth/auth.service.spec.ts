@@ -1361,7 +1361,8 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
           }),
         };
       });
-      const service = makeAuthService(db, makeSupabase());
+      const supabase = makeSupabase();
+      const service = makeAuthService(db, supabase);
 
       await expect(
         service.verifyPhoneOtp({
@@ -1372,6 +1373,9 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       ).rejects.toMatchObject({
         response: { code: 'ACCOUNT_SUSPENDED' },
       });
+      // The refusal must sit BEHIND the code check: asserting only the error
+      // would let the guard move above verification without failing.
+      expect(supabase.verifyOtp).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1499,6 +1503,43 @@ describe('AuthService reactivation on password login', () => {
     }));
     return sets;
   }
+
+  it('pins the revival predicate that keeps a suspension intact', async () => {
+    // The UPDATE writes `status: 'active'`, so the WHERE is the only thing
+    // stopping it from lifting a suspension — and requiring exactly
+    // `status='deleted'` there stranded an account an admin had set active.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const recovered = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'deleted',
+    });
+    const db = makeDb();
+    mockReactivation(db, recovered);
+    let reviveWhere: unknown;
+    db.update.mockImplementation(() => ({
+      set: (values: Record<string, unknown>) => ({
+        where: (condition: unknown) => {
+          reviveWhere = condition;
+          return {
+            returning: () =>
+              Promise.resolve([{ ...recovered, ...values } as UserRow]),
+          };
+        },
+      }),
+    }));
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await service.loginWithPassword({
+      identifier: 'testuser',
+      password: 'password123',
+    });
+
+    const { sql, params } = compileWhere(reviveWhere);
+    expect(sql).toContain('"deleted_at" is not null');
+    expect(sql).toContain('"status" <>');
+    expect(params).toContain('suspended');
+  });
 
   it('refuses a suspended account even though it is also soft-deleted', async () => {
     // Self-delete keeps the phone, and staff can suspend such a row. Reviving

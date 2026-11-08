@@ -274,7 +274,7 @@ describe('ReactionsService', () => {
             [{ listing: { id: 'l1' }, sellerUsername: null }],
             sink,
           );
-        if (call === 2) return chain([{ value: 1 }]);
+        if (call === 2) return capturingChain([{ value: 1 }], sink);
         return chain([]);
       });
       return sink;
@@ -317,6 +317,9 @@ describe('ReactionsService', () => {
       const liked = compile(sink.wheres);
       expect(liked.sql).toContain('"users"."status"');
       expect(liked.params).toContain('active');
+      // Both the rows and the count carry the predicate: if only one did, a
+      // page could be shorter than its own total.
+      expect(sink.wheres).toHaveLength(2);
 
       const savedSink = wireCapture();
       await service.listSavedListings('u1', {});
