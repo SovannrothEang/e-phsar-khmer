@@ -245,6 +245,25 @@ export class AdminService {
       conditions.push(ne(users.status, 'deleted'));
     }
     if (dto.role) conditions.push(eq(users.role, dto.role));
+    // Premium is derived from an active subscription, so it filters as an
+    // EXISTS — the page-level `accountType` annotation below only labels rows.
+    if (dto.accountType) {
+      const hasActivePlan = sql`exists (
+        select 1 from ${userSubscriptions}
+        where ${userSubscriptions.userId} = ${users.id}
+          and ${userSubscriptions.supersededAt} is null
+          and ${userSubscriptions.expiresAt} > now()
+      )`;
+      conditions.push(
+        dto.accountType === 'premium'
+          ? hasActivePlan
+          : sql`not ${hasActivePlan}`,
+      );
+    }
+    if (dto.verified !== undefined) {
+      const isVerified = sql`(${users.phoneVerifiedAt} is not null or ${users.emailVerifiedAt} is not null)`;
+      conditions.push(dto.verified ? isVerified : sql`not ${isVerified}`);
+    }
     if (dto.q) {
       const term = `%${dto.q}%`;
       conditions.push(

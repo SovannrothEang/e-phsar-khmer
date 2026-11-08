@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { AdminService } from './admin.service';
 import { users } from '../db/schema/users.schema';
 import { userLoginDevices } from '../db/schema/login-devices.schema';
@@ -108,5 +109,105 @@ describe('AdminService.announceSuspension', () => {
     const service = makeService({}, { publish });
 
     await expect(service.announceSuspension('u1')).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * `listUsers` filters. The premium/verified predicates are raw SQL, so the only
+ * way to catch a broken one is to compile the WHERE the query actually builds.
+ */
+describe('AdminService.listUsers filters', () => {
+  const dialect = new PgDialect();
+
+  /** Records the WHERE of the rows query and the count query. */
+  function makeListDb() {
+    const wheres: unknown[] = [];
+    const chain = (rows: unknown[]) => {
+      const c: Record<string, unknown> = {};
+      for (const m of ['from', 'innerJoin', 'leftJoin', 'groupBy'])
+        c[m] = () => c;
+      c.where = (arg: unknown) => {
+        wheres.push(arg);
+        return c;
+      };
+      for (const m of ['orderBy', 'limit', 'offset']) c[m] = () => c;
+      c.then = (resolve: (v: unknown[]) => unknown) =>
+        Promise.resolve(rows).then(resolve);
+      return c;
+    };
+    let call = 0;
+    return {
+      wheres,
+      db: {
+        select: jest.fn(() => chain(call++ === 0 ? [] : [{ value: 0 }])),
+        selectDistinct: jest.fn(() => chain([])),
+      },
+    };
+  }
+
+  const compiled = (wheres: unknown[]) =>
+    wheres
+      .map((where) => dialect.sqlToQuery(where as never))
+      .reduce(
+        (acc, q) => ({
+          sql: `${acc.sql} ${q.sql}`,
+          params: [...acc.params, ...q.params],
+        }),
+        { sql: '', params: [] as unknown[] },
+      );
+
+  it('filters premium as an active-subscription EXISTS', async () => {
+    const { db, wheres } = makeListDb();
+    const service = makeService(db);
+
+    await service.listUsers({ accountType: 'premium' });
+
+    const { sql } = compiled(wheres);
+    expect(sql).toContain('exists');
+    expect(sql).toContain('user_subscriptions');
+    expect(sql).toContain('superseded_at');
+  });
+
+  it('filters normal as NOT EXISTS, so the two are complementary', async () => {
+    const { db, wheres } = makeListDb();
+    const service = makeService(db);
+
+    await service.listUsers({ accountType: 'normal' });
+
+    expect(compiled(wheres).sql).toMatch(/not\s*\(?\s*exists|not exists/);
+  });
+
+  it('filters unverified as neither timestamp set', async () => {
+    const { db, wheres } = makeListDb();
+    const service = makeService(db);
+
+    await service.listUsers({ verified: false });
+
+    const { sql } = compiled(wheres);
+    expect(sql).toContain('phone_verified_at');
+    expect(sql).toContain('email_verified_at');
+    expect(sql).toMatch(/not/);
+  });
+
+  it('searching matches name, username, email or phone', async () => {
+    const { db, wheres } = makeListDb();
+    const service = makeService(db);
+
+    await service.listUsers({ q: 'xiaomi' });
+
+    const { sql, params } = compiled(wheres);
+    expect(sql).toContain('ilike');
+    expect(params).toContain('%xiaomi%');
+  });
+
+  it('defaults to every state except deleted', async () => {
+    const { db, wheres } = makeListDb();
+    const service = makeService(db);
+
+    await service.listUsers({});
+
+    const { sql, params } = compiled(wheres);
+    expect(sql).toContain('"status"');
+    expect(params).toContain('deleted');
   });
 });

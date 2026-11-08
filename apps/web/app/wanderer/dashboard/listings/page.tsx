@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale } from "next-intl";
+import { listingPublicUrl, publicSiteOrigin } from "@/lib/site";
 import { Eye, RotateCcw, ShieldOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -180,10 +181,15 @@ export default function AdminListingsPage() {
     refresh();
   };
 
+  // Absolute, on the MARKETPLACE origin: this page runs on the admin host,
+  // where proxy.ts 404s every non-/wanderer path.
   const viewHref = (row: AdminListingRow) =>
-    `/${locale}/${encodeURIComponent(
-      row.title.replace(/\s+/g, "-").toLowerCase(),
-    )}-adid-${row.id}`;
+    listingPublicUrl({
+      origin: publicSiteOrigin(window.location.origin),
+      locale,
+      title: row.title,
+      id: row.id,
+    });
 
   const categoryBySlug = useMemo(
     () => new Map(categories.map((category) => [category.slug, category])),
