@@ -80,15 +80,15 @@ const conditionField: FieldDef = {
 };
 
 /**
- * Trusted product spec (2026-10-30): the five family forms must link one of the
- * admin-entered spec pages. Required in the form only — the create DTO keeps
- * `productModelId` optional like every other per-form rule.
+ * Trusted product spec (2026-10-30): the five family forms can link one of the
+ * admin-entered spec pages. Optional everywhere — the create DTO's
+ * `productModelId` and the posting forms both leave it empty-allowed.
  */
 const productSpecField: FieldDef = {
   key: 'productSpec',
   label: { en: 'Product Specification' },
   type: 'product',
-  required: true,
+  required: false,
 };
 
 const vehicleMakeModelYearFields: FieldDef[] = [

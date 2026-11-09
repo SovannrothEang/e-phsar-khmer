@@ -387,6 +387,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           phone: pendingVerification.phone,
           token: code,
           password,
+          mode: pendingVerification.mode,
           firstName,
           lastName,
         });

@@ -519,6 +519,19 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Fixed
 
+- **Registering an existing phone number is refused instead of signing you into that account.**
+  `POST /auth/register` only sent an SMS, so a number that already had an account walked the whole sign-up
+  flow and `POST /auth/otp/verify` read the existing row as a _login_ — the caller landed in somebody
+  else's account (or, with a different password, on a bare `INVALID_CREDENTIALS` after the code was spent).
+  Registration now refuses any number that belongs to an account — active, soft-deleted inside the recovery
+  window, or verified on another account through `user_phones` — with `409 PHONE_ALREADY_REGISTERED` and no
+  SMS (`AuthService.assertPhoneNotRegistered`). A password-less legacy row is exempt: completing
+  registration is its only way in. `POST /auth/otp/verify` takes an optional `mode: "register" | "login"`,
+  and `register` applies the same guard, so an account created between the SMS and the code cannot swallow
+  the registration. The web register form shows the refusal inline with a **Sign in** link, and the
+  register/login submit buttons (admin login included) now disable and show a spinner for the whole request,
+  so a double click cannot fire a second submit.
+
 - **A client without the `expo-crypto` native module no longer blanks the mobile app.** `lib/e2e/random.ts`
   imported `expo-crypto` at module scope to install the `globalThis.crypto.getRandomValues` polyfill, and
   `lib/e2e/device.ts` → `contexts/AuthContext.tsx` → `app/_layout.tsx` pulled that chain into the root import
