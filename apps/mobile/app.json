@@ -46,6 +46,15 @@
           "photosPermission": "PhsarKhmer needs access to your photos so you can upload ad images."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "PhsarKhmer uses your location to show listings near you.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],

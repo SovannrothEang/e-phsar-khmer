@@ -140,6 +140,55 @@ export async function updateUser(
   }
 }
 
+/**
+ * Suspends an account: every session is revoked and the account is refused at
+ * sign-in with the reason below. A reason is required, because it is the only
+ * thing the blocked account can read.
+ */
+export async function suspendUser(userId: string, reason: string) {
+  const trimmed = reason.trim();
+  if (trimmed.length < 3) {
+    return {
+      success: false,
+      error:
+        "Give a reason (at least 3 characters) — the account is shown it when it tries to sign in.",
+    };
+  }
+
+  try {
+    await serverFetch(`/admin/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "suspended", statusReason: trimmed }),
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Failed to suspend user",
+    };
+  }
+}
+
+/**
+ * Lifts a suspension. The backend clears the reason triple, so the account no
+ * longer carries a stale "why you were suspended"; its sessions are already
+ * revoked, so it has to sign in once more.
+ */
+export async function restoreUserAccess(userId: string) {
+  try {
+    await serverFetch(`/admin/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "active" }),
+    });
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof ApiError ? err.message : "Failed to restore access",
+    };
+  }
+}
+
 export async function deleteUser(unsafeData: z.infer<typeof deleteUserSchema>) {
   const data = deleteUserSchema.safeParse(unsafeData);
 

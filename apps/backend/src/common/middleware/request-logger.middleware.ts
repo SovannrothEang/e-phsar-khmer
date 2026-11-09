@@ -1,6 +1,7 @@
 import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import type { RequestUser } from '../types/api-response.types';
+import { redactSensitiveQuery } from '../utils/redact';
 
 // Nest logs nothing per request by default, so without this the console is
 // silent between boot and the first unhandled crash. One line per request,
@@ -19,7 +20,7 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - start) / 1e6;
       const user = (req as Request & { user?: RequestUser }).user;
-      const line = `${req.method} ${req.originalUrl} ${res.statusCode} ${ms.toFixed(1)}ms${user ? ` user=${user.id}` : ''}`;
+      const line = `${req.method} ${redactSensitiveQuery(req.originalUrl)} ${res.statusCode} ${ms.toFixed(1)}ms${user ? ` user=${user.id}` : ''}`;
       if (res.statusCode >= 500) this.logger.error(line);
       else if (res.statusCode >= 400) this.logger.warn(line);
       else this.logger.log(line);

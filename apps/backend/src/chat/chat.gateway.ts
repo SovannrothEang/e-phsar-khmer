@@ -87,6 +87,14 @@ export class ChatGateway
   private deliverLocal(event: ChatPushEvent) {
     const conns = this.registry.connectionsFor(event.targetUserId);
     if (conns.length === 0) return;
+    // A suspension ends the session, so there is nothing to deliver: close
+    // every socket this user holds on this instance and stop tracking it.
+    if (event.type === 'session_ended') {
+      for (const conn of conns) {
+        this.evictSocket(conn, event.payload.reason);
+      }
+      return;
+    }
     const frame = JSON.stringify(
       'payload' in event
         ? { type: event.type, payload: event.payload }
@@ -168,12 +176,24 @@ export class ChatGateway
       // enough — a soft-deleted user must not keep a working socket until
       // their ticket happens to expire.
       const [user] = await this.db
-        .select({ id: users.id, tokensValidAfter: users.tokensValidAfter })
+        .select({
+          id: users.id,
+          status: users.status,
+          tokensValidAfter: users.tokensValidAfter,
+        })
         .from(users)
         .where(and(eq(users.id, claims.sub), isNull(users.deletedAt)))
         .limit(1);
       if (!user) {
         socket.close(4001, 'Invalid session');
+        return;
+      }
+
+      // Parity with the REST JwtStrategy, which rejects any non-active status
+      // on every request. Until 2026-11-08 this check was missing here, so a
+      // socket outlived a suspension for as long as its ticket lived.
+      if (user.status !== 'active') {
+        socket.close(4001, 'Account suspended');
         return;
       }
 

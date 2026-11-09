@@ -242,7 +242,13 @@ function makeService(
     notifications as never,
     loginLockout as never,
     socialState as never,
+    makeSettings() as never,
   );
+}
+
+/** Runtime settings: the suspension refusal reads the support channels. */
+function makeSettings() {
+  return { supportContacts: jest.fn().mockResolvedValue({}) };
 }
 
 describe('AuthService', () => {
@@ -822,6 +828,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       notifications as never,
       makeLockout() as never,
       makeSocialState() as never,
+      makeSettings() as never,
     );
   }
 
@@ -1285,6 +1292,93 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
     });
   });
 
+  describe('suspension refusal', () => {
+    it('refuses a suspended account after a correct password', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const suspended = makeUser({
+        primaryPhone: PHONE,
+        status: 'suspended',
+        statusReason: 'Reported: Scam',
+      });
+      const db = makeDb();
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([suspended]) }),
+        }),
+      }));
+      const service = makeService(db, makeJwtService(), makeConfigService());
+
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'ACCOUNT_SUSPENDED',
+          details: { reason: 'Reported: Scam' },
+        },
+      });
+    });
+
+    it('hides the suspension behind the password check', async () => {
+      // A wrong password must look like any other bad credential: the refusal
+      // cannot be used to discover that an identifier belongs to an account.
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      const suspended = makeUser({ primaryPhone: PHONE, status: 'suspended' });
+      const db = makeDb();
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve([suspended]) }),
+        }),
+      }));
+      const service = makeService(db, makeJwtService(), makeConfigService());
+
+      await expect(
+        service.loginWithPassword({
+          identifier: 'testuser',
+          password: 'wrong-password',
+        }),
+      ).rejects.toThrow('INVALID_CREDENTIALS');
+    });
+
+    it('refuses a suspended account on the OTP path only after the code checks out', async () => {
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      const suspended = makeUser({
+        primaryPhone: PHONE,
+        status: 'suspended',
+        statusReason: 'Reported: Scam',
+      });
+      let selectCall = 0;
+      const db = makeDb();
+      db.select.mockImplementation(() => {
+        selectCall++;
+        // 1: banned-phone lookup; 2: the existing-account lookup.
+        const rows = selectCall === 1 ? [] : [suspended];
+        return {
+          from: () => ({
+            where: () => ({ limit: () => Promise.resolve(rows) }),
+          }),
+        };
+      });
+      const supabase = makeSupabase();
+      const service = makeAuthService(db, supabase);
+
+      await expect(
+        service.verifyPhoneOtp({
+          phone: PHONE,
+          token: '000000',
+          password: 'password123',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'ACCOUNT_SUSPENDED' },
+      });
+      // The refusal must sit BEHIND the code check: asserting only the error
+      // would let the guard move above verification without failing.
+      expect(supabase.verifyOtp).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('verifyPhoneOtp — an account inside its recovery window', () => {
     it('revives it instead of creating a second account for the number', async () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -1410,6 +1504,100 @@ describe('AuthService reactivation on password login', () => {
     return sets;
   }
 
+  it('pins the revival predicate that keeps a suspension intact', async () => {
+    // The UPDATE writes `status: 'active'`, so the WHERE is the only thing
+    // stopping it from lifting a suspension — and requiring exactly
+    // `status='deleted'` there stranded an account an admin had set active.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const recovered = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'deleted',
+    });
+    const db = makeDb();
+    mockReactivation(db, recovered);
+    let reviveWhere: unknown;
+    db.update.mockImplementation(() => ({
+      set: (values: Record<string, unknown>) => ({
+        where: (condition: unknown) => {
+          reviveWhere = condition;
+          return {
+            returning: () =>
+              Promise.resolve([{ ...recovered, ...values } as UserRow]),
+          };
+        },
+      }),
+    }));
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await service.loginWithPassword({
+      identifier: 'testuser',
+      password: 'password123',
+    });
+
+    const { sql, params } = compileWhere(reviveWhere);
+    expect(sql).toContain('"deleted_at" is not null');
+    expect(sql).toContain('"status" <>');
+    expect(params).toContain('suspended');
+  });
+
+  it('refuses a suspended account even though it is also soft-deleted', async () => {
+    // Self-delete keeps the phone, and staff can suspend such a row. Reviving
+    // it would erase a suspension nobody lifted.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const suspended = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'suspended',
+      statusReason: 'Reported: Scam',
+    });
+    const db = makeDb();
+    mockReactivation(db, suspended);
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({
+        identifier: 'testuser',
+        password: 'password123',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'ACCOUNT_SUSPENDED' },
+    });
+  });
+
+  it('does not report success while the deletion marker survives', async () => {
+    // The UPDATE matched nothing (status is not revivable) — handing out
+    // tokens would answer "success" and then 401 every request forever.
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    const stranded = makeUser({
+      primaryPhone: '+85512345678',
+      deletedAt: new Date(),
+      status: 'deleted',
+    });
+    const db = makeDb();
+    mockReactivation(db, stranded);
+    // The revival UPDATE returns no row, so `revive` re-reads the row.
+    db.update.mockImplementation(() => ({
+      set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
+    }));
+    let selectCall = 0;
+    db.select.mockImplementation(() => {
+      selectCall++;
+      const rows = selectCall === 1 ? [] : [stranded];
+      return {
+        from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }),
+      };
+    });
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    await expect(
+      service.loginWithPassword({
+        identifier: 'testuser',
+        password: 'password123',
+      }),
+    ).rejects.toThrow('INVALID_CREDENTIALS');
+  });
+
   it('clears the deletion and signs the owner back in', async () => {
     (bcrypt.compare as jest.Mock).mockResolvedValue(true);
     const deleted = makeUser({
@@ -1481,6 +1669,28 @@ describe('VerifyOtpDto validation', () => {
       }),
     );
     expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('accepts the registration mode and rejects an unknown one', async () => {
+    const valid = await validate(
+      plainToInstance(VerifyOtpDto, {
+        phone: '+85512345678',
+        token: '000000',
+        password: 'password123',
+        mode: 'register',
+      }),
+    );
+    expect(valid).toHaveLength(0);
+
+    const invalid = await validate(
+      plainToInstance(VerifyOtpDto, {
+        phone: '+85512345678',
+        token: '000000',
+        password: 'password123',
+        mode: 'signup',
+      }),
+    );
+    expect(invalid.length).toBeGreaterThan(0);
   });
 });
 
@@ -3115,6 +3325,85 @@ describe('AuthService phone OTP (provider switch)', () => {
       expect(otpSender.issueAndSend).not.toHaveBeenCalled();
     });
 
+    it('refuses a number that already has an account, without sending an SMS', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup (none), 2: the active owner of the number
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: 'h' })] : [],
+      );
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('refuses a number a soft-deleted account still holds (login revives it)', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup, 2: active owner (none), 3: recovery-window lookup
+      selects(db, (n) =>
+        n === 3
+          ? [
+              makeUser({
+                primaryPhone: PHONE,
+                deletedAt: new Date(),
+                status: 'deleted',
+              }),
+            ]
+          : [],
+      );
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('refuses a number verified on another account (user_phones)', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban, 2: active primary owner (none), 3: recovery window (none),
+      // 4: the phone linked to some account as a secondary number
+      selects(db, (n) => (n === 4 ? [makeUser({ id: 'other' })] : []));
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('lets a bare legacy account register — completion is its only way in', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup (none), 2: the active row — password-less, so the guard
+      // must fall through instead of closing the account's only entry point.
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: null })] : [],
+      );
+      otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+
+      await expect(
+        service.registerWithPhone({ phone: PHONE, password: 'x' } as never),
+      ).resolves.toMatchObject({ otpSent: true });
+      expect(otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'register',
+        undefined,
+      );
+    });
+
     it('resend infers login for an active account and register otherwise', async () => {
       const a = build('plasgate');
       // 1: ban lookup (none), 2: active user lookup (found)
@@ -3251,6 +3540,56 @@ describe('AuthService phone OTP (provider switch)', () => {
         }),
       ).rejects.toBeDefined();
       expect(otpService.verify).not.toHaveBeenCalled();
+    });
+
+    it('register mode refuses an existing account instead of logging into it', async () => {
+      const { db, service, otpService } = build('plasgate');
+      // 1: ban lookup (none), 2: the active owner of the number
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: 'h' })] : [],
+      );
+
+      const err = (await service
+        .verifyPhoneOtp({
+          phone: PHONE,
+          token: '123456',
+          password: 'password123',
+          mode: 'register',
+        })
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      // Nothing spent, and no tokens for somebody else's account.
+      expect(otpService.verify).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
+    it('register mode still completes a bare account', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      const bare = makeUser({
+        primaryPhone: PHONE,
+        passwordHash: null,
+        username: null,
+      });
+      const { db, service, otpService } = build('plasgate');
+      // 1: ban, 2: the guard's owner lookup, 3: the existing-user lookup
+      selects(db, (n) => (n === 2 || n === 3 ? [bare] : []));
+      const sets = captureUpdates(db);
+      otpService.verify.mockResolvedValue({ status: 'ok', purpose: 'login' });
+
+      await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+        mode: 'register',
+      });
+
+      expect(sets[0]).toMatchObject({ passwordHash: 'hashed' });
+      expect(db.insert).not.toHaveBeenCalled();
     });
 
     it('revives a deleted account after a valid code', async () => {

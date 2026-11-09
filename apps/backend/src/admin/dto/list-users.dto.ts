@@ -1,5 +1,13 @@
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class ListUsersDto {
   @IsOptional()
@@ -13,6 +21,19 @@ export class ListUsersDto {
   @IsOptional()
   @IsEnum(['active', 'suspended', 'deleted'])
   status?: 'active' | 'suspended' | 'deleted';
+
+  /** Derived, not stored: premium = an active subscription row. */
+  @IsOptional()
+  @IsEnum(['premium', 'normal'])
+  accountType?: 'premium' | 'normal';
+
+  /** Has a verified phone OR a verified email. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsBoolean()
+  verified?: boolean;
 
   @IsOptional()
   @IsInt()

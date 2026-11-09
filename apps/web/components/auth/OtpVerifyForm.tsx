@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ArrowLeft, RefreshCwIcon } from "lucide-react";
+import { ArrowLeft, Loader2Icon, RefreshCwIcon } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,9 @@ import {
   storeOtpRegistration,
 } from "@/lib/otp-registration";
 import { isServerRedirect } from "@/lib/next-redirect";
+import { cn } from "@/lib/utils";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -82,6 +85,9 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
   const [verifying, setVerifying] = useState(false);
+  // A suspension reaches this endpoint too (it is a sign-in), and the OTP
+  // screen is then the only page the blocked user can see.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const [resending, setResending] = useState(false);
   // `null` until the countdown has ticked or a resend re-armed it; until then
   // the handoff's wait (or the 60 s fallback) is the countdown.
@@ -155,7 +161,11 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           doneRef.current = false;
           verifiedPhone = null;
           if (registration) storeOtpRegistration(registration);
-          toast.error(res.error);
+          if ("suspended" in res && res.suspended) {
+            setSuspended(res.suspended);
+          } else {
+            toast.error(res.error);
+          }
           setValue("");
         }
       } catch (error) {
@@ -246,8 +256,13 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
                 type="button"
                 onClick={() => void handleResend()}
                 disabled={cooldown > 0 || resending}
+                aria-busy={resending}
               >
-                <RefreshCwIcon className="mr-1 h-3 w-3" />
+                {/* The only feedback this button had was going disabled; spin
+                    the glyph so a slow send looks like work, not a dead click. */}
+                <RefreshCwIcon
+                  className={cn("mr-1 h-3 w-3", resending && "animate-spin")}
+                />
                 {cooldown > 0 ? `Resend code (${cooldown}s)` : "Resend code"}
               </Button>
             </div>
@@ -280,8 +295,16 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
             type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600 text-white h-10 cursor-pointer"
             disabled={verifying || value.length !== OTP_LENGTH}
+            aria-busy={verifying}
           >
-            {verifying ? "Verifying…" : "Verify"}
+            {verifying ? (
+              <>
+                <Loader2Icon className="h-4 w-4 animate-spin" />
+                Verifying…
+              </>
+            ) : (
+              "Verify"
+            )}
           </Button>
           <div className="type-body-sm text-muted-foreground text-center">
             Wrong number?{" "}
@@ -295,6 +318,7 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           </div>
         </CardFooter>
       </form>
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </Card>
   );
 }

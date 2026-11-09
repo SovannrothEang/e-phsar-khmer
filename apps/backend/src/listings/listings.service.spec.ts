@@ -556,6 +556,22 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(calls[0][0]).toHaveProperty('sellerVerifiedAccount');
   });
 
+  it('hides a suspended seller from the feed page, the total and the facets', async () => {
+    // The predicate lives in `common`, so every query built from it must
+    // reference `users` — and each of those queries must therefore JOIN it.
+    const cats = [{ slug: 'cars-and-vehicles', count: 1 }];
+    const [page, count, facets] = queue([], [{ count: 1 }], [cats]);
+    await service.findFeed({ includeTotal: true, includeFacets: true });
+
+    expect(whereOf(page).sql).toContain('"users"."status"');
+    expect(whereOf(count).sql).toContain('"users"."status"');
+    // The count is the query that shipped broken: it selected from `listings`
+    // with no `users` in FROM, so Postgres rejected it with 42P01. Every
+    // query built from the shared predicate must therefore join the table.
+    expect(count.leftJoin?.[0]).toBeDefined();
+    expect(facets.leftJoin?.[0]).toBeDefined();
+  });
+
   it('filters price on the final (discounted) price', async () => {
     const [page] = queue([]);
     await service.findFeed({ minPrice: 100, maxPrice: 500 });
@@ -1224,13 +1240,28 @@ describe('ListingsService expiry', () => {
   }
 
   /** findPublicById = the joined detail read, then the photos read. */
-  function mockPublicDetail(row: Record<string, unknown>) {
-    let call = 0;
-    db.select.mockImplementation(() => {
-      call++;
-      return call === 1
-        ? chain([{ listing: row, sellerUsername: 'seller' }], {})
-        : chain([], {});
+  // Call 1 is the listing row (findById), call 2 is the owner's status — a
+  // suspended owner's ad is hidden by a read rule, call 3+ is photos/reactions.
+  function mockPublicDetail(
+    row: Record<string, unknown>,
+    ownerStatus: 'active' | 'suspended' | 'deleted' = 'active',
+  ) {
+    let first = true;
+    db.select.mockImplementation((projection?: unknown) => {
+      // The owner-status read is the only select whose projection has a
+      // "status" key; the listing, photo and reaction reads do not.
+      if (
+        projection &&
+        typeof projection === 'object' &&
+        'status' in (projection as Record<string, unknown>)
+      ) {
+        return chain([{ status: ownerStatus }], {});
+      }
+      if (first) {
+        first = false;
+        return chain([{ listing: row, sellerUsername: 'seller' }], {});
+      }
+      return chain([], {});
     });
   }
 
@@ -1983,5 +2014,122 @@ describe('ListingsService.findMineById', () => {
     await expect(service.findMineById('u1', 'l1')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('ListingsService.findNearby', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * A fake Drizzle client for the nearby query: one listings select, then the
+   * batched photo select. `where`/`orderBy` are captured so the compiled SQL
+   * can be asserted instead of trusting the chain.
+   */
+  function nearbyDb(fixture: { rows?: Row[]; photos?: Row[] }) {
+    let whereArg: unknown;
+    let orderArgs: unknown[] = [];
+    let limitArg: unknown;
+
+    const builder = () => {
+      let value: unknown = [];
+      let currentTable: unknown;
+      const node: Record<string, unknown> = {};
+      const chain = () => node;
+      node.from = (table: unknown) => {
+        currentTable = table;
+        if (table === listings) value = fixture.rows ?? [];
+        else if (table === listingPhotos) value = fixture.photos ?? [];
+        return node;
+      };
+      node.leftJoin = chain;
+      node.innerJoin = chain;
+      node.where = (arg: unknown) => {
+        // The photo loader runs a second select; keep only the listings one.
+        if (currentTable === listings) whereArg = arg;
+        return node;
+      };
+      node.orderBy = (...args: unknown[]) => {
+        if (currentTable === listings) orderArgs = args;
+        return node;
+      };
+      node.limit = (arg: unknown) => {
+        if (currentTable === listings) limitArg = arg;
+        return Promise.resolve(value);
+      };
+      node.then = (
+        resolve: (v: unknown) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(value).then(resolve, reject);
+      return node;
+    };
+
+    return {
+      db: {
+        select: jest.fn(() => builder()),
+        insert: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      where: () => whereArg,
+      orderBy: () => orderArgs,
+      limit: () => limitArg,
+    };
+  }
+
+  it('returns the nearest rows with photos and the query meta', async () => {
+    const fake = nearbyDb({
+      rows: [
+        { id: 'l1', title: 'Near', sellerUsername: 'u1' },
+        { id: 'l2', title: 'Far', sellerUsername: 'u2' },
+      ],
+      photos: [{ listingId: 'l1', url: 'p1', path: 'listing/u1/p1', sort: 0 }],
+    });
+    const service = makeService(fake.db as never);
+
+    const result = await service.findNearby({
+      lat: 11.5564,
+      lng: 104.9282,
+      radiusKm: 10,
+      limit: 2,
+    });
+
+    expect(result.meta).toEqual({ limit: 2, radiusKm: 10 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2']);
+    expect(result.data[0].photos).toHaveLength(1);
+    expect(result.data[1].photos).toEqual([]);
+
+    const compiled = new PgDialect().sqlToQuery(fake.where() as never);
+    expect(compiled.sql).toContain('"listings"."status"');
+    // The same public read rule as the feed: suspended owners stay hidden.
+    expect(compiled.sql).toContain('"users"."status"');
+    expect(compiled.sql).toContain('is not null');
+    expect(compiled.sql).toMatch(/"listings"\."longitude"\s*[<>]=/);
+    expect(compiled.sql).toContain('asin');
+    expect(compiled.sql).toContain('<= $');
+    expect(fake.limit()).toBe(2);
+    expect(fake.orderBy()).toHaveLength(2);
+    const order = new PgDialect().sqlToQuery(fake.orderBy()[0] as never);
+    expect(order.sql).toContain('asc');
+  });
+
+  it('applies the documented defaults when the query omits them', async () => {
+    const fake = nearbyDb({ rows: [] });
+    const service = makeService(fake.db as never);
+
+    const result = await service.findNearby({ lat: 11.5564, lng: 104.9282 });
+
+    expect(result.meta).toEqual({ limit: 8, radiusKm: 10 });
+    expect(fake.limit()).toBe(8);
+  });
+
+  it('drops the longitude prefilter when the box crosses the antimeridian', async () => {
+    const fake = nearbyDb({ rows: [] });
+    const service = makeService(fake.db as never);
+
+    await service.findNearby({ lat: 0, lng: 179.95, radiusKm: 50 });
+
+    const compiled = new PgDialect().sqlToQuery(fake.where() as never);
+    expect(compiled.sql).not.toMatch(/"listings"\."longitude"\s*[<>]=/);
+    expect(compiled.sql).toContain('asin');
   });
 });

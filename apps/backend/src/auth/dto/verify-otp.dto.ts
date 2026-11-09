@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -29,6 +30,15 @@ export class VerifyOtpDto {
   @IsNotEmpty()
   @MinLength(8, { message: 'password must be at least 8 characters' })
   password: string;
+
+  @ApiPropertyOptional({
+    enum: ['register', 'login'],
+    description:
+      'Which flow is being completed. `register` refuses a number that already belongs to an account (409 PHONE_ALREADY_REGISTERED) instead of signing the caller into it; omit for a plain login.',
+  })
+  @IsOptional()
+  @IsIn(['register', 'login'])
+  mode?: 'register' | 'login';
 
   @ApiPropertyOptional({
     description: 'Registration only: stored on the created user',

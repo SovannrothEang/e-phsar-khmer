@@ -15,7 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as bcrypt from 'bcrypt';
-import { and, eq, gt, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, lte, ne, or, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import {
@@ -58,6 +58,7 @@ import { OtpSmsSender } from '../otp/otp-sms-sender';
 import type { OtpSendResult } from '../otp/otp-sms-sender';
 import type { OtpPurpose } from '../otp/otp.types';
 import { isIssuedBeforeCutoff } from './token-cutoff.util';
+import { SettingsService } from '../settings/settings.service';
 
 /** Response of every "send me a code" endpoint. */
 export interface OtpRequestResult {
@@ -126,6 +127,8 @@ export class AuthService {
     private readonly notifications: NotificationsService,
     private readonly loginLockout: LoginLockoutService,
     private readonly socialState: SocialStateService,
+    // Only for the support contacts carried by the suspension refusal.
+    private readonly settings: SettingsService,
   ) {}
 
   async loginWithPassword(
@@ -175,6 +178,10 @@ export class AuthService {
         throw new UnauthorizedException('INVALID_CREDENTIALS');
       }
 
+      // A soft-deleted row can ALSO be suspended (self-delete keeps the
+      // phone, and staff can suspend such a row). Reviving it would clear a
+      // suspension nobody lifted, so the refusal wins.
+      await this.assertNotSuspended(recoverable);
       const revived = await this.revive(recoverable.id);
       await this.loginLockout.reset(dto.identifier);
       return this.finishLogin(revived, device);
@@ -195,8 +202,7 @@ export class AuthService {
     // account and a token if that filter is ever lifted. Recovery goes through
     // findRecoverable() above, which is deliberate about which rows qualify.
     if (user.deletedAt) throw new UnauthorizedException('Account deactivated');
-    if (user.status !== 'active')
-      throw new UnauthorizedException('Account suspended');
+    if (user.status !== 'active') throw await this.suspendedRefusal(user);
 
     await this.loginLockout.reset(dto.identifier);
     return this.finishLogin(user, device);
@@ -255,6 +261,9 @@ export class AuthService {
     ip?: string | null,
   ): Promise<OtpRequestResult> {
     await this.assertPhoneNotBanned(dto.phone);
+    // Refused BEFORE any SMS is spent: a number that already belongs to an
+    // account must not walk the registration flow into that account.
+    await this.assertPhoneNotRegistered(dto.phone);
     if (this.usesOwnOtp) return this.sendOwnOtp(dto.phone, 'register', ip);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
@@ -266,6 +275,13 @@ export class AuthService {
   ): Promise<AuthResult> {
     // Moderation ban first: a banned number must not even burn an OTP.
     await this.assertPhoneNotBanned(dto.phone);
+    // Registration mode is the caller saying "I am signing up", so an account
+    // that already holds this number is a conflict — never a silent login into
+    // it. `registerWithPhone` refuses the same numbers; this closes the window
+    // between the SMS and the code (and covers a client that skips step 1).
+    if (dto.mode === 'register') {
+      await this.assertPhoneNotRegistered(dto.phone);
+    }
     // Password is checked BEFORE the Supabase call so a wrong password
     // never burns an OTP attempt. For an existing user this is a login
     // (password must match); for an absent user this is a registration
@@ -275,11 +291,6 @@ export class AuthService {
       .from(users)
       .where(and(eq(users.primaryPhone, dto.phone), isNull(users.deletedAt)))
       .limit(1);
-
-    // This endpoint bypasses loginWithPassword, so it needs its own
-    // suspension guard — otherwise a suspended account could mint tokens
-    // through the OTP login flow.
-    if (existing) this.assertAccountActive(existing);
 
     // A legacy bare account (created before passwords were required) is
     // COMPLETED in place: possessing the OTP proves phone ownership, so the
@@ -332,6 +343,14 @@ export class AuthService {
         throw new UnauthorizedException('Invalid or expired OTP');
       supabaseUser = data.user;
     }
+
+    // This endpoint bypasses loginWithPassword, so it needs its own
+    // suspension guard — otherwise a suspended account could mint tokens
+    // through the OTP login flow. Checked HERE, after the password and the
+    // OTP: asserting it any earlier let anyone who knows a phone number read
+    // the moderation reason and learn that the number belongs to an account.
+    if (existing) await this.assertAccountActive(existing);
+    if (recoverable) await this.assertNotSuspended(recoverable);
 
     if (recoverable) {
       const revived = await this.revive(recoverable.id);
@@ -397,7 +416,7 @@ export class AuthService {
       dto.phone,
       insertExtras,
     );
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     // Both the fresh-insert and the existing-login branch land here with
     // `user.primaryPhone === dto.phone` (mirrorSupabaseUser resolves the
     // phone-provider row by that number), and the OTP round trip above is
@@ -915,7 +934,7 @@ export class AuthService {
             },
             dto.provider,
           );
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     return this.finishLogin(user, device);
   }
 
@@ -1165,7 +1184,7 @@ export class AuthService {
       });
     }
 
-    this.assertAccountActive(user);
+    await this.assertAccountActive(user);
     return this.finishLogin(user, device);
   }
 
@@ -1285,12 +1304,34 @@ export class AuthService {
     return row ?? null;
   }
 
-  /** Clears the deletion. Idempotent — a concurrent sign-in may have won the race. */
+  /**
+   * Clears the deletion. Idempotent — a concurrent sign-in may have won the
+   * race.
+   *
+   * It does write `status: 'active'`, and that is safe ONLY because the WHERE
+   * excludes `suspended`: the predicate, not the setter, is what keeps a
+   * suspension intact. A row can be soft-deleted and suspended at once (a
+   * self-delete keeps the phone, and staff can suspend such a row), and only
+   * staff may lift that. Removing the predicate to "simplify" this would turn
+   * a suspended account back into a live one.
+   */
   private async revive(userId: string): Promise<UserRow> {
     const [row] = await this.db
       .update(users)
+      // Clearing the marker must never lift a suspension (the callers refuse a
+      // suspended row first; this is the second lock). Any other status may be
+      // revived — an admin can set `active` without clearing `deletedAt`,
+      // and requiring exactly `deleted` there stranded the account: the update
+      // matched nothing, the login "succeeded", and every later request 401'd
+      // on the marker this could no longer clear.
       .set({ status: 'active', deletedAt: null })
-      .where(and(eq(users.id, userId), isNotNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.id, userId),
+          isNotNull(users.deletedAt),
+          ne(users.status, 'suspended'),
+        ),
+      )
       .returning();
     if (row) return row;
 
@@ -1300,6 +1341,13 @@ export class AuthService {
       .where(eq(users.id, userId))
       .limit(1);
     if (!current) throw new UnauthorizedException('INVALID_CREDENTIALS');
+    // The update above cannot clear a suspension, so a suspended row must not
+    // fall through to token issuance through the race-loser path.
+    await this.assertNotSuspended(current);
+    // Still soft-deleted means the update matched nothing: handing out tokens
+    // here would answer "success" and then 401 every request, forever.
+    if (current.deletedAt)
+      throw new UnauthorizedException('INVALID_CREDENTIALS');
     return current;
   }
 
@@ -1308,10 +1356,83 @@ export class AuthService {
    * `refresh` check inline; the alternate providers (OTP verify, social,
    * Telegram) do not, and a suspended account must not mint a session through
    * any of them.
+   *
+   * The refusal carries the stored reason and the support channels: a
+   * suspended account cannot log in to read an in-app notice, so the login
+   * error is the only surface where it can learn why and who to contact. It is
+   * thrown after the credential check on every path, so it never reveals
+   * whether an identifier exists.
    */
-  private assertAccountActive(user: UserRow): void {
-    if (user.status !== 'active' || user.deletedAt)
-      throw new UnauthorizedException('Account suspended');
+  private async assertAccountActive(user: UserRow): Promise<void> {
+    if (user.status !== 'active' || user.deletedAt) {
+      throw await this.suspendedRefusal(user);
+    }
+  }
+
+  /**
+   * A revival candidate is soft-deleted by definition, so it can never pass
+   * `assertAccountActive`. The one state that must still block it is a
+   * suspension: reviving would clear a decision nobody lifted.
+   */
+  private async assertNotSuspended(user: UserRow): Promise<void> {
+    if (user.status === 'suspended') throw await this.suspendedRefusal(user);
+  }
+
+  private async suspendedRefusal(user: UserRow): Promise<ForbiddenException> {
+    // Settings reads never throw (SettingsService falls back to defaults), so
+    // a broken settings row cannot turn a refusal into a 500.
+    const support = await this.settings.supportContacts();
+    return new ForbiddenException({
+      code: 'ACCOUNT_SUSPENDED',
+      message: user.statusReason ?? 'This account is suspended.',
+      // The exception filter only forwards `code` and `details`, so the
+      // structured payload the client needs lives there.
+      details: { reason: user.statusReason, support },
+    });
+  }
+
+  /**
+   * The registration guard: a number that already answers to an account may not
+   * register again. Without it the OTP step is a takeover path — the same
+   * number reaches `verifyPhoneOtp`, which reads an existing row as a login and
+   * hands out tokens for the account the caller does not own.
+   *
+   * A bare legacy row (no `passwordHash`) is the one exception: the only way
+   * into it is COMPLETING registration (`verifyPhoneOtp`'s
+   * `completingBareAccount`), so refusing here would strand that account.
+   * Soft-deleted rows are not exempt — `login` revives those.
+   */
+  private async assertPhoneNotRegistered(phone: string): Promise<void> {
+    const [active] = await this.db
+      .select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(and(eq(users.primaryPhone, phone), isNull(users.deletedAt)))
+      .limit(1);
+    if (active) {
+      if (!active.passwordHash) return;
+      throw this.phoneAlreadyRegistered();
+    }
+
+    // A soft-deleted account keeps its number on purpose (recovery), so a
+    // fresh registration would fork a second row for the same person.
+    if (await this.findRecoverable(phone)) throw this.phoneAlreadyRegistered();
+
+    // A number verified on another account (`userPhones`) is taken even when
+    // it is not that account's primary one — the same rule
+    // `UsersService.assertPhoneAvailable` applies before a phone change.
+    const [linked] = await this.db
+      .select({ userId: userPhones.userId })
+      .from(userPhones)
+      .where(eq(userPhones.phone, phone))
+      .limit(1);
+    if (linked) throw this.phoneAlreadyRegistered();
+  }
+
+  private phoneAlreadyRegistered(): ConflictException {
+    return new ConflictException({
+      code: 'PHONE_ALREADY_REGISTERED',
+      message: 'This phone number already has an account. Sign in instead.',
+    });
   }
 
   /**

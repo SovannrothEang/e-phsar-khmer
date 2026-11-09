@@ -95,7 +95,7 @@ describe('AdminListingsService.remove', () => {
 });
 
 describe('AdminListingsService.inactivate', () => {
-  it('hides the ad and tells the seller how to republish', async () => {
+  it('hides the ad and tells the seller that staff must lift it', async () => {
     const db = makeDb({ status: 'active', moderatedAt: null });
     const row = moderationRow({ status: 'inactive' });
     const { service, listingsService, notifications } = makeService(db, row);
@@ -116,25 +116,12 @@ describe('AdminListingsService.inactivate', () => {
     });
     expect(notice.title).toBe('Your ad "A motorcycle" was set inactive');
     expect(notice.body).toContain('Wrong category');
-    // The 30-day window is still open, so republishing is free.
-    expect(notice.body).toContain(
-      'free while your 30-day window is still open',
-    );
-  });
-
-  it('tells the seller a lapsed window will spend a renewal', async () => {
-    const db = makeDb({ status: 'active', moderatedAt: null });
-    const row = moderationRow({
-      status: 'inactive',
-      expiresAt: new Date(Date.now() - 60_000),
-    });
-    const { service, notifications } = makeService(db, row);
-
-    await service.inactivate('l1', 'm1', 'Wrong category');
-
-    expect(notifications.notify.mock.calls[0][0].body).toContain(
-      'republishing uses one renewal',
-    );
+    // Since 2026-11-08 the owner's republish is refused, so the notice must
+    // not promise one — it names staff and support instead.
+    expect(notice.body).toContain('only an administrator');
+    expect(notice.body).toContain('contact support');
+    expect(notice.body).not.toContain('publish again');
+    expect(notice.body).not.toContain('renewal');
   });
 
   it('does not re-notify an already-inactive ad', async () => {

@@ -173,86 +173,55 @@ describe('ListingsService.inactivate', () => {
   });
 });
 
-describe('ListingsService.publish from inactive', () => {
+describe('ListingsService.publish from a staff-hidden or deleted ad', () => {
   let db: DbMock;
 
   beforeEach(() => {
     db = makeDb();
   });
 
-  it('reactivates free while the window is open, keeping the expiry', async () => {
+  it('refuses the owner republish that used to be free', async () => {
+    // 2026-11-08: lifting an inactivation is staff work too. The owner used to
+    // flip it back themselves while the 30-day window was open.
     const { service, entitlements, notifications } = makeService(db);
-    const existing = listingRow({ status: 'inactive' });
-    jest.spyOn(service, 'findById').mockResolvedValue(existing as never);
-    const capture: Capture = {};
-    db.update.mockReturnValue(
-      updateReturning([{ ...existing, status: 'active' }], capture),
-    );
+    jest
+      .spyOn(service, 'findById')
+      .mockResolvedValue(listingRow({ status: 'inactive' }) as never);
 
-    await service.publish('u1', 'l1');
-
-    // Not a renewal: no spend, no insert, no new expiry.
-    expect(entitlements.assertCanRenew).not.toHaveBeenCalled();
-    expect(db.insert).not.toHaveBeenCalled();
-    expect(db.transaction).not.toHaveBeenCalled();
-    // The hidden ad no longer held a slot, so coming back must claim one.
-    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalledWith(
-      'u1',
-      expect.objectContaining({ id: 'l1' }),
-    );
-    expect(capture.values).toMatchObject({
-      status: 'active',
-      inactiveAt: null,
-      inactiveById: null,
-      inactiveReason: null,
+    await expect(service.publish('u1', 'l1')).rejects.toMatchObject({
+      response: { code: 'LISTING_INACTIVE_BY_STAFF' },
     });
-    expect(capture.values).not.toHaveProperty('expiresAt');
-    expect(capture.values).not.toHaveProperty('renewCount');
-    expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
-    // Republishing clears the staff-hide notice that is now false.
-    expect(notifications.removeForListing).toHaveBeenCalledWith(
-      'l1',
-      ['listing.inactivated', 'listing.removed'],
-      'u1',
-    );
+    expect(db.update).not.toHaveBeenCalled();
+    expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
+    expect(notifications.removeForListing).not.toHaveBeenCalled();
   });
 
-  it('renews a lapsed inactive ad like any expired ad', async () => {
-    const { service, entitlements, notifications } = makeService(db);
-    const past = new Date(Date.now() - 40 * 86_400_000);
-    const existing = listingRow({
-      status: 'inactive',
-      publishedAt: past,
-      expiresAt: new Date(Date.now() - 86_400_000),
-      renewCount: 2,
-    });
-    jest.spyOn(service, 'findById').mockResolvedValue(existing as never);
-    const capture: Capture = {};
-    db.transaction.mockImplementation((fn: (tx: DbMock) => unknown) => fn(db));
-    db.update.mockReturnValue(
-      updateReturning([{ ...existing, status: 'active' }], capture),
+  it('refuses a lapsed inactive ad too — the owner path is gone entirely', async () => {
+    const { service } = makeService(db);
+    jest.spyOn(service, 'findById').mockResolvedValue(
+      listingRow({
+        status: 'inactive',
+        publishedAt: new Date(Date.now() - 40 * 86_400_000),
+        expiresAt: new Date(Date.now() - 86_400_000),
+      }) as never,
     );
-    const values = jest.fn().mockResolvedValue(undefined);
-    db.insert.mockReturnValue({ values });
 
-    await service.publish('u1', 'l1');
-
-    expect(entitlements.assertCanRenew).toHaveBeenCalled();
-    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalled();
-    expect(values).toHaveBeenCalledWith({ listingId: 'l1', userId: 'u1' });
-    expect(capture.values).toMatchObject({
-      status: 'active',
-      renewCount: 3,
-      inactiveAt: null,
-      inactiveById: null,
-      inactiveReason: null,
+    await expect(service.publish('u1', 'l1')).rejects.toMatchObject({
+      response: { code: 'LISTING_INACTIVE_BY_STAFF' },
     });
-    // The staff-hide notice is stale on this path too.
-    expect(notifications.removeForListing).toHaveBeenCalledWith(
-      'l1',
-      ['listing.inactivated', 'listing.removed'],
-      'u1',
-    );
+  });
+
+  it('refuses a permanently deleted ad', async () => {
+    const { service } = makeService(db);
+    jest
+      .spyOn(service, 'findById')
+      .mockResolvedValue(
+        listingRow({ status: 'deleted', deletedAt: new Date() }) as never,
+      );
+
+    await expect(service.publish('u1', 'l1')).rejects.toMatchObject({
+      response: { code: 'LISTING_DELETED_PERMANENTLY' },
+    });
   });
 
   it('a permanently removed ad is still refused', async () => {
@@ -302,6 +271,19 @@ describe('ListingsService staff restore', () => {
     await service.restoreStaffHidden('l1');
 
     expect(restore).toHaveBeenCalledWith('l1');
+  });
+
+  it('refuses to restore a permanently deleted ad', async () => {
+    const { service } = makeService(db);
+    db.select.mockReturnValue(
+      selectLimit([
+        { moderatedAt: new Date(), deletedAt: new Date(), status: 'deleted' },
+      ]),
+    );
+
+    await expect(service.restoreStaffHidden('l1')).rejects.toThrow(
+      'LISTING_DELETED_PERMANENTLY',
+    );
   });
 
   it('refuses a row that is neither removed nor inactive', async () => {

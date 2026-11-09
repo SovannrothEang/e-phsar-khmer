@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { Eye, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,13 +22,16 @@ import {
   type AdminColumn,
 } from "@/components/dashboard/admin-table";
 import { ReportStatusBadge } from "@/components/dashboard/report-status-badge";
+import { listingPublicUrl, publicSiteOrigin } from "@/lib/site";
 
-/** The public detail route reads the id after `-adid-`; the title is cosmetic. */
-function postHref(report: ListingReportView): string {
-  const title = (report.listingTitle ?? "listing")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-  return `${encodeURIComponent(title)}-adid-${report.listingId}`;
+/** The public detail URL for the reported ad, on the MARKETPLACE origin. */
+function postHref(report: ListingReportView, locale: string): string {
+  return listingPublicUrl({
+    origin: publicSiteOrigin(window.location.origin),
+    locale,
+    title: report.listingTitle,
+    id: report.listingId,
+  });
 }
 
 export default function ReportPostsPage() {
@@ -45,7 +47,6 @@ export default function ReportPostsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState("all");
-  const router = useRouter();
   const locale = useLocale();
 
   const updateStatus = async (id: string, status: "approved" | "rejected") => {
@@ -166,7 +167,12 @@ export default function ReportPostsPage() {
               {
                 label: "View post",
                 icon: <Eye className="mr-2 size-4" />,
-                onSelect: () => router.push(`/${locale}/${postHref(report)}`),
+                onSelect: () =>
+                  window.open(
+                    postHref(report, locale),
+                    "_blank",
+                    "noopener,noreferrer",
+                  ),
               },
               {
                 label: "Approve",
@@ -188,7 +194,7 @@ export default function ReportPostsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps -- updateStatus only calls stable setters + the action
-    [locale, router],
+    [locale],
   );
 
   return (

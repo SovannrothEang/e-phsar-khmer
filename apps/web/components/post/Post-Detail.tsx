@@ -8,7 +8,6 @@ import type { AdvertisementCard } from "@/lib/api/advertisements";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { IconClockHour4, IconMapPin } from "@tabler/icons-react";
 import ProfileSidebar from "./Profile-Sidebar";
-import LoanCalculator from "./LoanCalculator";
 import ContactUser from "./ContactUser";
 import { ThreeButton } from "./ThreeButton";
 import PostImage from "./PostImage";
@@ -415,8 +414,7 @@ export default function PostDetail({
                 inaction.
               </p>
             </div>
-            {/* Loan Calculator */}
-            <LoanCalculator />
+            {/* Loan Calculator hidden */}
             {/* <p className="text-xl font-medium">Related posts</p>
             <div>
                 <GridCardPost post={post} />

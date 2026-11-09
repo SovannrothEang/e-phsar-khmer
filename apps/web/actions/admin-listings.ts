@@ -29,6 +29,8 @@ export interface AdminListingRow {
   moderationReason: string | null;
   inactiveAt: string | null;
   inactiveReason: string | null;
+  /** Set on a permanent delete; the dashboard must not offer Restore. */
+  deletedAt: string | null;
 }
 
 export interface AdminListingsQuery {
@@ -83,9 +85,9 @@ export async function removeListing(id: string, reason: string) {
 }
 
 /**
- * Hides a listing until its owner fixes and republishes it. Unlike
- * `removeListing`, the seller keeps control and gets a notification with the
- * reason. The backend requires the reason (it is shown to the seller).
+ * Hides a listing until staff restores it, and notifies the seller with the
+ * reason. Unlike `removeListing` the row is not deleted, but the owner cannot
+ * lift the hide. The backend requires the reason (it is shown to the seller).
  */
 export async function inactivateListing(id: string, reason: string) {
   try {

@@ -42,6 +42,9 @@ export function AdminLoginForm({
   const [socialPending, setSocialPending] = useState<SocialProvider | null>(
     null,
   );
+  // Same guard as the public login form: the button must stay inert from the
+  // click until the route changes, not just while the request is in flight.
+  const [signingIn, setSigningIn] = useState(false);
   const closePoll = useRef<number | null>(null);
 
   useEffect(() => {
@@ -114,15 +117,27 @@ export function AdminLoginForm({
       onChange: loginSchema,
     },
     onSubmit: async ({ value }) => {
-      const result = await adminLogin(value);
+      if (signingIn) return;
+      setSigningIn(true);
+
+      let result: Awaited<ReturnType<typeof adminLogin>>;
+      try {
+        result = await adminLogin(value);
+      } catch {
+        toast.error("Login failed. Please try again.");
+        setSigningIn(false);
+        return;
+      }
 
       if (result.success) {
         form.reset();
         toast.success("Login successfully!", { position: "top-right" });
         router.push("/wanderer/dashboard");
-      } else {
-        toast.error(result.error || "Login failed.");
+        return;
       }
+
+      toast.error(result.error || "Login failed.");
+      setSigningIn(false);
     },
   });
 
@@ -172,10 +187,18 @@ export function AdminLoginForm({
 
               <Button
                 type="submit"
-                disabled={socialPending !== null}
+                disabled={socialPending !== null || signingIn}
+                aria-busy={signingIn}
                 className="h-10 w-full rounded-sm bg-orange-500 hover:bg-orange-600 text-white cursor-pointer"
               >
-                Login
+                {signingIn ? (
+                  <>
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                    Logging in…
+                  </>
+                ) : (
+                  "Login"
+                )}
               </Button>
 
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">

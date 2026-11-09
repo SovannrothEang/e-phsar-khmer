@@ -30,6 +30,16 @@ export class UpdateUserDto {
   @IsEnum(['active', 'suspended', 'deleted'])
   status?: 'active' | 'suspended' | 'deleted';
 
+  /**
+   * Why the account is being suspended. Required by `AdminService.updateUser`
+   * when `status` is `suspended` — the login refusal shows this text to the
+   * account, so "suspended" alone would leave nothing to appeal against.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  statusReason?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(100)

@@ -98,9 +98,24 @@ export interface OtpRegistrationDetails {
   lastName?: string;
 }
 
+/** The contact channels a suspension notice offers, all optional. */
+export interface SuspensionSupport {
+  email?: string;
+  telegram?: string;
+  phone?: string;
+}
+
 export type AuthOutcome =
   | { kind: "authenticated" }
   | { kind: "otp"; phone: string }
+  // A suspension is not a retryable error: it gets its own outcome so the
+  // screen can explain the status and the appeal channels instead of printing
+  // a generic failure into the password field.
+  | {
+      kind: "suspended";
+      reason: string | null;
+      support: SuspensionSupport;
+    }
   | { kind: "error"; message: string };
 
 interface AuthContextType {
@@ -164,6 +179,22 @@ function authErrorMessage(error: unknown): string {
     return "Invalid credentials.";
   }
   return error.message || "Something went wrong. Please try again.";
+}
+
+/** Maps the backend's `403 ACCOUNT_SUSPENDED` onto its own outcome. */
+function authFailure(error: unknown): AuthOutcome {
+  if (error instanceof ApiError && error.code === "ACCOUNT_SUSPENDED") {
+    const details = (error.details ?? {}) as {
+      reason?: string | null;
+      support?: SuspensionSupport;
+    };
+    return {
+      kind: "suspended",
+      reason: details.reason ?? error.message ?? null,
+      support: details.support ?? {},
+    };
+  }
+  return { kind: "error", message: authErrorMessage(error) };
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -269,7 +300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await completeAuth(result);
         return { kind: "authenticated" };
       } catch (error) {
-        return { kind: "error", message: authErrorMessage(error) };
+        return authFailure(error);
       }
     },
     [completeAuth],
@@ -293,7 +324,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await completeAuth(result);
         return { kind: "authenticated" };
       } catch (error) {
-        return { kind: "error", message: authErrorMessage(error) };
+        return authFailure(error);
       }
     },
     [completeAuth],
@@ -356,6 +387,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           phone: pendingVerification.phone,
           token: code,
           password,
+          mode: pendingVerification.mode,
           firstName,
           lastName,
         });
