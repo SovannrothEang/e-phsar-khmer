@@ -166,7 +166,7 @@ export default function AppliedJobs() {
                       params: { categorySlug: "jobs" },
                     })
                   }
-                  className="bg-orange-400 hover:bg-orange-600 text-card font-medium h-10 px-8 rounded-sm transition-colors cursor-pointer"
+                  className="bg-orange-400 hover:bg-orange-600 text-white font-medium h-10 px-8 rounded-sm transition-colors cursor-pointer"
                 >
                   {t("seeJobs")}
                 </Button>

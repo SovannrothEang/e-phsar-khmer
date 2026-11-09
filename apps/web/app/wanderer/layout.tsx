@@ -55,7 +55,8 @@ export default async function WandererRootLayout({
         >
           <NextIntlClientProvider locale={locale} messages={messages}>
             <Providers>{children}</Providers>
-            <Toaster />
+            {/* Admin-only: the storefront keeps Sonner's default position. */}
+            <Toaster position="top-right" />
           </NextIntlClientProvider>
         </ClientThemeProvider>
       </body>

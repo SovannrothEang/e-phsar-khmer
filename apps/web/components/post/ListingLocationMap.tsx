@@ -34,7 +34,7 @@ export default function ListingLocationMap({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="relative mx-6 block h-[120px] max-w-3xl overflow-hidden rounded-sm border border-gray-200"
+      className="relative mx-6 block h-[120px] max-w-3xl overflow-hidden rounded-sm border border-border"
     >
       <span
         className="absolute inset-0 bg-cover bg-center"

@@ -5,12 +5,25 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
-import { models, modelSubcategoryLinks } from '../db/schema/brands.schema';
+import {
+  brands,
+  models,
+  modelSubcategoryLinks,
+} from '../db/schema/brands.schema';
 import type { ModelRow } from '../db/schema/brands.schema';
+import {
+  categoryTranslations,
+  subcategories,
+  subcategoryTranslations,
+} from '../db/schema/categories.schema';
+import { likeTerm } from '../utils/like-term';
+import type { PaginatedResponse } from '../common/types/api-response.types';
 import type { CreateModelDto } from './dto/create-model.dto';
+import type { ListModelsDto } from './dto/list-models.dto';
 import type { UpdateModelDto } from './dto/update-model.dto';
 import { FilesService } from '../files/files.service';
 
@@ -26,19 +39,87 @@ export class AdminModelsService {
     private readonly files: FilesService,
   ) {}
 
-  async list(brandId?: string): Promise<AdminModel[]> {
-    const rows = await this.db
-      .select()
-      .from(models)
-      .where(brandId ? eq(models.brandId, brandId) : undefined)
-      .orderBy(asc(models.sortOrder));
+  /**
+   * Offset-paginated list. Every filter is optional: `q` matches the model
+   * name/slug, the brand name and the English category/subcategory names;
+   * `categoryId`/`subcategoryId` go through the link table (a brand's own
+   * category is not authoritative). The category and subcategory name matches
+   * use EXISTS so a model linked to several rows can never duplicate the page
+   * or inflate `total`.
+   */
+  async list(dto: ListModelsDto = {}): Promise<PaginatedResponse<AdminModel>> {
+    const page = dto.page ?? 1;
+    const pageSize = dto.pageSize ?? 20;
+    const offset = (page - 1) * pageSize;
 
-    const links = await this.db
-      .select({
-        modelId: modelSubcategoryLinks.modelId,
-        subcategoryId: modelSubcategoryLinks.subcategoryId,
-      })
-      .from(modelSubcategoryLinks);
+    const conditions: SQL[] = [];
+    if (dto.brandId) conditions.push(eq(models.brandId, dto.brandId));
+    if (dto.subcategoryId) {
+      conditions.push(sql`exists (
+        select 1 from ${modelSubcategoryLinks} msl
+        where msl.model_id = ${models.id}
+          and msl.subcategory_id = ${dto.subcategoryId}
+      )`);
+    }
+    if (dto.categoryId) {
+      conditions.push(sql`exists (
+        select 1 from ${modelSubcategoryLinks} msl
+        join ${subcategories} s on s.id = msl.subcategory_id
+        where msl.model_id = ${models.id}
+          and s.category_id = ${dto.categoryId}
+      )`);
+    }
+    if (dto.q) {
+      const term = likeTerm(dto.q);
+      conditions.push(
+        or(
+          ilike(models.name, term),
+          ilike(models.slug, term),
+          sql`exists (
+            select 1 from ${brands} b
+            where b.id = ${models.brandId} and b.name ilike ${term}
+          )`,
+          sql`exists (
+            select 1 from ${modelSubcategoryLinks} msl
+            join ${subcategories} s on s.id = msl.subcategory_id
+            join ${subcategoryTranslations} st
+              on st.subcategory_id = s.id and st.locale = 'en'
+            where msl.model_id = ${models.id} and st.name ilike ${term}
+          )`,
+          sql`exists (
+            select 1 from ${modelSubcategoryLinks} msl
+            join ${subcategories} s on s.id = msl.subcategory_id
+            join ${categoryTranslations} ct
+              on ct.category_id = s.category_id and ct.locale = 'en'
+            where msl.model_id = ${models.id} and ct.name ilike ${term}
+          )`,
+        )!,
+      );
+    }
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [rows, [totalRow]] = await Promise.all([
+      this.db
+        .select()
+        .from(models)
+        .where(where)
+        // Stable tie-breakers: sortOrder is shared by most catalogue rows.
+        .orderBy(asc(models.sortOrder), asc(models.name), asc(models.id))
+        .limit(pageSize)
+        .offset(offset),
+      this.db.select({ value: count() }).from(models).where(where),
+    ]);
+
+    const ids = rows.map((m) => m.id);
+    const links = ids.length
+      ? await this.db
+          .select({
+            modelId: modelSubcategoryLinks.modelId,
+            subcategoryId: modelSubcategoryLinks.subcategoryId,
+          })
+          .from(modelSubcategoryLinks)
+          .where(inArray(modelSubcategoryLinks.modelId, ids))
+      : [];
 
     const byModel = new Map<string, string[]>();
     for (const l of links) {
@@ -47,7 +128,21 @@ export class AdminModelsService {
       byModel.set(l.modelId, entry);
     }
 
-    return rows.map((m) => ({ ...m, subcategoryIds: byModel.get(m.id) ?? [] }));
+    const total = totalRow?.value ?? 0;
+    return {
+      data: rows.map((m) => ({
+        ...m,
+        subcategoryIds: byModel.get(m.id) ?? [],
+      })),
+      meta: {
+        nextCursor: null,
+        hasMore: offset + rows.length < total,
+        limit: pageSize,
+        total,
+        page,
+        pageSize,
+      },
+    };
   }
 
   async getOne(id: string): Promise<AdminModel> {

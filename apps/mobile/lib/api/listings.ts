@@ -81,3 +81,30 @@ export async function fetchCategories(): Promise<CategoryNode[]> {
   });
   return data ?? [];
 }
+
+export interface NearbyQuery {
+  lat: number;
+  lng: number;
+  radiusKm?: number;
+  limit?: number;
+}
+
+/**
+ * Nearest live ads around a point. The device fix travels only in this
+ * request; nothing stores it. The backend redacts it from the HTTP log.
+ */
+export async function fetchNearby(
+  query: NearbyQuery,
+): Promise<ListingDetail[]> {
+  const search = new URLSearchParams({
+    lat: String(query.lat),
+    lng: String(query.lng),
+    radiusKm: String(query.radiusKm ?? 10),
+    limit: String(query.limit ?? 8),
+  });
+  const { data } = await apiFetch<ListingDetail[]>(
+    `/listings/nearby?${search.toString()}`,
+    { auth: false },
+  );
+  return data ?? [];
+}

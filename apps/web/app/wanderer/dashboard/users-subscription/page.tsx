@@ -74,12 +74,14 @@ type Subscription = {
 // was retired so it never reads as another active plan.
 function statusBadge(sub: Subscription): { label: string; className: string } {
   const muted = "text-muted-foreground border-border bg-muted";
-  const red = "text-red-700 border-red-500 bg-red-50";
+  const red =
+    "text-red-700 dark:text-red-300 border-red-500 bg-red-50 dark:bg-red-950/40";
   switch (sub.status) {
     case "active":
       return {
         label: "Active",
-        className: "text-emerald-700 border-emerald-500 bg-emerald-50",
+        className:
+          "text-emerald-700 dark:text-emerald-300 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
       };
     case "expired":
       return { label: "Expired", className: red };

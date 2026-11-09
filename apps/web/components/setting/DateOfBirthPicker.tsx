@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
  */
 
 const NAV_BUTTON =
-  "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-muted disabled:pointer-events-none disabled:text-gray-300";
+  "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:text-gray-300";
 const GRID_CELL =
   "flex h-9 cursor-pointer items-center justify-center rounded-md type-body-sm transition-colors";
 const GRID_CELL_MUTED = "cursor-default text-gray-300";
@@ -124,7 +124,7 @@ export function DateOfBirthPicker({
         {/* Empty → dropdown affordance; with a value the red ⊖ takes its
             place (both sit in the same right-hand slot). */}
         {!value && (
-          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         )}
 
         <PopoverContent align="start" className="w-[320px] p-3">
@@ -292,7 +292,7 @@ export function DateOfBirthPicker({
           type="button"
           aria-label={t("clearDateOfBirth")}
           onClick={() => onChange(undefined)}
-          className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+          className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-500/10"
         >
           <Minus className="h-4 w-4" strokeWidth={3} />
         </button>
@@ -308,7 +308,7 @@ function BackToDays({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-label={t("backToCalendar")}
-      className="mt-2 flex w-full cursor-pointer items-center justify-center py-2 text-gray-500 transition-colors hover:text-gray-700"
+      className="mt-2 flex w-full cursor-pointer items-center justify-center py-2 text-muted-foreground transition-colors hover:text-foreground"
     >
       <CalendarDays className="h-5 w-5" />
     </button>

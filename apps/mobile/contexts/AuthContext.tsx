@@ -12,7 +12,6 @@ import {
 } from "@/lib/api/auth";
 import { tokenStore } from "@/lib/auth/token-store";
 import { toUserProfile } from "@/lib/auth/user-adapter";
-import { bootstrapE2eAfterAuth, clearE2eEngines } from "@/lib/e2e/device";
 import { looksLikePhone, normalizePhone } from "@/lib/phone";
 import React, {
   createContext,
@@ -157,6 +156,24 @@ interface AuthContextType {
   requireAuth: () => boolean;
 }
 
+/**
+ * Chat crypto is loaded on demand: `lib/e2e/device` pulls `@noble/curves`,
+ * which probes `crypto.getRandomValues` at import time and throws when the
+ * client has no expo-crypto native module. Only chat needs it, so the root
+ * layout must never fail because of it.
+ */
+function e2eDevice(): typeof import("@/lib/e2e/device") | null {
+  try {
+    return require("@/lib/e2e/device") as typeof import("@/lib/e2e/device");
+  } catch (error) {
+    console.warn(
+      "[e2e] encrypted chat is unavailable in this client; skipping device setup.",
+      error,
+    );
+    return null;
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function authErrorMessage(error: unknown): string {
@@ -223,7 +240,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPendingVerification(null);
     // Register this phone as an E2E chat device in the background; the chat
     // screen retries on demand if this pass fails.
-    bootstrapE2eAfterAuth(result.user.id);
+    e2eDevice()?.bootstrapE2eAfterAuth(result.user.id);
   }, []);
 
   // Restore the session once at boot; a failed refresh has already cleared the
@@ -240,7 +257,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(toUserProfile(me));
         setUserId(me.id);
         setIsAuthenticated(true);
-        bootstrapE2eAfterAuth(me.id);
+        e2eDevice()?.bootstrapE2eAfterAuth(me.id);
       } catch {
         /* Not signed in (or offline) — the visitor shell is the safe default. */
       } finally {
@@ -422,7 +439,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       /* the local session is cleared regardless */
     }
     await tokenStore.clearSession();
-    clearE2eEngines();
+    e2eDevice()?.clearE2eEngines();
     clearSessionState();
   }, [clearSessionState]);
 

@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
   // traces, which is what apps/web/Dockerfile ships. Vercel ignores it.
   output: "standalone",
   experimental: {
+    // Enables app/global-not-found.tsx for unmatched paths outside a root layout.
+    globalNotFound: true,
     // Server actions default to a 1 MB body. Avatar/cover uploads (backend cap
     // 5 MB) and feedback (up to 6 images × 5 MB) pass Files through actions,
     // so anything over 1 MB was rejected before reaching the backend.

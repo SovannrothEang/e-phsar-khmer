@@ -10384,7 +10384,10 @@ export const categoriesSeed: CategorySeed[] = [
   },
   {
     slug: 'books-sports-and-hobbies',
-    name: { en: 'Books & Sports & Hobbies', km: 'សៀវភៅ កីឡា & ចំណូលចិត្ត' },
+    // "Books, Sports & Hobbies" is the mock's label and the key every web
+    // locale already uses; the old "Books & Sports & Hobbies" left the strip
+    // entry untranslated (captain's call, 2026-11-09).
+    name: { en: 'Books, Sports & Hobbies', km: 'សៀវភៅ កីឡា & ចំណូលចិត្ត' },
     sortOrder: 10,
     subcategories: [
       {

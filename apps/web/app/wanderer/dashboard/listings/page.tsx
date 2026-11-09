@@ -60,13 +60,20 @@ const TABS: Record<
  *  Solid tints on purpose: Tailwind's alpha colours (e.g. orange-500/10) render
  *  teal fringing at the rounded corners in Chrome on scaled displays. */
 const STATUS_TONE: Record<string, string> = {
-  active: "border-emerald-500 bg-emerald-50 text-emerald-700",
-  draft: "border-slate-400 bg-slate-100 text-slate-600",
-  expired: "border-amber-500 bg-amber-50 text-amber-700",
-  restricted: "border-orange-500 bg-orange-50 text-orange-700",
-  inactive: "border-sky-500 bg-sky-50 text-sky-700",
-  deleted: "border-red-500 bg-red-50 text-red-700",
-  removed: "border-red-500 bg-red-50 text-red-700",
+  active:
+    "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+  draft:
+    "border-slate-400 bg-slate-100 text-muted-foreground dark:bg-slate-800 dark:text-slate-300",
+  expired:
+    "border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+  restricted:
+    "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300",
+  inactive:
+    "border-sky-500 bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300",
+  deleted:
+    "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  removed:
+    "border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
 };
 
 const priceLabel = (row: AdminListingRow) =>
@@ -304,7 +311,7 @@ export default function AdminListingsPage() {
             <Badge
               className={
                 STATUS_TONE[status] ??
-                "border-slate-400 bg-slate-100 text-slate-600"
+                "border-slate-400 bg-slate-100 text-muted-foreground dark:bg-slate-800 dark:text-slate-300"
               }
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -319,7 +326,7 @@ export default function AdminListingsPage() {
         sortValue: (row) => row.pendingReports,
         cell: (row) =>
           row.pendingReports > 0 ? (
-            <Badge className="border-red-500 bg-red-50 text-red-700">
+            <Badge className="border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300">
               {row.pendingReports}
             </Badge>
           ) : (

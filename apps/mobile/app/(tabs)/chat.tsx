@@ -12,12 +12,15 @@ import {
   type ChatUserSummary,
   type InboxItem,
 } from "@/lib/api/chat";
-import { decryptPage, type DecryptOutcome } from "@/lib/e2e/decrypt";
-import { getE2eEngine } from "@/lib/e2e/device";
-import { sendEncryptedText } from "@/lib/e2e/send";
+import type { DecryptOutcome } from "@/lib/e2e/decrypt";
 import type { RatchetEngine } from "@/lib/e2e/types";
 import { formatListingDate } from "@/lib/listings";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  Redirect,
+  router,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -33,6 +36,33 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+/**
+ * Chat crypto is loaded on demand: `lib/e2e/*` pulls `@noble/curves`, which
+ * probes `crypto.getRandomValues` at import time and throws when the client
+ * has no expo-crypto native module. Loading it in the boot graph would blank
+ * every route; only chat needs it.
+ */
+type E2eModules = {
+  getE2eEngine: typeof import("@/lib/e2e/device").getE2eEngine;
+  decryptPage: typeof import("@/lib/e2e/decrypt").decryptPage;
+  sendEncryptedText: typeof import("@/lib/e2e/send").sendEncryptedText;
+};
+
+/* eslint-disable @typescript-eslint/no-require-imports -- optional chat crypto */
+function e2eModules(): E2eModules | null {
+  try {
+    return {
+      getE2eEngine: require("@/lib/e2e/device").getE2eEngine,
+      decryptPage: require("@/lib/e2e/decrypt").decryptPage,
+      sendEncryptedText: require("@/lib/e2e/send").sendEncryptedText,
+    };
+  } catch (error) {
+    console.warn("[e2e] encrypted chat is unavailable in this client.", error);
+    return null;
+  }
+}
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 const POLL_BASE_MS = 3000;
 const POLL_MAX_MS = 30000;
@@ -118,7 +148,7 @@ export default function ChatScreen() {
     ? params.listingId[0]
     : params.listingId;
 
-  const { isAuthenticated, userId } = useAuth();
+  const { isAuthenticated, isLoading, userId } = useAuth();
 
   const [engine, setEngine] = useState<RatchetEngine | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
@@ -169,7 +199,17 @@ export default function ChatScreen() {
     let cancelled = false;
     if (!isAuthenticated || !userId) return;
 
-    getE2eEngine(userId)
+    const modules = e2eModules();
+    if (!modules) {
+      Promise.resolve().then(() => {
+        if (!cancelled) {
+          setEngineError("Encrypted chat is unavailable in this client.");
+        }
+      });
+      return;
+    }
+    modules
+      .getE2eEngine(userId)
       .then((ready) => {
         if (!cancelled) setEngine(ready);
       })
@@ -207,7 +247,9 @@ export default function ChatScreen() {
   // ── Thread loading and polling ─────────────────────────────────────────
   const decryptAndStore = useCallback(
     async (ready: RatchetEngine, rows: ChatMessage[]) => {
-      const outcomes = await decryptPage(ready, rows);
+      const modules = e2eModules();
+      if (!modules) return new Map<string, DecryptOutcome>();
+      const outcomes = await modules.decryptPage(ready, rows);
       setDecrypted((current) => {
         const next = new Map(current);
         for (const [id, outcome] of outcomes) next.set(id, outcome);
@@ -408,7 +450,12 @@ export default function ChatScreen() {
     setSending(true);
     setSendError(null);
     try {
-      const outcome = await sendEncryptedText(engine, {
+      const modules = e2eModules();
+      if (!modules) {
+        setSendError("Encrypted chat is unavailable in this client.");
+        return;
+      }
+      const outcome = await modules.sendEncryptedText(engine, {
         recipientId: thread.otherUser.id,
         plaintext: text,
         clientMessageId: makeClientMessageId(),
@@ -455,23 +502,19 @@ export default function ChatScreen() {
   const lockedBanner =
     unavailableCount > 0 ? lockedBannerText(unavailableCount, backupState) : "";
 
-  if (!isAuthenticated) {
+  // Guests never see a signed-out chat placeholder: opening Chat — from the
+  // tab or from a listing's Chat button — sends them to Welcome first.
+  if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-neutral-background">
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="chatbubbles-outline" size={44} color="#9CA3AF" />
-          <Text className="mt-3 text-center text-neutral-text-sub">
-            Sign in to see your messages.
-          </Text>
-          <TouchableOpacity
-            onPress={() => router.push("/(auth)/sign-in")}
-            className="mt-4 rounded-lg bg-secondary-orange px-8 py-3"
-          >
-            <Text className="font-bold text-white">Sign in</Text>
-          </TouchableOpacity>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color={Colors.primary.DEFAULT} />
         </View>
       </SafeAreaView>
     );
+  }
+  if (!isAuthenticated) {
+    return <Redirect href={"/(auth)/welcome" as never} />;
   }
 
   // ── Thread view ────────────────────────────────────────────────────────
@@ -558,7 +601,15 @@ export default function ChatScreen() {
                     onPress={() => {
                       setEngineError(null);
                       if (userId) {
-                        getE2eEngine(userId)
+                        const modules = e2eModules();
+                        if (!modules) {
+                          setEngineError(
+                            "Encrypted chat is unavailable in this client.",
+                          );
+                          return;
+                        }
+                        modules
+                          .getE2eEngine(userId)
                           .then(setEngine)
                           .catch(() =>
                             setEngineError("Could not prepare encrypted chat."),

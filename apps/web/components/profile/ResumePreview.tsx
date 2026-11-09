@@ -210,7 +210,7 @@ function EntryMenu({
         <button
           type="button"
           aria-label={t("entryActions")}
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted"
+          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
         >
           <IconDotsVertical size={18} />
         </button>
@@ -757,8 +757,8 @@ export function ResumePreview({
                   key={label}
                   className="flex items-center gap-2 type-body-sm"
                 >
-                  <Icon size={16} className="shrink-0 text-gray-500" />
-                  <span className="text-gray-500">{label}:</span>
+                  <Icon size={16} className="shrink-0 text-muted-foreground" />
+                  <span className="text-muted-foreground">{label}:</span>
                   <span
                     className={
                       link && value ? "text-[#00a0e9]" : "text-foreground"
@@ -784,9 +784,9 @@ export function ResumePreview({
                   <IconUser
                     size={64}
                     strokeWidth={1.5}
-                    className="text-gray-400"
+                    className="text-muted-foreground"
                   />
-                  <span className="type-body text-gray-500">3 x 4</span>
+                  <span className="type-body text-muted-foreground">3 x 4</span>
                 </div>
               }
             />
@@ -1192,7 +1192,7 @@ export function ResumePreview({
               aria-label={t("sections.cv.removeAria")}
               onClick={handleCvRemove}
               disabled={cvRemoving}
-              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               <IconTrash size={18} />
             </button>

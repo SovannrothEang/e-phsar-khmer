@@ -37,8 +37,10 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
 
   if (!types || types.length === 0) return null;
 
-  // Show first 4 types + "Show More" = 5 items per row
-  const displayTypes = types.slice(0, 4);
+  // Four columns, at most two rows: seven tiles plus "Show More".
+  const MAX_TILES = 7;
+  const hasMore = types.length > MAX_TILES;
+  const displayTypes = types.slice(0, hasMore ? MAX_TILES : types.length);
 
   const handleSelectType = (id: string) => {
     setModalVisible(false);
@@ -52,7 +54,7 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
           <TouchableOpacity
             key={type.id}
             onPress={() => onTypePress(type.id)}
-            className="w-1/5 items-center mb-2"
+            className="w-1/4 items-center mb-2"
           >
             <View className="w-14 h-14 mb-4 items-center justify-center">
               {type.image ? (
@@ -78,10 +80,10 @@ const TypeSelector = ({ types, onTypePress }: TypeSelectorProps) => {
           </TouchableOpacity>
         ))}
 
-        {/* Show More - Only if more than 4 types */}
-        {types.length > 4 && (
+        {/* Only when the list overflows the two-row grid */}
+        {hasMore && (
           <TouchableOpacity
-            className="w-1/5 items-center mb-2"
+            className="w-1/4 items-center mb-2"
             onPress={() => {
               setSearchQuery("");
               setModalVisible(true);

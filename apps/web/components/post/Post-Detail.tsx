@@ -264,7 +264,7 @@ export default function PostDetail({
           <div className="flex-1 w-full min-w-38 space-y-4">
             <div className="bg-card border rounded-sm overflow-hidden">
               {isExpired && (
-                <div className="border-l-3 border-l-[#f68b1e] bg-[#fdf0e6] px-4 py-3 type-body-sm text-foreground">
+                <div className="border-l-3 border-l-[#f68b1e] bg-amber-50 px-4 py-3 type-body-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                   {t("Post.expiredNotice")}
                 </div>
               )}
@@ -346,7 +346,7 @@ export default function PostDetail({
                           : `$${post.price}`}
                       </span>
                       {post.oldPrice && (
-                        <span className="type-body-sm text-gray-400 line-through mb-0.5">
+                        <span className="type-body-sm text-muted-foreground line-through mb-0.5">
                           ${post.oldPrice}
                         </span>
                       )}

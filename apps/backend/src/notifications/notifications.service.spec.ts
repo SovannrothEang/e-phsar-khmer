@@ -353,3 +353,42 @@ describe('NotificationsService.notify — SMS enqueue', () => {
     expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('NotificationsService.list', () => {
+  it('orders by createdAt then id so offset pagination is stable', async () => {
+    const db = makeDb();
+    const orders: unknown[] = [];
+    const listChain = {
+      from: () => ({
+        where: () => ({
+          orderBy: (...args: unknown[]) => {
+            orders.push(...args);
+            return { limit: () => ({ offset: () => Promise.resolve([]) }) };
+          },
+        }),
+      }),
+    };
+    db.select.mockImplementation((selection?: unknown) => {
+      if (selection) {
+        return {
+          from: () => ({ where: () => Promise.resolve([{ value: 0 }]) }),
+        };
+      }
+      return listChain;
+    });
+    const service = makeService(db);
+
+    await service.list('u1', { page: 1, pageSize: 20 } as never);
+
+    // Staff fan-out inserts several rows in the same instant; without a
+    // tie-breaker, equal `created_at` values can shift between pages.
+    const compiled = orders.map(
+      (order) => new PgDialect().sqlToQuery(order as never).sql,
+    );
+    expect(compiled).toHaveLength(2);
+    expect(compiled[0]).toContain('created_at');
+    expect(compiled[0]).toContain('desc');
+    expect(compiled[1]).toContain('id');
+    expect(compiled[1]).toContain('desc');
+  });
+});

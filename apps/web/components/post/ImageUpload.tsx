@@ -147,7 +147,7 @@ export default function ImageUpload({
           {existingPhotos.map((photo, i) => (
             <div
               key={photo.url}
-              className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group"
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group"
             >
               <DbImage
                 src={photo.url}
@@ -176,7 +176,7 @@ export default function ImageUpload({
           {images.map((f, i) => (
             <div
               key={i}
-              className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group"
+              className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- client-side object URL preview */}
               <img
@@ -202,7 +202,7 @@ export default function ImageUpload({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
-              className="w-20 h-20 rounded-sm border-2 border-dashed border-muted flex items-center justify-center text-gray-400 hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
+              className="w-20 h-20 rounded-sm border-2 border-dashed border-muted flex items-center justify-center text-muted-foreground hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
             >
               +
             </button>
@@ -215,16 +215,16 @@ export default function ImageUpload({
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           onClick={() => inputRef.current?.click()}
-          className="border-2 border-dashed border-gray-200 bg-gray-50 rounded-sm p-12 flex flex-col items-center gap-2 cursor-pointer hover:border-[#00a0e9] hover:bg-[#e1f3fb] transition-all"
+          className="border-2 border-dashed border-border bg-muted rounded-sm p-12 flex flex-col items-center gap-2 cursor-pointer hover:border-[#00a0e9] hover:bg-sky-500/10 transition-all"
         >
           <Upload className="w-10 h-10 text-[#00a0e9]" />
-          <p className="type-body-sm text-gray-500">
+          <p className="type-body-sm text-muted-foreground">
             {t("dropTitle")}{" "}
             <span className="text-[#00a0e9] font-semibold underline">
               {t("browse")}
             </span>
           </p>
-          <p className="type-meta text-gray-400">{t("supported")}</p>
+          <p className="type-meta text-muted-foreground">{t("supported")}</p>
         </div>
       )}
 

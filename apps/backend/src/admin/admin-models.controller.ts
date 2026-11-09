@@ -14,6 +14,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminModelsService } from './admin-models.service';
 import { CreateModelDto } from './dto/create-model.dto';
+import { ListModelsDto } from './dto/list-models.dto';
 import { UpdateModelDto } from './dto/update-model.dto';
 
 @ApiTags('admin')
@@ -25,9 +26,11 @@ export class AdminModelsController {
   constructor(private readonly service: AdminModelsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List models (optionally by brandId)' })
-  list(@Query('brandId') brandId?: string) {
-    return this.service.list(brandId);
+  @ApiOperation({
+    summary: 'List models (filterable, offset-paginated)',
+  })
+  list(@Query() query: ListModelsDto) {
+    return this.service.list(query);
   }
 
   @Post()

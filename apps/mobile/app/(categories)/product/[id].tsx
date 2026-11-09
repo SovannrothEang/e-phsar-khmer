@@ -725,7 +725,7 @@ export default function ProductDetailScreen() {
             activeOpacity={0.8}
           >
             <Ionicons name="call" size={18} color="white" />
-            <Text className="text-white font-bold text-sm">Call Seller</Text>
+            <Text className="text-white font-bold text-sm">Call</Text>
           </TouchableOpacity>
         )}
 

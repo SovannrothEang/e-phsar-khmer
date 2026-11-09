@@ -499,8 +499,10 @@ export function RowActions({
             disabled={action.disabled}
             className={cn(
               "cursor-pointer",
-              action.tone === "warning" && "text-orange-500",
-              action.tone === "success" && "text-emerald-600",
+              action.tone === "warning" &&
+                "text-orange-500 dark:text-orange-400",
+              action.tone === "success" &&
+                "text-emerald-600 dark:text-emerald-400",
               action.tone === "danger" && "text-destructive",
             )}
           >
@@ -563,8 +565,8 @@ export function EntityChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 type-body-sm text-black",
-        tone === "category" ? "bg-sky-200" : "bg-sky-100",
+        "inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 type-body-sm text-sky-700 dark:text-sky-300",
+        tone === "category" ? "bg-sky-500/15" : "bg-sky-500/10",
       )}
     >
       {children}

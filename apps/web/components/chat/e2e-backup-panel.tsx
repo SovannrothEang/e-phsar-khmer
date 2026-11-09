@@ -61,7 +61,7 @@ export function E2eBackupPanel() {
 
       {state?.kind === "ready" && backup.lastRestoredCount !== null && (
         <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/60 px-4 py-2 type-body">
-          <ShieldCheck className="size-4 text-green-600" />
+          <ShieldCheck className="size-4 text-green-600 dark:text-green-400" />
           <span>{t("restored", { count: backup.lastRestoredCount })}</span>
         </div>
       )}

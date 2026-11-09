@@ -353,7 +353,7 @@ export default async function SubcategoryPage({
     "";
 
   return (
-    <main className="min-h-screen flex flex-col bg-gray-100">
+    <main className="min-h-screen flex flex-col bg-muted">
       {/* ── Top banner ad ─────────────────────────────────────────────────── */}
       {banners.length > 0 && (
         <div className="w-full flex justify-center py-6">

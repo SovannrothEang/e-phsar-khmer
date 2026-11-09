@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   INestApplication,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
@@ -16,6 +17,8 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { BillingAddressesService } from './billing-addresses.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SearchUsersDto } from './dto/search-users.dto';
+import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 
 jest.mock('bcrypt');
 
@@ -2139,5 +2142,383 @@ describe('UsersController GET /users/:id', () => {
       .expect({ id: PROFILE_ID });
 
     expect(getPublicProfileById).toHaveBeenCalledWith(PROFILE_ID);
+  });
+});
+
+/**
+ * Chainable stub for the two selects `searchUsers` issues. The row select ends
+ * in `.offset()`, the count select is awaited directly; both record what the
+ * service asked for so the generated SQL can be compiled and asserted.
+ */
+function searchDb(
+  rows: Array<Record<string, unknown>>,
+  total: number,
+  capture: {
+    where?: unknown;
+    orderBy?: unknown[];
+    limit?: number;
+    offset?: number;
+    fields?: Record<string, unknown>;
+  } = {},
+) {
+  const db = makeDb();
+  let call = 0;
+  db.select.mockImplementation((fields: unknown) => {
+    call += 1;
+    const c: Record<string, unknown> = {};
+    c.from = () => c;
+    c.where = (arg: unknown) => {
+      capture.where = arg;
+      return c;
+    };
+    if (call === 1) {
+      c.orderBy = (...args: unknown[]) => {
+        capture.orderBy = args;
+        return c;
+      };
+      c.limit = (value: number) => {
+        capture.limit = value;
+        return c;
+      };
+      c.offset = (value: number) => {
+        capture.offset = value;
+        capture.fields = fields as Record<string, unknown>;
+        return Promise.resolve(rows);
+      };
+      c.then = (resolve: (value: unknown[]) => unknown) =>
+        Promise.resolve(rows).then(resolve);
+    } else {
+      c.then = (resolve: (value: unknown[]) => unknown) =>
+        Promise.resolve([{ value: total }]).then(resolve);
+    }
+    return c;
+  });
+  return db;
+}
+
+describe('UsersService searchUsers', () => {
+  it('filters to active, non-deleted, username-bearing users and matches every token', async () => {
+    const capture: { where?: unknown } = {};
+    const service = makeService(searchDb([], 0, capture));
+
+    await service.searchUsers('sak', 1, 3);
+
+    const { sql, params } = new PgDialect().sqlToQuery(capture.where as never);
+    expect(sql).toContain('"deleted_at" is null');
+    expect(sql).toContain('"status" = $');
+    expect(sql).toContain('"role" = $');
+    expect(sql).toContain('"username" is not null');
+    expect(params).toContain('active');
+    expect(params).toContain('user');
+    expect(params).toContain('%sak%');
+  });
+
+  it('treats the caller’s LIKE wildcards literally', async () => {
+    const capture: { where?: unknown } = {};
+    const service = makeService(searchDb([], 0, capture));
+
+    await service.searchUsers('50% a_b', 1, 3);
+
+    const { params } = new PgDialect().sqlToQuery(capture.where as never);
+    expect(params).toContain('%50\\%%');
+    expect(params).toContain('%a\\_b%');
+  });
+
+  it('caps the query at five tokens', async () => {
+    const capture: { where?: unknown } = {};
+    const service = makeService(searchDb([], 0, capture));
+
+    await service.searchUsers('a b c d e f', 1, 3);
+
+    const { params } = new PgDialect().sqlToQuery(capture.where as never);
+    expect(params).toContain('%e%');
+    expect(params).not.toContain('%f%');
+  });
+
+  it('returns the public allow-list without contact or moderation fields', async () => {
+    const rows = [
+      {
+        id: 'u1',
+        username: 'sakkuna',
+        firstName: 'Sakkuna',
+        lastName: 'Suon',
+        profilePhotoUrl: null,
+        verifiedAccount: true,
+        email: 'leak@example.com',
+        primaryPhone: '+85510000000',
+      },
+    ];
+    const db = searchDb(rows, 1);
+    const service = makeService(db);
+
+    const result = await service.searchUsers('sak', 1, 3);
+
+    expect(result.data).toEqual([
+      {
+        id: 'u1',
+        username: 'sakkuna',
+        firstName: 'Sakkuna',
+        lastName: 'Suon',
+        profilePhotoUrl: null,
+        verifiedAccount: true,
+      },
+    ]);
+    const calls = db.select.mock.calls as unknown[][];
+    const fields = calls[0][0] as Record<string, unknown>;
+    expect(Object.keys(fields).sort()).toEqual([
+      'firstName',
+      'id',
+      'lastName',
+      'profilePhotoUrl',
+      'username',
+      'verifiedAccount',
+    ]);
+  });
+
+  it('drops a row that somehow lost its username', async () => {
+    const service = makeService(
+      searchDb(
+        [
+          {
+            id: 'u1',
+            username: null,
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+          {
+            id: 'u2',
+            username: 'sak',
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+        ],
+        2,
+      ),
+    );
+
+    const result = await service.searchUsers('sak', 1, 3);
+
+    expect(result.data.map((row) => row.id)).toEqual(['u2']);
+  });
+
+  it('pages with a deterministic order and reports the total', async () => {
+    const capture: {
+      where?: unknown;
+      orderBy?: unknown[];
+      limit?: number;
+      offset?: number;
+    } = {};
+    const service = makeService(
+      searchDb(
+        [
+          {
+            id: 'u1',
+            username: 'sak1',
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+          {
+            id: 'u2',
+            username: 'sak2',
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+          {
+            id: 'u3',
+            username: 'sak3',
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+        ],
+        7,
+        capture,
+      ),
+    );
+
+    const result = await service.searchUsers('sak', 2, 3);
+
+    expect(capture.offset).toBe(3);
+    expect(capture.limit).toBe(3);
+    expect(capture.orderBy).toHaveLength(3);
+    const orderExpression = capture.orderBy?.[0];
+    expect(orderExpression).toBeDefined();
+    const orderSql = new PgDialect().sqlToQuery(orderExpression as never).sql;
+    expect(orderSql.toLowerCase()).toContain('case');
+    expect(orderSql.toLowerCase()).toContain('ilike');
+    expect(result.meta).toMatchObject({
+      page: 2,
+      pageSize: 3,
+      limit: 3,
+      total: 7,
+      hasMore: true,
+      nextCursor: null,
+    });
+  });
+
+  it('reports the last page as complete', async () => {
+    const service = makeService(
+      searchDb(
+        [
+          {
+            id: 'u1',
+            username: 'sak',
+            firstName: null,
+            lastName: null,
+            profilePhotoUrl: null,
+            verifiedAccount: false,
+          },
+        ],
+        4,
+      ),
+    );
+
+    const result = await service.searchUsers('sak', 2, 3);
+
+    expect(result.meta.hasMore).toBe(false);
+  });
+
+  it('does not advertise a page past the DTO cap', async () => {
+    const rows = Array.from({ length: 3 }, (_, index) => ({
+      id: `u${index}`,
+      username: `sak${index}`,
+      firstName: null,
+      lastName: null,
+      profilePhotoUrl: null,
+      verifiedAccount: false,
+    }));
+    const service = makeService(searchDb(rows, 5000));
+
+    const result = await service.searchUsers('sak', 100, 3);
+
+    expect(result.meta.hasMore).toBe(false);
+  });
+
+  it('does not turn a blank search into a directory dump', async () => {
+    const db = makeDb();
+    const service = makeService(db);
+
+    const result = await service.searchUsers('   ', 1, 3);
+
+    expect(result.data).toEqual([]);
+    expect(result.meta.total).toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+});
+
+describe('SearchUsersDto', () => {
+  const errorsFor = async (raw: Record<string, unknown>) =>
+    validate(
+      plainToInstance(SearchUsersDto, raw, { enableImplicitConversion: true }),
+      { whitelist: true, forbidNonWhitelisted: true },
+    );
+
+  it('requires q and trims it', async () => {
+    expect(await errorsFor({})).not.toHaveLength(0);
+    expect(await errorsFor({ q: '   ' })).not.toHaveLength(0);
+
+    const instance = plainToInstance(SearchUsersDto, { q: '  sak  ' });
+    expect(instance.q).toBe('sak');
+  });
+
+  it('caps q at 100 characters', async () => {
+    expect(await errorsFor({ q: 'a'.repeat(100) })).toHaveLength(0);
+    expect(await errorsFor({ q: 'a'.repeat(101) })).not.toHaveLength(0);
+  });
+
+  it('defaults and caps pagination', async () => {
+    const instance = plainToInstance(
+      SearchUsersDto,
+      { q: 'sak' },
+      { enableImplicitConversion: true },
+    );
+    expect(instance.page).toBe(1);
+    expect(instance.pageSize).toBe(20);
+
+    expect(await errorsFor({ q: 'sak', page: 0 })).not.toHaveLength(0);
+    expect(await errorsFor({ q: 'sak', page: 101 })).not.toHaveLength(0);
+    expect(await errorsFor({ q: 'sak', pageSize: 0 })).not.toHaveLength(0);
+    expect(await errorsFor({ q: 'sak', pageSize: 51 })).not.toHaveLength(0);
+  });
+
+  it('rejects a key this route does not declare', async () => {
+    expect(await errorsFor({ q: 'sak', limit: 10 })).not.toHaveLength(0);
+  });
+});
+
+describe('UsersController GET /users/search', () => {
+  const searchUsers = jest.fn();
+  let app: INestApplication<App>;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [
+        { provide: UsersService, useValue: { searchUsers } },
+        { provide: BillingAddressesService, useValue: {} },
+      ],
+    }).compile();
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+        transformOptions: { enableImplicitConversion: true },
+      }),
+    );
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    searchUsers.mockReset();
+  });
+
+  it('is public on the handler only', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      UsersController.prototype,
+      'searchUsers',
+    ) as { value?: object } | undefined;
+    const handler = descriptor?.value;
+    expect(handler).toBeDefined();
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, handler as object)).toBe(true);
+
+    expect(Reflect.getMetadata(IS_PUBLIC_KEY, UsersController)).toBeUndefined();
+  });
+
+  it('routes /users/search to the search handler, not ParseUUIDPipe', async () => {
+    searchUsers.mockResolvedValue({ data: [], meta: {} });
+
+    await request(app.getHttpServer())
+      .get('/users/search?q=sak&pageSize=3')
+      .expect(200);
+
+    expect(searchUsers).toHaveBeenCalledWith('sak', 1, 3);
+  });
+
+  it('rejects a missing q and an undeclared query key', async () => {
+    await request(app.getHttpServer()).get('/users/search').expect(400);
+    await request(app.getHttpServer())
+      .get('/users/search?q=sak&limit=10')
+      .expect(400);
+
+    expect(searchUsers).not.toHaveBeenCalled();
+  });
+
+  it('keeps the :id UUID guard for /users/:id', async () => {
+    await request(app.getHttpServer()).get('/users/not-a-uuid').expect(400);
   });
 });

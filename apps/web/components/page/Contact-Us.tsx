@@ -60,7 +60,7 @@ export default function ContactUs() {
                 return (
                   <div key={contact.number} className="flex items-center gap-2">
                     {icon && (
-                      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-gray-100 ">
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border ">
                         <Image
                           src={icon}
                           alt={contact.label}
@@ -84,7 +84,7 @@ export default function ContactUs() {
                 );
               })}
             </div>
-            <div className="border-t border-gray-200 dark:border-muted my-4" />
+            <div className="border-t border-border dark:border-muted my-4" />
             <div className="flex items-center gap-3 mb-2">
               <Mail size={18} className="text-foreground" />
               <Link
@@ -94,15 +94,15 @@ export default function ContactUs() {
                 {CONTACT_EMAIL}
               </Link>
             </div>
-            <div className="border-t border-gray-200 dark:border-muted my-4" />
+            <div className="border-t border-border dark:border-muted my-4" />
             <Accordion type="single" collapsible className="w-full border-none">
               <AccordionItem value="hours" className="border-none">
                 <AccordionTrigger className="hover:no-underline py-0 group cursor-pointer">
                   <div className="flex items-center gap-2 type-body-sm">
-                    <Clock8 size={18} className="text-gray-400" />
+                    <Clock8 size={18} className="text-muted-foreground" />
                     <span className="text-[#00a0e9] font-medium">Open</span>
-                    <span className="text-gray-400 mx-1">•</span>
-                    <span className="text-gray-600 dark:text-gray-300">
+                    <span className="text-muted-foreground mx-1">•</span>
+                    <span className="text-muted-foreground dark:text-gray-300">
                       08:00AM - 05:00PM
                     </span>
                   </div>

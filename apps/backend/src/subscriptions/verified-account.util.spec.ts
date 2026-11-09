@@ -1,5 +1,6 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { userSubscriptions } from '../db/schema/subscriptions.schema';
+import { users } from '../db/schema/users.schema';
 import {
   activePaidSubscriptionExistsSql,
   hasActivePaidSubscription,
@@ -58,5 +59,15 @@ describe('activePaidSubscriptionExistsSql', () => {
     expect(query.sql).toContain('us.user_id = "user_subscriptions"."user_id"');
     expect(query.sql).toContain('us.superseded_at is null');
     expect(query.sql).toContain('us.expires_at > now()');
+  });
+
+  it('qualifies a column from the outer table, not just its name', () => {
+    // The regression: an unqualified `"id"` binds to user_subscriptions.id, so
+    // the correlated subquery is always false in a single-table select.
+    const query = new PgDialect().sqlToQuery(
+      activePaidSubscriptionExistsSql(users.id),
+    );
+
+    expect(query.sql).toContain('us.user_id = "users"."id"');
   });
 });

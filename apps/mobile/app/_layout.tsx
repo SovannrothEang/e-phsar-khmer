@@ -71,6 +71,18 @@ export default function RootLayout() {
                         animation: "fade_from_bottom",
                       }}
                     />
+                    <Stack.Screen
+                      name="search-users"
+                      options={{
+                        animation: "fade_from_bottom",
+                      }}
+                    />
+                    <Stack.Screen
+                      name="search-posts"
+                      options={{
+                        animation: "fade_from_bottom",
+                      }}
+                    />
                   </Stack>
                 </QueryClientProvider>
               </NotificationProvider>

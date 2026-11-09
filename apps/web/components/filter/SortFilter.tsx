@@ -111,7 +111,7 @@ export default function SortFilter() {
           {t("Filters.sort.label")}
         </p>
         <ul className="">
-          <div className="border-b border-gray-200" />
+          <div className="border-b border-border" />
           {options.map((option) => {
             const isSelected = sortParam === option.value;
             return (

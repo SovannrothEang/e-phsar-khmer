@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useNotification } from "@/contexts/NotificationContext";
+import { NEXT_SELL } from "@/lib/auth-redirect";
 import { Ionicons } from "@expo/vector-icons";
 import { router, Tabs } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -81,6 +82,19 @@ const TabsLayout = () => {
     },
   });
 
+  /** A guest tapping Sell signs in first, then lands on the category chooser. */
+  const sellTabListener = (navigation: any) => ({
+    tabPress: (e: any) => {
+      if (!isAuthenticated) {
+        e.preventDefault();
+        navigation.navigate("(auth)", {
+          screen: "welcome",
+          params: { next: NEXT_SELL },
+        });
+      }
+    },
+  });
+
   return (
     <Tabs
       screenOptions={{
@@ -150,7 +164,7 @@ const TabsLayout = () => {
       />
       <Tabs.Screen
         name="sell"
-        listeners={({ navigation }) => createProtectedTabListener(navigation)}
+        listeners={({ navigation }) => sellTabListener(navigation)}
         options={{
           title: t("sell"),
           tabBarButton: (props) => (

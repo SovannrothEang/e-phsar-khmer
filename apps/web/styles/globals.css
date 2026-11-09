@@ -14,7 +14,6 @@
   --font-sans:
     ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji", var(--font-koh-santepheap);
-  --font-Arial: var(--font-Arial);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -208,6 +207,7 @@
 }
 
 :root {
+  color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -219,7 +219,7 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -243,6 +243,7 @@
   /* Counter position top-left */
 }
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -261,11 +262,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --chart-1: oklch(0.72 0.15 250);
+  --chart-2: oklch(0.74 0.16 150);
+  --chart-3: oklch(0.78 0.16 85);
+  --chart-4: oklch(0.72 0.17 310);
+  --chart-5: oklch(0.7 0.18 25);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -315,6 +316,24 @@
 }
 .leaflet-container .leaflet-control-attribution a {
   color: inherit;
+}
+
+/* OSM tiles are a light raster, so dark mode inverts the tile layer only —
+   markers and popups keep their own colours. Leaflet's controls sit on the
+   theme surface instead of their default white boxes. */
+.dark .leaflet-container {
+  background: var(--card);
+}
+.dark .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+.dark .leaflet-control-zoom a {
+  background-color: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.dark .leaflet-control-zoom a:hover {
+  background-color: var(--muted);
 }
 
 /* The picker list scrolls, but Chromium's overlay scrollbars leave no visible

@@ -92,7 +92,7 @@ export default function SubcategoryGrid({
         <div className="flex justify-center mt-2">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full border rounded py-2.5 type-nav text-muted-foreground bg-card hover:bg-gray-200"
+            className="w-full border rounded py-2.5 type-nav text-muted-foreground bg-card hover:bg-secondary"
           >
             {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>

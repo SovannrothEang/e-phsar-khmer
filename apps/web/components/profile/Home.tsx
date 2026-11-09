@@ -351,7 +351,7 @@ export default function HomeProfile({
                         onChange={(e) => setKeyword(e.target.value)}
                         placeholder={t("search")}
                         aria-label={t("search")}
-                        className="h-10 border-gray-200 focus:ring-0"
+                        className="h-10 border-border focus:ring-0"
                       />
                       <InputGroupAddon align="inline-end">
                         <InputGroupButton

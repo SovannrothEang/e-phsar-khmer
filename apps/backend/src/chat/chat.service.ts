@@ -581,7 +581,13 @@ export class ChatService {
 
     return {
       conversation: items[0] ?? null,
-      otherUser,
+      // Participant-only: with no conversation there is nobody to show
+      // "last active" to, and any signed-in user can ask /chats/with/:id about
+      // any public seller id.
+      otherUser: {
+        ...otherUser,
+        lastSeenAt: conversation ? otherUser.lastSeenAt : null,
+      },
       blockedByMe: blocks.some((row) => row.blockerId === userId),
       canMessage: blocks.length === 0,
     };

@@ -67,7 +67,7 @@ export function CategorySelector({
                 ${
                   hoveredCat?.slug === cat.slug
                     ? "bg-[#00a0e9]/10 border-l-[#00a0e9]"
-                    : "border-l-transparent hover:bg-gray-50"
+                    : "border-l-transparent hover:bg-muted"
                 }`}
             >
               <div className="w-8 h-8 relative flex-shrink-0">
@@ -90,7 +90,7 @@ export function CategorySelector({
                 {cat.name}
               </span>
               <ChevronRight
-                className={`w-4 h-4 flex-shrink-0 transition-colors ${hoveredCat?.slug === cat.slug ? "text-[#00a0e9]" : "text-gray-500"}`}
+                className={`w-4 h-4 flex-shrink-0 transition-colors ${hoveredCat?.slug === cat.slug ? "text-[#00a0e9]" : "text-muted-foreground"}`}
               />
             </li>
           ))}
@@ -98,7 +98,7 @@ export function CategorySelector({
       </div>
 
       {/* Vertical Separator */}
-      <div className="w-px bg-gray-200 flex-shrink-0" />
+      <div className="w-px bg-secondary flex-shrink-0" />
 
       {/* Right: Subcategories - scroll only when > 15 items */}
       <div
@@ -107,9 +107,9 @@ export function CategorySelector({
         onMouseLeave={handlePanelLeave}
       >
         <div className="px-6 py-3 flex-shrink-0">
-          <span className="flex items-center gap-2 type-body text-gray-500">
+          <span className="flex items-center gap-2 type-body text-muted-foreground">
             <span
-              className={`w-4 h-4 rounded-full type-meta flex items-center justify-center ${hoveredCat ? "bg-[#00a0e9]  text-foreground" : "bg-gray-300 text-white"}`}
+              className={`w-4 h-4 rounded-full type-meta flex items-center justify-center ${hoveredCat ? "bg-[#00a0e9] text-white" : "bg-input text-foreground"}`}
             >
               2
             </span>
@@ -132,7 +132,7 @@ export function CategorySelector({
               <li key={sub.slug}>
                 <button
                   onClick={() => onSelect(hoveredCat, sub)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-blue-100 transition-colors group text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-muted transition-colors group text-left"
                 >
                   <div className="w-8 h-8 relative flex-shrink-0">
                     <DbImage
@@ -157,7 +157,7 @@ export function CategorySelector({
             ))}
           </ul>
         ) : (
-          <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-24">
+          <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground py-24">
             <ChevronRight className="w-8 h-8 text-gray-200 mb-2" />
             <p className="type-body">{t("hoverHint")}</p>
           </div>

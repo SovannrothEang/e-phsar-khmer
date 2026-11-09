@@ -3,9 +3,11 @@ import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
+import PromoCard from "@/components/home/PromoCard";
 import TypeSelector from "@/components/category/TypeSelector";
 import Divider from "@/components/common/Divider";
 import SafeAreaView from "@/components/common/SafeAreaView";
+import SelectionSheet from "@/components/common/SelectionSheet";
 import { Colors } from "@/constants/Colors";
 import {
   fetchBrands,
@@ -13,7 +15,9 @@ import {
   fetchSubcategory,
 } from "@/lib/api/catalog";
 import { resolveTypeTiles } from "@/lib/category-types";
+import { openFiltersHref } from "@/lib/filter-route";
 import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
+import { TYPE_IN_FILTERS_ONLY_SUBCATEGORIES } from "@/lib/filter-options";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -30,9 +34,9 @@ export default function SubCategoryScreen() {
   const subCategoryId = Array.isArray(params.subCategoryId)
     ? params.subCategoryId[0]
     : params.subCategoryId;
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    params.view === "grid" ? "grid" : "list",
-  );
+  // View is URL-driven so the filter screen can apply it in place.
+  const viewMode: ViewMode = params.view === "grid" ? "grid" : "list";
+  const [brandSheetOpen, setBrandSheetOpen] = useState(false);
 
   const subQuery = useQuery({
     queryKey: ["subcategory", categoryId, subCategoryId],
@@ -70,18 +74,17 @@ export default function SubCategoryScreen() {
   );
 
   const toggleViewMode = () => {
-    setViewMode(viewMode === "list" ? "grid" : "list");
+    router.setParams({ view: viewMode === "list" ? "grid" : "" });
   };
 
   const openFilters = () =>
-    router.push({
-      pathname: "/filters",
-      params: {
-        categoryId,
-        subCategoryId,
-        ...pickFilterParams(params),
-      },
-    });
+    router.push(
+      openFiltersHref(
+        "subcategory",
+        { categoryId, subCategoryId },
+        pickFilterParams(params),
+      ),
+    );
 
   const openType = (typeId: string, name: string) => {
     if (!typeTiles) return;
@@ -96,6 +99,13 @@ export default function SubCategoryScreen() {
         attrValue: name,
       },
     });
+  };
+
+  const openBrand = (brandSlug: string) => {
+    setBrandSheetOpen(false);
+    router.push(
+      `/(categories)/${categoryId}/${subCategoryId}/${brandSlug}` as never,
+    );
   };
 
   const subName = subcategory?.name || subCategoryId || "Category";
@@ -180,25 +190,25 @@ export default function SubCategoryScreen() {
                   name: brand.name,
                   image: brand.icon,
                 }))}
-                onBrandPress={(brandSlug) =>
-                  router.push(
-                    `/(categories)/${categoryId}/${subCategoryId}/${brandSlug}` as never,
-                  )
-                }
+                onBrandPress={openBrand}
+                onShowMore={() => setBrandSheetOpen(true)}
               />
               <Divider />
             </View>
           )}
 
-          {typeTiles && typeTiles.rows.length > 0 && (
-            <TypeSelector
-              types={typeTiles.rows}
-              onTypePress={(typeId) => {
-                const row = typeTiles.rows.find((tile) => tile.id === typeId);
-                if (row) openType(typeId, row.name);
-              }}
-            />
-          )}
+          {typeTiles &&
+            typeTiles.rows.length > 0 &&
+            // Furniture's Type has no tile artwork; it lives in the filters.
+            !TYPE_IN_FILTERS_ONLY_SUBCATEGORIES.has(subCategoryId ?? "") && (
+              <TypeSelector
+                types={typeTiles.rows}
+                onTypePress={(typeId) => {
+                  const row = typeTiles.rows.find((tile) => tile.id === typeId);
+                  if (row) openType(typeId, row.name);
+                }}
+              />
+            )}
 
           <Divider variant="thick" />
 
@@ -206,11 +216,26 @@ export default function SubCategoryScreen() {
             <ListingFeed
               query={feedQuery}
               viewMode={viewMode}
+              leading={<PromoCard viewMode={viewMode} />}
               emptyLabel="No ads in this category yet."
             />
           </View>
         </FeedScrollView>
       </View>
+
+      <SelectionSheet
+        visible={brandSheetOpen}
+        title="Brand"
+        options={brands.map((brand) => ({
+          id: brand.slug,
+          name: brand.name,
+          image: brand.icon,
+        }))}
+        loading={brandsQuery.isLoading}
+        emptyLabel="No brands"
+        onSelect={(option) => openBrand(option.id)}
+        onClose={() => setBrandSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

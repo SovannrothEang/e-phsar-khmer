@@ -148,7 +148,7 @@ function AddressPicker({
     <>
       <div className="min-h-[280px] space-y-3">
         {addresses.length === 0 ? (
-          <p className="py-12 text-center text-sm text-gray-500">
+          <p className="py-12 text-center text-sm text-muted-foreground">
             No saved addresses yet. Add one to use it at checkout.
           </p>
         ) : (
@@ -167,7 +167,7 @@ function AddressPicker({
                 <span
                   aria-hidden
                   className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    selected ? "border-[#00a0e9]" : "border-gray-300"
+                    selected ? "border-[#00a0e9]" : "border-input"
                   }`}
                 >
                   {selected && (
@@ -186,19 +186,19 @@ function AddressPicker({
                   </div>
                   <div className="mt-2 space-y-1 text-sm text-foreground">
                     <p className="flex items-center gap-2">
-                      <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
+                      <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
                       {address.name}
                     </p>
                     <p className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+                      <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
                       {address.phone}
                     </p>
                     <p className="flex items-start gap-2">
-                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <span>
                         {address.address}
                         {address.company && (
-                          <span className="block text-gray-500">
+                          <span className="block text-muted-foreground">
                             {address.company}
                           </span>
                         )}
@@ -213,7 +213,7 @@ function AddressPicker({
                       type="button"
                       aria-label="Address actions"
                       onClick={(e) => e.stopPropagation()}
-                      className="rounded-sm p-1 text-gray-500 hover:bg-muted"
+                      className="rounded-sm p-1 text-muted-foreground hover:bg-muted"
                     >
                       <EllipsisVertical className="h-5 w-5" />
                     </button>

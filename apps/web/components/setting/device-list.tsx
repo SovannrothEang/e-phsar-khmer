@@ -140,7 +140,7 @@ export function DeviceList({
         </h2>
         <div className="bg-card border border-border rounded-sm overflow-hidden">
           <div className="p-4 flex items-start gap-4">
-            <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 text-[#00a0e9]">
+            <div className="h-12 w-12 rounded-full bg-sky-500/10 flex items-center justify-center flex-shrink-0 text-[#00a0e9] dark:text-sky-300">
               {current ? (
                 <DeviceIcon device={current} size={24} />
               ) : (
@@ -259,7 +259,7 @@ export function DeviceList({
                   aria-label={t("signOutAria", {
                     device: deviceTitle(device, t("unknown")),
                   })}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors disabled:opacity-40 cursor-pointer"
+                  className="p-2 text-red-500 hover:bg-red-500/10 rounded-full transition-colors disabled:opacity-40 cursor-pointer"
                 >
                   <LogOut size={18} />
                 </button>

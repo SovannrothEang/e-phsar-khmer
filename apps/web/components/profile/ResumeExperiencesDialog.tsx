@@ -205,7 +205,7 @@ export function ResumeExperiencesDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
+                className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
                 <span className="sr-only">{t("form.close")}</span>
@@ -293,14 +293,14 @@ export function ResumeExperiencesDialog({
                     type="button"
                     aria-label={t("form.clearLocation")}
                     onClick={() => setPlace(EMPTY_RESUME_LOCATION)}
-                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <IconX size={18} />
                   </button>
                 ) : (
                   <IconChevronDown
                     size={16}
-                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
                   />
                 )}
               </div>
@@ -354,7 +354,7 @@ export function ResumeExperiencesDialog({
                       type="button"
                       aria-label={t("form.clearStart")}
                       onClick={() => setStartDate(null)}
-                      className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                      className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <IconX size={18} />
                     </button>
@@ -417,7 +417,7 @@ export function ResumeExperiencesDialog({
                       type="button"
                       aria-label={t("form.clearEnd")}
                       onClick={() => setEndDate(null)}
-                      className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                      className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <IconX size={18} />
                     </button>
@@ -473,7 +473,7 @@ export function ResumeExperiencesDialog({
             <button
               type="button"
               onClick={onSkip}
-              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600"
+              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600 dark:bg-muted dark:text-foreground dark:hover:bg-muted/80"
             >
               {t("form.skip")}
             </button>

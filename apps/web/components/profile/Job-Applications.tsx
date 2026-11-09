@@ -278,7 +278,7 @@ function Chip({
       className={`inline-flex items-center rounded-sm border px-2 py-0.5 type-meta ${
         muted
           ? "border-border bg-muted text-muted-foreground"
-          : "border-blue-100 bg-blue-50 text-[#00a0e9]"
+          : "border-sky-500/20 bg-sky-500/10 text-[#00a0e9] dark:text-sky-300"
       }`}
     >
       {children}

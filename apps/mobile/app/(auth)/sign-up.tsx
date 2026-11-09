@@ -4,7 +4,8 @@ import { SocialAuthSection } from "@/components/auth/SocialAuthSection";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "expo-router";
+import { SELL_ROUTE, wantsSellAfterAuth } from "@/lib/auth-redirect";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -17,6 +18,9 @@ import {
 const SignUpScreen = () => {
   const router = useRouter();
   const { signUp } = useAuth();
+  const params = useLocalSearchParams<{ next?: string | string[] }>();
+  // Carried from Welcome: "sell" resumes the posting flow after register.
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneError, setPhoneError] = useState("");
@@ -35,11 +39,20 @@ const SignUpScreen = () => {
 
     if (result.kind === "otp") {
       // Name + password are collected next; the code is verified last.
-      router.push("/(auth)/create-account" as never);
+      router.push(
+        next
+          ? ({
+              pathname: "/(auth)/create-account",
+              params: { next },
+            } as never)
+          : ("/(auth)/create-account" as never),
+      );
       return;
     }
     if (result.kind === "authenticated") {
-      router.replace("/(tabs)/account");
+      router.replace(
+        wantsSellAfterAuth(next) ? (SELL_ROUTE as never) : "/(tabs)/account",
+      );
       return;
     }
     // Registration cannot suspend an account, but the outcome union carries

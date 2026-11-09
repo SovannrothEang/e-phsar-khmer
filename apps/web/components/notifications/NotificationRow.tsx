@@ -75,7 +75,7 @@ export function NotificationRow({
   return (
     <div
       className={`flex items-start transition-colors ${compact ? "p-3" : "p-4"}
-        ${notification.isRead ? "bg-background hover:bg-gray-200" : "bg-muted hover:bg-gray-200"}`}
+        ${notification.isRead ? "bg-background hover:bg-secondary" : "bg-muted hover:bg-secondary"}`}
     >
       <div
         role={clickable ? "button" : undefined}
@@ -124,12 +124,12 @@ export function NotificationRow({
           </p>
           {notification.body ? (
             <p
-              className={`type-body-sm text-gray-600 mt-1 break-words ${compact ? "line-clamp-2" : ""}`}
+              className={`type-body-sm text-muted-foreground mt-1 break-words ${compact ? "line-clamp-2" : ""}`}
             >
               {notification.body}
             </p>
           ) : null}
-          <p className="type-meta text-gray-600 mt-1">
+          <p className="type-meta text-muted-foreground mt-1">
             {formatNotificationDate(notification.createdAt, locale)}
           </p>
         </div>
@@ -138,7 +138,7 @@ export function NotificationRow({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={t("actionsAria", { title: notification.title })}
-          className={`rounded-full transition-all text-gray-400 hover:bg-gray-100 cursor-pointer outline-none ${
+          className={`rounded-full transition-all text-muted-foreground hover:bg-muted cursor-pointer outline-none ${
             compact ? "p-2.5" : "p-3"
           }`}
         >

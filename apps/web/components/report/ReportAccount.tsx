@@ -204,7 +204,7 @@ export function ReportAccount({
                       <Button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="absolute -top-0 -right-0 bg-red-500 text-card rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-sm border-none cursor-pointer"
+                        className="absolute -top-0 -right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-sm border-none cursor-pointer"
                       >
                         <X size={12} strokeWidth={3} />
                       </Button>
@@ -278,7 +278,7 @@ export function ReportAccount({
             <Button
               type="submit"
               disabled={submitting}
-              className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3"
+              className="rounded-sm cursor-pointer h-10 text-white bg-orange-400 hover:bg-orange-500 w-2/3"
             >
               {submitting ? "Sending…" : "Submit"}
             </Button>

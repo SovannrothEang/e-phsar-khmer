@@ -12,14 +12,17 @@ interface BrandItem {
 interface BrandGridProps {
   brands: BrandItem[];
   onBrandPress: (id: string) => void;
+  /** Opens the full brand list; the tile is hidden when everything fits. */
+  onShowMore?: () => void;
 }
 
-const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
+const BrandGrid = ({ brands, onBrandPress, onShowMore }: BrandGridProps) => {
   const { t } = useLanguage();
   if (!brands || brands.length === 0) return null;
 
-  // Show top 9 brands + "Show More" = 10 items (2 rows of 5)
+  // Show top 9 brands + "See All" = 10 items (2 rows of 5)
   const displayBrands = brands.slice(0, 9);
+  const hasMore = brands.length > displayBrands.length;
 
   return (
     <View className="px-2 pt-2 pb-2">
@@ -54,22 +57,26 @@ const BrandGrid = ({ brands, onBrandPress }: BrandGridProps) => {
           </TouchableOpacity>
         ))}
 
-        {/* Show More */}
-        <TouchableOpacity
-          className="w-1/5 items-center mb-2"
-          onPress={() => {}}
-        >
-          <View className="w-14 h-14 mb-2 rounded-full items-center justify-center">
-            <Ionicons
-              name="ellipsis-horizontal-circle-outline"
-              size={28}
-              color="gray"
-            />
-          </View>
-          <Text className="text-xs text-center text-gray-900">
-            {t("seeAll")}
-          </Text>
-        </TouchableOpacity>
+        {/* See All — opens the full, searchable brand list */}
+        {hasMore && onShowMore ? (
+          <TouchableOpacity
+            className="w-1/5 items-center mb-2"
+            onPress={onShowMore}
+            accessibilityRole="button"
+            accessibilityLabel={t("seeAll")}
+          >
+            <View className="w-14 h-14 mb-2 rounded-full items-center justify-center">
+              <Ionicons
+                name="ellipsis-horizontal-circle-outline"
+                size={28}
+                color="gray"
+              />
+            </View>
+            <Text className="text-xs text-center text-gray-900">
+              {t("seeAll")}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );

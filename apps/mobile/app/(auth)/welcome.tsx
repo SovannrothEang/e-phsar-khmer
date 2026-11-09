@@ -7,11 +7,17 @@ import {
 import { AppFooterDeviceInfo } from "@/components/common/AppFooterDeviceInfo";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 const AuthLandingScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ next?: string | string[] }>();
+  // "sell" when a guest tapped Start Selling: the auth screens hand the
+  // category chooser back once the account exists.
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
+  const authHref = (pathname: "/(auth)/sign-in" | "/(auth)/sign-up") =>
+    next ? ({ pathname, params: { next } } as never) : (pathname as never);
 
   return (
     <SafeAreaView
@@ -40,7 +46,7 @@ const AuthLandingScreen = () => {
             around it. */}
         <View className="flex-row gap-4 px-2">
           <TouchableOpacity
-            onPress={() => router.push("/(auth)/sign-in")}
+            onPress={() => router.push(authHref("/(auth)/sign-in"))}
             activeOpacity={0.85}
             accessibilityRole="button"
             className="flex-1 bg-secondary-orange h-[44px] rounded-[4px] items-center justify-center shadow-xs"
@@ -49,7 +55,7 @@ const AuthLandingScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push("/(auth)/sign-up")}
+            onPress={() => router.push(authHref("/(auth)/sign-up"))}
             activeOpacity={0.85}
             accessibilityRole="button"
             className="flex-1 bg-white dark:bg-gray-900 border-[1.5px] border-secondary-orange h-[44px] rounded-[4px] items-center justify-center shadow-xs"

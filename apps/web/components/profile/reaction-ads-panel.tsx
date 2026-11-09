@@ -109,7 +109,10 @@ export default function ReactionAdsPanel({
           <main className="max-w-2xl mx-auto mt-3">
             <div className="bg-card rounded-xs shadow-sm  min-h-[500px] flex flex-col items-center justify-center p-6">
               <div className="w-32 h-32 bg-muted rounded-full flex items-center justify-center mb-10 mt-4">
-                <Icon className="w-16 h-16 text-gray-500" strokeWidth={2.5} />
+                <Icon
+                  className="w-16 h-16 text-muted-foreground"
+                  strokeWidth={2.5}
+                />
               </div>
               <div className="text-center">
                 <h2 className="type-section-title text-foreground mb-2">

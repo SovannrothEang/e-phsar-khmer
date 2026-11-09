@@ -102,7 +102,7 @@ export default function PublicProfileHeader({
         // Same empty-cover treatment as `MyProfileHeader`: a full-height
         // gradient banner, not a thin strip, so the profile header reads the
         // same whether or not a cover has been uploaded.
-        <div className="h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5" />
+        <div className="h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5 dark:from-primary/10 dark:via-primary/15 dark:to-transparent" />
       )}
 
       <div className="bg-card w-full">

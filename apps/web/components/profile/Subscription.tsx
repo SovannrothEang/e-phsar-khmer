@@ -66,7 +66,9 @@ function PlanSheet({
           {title}
         </h2>
         {subtitle && (
-          <p className="mt-1 text-center text-xs text-gray-500">{subtitle}</p>
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            {subtitle}
+          </p>
         )}
       </div>
       <div className="divide-y divide-muted">
@@ -119,7 +121,7 @@ function HistoryCard({ subscription }: { subscription: UserSubscription }) {
         <p className="truncate text-sm font-medium text-foreground">
           {subscription.packageName ?? "Subscription"}
         </p>
-        <p className="truncate text-xs text-gray-500">
+        <p className="truncate text-xs text-muted-foreground">
           {[subscription.groupName, subscription.termName]
             .filter(Boolean)
             .join(" · ")}{" "}
@@ -215,7 +217,7 @@ export default function Subscription() {
             className="rounded-sm border bg-card p-8 text-center"
           >
             <CircleAlert className="mx-auto h-8 w-8 text-amber-600" />
-            <p className="mt-3 text-sm text-gray-500">{error}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{error}</p>
             <Button
               variant="outline"
               onClick={() => void load()}
@@ -275,7 +277,7 @@ export default function Subscription() {
 
             {history.length > 0 && (
               <section aria-label="Past plans" className="pt-2">
-                <h2 className="mb-2 text-sm font-medium text-gray-500">
+                <h2 className="mb-2 text-sm font-medium text-muted-foreground">
                   History
                 </h2>
                 <div className="space-y-2">

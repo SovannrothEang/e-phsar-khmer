@@ -65,9 +65,12 @@ const TABS: Record<
 
 /** Soft tones, matching the other admin tables (not solid fills). */
 const STATUS_TONE: Record<string, string> = {
-  active: "border-emerald-500 bg-emerald-50 text-emerald-700",
-  suspended: "border-amber-500 bg-amber-50 text-amber-700",
-  deleted: "border-red-500 bg-red-50 text-red-700",
+  active:
+    "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300",
+  suspended:
+    "border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300",
+  deleted:
+    "border-red-500 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300",
 };
 
 /** Stored numbers are already E.164 ("+855…"); the old `+{phone}` produced "++855…". */
@@ -88,8 +91,8 @@ function AccountTypeBadge({ type }: { type: User["accountType"] }) {
   }
   return (
     <Badge variant="outline">
-      <UserRound className="text-slate-500" />
-      <p className="text-slate-500">Normal</p>
+      <UserRound className="text-muted-foreground" />
+      <p className="text-muted-foreground">Normal</p>
     </Badge>
   );
 }
@@ -132,6 +135,9 @@ export default function UserPage({
     // Only the default view has a server-rendered first page.
     initialData: tab === "active" && page === 1 && !q ? initialData : undefined,
     placeholderData: (prev) => prev,
+    // Presence is a 2-minute window; a minute keeps the dot near the truth
+    // without a per-render refetch. Hidden tabs stop (the default).
+    refetchInterval: 60_000,
   });
   const rows = data?.users ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
@@ -309,6 +315,32 @@ export default function UserPage({
               </span>
             ) : null}
           </div>
+        ),
+      },
+      {
+        key: "presence",
+        header: "Presence",
+        sortValue: (user) => (user.status === "Online" ? 0 : 1),
+        cell: (user) => (
+          <span
+            className="inline-flex items-center gap-1.5"
+            title={
+              user.lastSeenAt
+                ? new Date(user.lastSeenAt).toLocaleString("en-GB", {
+                    timeZone: "Asia/Phnom_Penh",
+                  })
+                : "Never active"
+            }
+          >
+            <span
+              className={`size-1.5 rounded-full ${
+                user.status === "Online"
+                  ? "bg-emerald-500"
+                  : "bg-muted-foreground/40"
+              }`}
+            />
+            <span className="type-body-sm">{user.status}</span>
+          </span>
         ),
       },
       {

@@ -12,7 +12,7 @@ export default async function TrendingAds() {
   if (posts.length === 0) return null;
 
   return (
-    <div className=" rounded bg-gradient-to-b from-[#00a0e9] from-0% via-[#00a0e9] via-[60px] to-card dark:from-primary-900 dark:to-black overflow-hidden">
+    <div className=" rounded bg-gradient-to-b from-[#00a0e9] from-0% via-[#00a0e9] via-[60px] to-card dark:from-[#0a4a66] dark:via-[#0a3f59] dark:to-card overflow-hidden">
       <h2 className="type-section-title pb-3 px-4 pt-3">{t("trending")}</h2>
       <div className="flex gap-3 overflow-x-auto px-4 pb-4 snap-x">
         {posts.map((post) => (

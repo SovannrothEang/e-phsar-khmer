@@ -158,6 +158,7 @@ export default function AdvertisementsPage() {
     await queryClient.invalidateQueries({
       queryKey: ["admin", "advertisements"],
     });
+    toast.success(isActive ? "Banner activated" : "Banner deactivated");
   };
 
   const confirmDelete = async () => {

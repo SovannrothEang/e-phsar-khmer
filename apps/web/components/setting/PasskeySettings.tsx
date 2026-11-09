@@ -31,7 +31,7 @@ export default async function PasskeySettings() {
                   </div>
                 </div>
 
-                <Button className="bg-[#00a0e9]/80 hover:bg-[#00a0e9]/60 text-card rounded-sm w-full h-10 cursor-pointer">
+                <Button className="bg-[#00a0e9]/80 hover:bg-[#00a0e9]/60 text-white rounded-sm w-full h-10 cursor-pointer">
                   <Plus size={18} className="block mr-1 text-lg" />
                   <span className="type-body-sm">{t("add")}</span>
                 </Button>

@@ -19,6 +19,7 @@ function makeGateway(
   const loginDevices = {
     isSessionActive: jest.fn().mockResolvedValue(opts.sessionActive ?? true),
   };
+  const activity = { touch: jest.fn() };
   const gateway = new ChatGateway(
     registry,
     {} as never, // jwt
@@ -27,6 +28,7 @@ function makeGateway(
     loginDevices as never,
     {} as never, // db
     { get: jest.fn().mockReturnValue([ORIGIN]) } as never, // config
+    activity as never,
   );
   const sent: unknown[] = [];
   const send = jest.fn((raw: string) => sent.push(JSON.parse(raw)));
@@ -48,7 +50,16 @@ function makeGateway(
     userId: 'u1',
     sessionId: opts.sessionId ?? null,
   });
-  return { gateway, registry, socket, sent, send, close, loginDevices };
+  return {
+    gateway,
+    registry,
+    socket,
+    sent,
+    send,
+    close,
+    loginDevices,
+    activity,
+  };
 }
 
 describe('ChatGateway.onSendMessage', () => {
@@ -322,6 +333,7 @@ describe('ChatGateway.handleConnection', () => {
         }),
       }),
     });
+    const activity = { touch: jest.fn() };
     const gateway = new ChatGateway(
       registry,
       jwt as never,
@@ -330,6 +342,7 @@ describe('ChatGateway.handleConnection', () => {
       { isSessionActive: jest.fn().mockResolvedValue(true) } as never,
       { select } as never,
       { get: jest.fn().mockReturnValue([ORIGIN]) } as never,
+      activity as never,
     );
     const close = jest.fn();
     const on = jest.fn();
@@ -343,17 +356,26 @@ describe('ChatGateway.handleConnection', () => {
     } as unknown as WebSocket;
     const req = (url: string, headers: Record<string, string> = {}) =>
       ({ url, headers }) as IncomingMessage;
-    return { gateway, registry, jwt, socket, close, on, req };
+    return { gateway, registry, jwt, activity, socket, close, on, req };
   }
 
   it('accepts a valid ticket with no Origin (native client)', async () => {
-    const { gateway, registry, socket, close, on, req } = makeHandshake();
+    const { gateway, registry, activity, socket, close, on, req } =
+      makeHandshake();
 
     await gateway.handleConnection(socket, req(`/ws/chat?ticket=${TICKET}`));
 
     expect(close).not.toHaveBeenCalled();
     expect(registry.isOnline(USER)).toBe(true);
     expect(on).toHaveBeenCalledWith('pong', expect.any(Function));
+
+    // An open socket counts as activity: the pong refreshes last_seen_at.
+    const pong = (on.mock.calls as Array<[string, () => void]>).find(
+      ([event]) => event === 'pong',
+    )?.[1];
+    expect(pong).toBeDefined();
+    pong?.();
+    expect(activity.touch).toHaveBeenCalledWith(USER);
   });
 
   it('accepts a valid ticket from an allowed Origin', async () => {

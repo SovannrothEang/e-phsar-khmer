@@ -17,7 +17,7 @@ export function VerifiedAccountBadge({
   const t = useTranslations("Common");
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#7C3AED] shadow-sm ring-1 ring-black/5 ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-background px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#7C3AED] shadow-sm ring-1 ring-border dark:text-[#c4b5fd] ${className}`}
     >
       <BadgeCheck className="size-3.5 shrink-0" aria-hidden />
       {t("verifiedAccount")}

@@ -1,11 +1,13 @@
 import AccountHeader from "@/components/account/AccountHeader";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
+import { useAuth } from "@/contexts/AuthContext";
+import { NEXT_SELL } from "@/lib/auth-redirect";
 import { fetchCategories } from "@/lib/api/listings";
 import { categoryImage } from "@/lib/category-images";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { Redirect, router, Stack, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Image,
@@ -20,6 +22,7 @@ export default function ChooseCategoryScreen() {
   const categorySlug = Array.isArray(params.category)
     ? params.category[0]
     : params.category;
+  const { isAuthenticated, isLoading } = useAuth();
 
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
@@ -32,6 +35,18 @@ export default function ChooseCategoryScreen() {
     : undefined;
   const subcategories = parent?.subcategories ?? [];
   const isSubcategoryStep = Boolean(categorySlug);
+
+  // Posting needs an account: a guest goes through Welcome and the auth
+  // screens bring the chooser back once they are signed in.
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <Redirect
+        href={
+          { pathname: "/(auth)/welcome", params: { next: NEXT_SELL } } as never
+        }
+      />
+    );
+  }
 
   return (
     <SafeAreaView

@@ -6,10 +6,22 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import {
   fetchCommunes,
   fetchDistricts,
+  fetchLinkedAttributes,
   fetchProvinces,
+  fetchSubcategory,
 } from "@/lib/api/catalog";
-import { firstParam } from "@/lib/feed-params";
-import { CONDITION_OPTIONS, SORT_OPTIONS } from "@/lib/filter-options";
+import {
+  countActiveFilters,
+  firstParam,
+  normalizePriceRange,
+  normalizeYearRange,
+} from "@/lib/feed-params";
+import {
+  CONDITION_OPTIONS,
+  NO_PRICE_CATEGORIES,
+  SORT_OPTIONS,
+  TYPE_IN_FILTERS_ONLY_SUBCATEGORIES,
+} from "@/lib/filter-options";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -29,7 +41,10 @@ interface FilterChipsProps {
   subCategoryId?: string;
   filters?: FilterItem[];
   onFiltersPress?: () => void;
-  selectedLocation?: string;
+  /** True when the brand comes from the path, not from a filter. */
+  brandIsScope?: boolean;
+  /** A screen-owned active row, e.g. the search query on /search-posts. */
+  extraFilterCount?: number;
 }
 
 type LocationStep = "province" | "district" | "commune";
@@ -40,12 +55,40 @@ type LocationStep = "province" | "district" | "commune";
  * sangkat) and writes the browse params in place, so the chip can show the
  * deepest chosen location without leaving the feed.
  */
+/** Extra quick filters per subcategory (captain's list, 2026-11-08). */
+const YEAR_FILTER: FilterItem = {
+  key: "year",
+  label: "Year",
+  hasDropdown: true,
+};
+const CONDITION_FILTER: FilterItem = {
+  key: "condition",
+  label: "Condition",
+  hasDropdown: true,
+};
+
+const EXTRA_FILTERS_BY_SUBCATEGORY: Record<string, FilterItem[]> = {
+  "cars-for-sale": [YEAR_FILTER, CONDITION_FILTER],
+  "motorcycles-for-sale": [YEAR_FILTER, CONDITION_FILTER],
+  bicycles: [CONDITION_FILTER],
+  "lorries-vans-and-tractors": [CONDITION_FILTER],
+  "parts-and-accessories": [CONDITION_FILTER],
+  // Phones & Tablets (captain, 2026-11-08); phone-numbers has no condition.
+  phones: [CONDITION_FILTER],
+  tablets: [CONDITION_FILTER],
+  "smart-watches": [CONDITION_FILTER],
+  "phone-accessories": [CONDITION_FILTER],
+  // Books, Sports & Hobbies: only Musical Instruments declares a condition.
+  "musical-instruments": [CONDITION_FILTER],
+};
+
 const FilterChips = ({
   categoryId,
   subCategoryId,
   filters,
   onFiltersPress,
-  selectedLocation,
+  brandIsScope,
+  extraFilterCount = 0,
 }: FilterChipsProps) => {
   const { t } = useLanguage();
   const params = useLocalSearchParams();
@@ -55,6 +98,7 @@ const FilterChips = ({
   const [priceOpen, setPriceOpen] = useState(false);
   const [yearOpen, setYearOpen] = useState(false);
   const [conditionOpen, setConditionOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
 
   const provinceSlug = firstParam(params.provinceSlug) ?? "";
   const districtSlug = firstParam(params.districtSlug) ?? "";
@@ -100,10 +144,70 @@ const FilterChips = ({
   );
 
   const locationName = communeName || districtName || provinceName;
-  const currentLocation = selectedLocation ?? locationName;
+  const currentLocation = locationName;
 
   const isJobs = categoryId === "jobs";
-  const isVehicles = categoryId === "cars-and-vehicles" && !!subCategoryId;
+  // Services post no price, so the feed offers no Price/Salary chip there.
+  const hasPrice = !NO_PRICE_CATEGORIES.has(categoryId ?? "");
+  // Furniture's Type has no tile row; it is reachable from this chip row and
+  // the Filters page only, with a compact searchless sheet.
+  const showTypeChip = TYPE_IN_FILTERS_ONLY_SUBCATEGORIES.has(
+    subCategoryId ?? "",
+  );
+  const typeSubQuery = useQuery({
+    queryKey: ["subcategory", categoryId, subCategoryId],
+    queryFn: () => fetchSubcategory(categoryId!, subCategoryId!),
+    enabled: showTypeChip && !!categoryId && !!subCategoryId,
+  });
+  const typeAttributesQuery = useQuery({
+    queryKey: ["linked-attributes", typeSubQuery.data?.id],
+    queryFn: () => fetchLinkedAttributes(typeSubQuery.data!.id),
+    enabled: showTypeChip && !!typeSubQuery.data?.id,
+  });
+  const typeOptions = useMemo(
+    () =>
+      (typeAttributesQuery.data ?? [])
+        .filter((row) => row.type === "types")
+        .map((row) => ({ id: row.name, name: row.name, image: row.image })),
+    [typeAttributesQuery.data],
+  );
+  const attrsParam = firstParam(params.attrs) ?? "";
+  const selectedType = useMemo(() => {
+    if (!attrsParam) return "";
+    try {
+      const parsed: unknown = JSON.parse(attrsParam);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return "";
+      }
+      const value = (parsed as Record<string, unknown>).type;
+      return typeof value === "string" ? value : "";
+    } catch {
+      return "";
+    }
+  }, [attrsParam]);
+  /** Sets or removes `attrs.type` without touching the other attributes. */
+  const setType = (value: string) => {
+    let current: Record<string, string> = {};
+    if (attrsParam) {
+      try {
+        const parsed: unknown = JSON.parse(attrsParam);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          current = Object.fromEntries(
+            Object.entries(parsed as Record<string, unknown>).map(
+              ([key, v]) => [key, String(v)],
+            ),
+          );
+        }
+      } catch {
+        /* malformed attrs are replaced */
+      }
+    }
+    if (value.trim() !== "") current.type = value;
+    else delete current.type;
+    router.setParams({
+      attrs: Object.keys(current).length > 0 ? JSON.stringify(current) : "",
+    });
+  };
 
   const defaultFilters: FilterItem[] = [
     { key: "filters", label: t("filters"), icon: "options-outline" },
@@ -114,18 +218,21 @@ const FilterChips = ({
       hasDropdown: true,
     },
     { key: "sort", label: t("sort"), hasDropdown: true },
-    {
-      key: isJobs ? "salary" : "price",
-      label: isJobs ? t("salary") : t("price"),
-      hasDropdown: true,
-    },
-    // Vehicles carry two extra quick filters, matching the filter screen.
-    ...(isVehicles
-      ? ([
-          { key: "year", label: "Year", hasDropdown: true },
-          { key: "condition", label: "Condition", hasDropdown: true },
-        ] satisfies FilterItem[])
+    ...(hasPrice
+      ? [
+          {
+            key: isJobs ? "salary" : "price",
+            label: isJobs ? t("salary") : t("price"),
+            hasDropdown: true,
+          },
+        ]
       : []),
+    // Furniture children: Type stays a chip, never an icon tile strip.
+    ...(showTypeChip
+      ? [{ key: "type", label: "Type", hasDropdown: true }]
+      : []),
+    // Quick filters each subcategory's schema actually supports.
+    ...(EXTRA_FILTERS_BY_SUBCATEGORY[subCategoryId ?? ""] ?? []),
   ];
 
   const items = filters || defaultFilters;
@@ -143,9 +250,58 @@ const FilterChips = ({
           ? `≤${yearMax}`
           : "";
   const selectedCondition = firstParam(params.condition) ?? "";
+  const sortParam = firstParam(params.sort) ?? "";
+  const sortLabel =
+    sortParam && sortParam !== "newest"
+      ? (SORT_OPTIONS.find((option) => option.id === sortParam)?.name ??
+        sortParam)
+      : "";
+  const priceMin = firstParam(params.minPrice) ?? "";
+  const priceMax = firstParam(params.maxPrice) ?? "";
+  const priceLabel =
+    priceMin && priceMax
+      ? `$${priceMin}–$${priceMax}`
+      : priceMin
+        ? `$${priceMin}+`
+        : priceMax
+          ? `≤$${priceMax}`
+          : "";
+  /** Badge on the Filters chip: the shared one-per-active-row definition. */
+  const activeFilterCount =
+    countActiveFilters(params, { brandIsScope }) + extraFilterCount;
   const conditionLabel =
     CONDITION_OPTIONS.find((option) => option.id === selectedCondition)?.name ??
     selectedCondition;
+
+  const clearFilter = (key?: string) => {
+    if (key === "location") {
+      router.setParams({
+        provinceSlug: "",
+        districtSlug: "",
+        communeSlug: "",
+      });
+      return;
+    }
+    if (key === "year") {
+      router.setParams({ yearMin: "", yearMax: "" });
+      return;
+    }
+    if (key === "condition") {
+      router.setParams({ condition: "" });
+      return;
+    }
+    if (key === "sort") {
+      router.setParams({ sort: "" });
+      return;
+    }
+    if (key === "price" || key === "salary") {
+      router.setParams({ minPrice: "", maxPrice: "" });
+      return;
+    }
+    if (key === "type") {
+      setType("");
+    }
+  };
 
   const handleFilterPress = (filter: FilterItem) => {
     if (filter.key === "location") {
@@ -171,6 +327,10 @@ const FilterChips = ({
     }
     if (filter.key === "condition") {
       setConditionOpen(true);
+      return;
+    }
+    if (filter.key === "type") {
+      setTypeOpen(true);
     }
   };
 
@@ -301,11 +461,17 @@ const FilterChips = ({
             filter.key === "location" || filter.label === t("location");
           const valueLabel = isLocation
             ? currentLocation
-            : filter.key === "year"
-              ? selectedYear
-              : filter.key === "condition"
-                ? conditionLabel
-                : "";
+            : filter.key === "sort"
+              ? sortLabel
+              : filter.key === "year"
+                ? selectedYear
+                : filter.key === "condition"
+                  ? conditionLabel
+                  : filter.key === "price" || filter.key === "salary"
+                    ? priceLabel
+                    : filter.key === "type"
+                      ? selectedType
+                      : "";
           const displayLabel = valueLabel || filter.label;
           const isSelected = !!valueLabel;
 
@@ -333,14 +499,36 @@ const FilterChips = ({
               >
                 {displayLabel}
               </Text>
-              {filter.hasDropdown && (
-                <Ionicons
-                  name="caret-down"
-                  size={12}
-                  color={isSelected ? "white" : "#4B5563"}
-                  style={{ marginLeft: 6 }}
-                />
+              {filter.key === "filters" && activeFilterCount > 0 && (
+                <View className="ml-1.5 h-5 min-w-5 items-center justify-center rounded-full bg-[#F59E0B] px-1">
+                  <Text className="text-[11px] font-bold text-white">
+                    {activeFilterCount}
+                  </Text>
+                </View>
               )}
+              {filter.hasDropdown &&
+                (isSelected ? (
+                  <TouchableOpacity
+                    onPress={() => clearFilter(filter.key)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Clear ${filter.label}`}
+                  >
+                    <Ionicons
+                      name="close"
+                      size={16}
+                      color="white"
+                      style={{ marginLeft: 6 }}
+                    />
+                  </TouchableOpacity>
+                ) : (
+                  <Ionicons
+                    name="caret-down"
+                    size={12}
+                    color="#4B5563"
+                    style={{ marginLeft: 6 }}
+                  />
+                ))}
             </TouchableOpacity>
           );
         })}
@@ -380,7 +568,11 @@ const FilterChips = ({
         initialMin={yearMin}
         initialMax={yearMax}
         onApply={(min, max) => {
-          router.setParams({ yearMin: min, yearMax: max });
+          const years = normalizeYearRange(min, max);
+          router.setParams({
+            yearMin: years.min ?? "",
+            yearMax: years.max ?? "",
+          });
           setYearOpen(false);
         }}
         onClose={() => setYearOpen(false)}
@@ -403,11 +595,43 @@ const FilterChips = ({
         initialMin={firstParam(params.minPrice) ?? ""}
         initialMax={firstParam(params.maxPrice) ?? ""}
         onApply={(min, max) => {
-          router.setParams({ minPrice: min.trim(), maxPrice: max.trim() });
+          const price = normalizePriceRange(min, max);
+          router.setParams({
+            minPrice: price.min ?? "",
+            maxPrice: price.max ?? "",
+          });
           setPriceOpen(false);
         }}
         onClose={() => setPriceOpen(false)}
       />
+
+      {showTypeChip ? (
+        <SelectionSheet
+          visible={typeOpen}
+          title="Type"
+          options={typeOptions}
+          value={selectedType}
+          loading={typeSubQuery.isLoading || typeAttributesQuery.isLoading}
+          emptyLabel="No types"
+          // The furniture Type lists are short and have no artwork.
+          searchable={false}
+          compact
+          showIcons={false}
+          onSelect={(option) => {
+            setType(option.name);
+            setTypeOpen(false);
+          }}
+          onClear={
+            selectedType
+              ? () => {
+                  setType("");
+                  setTypeOpen(false);
+                }
+              : undefined
+          }
+          onClose={() => setTypeOpen(false)}
+        />
+      ) : null}
     </View>
   );
 };

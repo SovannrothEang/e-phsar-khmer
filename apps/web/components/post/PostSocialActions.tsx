@@ -42,7 +42,7 @@ export function PostSocialActions({
             toggleLike(listingId);
           }}
           disabled={isPending(listingId)}
-          className="bg-card type-nav px-2 py-1.5 h-10 min-w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
+          className="bg-card type-nav px-2 py-1.5 h-10 min-w-26 rounded-sm flex items-center shadow-sm hover:bg-muted transition-colors cursor-pointer"
         >
           <IconHeartPlus
             className={`scale-145 ${
@@ -62,7 +62,7 @@ export function PostSocialActions({
             setShareOpen(true);
           }}
           aria-label={t("Common.share")}
-          className="bg-card px-2 py-1.5 h-10 w-15 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
+          className="bg-card px-2 py-1.5 h-10 w-15 rounded-sm flex items-center shadow-sm hover:bg-muted transition-colors cursor-pointer"
         >
           <IconShare3 className="scale-160 text-foreground" stroke={1.5} />
         </Button>

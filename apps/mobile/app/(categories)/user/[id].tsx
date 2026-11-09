@@ -10,7 +10,9 @@ import {
   followUser,
   unfollowUser,
 } from "@/lib/api/users";
+import { openFiltersHref } from "@/lib/filter-route";
 import {
+  countActiveFilters,
   feedQueryFromParams,
   firstParam,
   pickFilterParams,
@@ -72,21 +74,8 @@ const ProfileScreen = () => {
       )?.name ?? provinceSlug,
     [provincesQuery.data, provinceSlug],
   );
-  // Location counts once however deep it goes; price counts as one row.
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filterParams.postedWithin) count += 1;
-    if (
-      filterParams.provinceSlug ||
-      filterParams.districtSlug ||
-      filterParams.communeSlug
-    ) {
-      count += 1;
-    }
-    if (filterParams.minPrice || filterParams.maxPrice) count += 1;
-    if (filterParams.sort && filterParams.sort !== "newest") count += 1;
-    return count;
-  }, [filterParams]);
+  // One badge definition for every browse surface.
+  const activeFilterCount = useMemo(() => countActiveFilters(params), [params]);
   const feedQuery = useMemo(
     () => ({
       userId: profile?.id,
@@ -185,15 +174,16 @@ const ProfileScreen = () => {
 
   const openFilters = () => {
     if (!profile?.username) return;
-    router.push({
-      pathname: "/filters",
-      params: {
-        userId: profile.id,
-        username: profile.username,
-        ...(search.trim() ? { q: search.trim() } : {}),
-        ...pickFilterParams(params),
-      },
-    } as never);
+    router.push(
+      openFiltersHref(
+        "profile",
+        { userId: profile.id, username: profile.username },
+        {
+          ...(search.trim() ? { q: search.trim() } : {}),
+          ...pickFilterParams(params),
+        },
+      ),
+    );
   };
 
   if (profileQuery.isLoading) {

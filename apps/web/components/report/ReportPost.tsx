@@ -142,7 +142,7 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
             <Button
               type="submit"
               disabled={submitting}
-              className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3"
+              className="rounded-sm cursor-pointer h-10 text-white bg-orange-400 hover:bg-orange-500 w-2/3"
             >
               {submitting ? "Sending…" : "Submit"}
             </Button>

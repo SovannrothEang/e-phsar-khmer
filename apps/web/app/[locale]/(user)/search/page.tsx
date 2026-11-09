@@ -185,7 +185,7 @@ export default async function SearchPage({
                     key={c.key}
                     href={{ pathname: "/search", query: c.query }}
                     aria-label={t("removeFilter", { name: c.label })}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-500 bg-card px-3 py-1 type-nav text-sky-600 hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-sky-500 bg-card px-3 py-1 type-nav text-sky-600 dark:text-sky-400 hover:bg-muted transition-colors"
                   >
                     {c.label}
                     <IconX className="size-3.5" aria-hidden />
@@ -233,11 +233,14 @@ export default async function SearchPage({
                 <div className="flex flex-wrap justify-center gap-4 pt-2 type-nav">
                   <Link
                     href={{ pathname: "/search", query: clearFilters }}
-                    className="text-sky-600 hover:underline"
+                    className="text-sky-600 dark:text-sky-400 hover:underline"
                   >
                     {t("clearFilters")}
                   </Link>
-                  <Link href="/search" className="text-sky-600 hover:underline">
+                  <Link
+                    href="/search"
+                    className="text-sky-600 dark:text-sky-400 hover:underline"
+                  >
                     {t("clearSearch")}
                   </Link>
                 </div>

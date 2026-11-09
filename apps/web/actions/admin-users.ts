@@ -63,7 +63,9 @@ export async function getTeamUsers(
   params?: Omit<GetAdminUsersParams, "role">,
 ): Promise<AdminUsersResult> {
   const results = await Promise.all(
-    TEAM_ROLES.map((role) => getAdminUsers({ ...params, role })),
+    // The default page size (20) silently hid staff past the first page; 100
+    // is the ListUsersDto maximum. The table still pages client-side at 20.
+    TEAM_ROLES.map((role) => getAdminUsers({ ...params, role, pageSize: 100 })),
   );
   const users = results
     .flatMap((result) => result.users)

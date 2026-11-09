@@ -7,8 +7,10 @@ export interface ChatUserSummary {
   username: string | null;
   profilePhotoUrl: string | null;
   /**
-   * Coarse last activity (ActivityService touches at most every 5 minutes),
-   * not live presence — disconnected users keep their last timestamp.
+   * Coarse last activity (ActivityService writes at most every 60 seconds),
+   * not a live socket state — disconnected users keep their last timestamp.
+   * Participant-only: `getConversationWith` returns it only when a
+   * conversation exists.
    */
   lastSeenAt: Date | null;
 }

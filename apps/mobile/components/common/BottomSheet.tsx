@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface BottomSheetProps {
   visible: boolean;
@@ -35,6 +36,7 @@ export default function BottomSheet({
   children,
 }: BottomSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const backdrop = useAnimatedValue(0);
   const translateY = useAnimatedValue(windowHeight);
@@ -135,6 +137,12 @@ export default function BottomSheet({
               transform: [{ translateY }],
             },
             height ? { height } : null,
+            // A fixed 90% panel lifted above the IME would push its header —
+            // and the search field being typed into — off the top of the
+            // screen; cap it to the space left, keeping the status bar clear.
+            keyboardHeight > 0
+              ? { maxHeight: windowHeight - keyboardHeight - insets.top }
+              : null,
           ]}
           className="max-h-[95%] overflow-hidden rounded-t-[12px] bg-white"
         >

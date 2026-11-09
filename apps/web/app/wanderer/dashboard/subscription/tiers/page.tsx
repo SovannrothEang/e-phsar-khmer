@@ -230,7 +230,7 @@ export default function TiersPage() {
       sortValue: (row) => (row.isActive ? 1 : 0),
       cell: (row) =>
         row.isActive ? (
-          <Badge className="border-emerald-500 bg-emerald-50 text-emerald-700">
+          <Badge className="border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
             Active
           </Badge>
         ) : (

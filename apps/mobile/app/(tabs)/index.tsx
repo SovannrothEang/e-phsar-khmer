@@ -51,7 +51,7 @@ const HomeScreen = () => {
         showsVerticalScrollIndicator={false}
         className="bg-white dark:bg-gray-950"
       >
-        <HomeBanner banners={banners} />
+        <HomeBanner banners={banners} isLoading={bannersQuery.isLoading} />
 
         {/* Main Category Grid */}
         <View className="bg-white px-1 pb-2 pt-7 dark:bg-gray-900">

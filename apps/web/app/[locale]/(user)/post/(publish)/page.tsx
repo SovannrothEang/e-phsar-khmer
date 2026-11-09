@@ -35,16 +35,16 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
         { n: 2, label: t("stepFillInfo") },
       ].map(({ n, label }, i) => (
         <div key={n} className="flex items-center gap-2 py-2">
-          {i > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
+          {i > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           <div className="flex items-center gap-2">
             <span
               className={`w-4 h-4 rounded-full type-button-sm flex items-center justify-center
-                  ${step === n ? "bg-[#00a0e9] text-white" : step > n ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
+                  ${step === n ? "bg-[#00a0e9] text-white" : step > n ? "bg-green-500 text-white" : "bg-secondary text-muted-foreground"}`}
             >
               {n}
             </span>
             <span
-              className={`type-body  ${step === n ? "text-foreground" : "text-gray-400"}`}
+              className={`type-body  ${step === n ? "text-foreground" : "text-muted-foreground"}`}
             >
               {label}
             </span>
@@ -77,7 +77,7 @@ function SelectField({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-card-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent appearance-none cursor-pointer"
+        className="w-full border border-border rounded-sm px-3 py-2.5 type-body text-card-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent appearance-none cursor-pointer"
       >
         <option value="">Select {label}</option>
         {options.map((o) => (
@@ -114,7 +114,7 @@ function InputField({
       </label>
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             {icon}
           </div>
         )}
@@ -123,7 +123,7 @@ function InputField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full border border-gray-200 rounded-sm py-2.5 type-body text-card-foreground focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent ${icon ? "pl-9 pr-3" : "px-3"}`}
+          className={`w-full border border-border rounded-sm py-2.5 type-body text-card-foreground focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent ${icon ? "pl-9 pr-3" : "px-3"}`}
         />
       </div>
     </div>
@@ -145,7 +145,7 @@ function TextareaField({
 }) {
   return (
     <div>
-      <label className="block type-nav text-gray-700 mb-1.5">
+      <label className="block type-nav text-foreground mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <textarea
@@ -153,7 +153,7 @@ function TextareaField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="w-full border border-gray-200 rounded-lg px-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
+        className="w-full border border-border rounded-lg px-3 py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent resize-none"
       />
     </div>
   );
@@ -181,7 +181,7 @@ function BrandModelField({
           onChange={(e) =>
             setForm({ ...form, brand: e.target.value, model: "" })
           }
-          className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
+          className="w-full border border-border rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
         >
           <option value="">Select Brand</option>
           {sub.brands.map((b) => (
@@ -199,7 +199,7 @@ function BrandModelField({
           <select
             value={(form.model as string) || ""}
             onChange={(e) => setForm({ ...form, model: e.target.value })}
-            className="w-full border border-gray-200 rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
+            className="w-full border border-border rounded-sm px-3 py-2.5 type-body text-foreground bg-card focus:outline-none focus:ring-2 focus:ring-[#00a0e9] focus:border-transparent"
           >
             <option value="">{selectedBrand.Model?.[0].name} </option>
             {selectedBrand.Model.map((m) => (
@@ -236,7 +236,7 @@ function TypesField({
             type="button"
             onClick={() => setForm({ ...form, type: t.name })}
             className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border-2 transition-all text-center
-              ${form.type === t.name ? "border-orange-500 bg-orange-50" : "border-gray-200 hover:border-orange-300 hover:bg-orange-50"}`}
+              ${form.type === t.name ? "border-orange-500 bg-orange-500/10" : "border-border hover:border-orange-300 hover:bg-orange-500/10"}`}
           >
             <div className="w-10 h-10 relative">
               <Image
@@ -248,7 +248,9 @@ function TypesField({
                 //onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
               />
             </div>
-            <span className="type-button-sm text-gray-600">{t.name}</span>
+            <span className="type-button-sm text-muted-foreground">
+              {t.name}
+            </span>
           </button>
         ))}
       </div>
@@ -276,7 +278,7 @@ function ColorsField({
   };
   return (
     <div>
-      <label className="block type-nav text-gray-700 mb-2">Color</label>
+      <label className="block type-nav text-foreground mb-2">Color</label>
       <div className="flex flex-wrap gap-2">
         {sub.colors.map((c) => (
           <button
@@ -284,10 +286,10 @@ function ColorsField({
             type="button"
             onClick={() => setForm({ ...form, color: c })}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 type-button-sm transition-all
-              ${form.color === c ? "border-orange-500" : "border-gray-200 hover:border-gray-300"}`}
+              ${form.color === c ? "border-orange-500" : "border-border hover:border-input"}`}
           >
             <span
-              className="w-4 h-4 rounded-full border border-gray-200"
+              className="w-4 h-4 rounded-full border border-border"
               style={{ background: colorMap[c] ?? c }}
             />
             {c}
@@ -319,11 +321,11 @@ function DiscountPriceField({
       )}
       {sub.price !== undefined && (
         <div>
-          <label className="block type-nav text-gray-700 mb-1.5">
+          <label className="block type-nav text-foreground mb-1.5">
             Price <span className="text-red-500">*</span>
           </label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 type-body">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground type-body">
               $
             </span>
             <input
@@ -331,7 +333,7 @@ function DiscountPriceField({
               value={(form.price as string) || ""}
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               placeholder="0"
-              className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full border border-border rounded-lg pl-7 pr-3 py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         </div>
@@ -410,13 +412,13 @@ function DynamicForm({
           <label className="block type-nav text-card-foreground mb-1.5">
             Choose a category <span className="text-red-500">*</span>
           </label>
-          <div className="flex items-center gap-3 border border-gray-200 rounded-sm px-3 py-2.5 flex-wrap">
+          <div className="flex items-center gap-3 border border-border rounded-sm px-3 py-2.5 flex-wrap">
             <span className="type-body text-foreground">{category.name}</span>
-            <ChevronRight className="w-4 h-4 text-gray-400" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
             <span className="type-body  text-foreground">{sub.name}</span>
             <button
               onClick={onBack}
-              className="type-nav bg-[#00a0e9] text-card px-3 py-1.5 rounded-sm hover:bg-[#00a0e9]/80 transition-colors"
+              className="type-nav bg-[#00a0e9] text-white px-3 py-1.5 rounded-sm hover:bg-[#00a0e9]/80 transition-colors"
             >
               Change
             </button>
@@ -449,8 +451,8 @@ function DynamicForm({
                   className={`py-2.5 type-nav transition-all border rounded-sm
                     ${
                       form.taxType === t
-                        ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
-                        : "bg-card text-foreground border-gray-300 hover:border-[#00a0e9] hover:text-[#00a0e9]"
+                        ? "bg-sky-500/10 text-[#00a0e9] border-[#00a0e9]"
+                        : "bg-card text-foreground border-input hover:border-[#00a0e9] hover:text-[#00a0e9]"
                     }`}
                 >
                   {t}
@@ -476,8 +478,8 @@ function DynamicForm({
                   className={`py-2.5 type-nav transition-all border rounded-sm
                    ${
                      form.condition === c
-                       ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
-                       : "bg-card text-foreground border-gray-300 hover:border-[#00a0e9] hover:text-[#00a0e9]"
+                       ? "bg-sky-500/10 text-[#00a0e9] border-[#00a0e9]"
+                       : "bg-card text-foreground border-input hover:border-[#00a0e9] hover:text-[#00a0e9]"
                    }`}
                 >
                   {c}
@@ -515,8 +517,8 @@ function DynamicForm({
                   className={`py-2.5 type-nav transition-all border rounded-sm
                     ${
                       form.transmission === t
-                        ? "bg-[#e1f5fe] text-[#00a0e9] border-[#00a0e9]"
-                        : "bg-card text-foreground border-gray-300 hover:border-[#00a0e9] hover:text-[#00a0e9]"
+                        ? "bg-sky-500/10 text-[#00a0e9] border-[#00a0e9]"
+                        : "bg-card text-foreground border-input hover:border-[#00a0e9] hover:text-[#00a0e9]"
                     }`}
                 >
                   {t}
@@ -582,7 +584,7 @@ function DynamicForm({
         {/* Network */}
         {sub.network && (
           <div className="space-y-2">
-            <label className="block type-nav text-gray-700">
+            <label className="block type-nav text-foreground">
               Network
               <span className="text-red-500">*</span>
             </label>
@@ -596,8 +598,8 @@ function DynamicForm({
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all
             ${
               form.network === net.slug
-                ? "border-orange-500 bg-orange-50 text-orange-600"
-                : "border-gray-200 bg-white text-gray-700 hover:border-orange-300"
+                ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-300"
+                : "border-border bg-card text-foreground hover:border-orange-300"
             }`}
                 >
                   <Image
@@ -678,17 +680,17 @@ function DynamicForm({
         {/* Salary (Jobs) */}
         {isJob && (
           <div>
-            <label className="block type-nav text-gray-700 mb-1.5">
+            <label className="block type-nav text-foreground mb-1.5">
               Salary <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="number"
                 value={(form.salary as string) || ""}
                 onChange={(e) => setForm({ ...form, salary: e.target.value })}
                 placeholder="Monthly salary"
-                className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full border border-border rounded-lg pl-9 pr-3 py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           </div>
@@ -702,7 +704,7 @@ function DynamicForm({
         {/* Delivery */}
         {sub.delivery !== undefined && !isJob && (
           <div>
-            <label className="block type-nav text-gray-700 mb-2">
+            <label className="block type-nav text-foreground mb-2">
               Delivery Available
             </label>
             <div className="flex gap-2">
@@ -715,8 +717,8 @@ function DynamicForm({
                     ${
                       (form.delivery === true && v === "Yes") ||
                       (form.delivery === false && v === "No")
-                        ? "border-orange-500 bg-orange-50 text-orange-600"
-                        : "border-gray-200 text-gray-600 hover:border-orange-300"
+                        ? "border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-300"
+                        : "border-border text-muted-foreground hover:border-orange-300"
                     }`}
                 >
                   <Truck className="w-4 h-4" />
@@ -738,8 +740,8 @@ function DynamicForm({
       </div>
 
       {/* Location & Contact */}
-      <div className="bg-white rounded-xl p-5 space-y-4">
-        <h2 className="type-card-heading text-gray-800 border-b border-gray-100 pb-3">
+      <div className="bg-card rounded-xl p-5 space-y-4">
+        <h2 className="type-card-heading text-foreground border-b border-border pb-3">
           Location & Contact
         </h2>
 
@@ -798,14 +800,14 @@ function DynamicForm({
       <div className="flex justify-end gap-3 pb-8">
         <button
           onClick={onBack}
-          className="px-6 py-2.5 rounded-lg border border-gray-200 type-nav text-gray-600 hover:bg-gray-50 transition-colors"
+          className="px-6 py-2.5 rounded-lg border border-border type-nav text-muted-foreground hover:bg-muted transition-colors"
         >
           Back
         </button>
         <button
           type="button"
           onClick={handleSubmit}
-          className="px-8 py-2.5 rounded-lg bg-orange-500 text-white type-body hover:bg-orange-600 transition-colors shadow-sm shadow-orange-200"
+          className="px-8 py-2.5 rounded-lg bg-orange-500 text-white type-body hover:bg-orange-600 transition-colors shadow-sm shadow-orange-500/20"
         >
           Post Ad
         </button>

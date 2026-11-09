@@ -2,9 +2,11 @@ import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
+import PromoCard from "@/components/home/PromoCard";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { fetchCategory } from "@/lib/api/catalog";
+import { openFiltersHref } from "@/lib/filter-route";
 import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -26,9 +28,8 @@ export default function CategoryScreen() {
   const categoryId = Array.isArray(params.categoryId)
     ? params.categoryId[0]
     : params.categoryId;
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    params.view === "grid" ? "grid" : "list",
-  );
+  // View is URL-driven so the filter screen can apply it in place.
+  const viewMode: ViewMode = params.view === "grid" ? "grid" : "list";
 
   const categoryQuery = useQuery({
     queryKey: ["category", categoryId],
@@ -46,14 +47,13 @@ export default function CategoryScreen() {
   );
 
   const toggleViewMode = () => {
-    setViewMode(viewMode === "list" ? "grid" : "list");
+    router.setParams({ view: viewMode === "list" ? "grid" : "" });
   };
 
   const openFilters = () =>
-    router.push({
-      pathname: "/filters",
-      params: { categoryId, ...pickFilterParams(params) },
-    });
+    router.push(
+      openFiltersHref("category", { categoryId }, pickFilterParams(params)),
+    );
 
   const categoryName = category?.name || categoryId || "Category";
 
@@ -237,6 +237,7 @@ export default function CategoryScreen() {
             <ListingFeed
               query={feedQuery}
               viewMode={viewMode}
+              leading={<PromoCard viewMode={viewMode} />}
               emptyLabel="No ads in this category yet."
             />
           </View>

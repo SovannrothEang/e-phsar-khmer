@@ -42,7 +42,7 @@ const MONTHS = [
 ] as const;
 
 const NAV_BUTTON =
-  "flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-muted disabled:pointer-events-none disabled:text-gray-300";
+  "flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:text-gray-300";
 
 export function ResumeDobCalendar({
   selected,

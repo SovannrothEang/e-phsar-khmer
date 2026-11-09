@@ -96,7 +96,7 @@ export function DeleteAccountDialog({
           <DialogClose asChild>
             <Button
               variant="ghost"
-              className="bg-[#eeeeee] hover:bg-gray-200 text-black px-6 rounded-sm font-medium cursor-pointer"
+              className="bg-muted hover:bg-muted/70 text-foreground px-6 rounded-sm font-medium cursor-pointer"
             >
               {tCommon("cancel")}
             </Button>

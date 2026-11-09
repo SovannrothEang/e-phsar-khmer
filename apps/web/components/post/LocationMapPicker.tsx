@@ -57,7 +57,7 @@ export default function LocationMapPicker({
 
   return (
     <>
-      <div className="relative isolate z-0 h-36 overflow-hidden rounded-lg border border-gray-200 sm:h-40">
+      <div className="relative isolate z-0 h-36 overflow-hidden rounded-lg border border-border sm:h-40">
         {/* No pin yet → the design's mock map. With a pin the real map renders
             (isolated: Leaflet panes use z-index 400/800 and would otherwise
             paint straight over the dialog's overlay). */}
@@ -103,7 +103,7 @@ export default function LocationMapPicker({
           <button
             type="button"
             onClick={openDialog}
-            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-card px-4 py-2.5 type-nav text-card-foreground shadow-md transition-colors hover:bg-muted"
+            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-4 py-2.5 type-nav text-card-foreground shadow-md transition-colors hover:bg-muted"
           >
             <MapPinned className="h-4 w-4 text-[#dc2626]" />
             {t("selectLocationOnMap")}

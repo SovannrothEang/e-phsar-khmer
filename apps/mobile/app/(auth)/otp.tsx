@@ -6,6 +6,7 @@ import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { SELL_ROUTE, wantsSellAfterAuth } from "@/lib/auth-redirect";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -22,8 +23,13 @@ const RESEND_SECONDS = 60;
 export default function OtpScreen() {
   const router = useRouter();
   const { isDark } = useTheme();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{
+    mode?: string;
+    next?: string | string[];
+  }>();
   const { pendingVerification, verifyOtp, resendOtp } = useAuth();
+  // "sell" when the guest came from Start Selling: resume posting afterwards.
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
 
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -66,7 +72,9 @@ export default function OtpScreen() {
       : await verifyOtp(code);
     setIsLoading(false);
     if (result.kind === "authenticated") {
-      router.replace("/(tabs)");
+      router.replace(
+        wantsSellAfterAuth(next) ? (SELL_ROUTE as never) : "/(tabs)",
+      );
       return;
     }
     if (result.kind === "suspended") {
@@ -118,11 +126,14 @@ export default function OtpScreen() {
             Start again with your phone number.
           </Text>
           <TouchableOpacity
-            onPress={() =>
+            onPress={() => {
+              const pathname = wasRegister
+                ? "/(auth)/sign-up"
+                : "/(auth)/sign-in";
               router.replace(
-                wasRegister ? "/(auth)/sign-up" : "/(auth)/sign-in",
-              )
-            }
+                (next ? { pathname, params: { next } } : pathname) as never,
+              );
+            }}
             className="mt-6 rounded-xl bg-secondary-orange px-8 py-3.5"
           >
             <Text className="font-bold text-white">

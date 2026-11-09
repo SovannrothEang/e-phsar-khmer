@@ -12,6 +12,7 @@ import { brands, models } from '../../db/schema/brands.schema';
 import { modelSlug } from '../../products/seeds/products.seed';
 import { buildCatalogListings } from './catalog-listings';
 import { DEMO_PEOPLE, demoPhone } from './demo-people';
+import { demoListingCoordinates } from './province-centers';
 
 /**
  * Demo listings seed ("seed data properly for now", 2026-08-31): a curated
@@ -647,14 +648,37 @@ export async function seedListings(db: DbClient): Promise<void> {
   const personIds = await ensureDemoPeople(db, provBySlug);
 
   let inserted = 0;
+  let backfilled = 0;
   for (const demo of demos) {
     const ownerId = personIds[demo.ownerIndex ?? 0];
+    const coordinates = demoListingCoordinates(demo.province, demo.title);
     const [existing] = await db
       .select({ id: listings.id })
       .from(listings)
       .where(eq(listings.title, demo.title))
       .limit(1);
-    if (existing) continue; // idempotent by title
+    if (existing) {
+      // Idempotent by title, but rows seeded before coordinates existed still
+      // need a pin for the Nearby read. Never overwrite a real one.
+      if (coordinates) {
+        const filled = await db
+          .update(listings)
+          .set(coordinates)
+          .where(
+            and(
+              eq(listings.id, existing.id),
+              // Only this demo seller's row: a real user's same-titled ad must
+              // never receive a fabricated demo pin.
+              eq(listings.userId, ownerId),
+              isNull(listings.latitude),
+              isNull(listings.longitude),
+            ),
+          )
+          .returning({ id: listings.id });
+        backfilled += filled.length;
+      }
+      continue;
+    }
 
     const categoryId = catBySlug.get(demo.category);
     const subcategoryId = subBySlug.get(demo.subcategory);
@@ -691,6 +715,7 @@ export async function seedListings(db: DbClient): Promise<void> {
           : undefined,
         location: demo.location,
         address: demo.address,
+        ...(coordinates ?? {}),
         deliveryFree: demo.deliveryFree ?? false,
         contactName: demo.contactName,
         contactPhones: demo.contactPhones ?? [],
@@ -712,4 +737,7 @@ export async function seedListings(db: DbClient): Promise<void> {
     inserted++;
   }
   console.log(`  ✓ seeded ${inserted} demo listings`);
+  if (backfilled > 0) {
+    console.log(`  ✓ backfilled coordinates on ${backfilled} demo listings`);
+  }
 }

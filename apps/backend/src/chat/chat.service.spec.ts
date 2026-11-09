@@ -1397,11 +1397,45 @@ describe('ChatService.getConversationWith', () => {
         id: 'u2',
         username: 'dara',
         profilePhotoUrl: null,
-        lastSeenAt: SEEN_AT,
+        // Participant-only: with no conversation there is nobody to show
+        // "last active" to, and any signed-in user can ask about any id.
+        lastSeenAt: null,
       },
       blockedByMe: false,
       canMessage: true,
     });
+  });
+
+  it('keeps lastSeenAt when a conversation exists', async () => {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1)
+        return limitQuery([
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
+        ]);
+      if (callCount === 2) return whereQuery([]); // no blocks
+      return limitQuery([conversation]); // an existing conversation
+    });
+    // The inbox builder runs its own batch queries; stub it so this test is
+    // only about the presence projection.
+    jest
+      .spyOn(
+        service as unknown as {
+          buildInboxItems: (...args: unknown[]) => Promise<unknown[]>;
+        },
+        'buildInboxItems',
+      )
+      .mockResolvedValue([{ id: 'c1' }] as never);
+
+    const result = await service.getConversationWith('u1', 'u2');
+
+    expect(result.otherUser.lastSeenAt).toEqual(SEEN_AT);
   });
 
   it('reports blockedByMe and canMessage flags', async () => {

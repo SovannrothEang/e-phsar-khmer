@@ -74,6 +74,24 @@ export class QueryListingsDto extends PaginationQueryDto {
   @Type(() => Number)
   maxPrice?: number;
 
+  @ApiPropertyOptional({
+    description:
+      "Min listed size — listings.attributes->>'size' as a number. " +
+      'Non-numeric sizes never match.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  sizeMin?: number;
+
+  @ApiPropertyOptional({ description: 'Max listed size (see sizeMin)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  sizeMax?: number;
+
   @ApiPropertyOptional({ enum: ['new', 'used'] })
   @IsOptional()
   @IsIn(['new', 'used'])

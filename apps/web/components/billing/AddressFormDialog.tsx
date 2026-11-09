@@ -308,7 +308,7 @@ function AddressForm({
                 onClick={() => setCategory(item.value)}
                 className={`flex-1 rounded-sm border py-2 text-sm transition-colors ${
                   category === item.value
-                    ? "border-sky-400 bg-sky-50 text-sky-600 dark:bg-sky-500/10"
+                    ? "border-sky-400 bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300"
                     : "hover:bg-muted"
                 }`}
               >

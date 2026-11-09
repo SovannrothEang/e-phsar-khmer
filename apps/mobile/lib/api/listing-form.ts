@@ -46,6 +46,8 @@ export interface CreateListingPayload {
   provinceId?: string;
   districtId?: string;
   communeId?: string;
+  latitude?: number;
+  longitude?: number;
   productModelId?: string;
   deliveryFree?: boolean;
   contactName?: string;

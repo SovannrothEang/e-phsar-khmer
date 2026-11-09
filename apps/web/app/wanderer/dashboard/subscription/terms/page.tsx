@@ -274,7 +274,9 @@ export default function TermsPage() {
       cell: (row) => {
         const label = discountLabel(row.discount, row.discountType);
         return label ? (
-          <Badge className="bg-red-100 text-red-500">{label}</Badge>
+          <Badge className="bg-red-100 text-red-500 dark:bg-red-950/40 dark:text-red-300">
+            {label}
+          </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         );
@@ -286,7 +288,7 @@ export default function TermsPage() {
       sortValue: (row) => (row.isActive ? 1 : 0),
       cell: (row) =>
         row.isActive ? (
-          <Badge className="border-emerald-500 bg-emerald-50 text-emerald-700">
+          <Badge className="border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
             Active
           </Badge>
         ) : (

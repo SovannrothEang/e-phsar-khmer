@@ -36,10 +36,10 @@ const STATUS_LABEL_KEY: Record<SubscriptionStatus, string> = {
 };
 
 const STATUS_TONE: Record<SubscriptionStatus, string> = {
-  active: "text-emerald-600",
-  expired: "text-red-600",
-  superseded: "text-gray-500",
-  revoked: "text-red-600",
+  active: "text-emerald-600 dark:text-emerald-400",
+  expired: "text-red-600 dark:text-red-400",
+  superseded: "text-muted-foreground",
+  revoked: "text-red-600 dark:text-red-400",
 };
 
 function formatDate(value: string): string {
@@ -290,7 +290,7 @@ export default function Subscriptions({ username }: { username: string }) {
               className="mx-auto max-w-2xl rounded-sm border bg-card p-8 text-center"
             >
               <CircleAlert className="mx-auto h-8 w-8 text-amber-600" />
-              <p className="mt-3 type-body-sm text-gray-500">{error}</p>
+              <p className="mt-3 type-body-sm text-muted-foreground">{error}</p>
               <Button
                 variant="outline"
                 onClick={() => void load()}
@@ -321,7 +321,7 @@ export default function Subscriptions({ username }: { username: string }) {
                       query: { id: "me" },
                     })
                   }
-                  className="h-10 cursor-pointer rounded-sm bg-orange-400 px-8 font-medium text-card transition-colors hover:bg-orange-600"
+                  className="h-10 cursor-pointer rounded-sm bg-orange-400 px-8 font-medium text-white transition-colors hover:bg-orange-600"
                 >
                   {t("subscribeNow")}
                 </Button>

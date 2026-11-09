@@ -105,7 +105,8 @@ export async function CategoryFacets({
                   aria-current={r.active ? "page" : undefined}
                   className={cn(
                     "shrink-0 whitespace-nowrap rounded-full border bg-card px-3 py-1.5 type-nav transition-colors hover:bg-muted",
-                    r.active && "border-sky-500 text-sky-600 font-medium",
+                    r.active &&
+                      "border-sky-500 text-sky-600 dark:text-sky-400 font-medium",
                   )}
                 >
                   {r.label}{" "}
@@ -132,7 +133,8 @@ export async function CategoryFacets({
               className={cn(
                 "flex items-center justify-between gap-3 rounded-sm px-3 py-2 type-nav transition-colors hover:bg-muted",
                 r.depth === 1 && "pl-7",
-                r.active && "bg-muted text-sky-600 font-semibold",
+                r.active &&
+                  "bg-muted text-sky-700 dark:text-sky-400 font-semibold",
               )}
             >
               <span className="min-w-0 truncate">{r.label}</span>

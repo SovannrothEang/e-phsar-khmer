@@ -120,7 +120,7 @@ export default function ProfileSidebar({
           imgClassName="bg-card"
         />
       </div>
-      <div className="text-card min-w-0">
+      <div className="text-white min-w-0">
         <h2 className="type-card-heading flex min-w-0 items-center gap-1.5">
           <span className="truncate">{user?.name}</span>
           {user?.verifiedAccount && <VerifiedAccountBadge />}
@@ -174,7 +174,7 @@ export default function ProfileSidebar({
               userId={userId}
               viewerId={viewerId}
               variant="compact"
-              className="bg-card text-foreground hover:bg-gray-100 h-7 mt-9 rounded-sm flex items-center cursor-pointer"
+              className="bg-card text-foreground hover:bg-muted h-7 mt-9 rounded-sm flex items-center cursor-pointer"
             />
           )}
         </div>

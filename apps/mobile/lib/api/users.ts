@@ -51,3 +51,48 @@ export async function unfollowUser(
   );
   return data;
 }
+
+/** One row of the public user search (`GET /users/search`). */
+export interface UserSearchItem {
+  id: string;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+  verifiedAccount: boolean;
+}
+
+export interface UserSearchPage {
+  items: UserSearchItem[];
+  total: number;
+  hasMore: boolean;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * Anonymous public user search by handle or name. The backend caps `q` at 100
+ * chars and `pageSize` at 50; the caller only sends the three declared keys
+ * because the global pipe rejects unknown query params.
+ */
+export async function searchUsers(
+  q: string,
+  { page = 1, pageSize = 20 }: { page?: number; pageSize?: number } = {},
+): Promise<UserSearchPage> {
+  const search = new URLSearchParams({
+    q,
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  const { data, meta } = await apiFetch<UserSearchItem[]>(
+    `/users/search?${search.toString()}`,
+    { auth: false },
+  );
+  return {
+    items: data ?? [],
+    total: (meta?.total as number | undefined) ?? 0,
+    hasMore: Boolean(meta?.hasMore),
+    page: (meta?.page as number | undefined) ?? page,
+    pageSize: (meta?.pageSize as number | undefined) ?? pageSize,
+  };
+}

@@ -24,7 +24,7 @@ export function AccountIdentity({ me }: { me?: SettingsUser | null }) {
         src={me?.profilePhotoUrl}
         name={name}
         size={50}
-        className="border border-gray-100 text-sm"
+        className="border border-border text-sm"
       />
       <div>
         {/* The card's link carries `group`; only the display name picks up

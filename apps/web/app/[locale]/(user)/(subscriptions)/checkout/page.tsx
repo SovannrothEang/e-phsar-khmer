@@ -581,7 +581,7 @@ export default function CheckoutPage() {
                 <h3 className="mt-3 text-lg font-medium text-foreground">
                   Offer unavailable
                 </h3>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   This term may have been removed or deactivated.
                 </p>
                 <Link
@@ -595,13 +595,13 @@ export default function CheckoutPage() {
           ) : blocked ? (
             <Card title="Subscription">
               <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                <BadgeCheck className="h-9 w-9 text-emerald-600" />
+                <BadgeCheck className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="mt-3 text-lg font-medium text-foreground">
                   {blocked === "current"
                     ? "You're already on this plan"
                     : "Not an upgrade from your current plan"}
                 </h3>
-                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                   {blocked === "current"
                     ? `Your ${offer.packageName} package is active — nothing to pay.`
                     : "Your current plan already covers this for the time left. Pick a bigger package to upgrade."}
@@ -628,11 +628,11 @@ export default function CheckoutPage() {
           ) : activated ? (
             <Card title="Subscription">
               <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                <BadgeCheck className="h-9 w-9 text-emerald-600" />
+                <BadgeCheck className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="mt-3 text-lg font-medium text-foreground">
                   You&apos;re all set
                 </h3>
-                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                   Payment confirmed and your {offer.packageName} package is
                   ready to use.
                 </p>
@@ -659,7 +659,7 @@ export default function CheckoutPage() {
                 <h3 className="mt-3 text-lg font-medium text-foreground">
                   Payment didn&apos;t complete
                 </h3>
-                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                   The code expired or the payment wasn&apos;t received, so no
                   subscription was activated. Start a new checkout to try again.
                 </p>
@@ -683,11 +683,11 @@ export default function CheckoutPage() {
           ) : payment?.status === "succeeded" ? (
             <Card title="Subscription">
               <div className="flex min-h-56 flex-col items-center justify-center text-center">
-                <BadgeCheck className="h-10 w-10 text-emerald-600" />
+                <BadgeCheck className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
                 <h3 className="mt-3 text-lg font-medium text-foreground">
                   Payment successful
                 </h3>
-                <p className="mt-1 max-w-sm text-sm text-gray-500">
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                   Your payment was received. We&apos;re activating your{" "}
                   {offer.packageName} plan — this page updates by itself.
                 </p>
@@ -722,23 +722,23 @@ export default function CheckoutPage() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <UserRound className="h-9 w-9 text-gray-400" />
+                      <UserRound className="h-9 w-9 text-muted-foreground" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-base font-semibold text-foreground">
                       {offer.groupName}: {offer.packageName} - {offer.termName}
                     </p>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       Account: {me?.username ?? "—"}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Valid Until:{" "}
                       {validUntilLabel(offer.durationValue, offer.durationUnit)}
                     </p>
                     <p className="mt-2 text-sm font-medium">
                       {listPrice > planPrice && (
-                        <span className="mr-2 text-gray-400 line-through">
+                        <span className="mr-2 text-muted-foreground line-through">
                           ${money(listPrice)}
                         </span>
                       )}
@@ -763,22 +763,22 @@ export default function CheckoutPage() {
                     {selectedAddress && (
                       <>
                         <p className="flex items-center gap-3 text-sm text-foreground">
-                          <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
+                          <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {selectedAddress.name}
                         </p>
                         <p className="flex items-center gap-3 text-sm text-foreground">
-                          <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+                          <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {selectedAddress.phone}
                         </p>
                       </>
                     )}
                     {selectedAddress && (
                       <p className="flex items-start gap-3 text-sm text-foreground">
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                         <span>
                           {selectedAddress.address}
                           {selectedAddress.company && (
-                            <span className="block text-gray-500">
+                            <span className="block text-muted-foreground">
                               {selectedAddress.company}
                             </span>
                           )}
@@ -786,7 +786,7 @@ export default function CheckoutPage() {
                       </p>
                     )}
                     {!selectedAddress && (
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         No saved billing address yet — the plan is linked to
                         this account either way.
                       </p>
@@ -833,14 +833,14 @@ export default function CheckoutPage() {
                           "Confirm the amount and approve",
                         ].map((text, index) => (
                           <li key={text} className="flex items-center gap-3">
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-gray-500">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
                               {index + 1}
                             </span>
                             {text}
                           </li>
                         ))}
                       </ol>
-                      <p className="mt-4 text-xs text-gray-500">
+                      <p className="mt-4 text-xs text-muted-foreground">
                         Keep this page open — it confirms automatically.
                       </p>
                     </div>
@@ -854,13 +854,13 @@ export default function CheckoutPage() {
                       {/* Expiry and app hand-off sit outside the card, per the
                           guideline: only name, amount and QR belong inside it. */}
                       {remainingMs !== null && (
-                        <p className="mt-3 text-center text-xs tabular-nums text-gray-500">
+                        <p className="mt-3 text-center text-xs tabular-nums text-muted-foreground">
                           {clock(remainingMs)} | QR will expire
                         </p>
                       )}
                       {appLink && platform && (
                         <div>
-                          <div className="my-3 flex items-center gap-3 text-xs text-gray-500">
+                          <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
                             <span className="h-px flex-1 bg-border" /> Or
                             <span className="h-px flex-1 bg-border" />
                           </div>
@@ -887,7 +887,7 @@ export default function CheckoutPage() {
                       ))}
                     </div>
                   ) : providers.length === 0 ? (
-                    <p className="rounded-sm bg-muted p-4 text-sm text-gray-500">
+                    <p className="rounded-sm bg-muted p-4 text-sm text-muted-foreground">
                       We couldn&apos;t load payment methods. Refresh the page to
                       try again.
                     </p>
@@ -925,14 +925,14 @@ export default function CheckoutPage() {
                                   className="h-full w-full object-contain"
                                 />
                               ) : (
-                                <CreditCard className="h-5 w-5 text-gray-400" />
+                                <CreditCard className="h-5 w-5 text-muted-foreground" />
                               )}
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block font-semibold text-foreground">
                                 {itemUi.title}
                               </span>
-                              <span className="block text-sm text-gray-500">
+                              <span className="block text-sm text-muted-foreground">
                                 {item.available
                                   ? itemUi.subtitle
                                   : "Unavailable right now"}
@@ -943,7 +943,7 @@ export default function CheckoutPage() {
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
                                 selected
                                   ? "border-[#00a0e9] bg-[#00a0e9] text-white"
-                                  : "border-gray-300"
+                                  : "border-input"
                               }`}
                             >
                               {selected && <Check className="h-3 w-3" />}
@@ -959,13 +959,13 @@ export default function CheckoutPage() {
               <Card title="Summary">
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between gap-2">
-                    <dt className="text-gray-500">Subtotal</dt>
+                    <dt className="text-muted-foreground">Subtotal</dt>
                     <dd className="tabular-nums text-foreground">
                       ${money(listPrice)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <dt className="text-gray-500">Discount</dt>
+                    <dt className="text-muted-foreground">Discount</dt>
                     <dd className="tabular-nums text-foreground">
                       {discountAmount > 0
                         ? `−$${money(discountAmount)}`
@@ -976,7 +976,7 @@ export default function CheckoutPage() {
                     {/* Subscriptions are priced without a tax line today; the
                         backend's payment amount stays authoritative, so VAT is
                         shown as zero rather than invented in the UI. */}
-                    <dt className="text-gray-500">VAT</dt>
+                    <dt className="text-muted-foreground">VAT</dt>
                     <dd className="tabular-nums text-foreground">$0.00</dd>
                   </div>
                   {credit > 0 && (
@@ -993,13 +993,13 @@ export default function CheckoutPage() {
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-lg font-medium text-foreground">
                       Total{" "}
-                      <span className="text-sm font-normal text-gray-500">
+                      <span className="text-sm font-normal text-muted-foreground">
                         (incl. VAT)
                       </span>
                     </span>
                     <span className="text-xl font-semibold tabular-nums text-foreground">
                       ${money(dueToday)}
-                      <small className="ml-1 text-xs font-medium text-gray-500">
+                      <small className="ml-1 text-xs font-medium text-muted-foreground">
                         {payment?.currency ?? "USD"}
                       </small>
                     </span>

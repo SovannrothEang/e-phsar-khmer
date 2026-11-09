@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 
 // Multer buffers uploads in memory: without a limit it reads the whole body
 // before the service's 5 MB check ever runs. Over the limit → 413.
@@ -27,6 +28,7 @@ import {
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { ListFollowsDto } from './dto/list-follows.dto';
+import { SearchUsersDto } from './dto/search-users.dto';
 import type { RequestUser } from '../common/types/api-response.types';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -243,6 +245,18 @@ export class UsersController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.billingAddressesService.remove(user.id, id);
+  }
+
+  @Get('search')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Search public user profiles by name or username',
+    description:
+      'Anonymous read. Whitespace-split keyword match over username, first name and last name; only active, non-deleted users with a username. Serves the public search allow-list — never phone, email, role or moderation state.',
+  })
+  searchUsers(@Query() query: SearchUsersDto) {
+    return this.usersService.searchUsers(query.q, query.page, query.pageSize);
   }
 
   @Get('by-username/:username')

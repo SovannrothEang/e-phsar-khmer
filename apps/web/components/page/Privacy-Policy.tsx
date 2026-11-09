@@ -246,7 +246,7 @@ export default function PrivacyPolicy() {
               be used according to the rules and laws that applied at the time
               the information was collected.
             </p>
-            <p className="text-gray-700 type-body mt-10">
+            <p className="text-foreground type-body mt-10">
               Last updated: {new Date().getFullYear()}
             </p>
           </div>

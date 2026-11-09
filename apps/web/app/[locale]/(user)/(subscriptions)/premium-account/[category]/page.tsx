@@ -105,7 +105,7 @@ function Benefits({ item }: { item: SubscriptionCatalogItem }) {
       {rows.map(([label, value]) => (
         <li
           key={label}
-          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
+          className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"
         >
           <CircleCheck size={16} className="shrink-0 text-sky-400" />
           <span className="capitalize">
@@ -396,7 +396,7 @@ export default function PremiumPlanPage() {
               {state?.kind === "current" ? (
                 <Link
                   href="/me/membership"
-                  className="block w-full rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-gray-500"
+                  className="block w-full rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-muted-foreground"
                 >
                   Your current plan
                   {active &&
@@ -407,7 +407,7 @@ export default function PremiumPlanPage() {
               ) : state?.kind === "unavailable" ? (
                 <span
                   aria-disabled
-                  className="block w-full cursor-not-allowed rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-gray-500"
+                  className="block w-full cursor-not-allowed rounded-sm bg-muted py-2.5 text-center text-sm font-semibold text-muted-foreground"
                 >
                   Not an upgrade from your plan
                 </span>

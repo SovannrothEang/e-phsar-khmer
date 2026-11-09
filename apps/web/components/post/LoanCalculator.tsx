@@ -14,8 +14,10 @@ export default function LoanCalculator() {
       </div>
       <div className="flex flex-col md:flex-row items-center gap-8 px-2">
         <div className="relative w-32 h-32 rounded-full border-[10px] border-[#00a0e9] border-l-[#f68b1e] border-b-gray-200 flex items-center justify-center flex-col">
-          <span className="type-price text-gray-800">1,947</span>
-          <span className="type-meta text-gray-600 mt-1">{t("perMonth")}</span>
+          <span className="type-price text-foreground">1,947</span>
+          <span className="type-meta text-muted-foreground mt-1">
+            {t("perMonth")}
+          </span>
           <span className="type-discount text-[#00a0e9]">
             {t("overYears", { years: 5 })}
           </span>
@@ -34,21 +36,21 @@ export default function LoanCalculator() {
                     className="w-3 h-3 rounded-full border-[3px]"
                     style={{ borderColor: color }}
                   />
-                  <span className="text-gray-600">{label}:</span>
+                  <span className="text-muted-foreground">{label}:</span>
                 </div>
-                <span className="font-bold text-gray-800">{value}</span>
+                <span className="font-bold text-foreground">{value}</span>
               </div>
             ))}
           </div>
         </div>
         <div className="flex-1 w-full space-y-4">
           <div>
-            <label className="type-meta text-gray-600 mb-1.5 block">
+            <label className="type-meta text-muted-foreground mb-1.5 block">
               {t("downPayment")}
             </label>
             <div className="flex">
-              <div className="flex items-center border border-gray-300 rounded-sm overflow-hidden flex-1 focus-within:border-[#00a0e9]">
-                <span className="px-3 type-body-sm text-gray-500 bg-gray-50 border-r border-gray-300 h-full flex items-center">
+              <div className="flex items-center border border-input rounded-sm overflow-hidden flex-1 focus-within:border-[#00a0e9]">
+                <span className="px-3 type-body-sm text-muted-foreground bg-muted border-r border-input h-full flex items-center">
                   $
                 </span>
                 <input
@@ -57,13 +59,13 @@ export default function LoanCalculator() {
                   defaultValue="24000"
                 />
               </div>
-              <div className="flex items-center border border-gray-300 rounded-sm overflow-hidden w-20 ml-2 focus-within:border-[#00a0e9]">
+              <div className="flex items-center border border-input rounded-sm overflow-hidden w-20 ml-2 focus-within:border-[#00a0e9]">
                 <input
                   type="text"
                   className="w-full type-body-sm px-2 py-1.5 focus:outline-none text-center"
                   defaultValue="20"
                 />
-                <span className="px-2 type-body-sm text-gray-500 bg-gray-50 border-l border-gray-300 h-full flex items-center">
+                <span className="px-2 type-body-sm text-muted-foreground bg-muted border-l border-input h-full flex items-center">
                   %
                 </span>
               </div>
@@ -71,31 +73,31 @@ export default function LoanCalculator() {
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="type-meta text-gray-600 mb-1.5 block">
+              <label className="type-meta text-muted-foreground mb-1.5 block">
                 {t("term")}
               </label>
-              <div className="flex items-center border border-gray-300 rounded-sm overflow-hidden focus-within:border-[#00a0e9]">
+              <div className="flex items-center border border-input rounded-sm overflow-hidden focus-within:border-[#00a0e9]">
                 <input
                   type="text"
                   className="w-full type-body-sm px-3 py-1.5 focus:outline-none"
                   defaultValue="5"
                 />
-                <span className="px-3 type-body-sm text-gray-500 bg-gray-50 border-l border-gray-300 h-full flex items-center">
+                <span className="px-3 type-body-sm text-muted-foreground bg-muted border-l border-input h-full flex items-center">
                   {t("yearUnit")}
                 </span>
               </div>
             </div>
             <div className="flex-1">
-              <label className="type-meta text-gray-600 mb-1.5 block">
+              <label className="type-meta text-muted-foreground mb-1.5 block">
                 {t("interest")}
               </label>
-              <div className="flex items-center border border-gray-300 rounded-sm overflow-hidden focus-within:border-[#00a0e9]">
+              <div className="flex items-center border border-input rounded-sm overflow-hidden focus-within:border-[#00a0e9]">
                 <input
                   type="text"
                   className="w-full type-body-sm px-3 py-1.5 focus:outline-none"
                   defaultValue="8"
                 />
-                <span className="px-3 type-body-sm text-gray-500 bg-gray-50 border-l border-gray-300 h-full flex items-center">
+                <span className="px-3 type-body-sm text-muted-foreground bg-muted border-l border-input h-full flex items-center">
                   %
                 </span>
               </div>

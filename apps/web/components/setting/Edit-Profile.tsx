@@ -346,7 +346,7 @@ export default function EditProfile({
                       onClick={() => setGender("male")}
                       className={`flex-1 border py-1.5 rounded-sm cursor-pointer ${
                         gender === "male"
-                          ? "border-sky-400 bg-sky-100 text-sky-600"
+                          ? "border-sky-400 bg-sky-500/10 text-sky-700 dark:text-sky-300"
                           : "border-border"
                       }`}
                     >
@@ -357,7 +357,7 @@ export default function EditProfile({
                       onClick={() => setGender("female")}
                       className={`flex-1 border py-1.5 rounded-sm cursor-pointer ${
                         gender === "female"
-                          ? "border-sky-400 bg-sky-100 text-sky-600"
+                          ? "border-sky-400 bg-sky-500/10 text-sky-700 dark:text-sky-300"
                           : "border-border"
                       }`}
                     >
@@ -433,7 +433,7 @@ export default function EditProfile({
                           type="button"
                           onClick={() => removePhoneRow(index)}
                           aria-label={t("removePhone", { n: index + 1 })}
-                          className="mb-0.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+                          className="mb-0.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-500/10"
                         >
                           <Minus className="h-4 w-4" strokeWidth={3} />
                         </button>
@@ -443,7 +443,7 @@ export default function EditProfile({
                           type="button"
                           onClick={addPhoneRow}
                           aria-label={t("addPhone")}
-                          className="mb-0.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-card transition-colors hover:bg-[#00a0e9]/80"
+                          className="mb-0.5 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-white transition-colors hover:bg-[#00a0e9]/80"
                         >
                           <Plus className="h-5 w-5" />
                         </button>
@@ -523,7 +523,7 @@ export default function EditProfile({
                   type="button"
                   onClick={() => void submit()}
                   disabled={!canSubmit}
-                  className="bg-orange-500 text-card rounded-sm w-full h-8 mb-4 cursor-pointer"
+                  className="bg-orange-500 text-white rounded-sm w-full h-8 mb-4 cursor-pointer"
                 >
                   {saving ? t("saving") : t("submit")}
                 </Button>

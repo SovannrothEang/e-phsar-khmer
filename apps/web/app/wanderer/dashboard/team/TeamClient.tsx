@@ -592,6 +592,8 @@ export default function TeamPage({
     queryKey: ["admin", "team"],
     queryFn: () => getTeamUsers(),
     initialData,
+    // Keep the Online/Offline tabs and counts near the 2-minute window.
+    refetchInterval: 60_000,
   });
   const users = data?.users;
 

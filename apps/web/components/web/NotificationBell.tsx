@@ -36,7 +36,7 @@ import type { BackendNotification } from "@/types/notification";
 const WIDE_NAV_QUERY = "(min-width: 1024px)";
 
 const BELL_BUTTON =
-  "relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer";
+  "relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer";
 
 interface PanelProps {
   limit: number;
@@ -125,7 +125,9 @@ function RecentPanel({ limit, onNavigate, title }: PanelProps) {
           </div>
         ) : isError ? (
           <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-            <p className="type-body-sm text-gray-500">{t("loadFailed")}</p>
+            <p className="type-body-sm text-muted-foreground">
+              {t("loadFailed")}
+            </p>
             <button
               type="button"
               onClick={() => void refetch()}
@@ -135,7 +137,7 @@ function RecentPanel({ limit, onNavigate, title }: PanelProps) {
             </button>
           </div>
         ) : items.length === 0 ? (
-          <p className="px-4 py-8 text-center type-body-sm text-gray-500">
+          <p className="px-4 py-8 text-center type-body-sm text-muted-foreground">
             {t("empty")}
           </p>
         ) : (

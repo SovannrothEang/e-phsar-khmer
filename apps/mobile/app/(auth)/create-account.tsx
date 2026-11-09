@@ -4,7 +4,7 @@ import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 
@@ -16,6 +16,9 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 const CreateAccountScreen = () => {
   const router = useRouter();
   const { pendingVerification, setRegistrationProfile } = useAuth();
+  const params = useLocalSearchParams<{ next?: string | string[] }>();
+  // Carried from Welcome: "sell" resumes the posting flow after register.
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -24,7 +27,17 @@ const CreateAccountScreen = () => {
   const [error, setError] = useState("");
 
   // Reachable only right after the phone step; otherwise start again.
-  if (!pendingVerification) return <Redirect href="/(auth)/sign-up" />;
+  if (!pendingVerification) {
+    return (
+      <Redirect
+        href={
+          (next
+            ? { pathname: "/(auth)/sign-up", params: { next } }
+            : "/(auth)/sign-up") as never
+        }
+      />
+    );
+  }
 
   const handleSubmit = () => {
     if (!firstName.trim()) {
@@ -47,7 +60,7 @@ const CreateAccountScreen = () => {
     });
     router.push({
       pathname: "/(auth)/otp",
-      params: { mode: "register" },
+      params: next ? { mode: "register", next } : { mode: "register" },
     } as never);
   };
 

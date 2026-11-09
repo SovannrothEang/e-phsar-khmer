@@ -58,7 +58,7 @@ export function GridCardPost({ post }: { post: Post }) {
         href={`/${toSlug(post.title)}-adid-${post.postId}`}
         className="absolute inset-0 z-20"
       />
-      <div className="relative h-52 w-full bg-zinc-100">
+      <div className="relative h-52 w-full bg-muted">
         {photo ? (
           <DbImage
             src={photo}
@@ -153,7 +153,7 @@ export function GridCardPost({ post }: { post: Post }) {
         <div className="mt-auto flex items-center justify-between">
           {/* LEFT: price */}
           <div className="flex items-center gap-3">
-            <span className="text-red-600 type-price">
+            <span className="text-red-600 dark:text-red-400 type-price">
               {post.price === null
                 ? t("Common.negotiable")
                 : `$${post.price.toLocaleString()}`}
@@ -177,7 +177,7 @@ export function GridCardPost({ post }: { post: Post }) {
               className={`h-6 w-6 transition ${
                 reactions.isLiked(listingId)
                   ? "fill-red-500 text-red-500 scale-110"
-                  : "text-gray-400 group-hover/heart:text-white"
+                  : "text-muted-foreground group-hover/heart:text-white"
               }`}
             />
           </button>

@@ -11,6 +11,8 @@ export interface FeedQuery {
   q?: string;
   minPrice?: string;
   maxPrice?: string;
+  sizeMin?: string;
+  sizeMax?: string;
   condition?: string;
   yearMin?: string;
   yearMax?: string;
@@ -19,6 +21,9 @@ export interface FeedQuery {
   attrKey?: string;
   attrValue?: string;
   attrs?: Record<string, string>;
+  /** Column-backed toggles; the backend only accepts true/"true". */
+  hasDiscount?: boolean;
+  deliveryFree?: boolean;
   sort?: string;
   postedWithin?: string;
   userId?: string;

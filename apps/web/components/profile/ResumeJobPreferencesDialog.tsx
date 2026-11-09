@@ -193,7 +193,7 @@ export function ResumeJobPreferencesDialog({
                             "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border",
                             selected
                               ? "border-[#00a0e9] bg-[#00a0e9] text-white"
-                              : "border-gray-400",
+                              : "border-input",
                           )}
                         >
                           {selected && <IconCheck size={12} />}
@@ -212,14 +212,14 @@ export function ResumeJobPreferencesDialog({
               type="button"
               aria-label={t("form.clearField", { label })}
               onClick={() => setValues([])}
-              className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+              className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <IconX size={18} />
             </button>
           ) : (
             <IconChevronDown
               size={16}
-              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+              className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
             />
           )}
         </div>
@@ -238,7 +238,7 @@ export function ResumeJobPreferencesDialog({
           <DialogClose asChild>
             <button
               type="button"
-              className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
+              className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
             >
               <IconX size={18} />
               <span className="sr-only">{t("form.close")}</span>

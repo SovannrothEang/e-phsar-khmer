@@ -128,7 +128,7 @@ export default function Feedback() {
                       <Button
                         type="button"
                         onClick={() => removeFile(index)}
-                        className="absolute -top-0 -right-0 bg-red-500 text-card rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-sm border-none cursor-pointer"
+                        className="absolute -top-0 -right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center z-10 shadow-sm border-none cursor-pointer"
                       >
                         <X size={12} strokeWidth={3} />
                       </Button>
@@ -228,7 +228,7 @@ export default function Feedback() {
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="bg-orange-500 hover:bg-orange-600 text-card rounded-sm h-10 mt-4 w-full text-sm font-medium transition-all cursor-pointer"
+            className="bg-orange-500 hover:bg-orange-600 text-white rounded-sm h-10 mt-4 w-full text-sm font-medium transition-all cursor-pointer"
           >
             {isSubmitting ? "Sending…" : "Submit"}
           </Button>

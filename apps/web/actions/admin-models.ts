@@ -1,6 +1,10 @@
 "use server";
 
 import { serverFetch } from "@/lib/api/client";
+import {
+  buildAdminModelsQuery,
+  type AdminModelsQuery,
+} from "@/lib/models/query";
 import type { Model } from "@/types/model";
 
 interface BackendModel {
@@ -20,9 +24,19 @@ interface BackendSubcategory {
   categoryId: string;
 }
 
-export async function getAdminModels(): Promise<Model[]> {
-  const [{ data: models }, { data: subcategories }] = await Promise.all([
-    serverFetch<BackendModel[]>("/admin/models"),
+export interface AdminModelsResult {
+  models: Model[];
+  total: number;
+}
+
+export async function getAdminModels(
+  params: AdminModelsQuery = {},
+): Promise<AdminModelsResult> {
+  const queryString = buildAdminModelsQuery(params);
+  const [{ data: models, meta }, { data: subcategories }] = await Promise.all([
+    serverFetch<BackendModel[]>(
+      queryString ? `/admin/models?${queryString}` : "/admin/models",
+    ),
     serverFetch<BackendSubcategory[]>("/admin/subcategories"),
   ]);
 
@@ -35,18 +49,21 @@ export async function getAdminModels(): Promise<Model[]> {
     subcategories.map((sub) => [sub.id, sub.categoryId]),
   );
 
-  return models.map((m) => {
-    const subs = m.subcategoryIds ?? [];
-    return {
-      modelId: m.id,
-      name: m.name,
-      slug: m.slug,
-      brandId: m.brandId,
-      // A model's subcategories all sit in one category by construction.
-      categoryId: subs.map((id) => subToCategory.get(id)).find(Boolean) ?? "",
-      subcategories: subs,
-      createdAt: m.createdAt.slice(0, 10),
-      updatedAt: m.updatedAt.slice(0, 10),
-    };
-  });
+  return {
+    models: models.map((m) => {
+      const subs = m.subcategoryIds ?? [];
+      return {
+        modelId: m.id,
+        name: m.name,
+        slug: m.slug,
+        brandId: m.brandId,
+        // A model's subcategories all sit in one category by construction.
+        categoryId: subs.map((id) => subToCategory.get(id)).find(Boolean) ?? "",
+        subcategories: subs,
+        createdAt: m.createdAt.slice(0, 10),
+        updatedAt: m.updatedAt.slice(0, 10),
+      };
+    }),
+    total: meta?.total ?? models.length,
+  };
 }

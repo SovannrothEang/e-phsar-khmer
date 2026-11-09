@@ -11,10 +11,13 @@ import {
   count,
   desc,
   eq,
+  ilike,
   inArray,
   isNotNull,
   isNull,
   ne,
+  or,
+  sql,
 } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import {
@@ -50,14 +53,23 @@ import type { DeleteAccountDto } from './dto/delete-account.dto';
 import type { RequestPhoneChangeDto } from './dto/request-phone-change.dto';
 import type { VerifyPhoneChangeDto } from './dto/verify-phone-change.dto';
 import type { ListFollowsDto } from './dto/list-follows.dto';
+import { MAX_SEARCH_PAGE } from './dto/search-users.dto';
 import type { PaginatedResponse } from '../common/types/api-response.types';
 import { isBlockedEitherWay } from '../chat/blocks.util';
 import { NotificationsService } from '../notifications/notifications.service';
-import { hasActivePaidSubscription } from '../subscriptions/verified-account.util';
+import {
+  activePaidSubscriptionExistsSql,
+  hasActivePaidSubscription,
+} from '../subscriptions/verified-account.util';
+import { escapeLike, likeTerm } from '../utils/like-term';
 import type { PublicUser } from '../auth/auth.service';
 
 /** Matches AuthService/AdminService — bcrypt cost is a property of the data, not the caller. */
 const BCRYPT_ROUNDS = 10;
+
+/** Same caps as the listings keyword search: five tokens of 50 chars. */
+const MAX_SEARCH_TOKENS = 5;
+const MAX_SEARCH_TOKEN_LENGTH = 50;
 
 export interface BlockedUserItem {
   id: string;
@@ -100,6 +112,21 @@ export interface PublicProfile {
   createdAt: Date;
   followers: number;
   following: number;
+}
+
+/**
+ * One row of the public user search. A separate allow-list from
+ * `PublicProfile`: search is anonymous and paged, so it carries no follower
+ * counts, timestamps, verification timestamps or contact/location fields.
+ * `username` is non-null because rows are filtered to openable profiles.
+ */
+export interface UserSearchItem {
+  id: string;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePhotoUrl: string | null;
+  verifiedAccount: boolean;
 }
 
 @Injectable()
@@ -1010,6 +1037,132 @@ export class UsersService {
       verifiedAccount: await hasActivePaidSubscription(this.db, user.id),
       createdAt: user.createdAt,
       ...counts,
+    };
+  }
+
+  /**
+   * Public user search by handle or name.
+   *
+   * Anonymous and viewer-agnostic (`req.user` is never populated on a
+   * `@Public()` route), so the projection below is the whole contract. The
+   * filters mirror `loadPublicProfile`: a suspended or soft-deleted account is
+   * invisible here too, and rows without a username are omitted because the
+   * profile screen is username-addressed.
+   *
+   * Matching is a case-insensitive substring per token — AND across tokens, OR
+   * across the handle/first/last columns — because Khmer and partial handles
+   * have no word boundaries. `likeTerm`/`escapeLike` keep the caller's `%`,
+   * `_` and `\` literal instead of turning them into patterns.
+   */
+  async searchUsers(
+    q: string,
+    page = 1,
+    pageSize = 20,
+  ): Promise<PaginatedResponse<UserSearchItem>> {
+    const needle = q.trim();
+    const tokens = needle
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, MAX_SEARCH_TOKENS)
+      .map((token) => token.slice(0, MAX_SEARCH_TOKEN_LENGTH));
+
+    // The DTO already rejects a blank `q`; this guard keeps a direct service
+    // call from turning an empty search into a user-directory dump.
+    if (tokens.length === 0) {
+      return {
+        data: [],
+        meta: {
+          nextCursor: null,
+          hasMore: false,
+          limit: pageSize,
+          total: 0,
+          page,
+          pageSize,
+        },
+      };
+    }
+
+    const where = and(
+      isNull(users.deletedAt),
+      eq(users.status, 'active'),
+      // Public search is for customers: staff accounts (admin/super_admin)
+      // are not part of the directory the app exposes.
+      eq(users.role, 'user'),
+      isNotNull(users.username),
+      ...tokens.map((token) => {
+        const pattern = likeTerm(token);
+        return or(
+          ilike(users.username, pattern),
+          ilike(users.firstName, pattern),
+          ilike(users.lastName, pattern),
+        );
+      }),
+    );
+
+    const lowerNeedle = needle.toLowerCase();
+    const offset = (page - 1) * pageSize;
+    const rowQuery = this.db
+      .select({
+        id: users.id,
+        username: users.username,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profilePhotoUrl: users.profilePhotoUrl,
+        verifiedAccount: activePaidSubscriptionExistsSql(users.id),
+      })
+      .from(users)
+      .where(where)
+      // Exact handle first, then handle prefix, then the rest. The trailing
+      // username + id keep page boundaries stable when several rows tie.
+      .orderBy(
+        sql`case
+            when lower(${users.username}) = ${lowerNeedle} then 0
+            when ${users.username} ilike ${`${escapeLike(lowerNeedle)}%`} then 1
+            else 2
+          end`,
+        sql`lower(${users.username})`,
+        users.id,
+      )
+      .limit(pageSize)
+      .offset(offset);
+    const [rows, [totalRow]] = await Promise.all([
+      rowQuery,
+      this.db.select({ value: count() }).from(users).where(where),
+    ]);
+
+    // `isNotNull(users.username)` guarantees this, but TypeScript cannot see
+    // through the SQL condition; drop rather than cast. The object is rebuilt
+    // field by field so a future column added to the select cannot leak into
+    // the public response by a spread.
+    const data: UserSearchItem[] = rows.flatMap((row) =>
+      row.username
+        ? [
+            {
+              id: row.id,
+              username: row.username,
+              firstName: row.firstName,
+              lastName: row.lastName,
+              profilePhotoUrl: row.profilePhotoUrl,
+              verifiedAccount: row.verifiedAccount,
+            },
+          ]
+        : [],
+    );
+    const total = totalRow.value;
+
+    return {
+      data,
+      meta: {
+        nextCursor: null,
+        // The DTO's page cap is the real last page: without the first term a
+        // full page 100 would advertise page 101, which the pipe rejects with
+        // a 400 and the mobile list would stop without a footer.
+        hasMore: page < MAX_SEARCH_PAGE && offset + data.length < total,
+        limit: pageSize,
+        total,
+        page,
+        pageSize,
+      },
     };
   }
 

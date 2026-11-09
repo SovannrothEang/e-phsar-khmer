@@ -10,6 +10,7 @@ import SelectionSheet, {
 } from "@/components/common/SelectionSheet";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrentLocation } from "@/hooks/useCurrentLocation";
 import { fetchMyPhones, fetchMyProfile, type MyPhone } from "@/lib/api/account";
 import { ApiError } from "@/lib/api/client";
 import {
@@ -130,6 +131,16 @@ const NewAdScreen = () => {
   const [district, setDistrict] = useState<PlaceSummary | null>(null);
   const [commune, setCommune] = useState<PlaceSummary | null>(null);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  // Optional pin, separate from the mandatory province/district/commune picker.
+  const [locationPin, setLocationPin] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [pinPending, setPinPending] = useState(false);
+  const {
+    request: requestLocationPermission,
+    openSettings: openLocationSettings,
+  } = useCurrentLocation();
 
   const [contactPhones, setContactPhones] = useState<string[]>([""]);
   const [productModelId, setProductModelId] = useState("");
@@ -534,6 +545,9 @@ const NewAdScreen = () => {
       ...(declares("location") && province ? { provinceId: province.id } : {}),
       ...(declares("location") && district ? { districtId: district.id } : {}),
       ...(declares("location") && commune ? { communeId: commune.id } : {}),
+      ...(declares("location") && locationPin
+        ? { latitude: locationPin.lat, longitude: locationPin.lng }
+        : {}),
       ...(declares("deliveryFree")
         ? { deliveryFree: values.deliveryFree === "true" }
         : {}),
@@ -583,9 +597,38 @@ const NewAdScreen = () => {
       .join(", ") || "Select location";
   const hasLocation = Boolean(province || district || commune);
 
+  const handleUseMyLocation = async () => {
+    if (locationPin || pinPending) return;
+    setPinPending(true);
+    const result = await requestLocationPermission();
+    setPinPending(false);
+    if (result.permission === "granted" && result.fix) {
+      setLocationPin(result.fix);
+      return;
+    }
+    if (result.permission === "blocked") {
+      Alert.alert(
+        "Location",
+        "Location is blocked. Enable it in Settings to pin your ad.",
+        [
+          { text: "Not now", style: "cancel" },
+          { text: "Open Settings", onPress: openLocationSettings },
+        ],
+      );
+    } else {
+      Alert.alert(
+        "Location",
+        result.permission === "denied"
+          ? "Location permission was denied. You can still post without a pin."
+          : "Could not get your location. You can still post without a pin.",
+      );
+    }
+  };
+
   const openMap = () => {
-    const target =
-      locationLabel !== "Select location"
+    const target = locationPin
+      ? `${locationPin.lat},${locationPin.lng}`
+      : locationLabel !== "Select location"
         ? [locationLabel, values.address?.trim()].filter(Boolean).join(", ")
         : values.address?.trim() || "";
     if (!target) {
@@ -1264,6 +1307,53 @@ const NewAdScreen = () => {
                   </View>
 
                   <TouchableOpacity
+                    onPress={() => void handleUseMyLocation()}
+                    activeOpacity={locationPin ? 1 : 0.85}
+                    disabled={!!locationPin || pinPending}
+                    className="mb-3 flex-row items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
+                  >
+                    <View className="flex-1 flex-row items-center gap-3">
+                      <Ionicons
+                        name="navigate"
+                        size={20}
+                        color={locationPin ? Colors.primary.DEFAULT : "#9CA3AF"}
+                      />
+                      <View className="flex-1">
+                        <Text className="text-base font-medium text-gray-900">
+                          {locationPin
+                            ? "Location pin set"
+                            : "Use my current location"}
+                        </Text>
+                        {locationPin ? (
+                          <Text className="mt-0.5 text-xs text-gray-500">
+                            {locationPin.lat.toFixed(5)},{" "}
+                            {locationPin.lng.toFixed(5)}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {pinPending ? (
+                      <ActivityIndicator color={Colors.primary.DEFAULT} />
+                    ) : locationPin ? (
+                      <TouchableOpacity
+                        onPress={() => setLocationPin(null)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear location pin"
+                      >
+                        <Text className="text-sm font-semibold text-red-500">
+                          Clear
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color="#9CA3AF"
+                      />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
                     onPress={openMap}
                     activeOpacity={0.9}
                     className="mb-3 h-40 overflow-hidden rounded-lg"
@@ -1281,7 +1371,9 @@ const NewAdScreen = () => {
                           color="#EA4335"
                         />
                         <Text className="text-sm font-semibold text-gray-900">
-                          Set location on Google Maps
+                          {locationPin
+                            ? "View pin on Google Maps"
+                            : "Set location on Google Maps"}
                         </Text>
                       </View>
                     </View>
@@ -1337,10 +1429,10 @@ const NewAdScreen = () => {
       >
         <TouchableOpacity
           onPress={() => void handleSubmit()}
-          disabled={submitting || !subcategory}
+          disabled={submitting || pinPending || !subcategory}
           activeOpacity={0.9}
           className={`h-12 items-center justify-center rounded-md ${
-            subcategory ? "bg-secondary-orange" : "bg-gray-300"
+            subcategory && !pinPending ? "bg-secondary-orange" : "bg-gray-300"
           }`}
         >
           {submitting ? (

@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
@@ -16,6 +17,7 @@ import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
+import { QueryNearbyDto } from './dto/query-nearby.dto';
 import { QueryTrendingDto } from './dto/query-trending.dto';
 
 @ApiTags('listings')
@@ -37,6 +39,16 @@ export class ListingsController {
   })
   getTrending(@Query() query: QueryTrendingDto) {
     return this.listingsService.findTrending(query);
+  }
+
+  @Get('nearby')
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Live listings within a radius of a point, nearest first',
+  })
+  getNearby(@Query() query: QueryNearbyDto) {
+    return this.listingsService.findNearby(query);
   }
 
   @Get('me/all')

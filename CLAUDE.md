@@ -66,7 +66,8 @@ pnpm --filter backend db:seed:catalog   # demo catalogue only
 
 ```bash
 pnpm --filter web dev      # dev on port 3001
-pnpm --filter web build    # next build — the only type gate (no check-types, no test suite)
+pnpm --filter web build    # next build — the only type gate (no check-types)
+pnpm --filter web test     # node --test "lib/**/*.test.ts" — lib-only, no component runner
 pnpm --filter web lint
 ```
 

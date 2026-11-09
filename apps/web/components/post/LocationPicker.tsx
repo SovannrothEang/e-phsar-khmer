@@ -165,23 +165,23 @@ export default function LocationPicker({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className={`flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-left type-nav text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+            className={`flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-left type-nav text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
               error
                 ? "border-destructive ring-3 ring-destructive/20"
-                : "border-gray-200"
+                : "border-border"
             }`}
           >
-            <span className={label ? "" : "text-gray-400"}>
+            <span className={label ? "" : "text-muted-foreground"}>
               {label || t("chooseLocation")}
             </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
           </button>
         </PopoverTrigger>
         <PopoverContent
           align="start"
           className="w-[var(--radix-popover-trigger-width)] p-0"
         >
-          <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
             {level === "province" ? (
               <button
                 type="button"
@@ -243,7 +243,7 @@ export default function LocationPicker({
                   {selected?.id === row.id ? (
                     <Check className="h-4 w-4 shrink-0 text-[#00a0e9]" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                 </button>
               ))

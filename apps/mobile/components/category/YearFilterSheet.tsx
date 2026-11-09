@@ -111,7 +111,8 @@ export default function YearFilterSheet({
                   ? "Max year"
                   : "Year"}
             </Text>
-            {picking ? (
+            {/* Clear only once there is something to clear. */}
+            {picking || (!min && !max) ? (
               <View className="h-10 w-10" />
             ) : (
               <TouchableOpacity

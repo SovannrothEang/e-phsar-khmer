@@ -25,6 +25,7 @@ import type { DbClient } from '../db/drizzle.provider';
 import { users } from '../db/schema/users.schema';
 import { LoginDevicesService } from '../auth/login-devices.service';
 import { isIssuedBeforeCutoff } from '../auth/token-cutoff.util';
+import { ActivityService } from '../activity/activity.service';
 import { ConnectionRegistry } from './connection-registry';
 import type { ConnectionInfo } from './connection-registry';
 import { ChatService } from './chat.service';
@@ -75,6 +76,7 @@ export class ChatGateway
     private readonly loginDevices: LoginDevicesService,
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly config: ConfigService,
+    private readonly activity: ActivityService,
   ) {}
 
   onModuleInit() {
@@ -229,6 +231,9 @@ export class ChatGateway
       // records it. Without it every socket is force-closed ~40s after connect.
       socket.on('pong', () => {
         conn.lastPongAt = Date.now();
+        // An open socket counts as online even while the tab is idle; the
+        // 60 s ActivityService throttle caps the write rate.
+        this.activity.touch(conn.userId);
       });
       this.conns.set(socket, conn);
       this.registry.add(claims.sub, conn);

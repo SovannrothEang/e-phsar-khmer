@@ -61,7 +61,7 @@ const PrivacyRow = ({ title, settingKey, initialState }: PrivacyRowProps) => {
         checked={isPublic}
         disabled={pending}
         onCheckedChange={(next) => void handleCheckedChange(next)}
-        className="data-[state=checked]:bg-[#00a0e9] data-[state=unchecked]:bg-gray-300 scale-120"
+        className="data-[state=checked]:bg-[#00a0e9] data-[state=unchecked]:bg-input scale-120"
       />
     </div>
   );

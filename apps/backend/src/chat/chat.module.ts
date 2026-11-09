@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { AuthModule } from '../auth/auth.module';
+import { ActivityModule } from '../activity/activity.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
@@ -28,6 +29,8 @@ import { backgroundProviders } from '../config/runtime-role';
 @Module({
   imports: [
     AuthModule,
+    // The socket pong refreshes the user's last_seen_at.
+    ActivityModule,
     ChatPubSubModule,
     // E2eNudgeService needs NotificationsService to post the nudge. No
     // forwardRef: NotificationsModule imports the ChatPubSubModule leaf (not

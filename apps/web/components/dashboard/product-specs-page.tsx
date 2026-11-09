@@ -46,8 +46,8 @@ import {
   type AdminColumn,
 } from "@/components/dashboard/admin-table";
 import { matchTemplateGroup } from "@/lib/product-spec-families";
+import { SearchPicker } from "@/components/common/SearchPicker";
 import type { Brand } from "@/types/brand";
-import type { Model } from "@/types/model";
 import type {
   AdminProduct,
   ProductSpecFamily,
@@ -457,7 +457,7 @@ function PublishToggle({
 function CreateProductForm({
   family,
   brands,
-  models,
+  subcategoryId,
   template,
   usedModelIds,
   onSuccess,
@@ -465,7 +465,7 @@ function CreateProductForm({
 }: {
   family: ProductSpecFamily;
   brands: Brand[];
-  models: Model[];
+  subcategoryId?: string;
   template: ProductSpecTemplate;
   usedModelIds: Set<string>;
   onSuccess: (label: string) => void;
@@ -478,6 +478,15 @@ function CreateProductForm({
   const [values, setValues] = useState<SpecValues>({});
   const [groups, setGroups] = useState<ProductSpecGroup[]>([emptyGroup()]);
   const [saving, setSaving] = useState(false);
+
+  // Scoped to the chosen brand and family, so the picker never loads the whole
+  // catalogue and a large brand cannot be truncated by another brand's rows.
+  const { data: modelPage } = useQuery({
+    queryKey: ["admin", "models", "picker", brandId, subcategoryId],
+    queryFn: () => getAdminModels({ brandId, subcategoryId, pageSize: 100 }),
+    enabled: Boolean(brandId && subcategoryId),
+  });
+  const models = modelPage?.models ?? [];
 
   const modelOptions = models.filter(
     (model) => model.brandId === brandId && !usedModelIds.has(model.modelId),
@@ -548,19 +557,19 @@ function CreateProductForm({
       </div>
 
       <div className="grid gap-2">
-        <label className="type-body-sm font-medium">Model</label>
-        <Select value={modelId} onValueChange={setModelId} disabled={!brandId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a model" />
-          </SelectTrigger>
-          <SelectContent>
-            {modelOptions.map((model) => (
-              <SelectItem key={model.modelId} value={model.modelId}>
-                {model.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchPicker
+          label="Model"
+          options={modelOptions.map((model) => ({
+            id: model.modelId,
+            name: model.name,
+          }))}
+          value={modelId}
+          onChange={setModelId}
+          required
+          disabled={!brandId}
+          placeholder={brandId ? "Choose a model" : "Choose a brand first"}
+          emptyLabel="No model matches"
+        />
         <p className="type-meta text-muted-foreground">
           Only models linked to this family appear here. Missing a model? Add it
           first under{" "}
@@ -572,6 +581,12 @@ function CreateProductForm({
           </Link>
           .
         </p>
+        {modelPage && modelPage.total > modelPage.models.length ? (
+          <p className="type-meta text-amber-600">
+            Showing the first {modelPage.models.length} of {modelPage.total}{" "}
+            models for this brand.
+          </p>
+        ) : null}
       </div>
 
       <PublishToggle value={isPublished} onChange={setIsPublished} />
@@ -819,10 +834,6 @@ export function ProductSpecsPage({
     queryKey: ["admin", "brands"],
     queryFn: getAdminBrands,
   });
-  const { data: modelList = [] } = useQuery({
-    queryKey: ["admin", "models"],
-    queryFn: getAdminModels,
-  });
   const { data: subcategoryList = [] } = useQuery({
     queryKey: ["admin", "subcategories"],
     queryFn: getAdminSubcategories,
@@ -845,16 +856,6 @@ export function ProductSpecsPage({
   const familySubcategoryId = subcategoryList.find(
     (subcategory) => subcategory.slug === subcategorySlug,
   )?.subId;
-
-  const eligibleModels = useMemo(
-    () =>
-      familySubcategoryId
-        ? modelList.filter((model) =>
-            model.subcategories.includes(familySubcategoryId),
-          )
-        : [],
-    [modelList, familySubcategoryId],
-  );
 
   // Only brands of this family's listing subcategory — never every catalogue
   // brand (Apple, Samsung… have no place in a Cars picker).
@@ -938,7 +939,7 @@ export function ProductSpecsPage({
           className={cn(
             "inline-flex items-center rounded px-2 py-0.5 type-body-sm",
             product.isPublished
-              ? "bg-emerald-100 text-emerald-700"
+              ? "bg-emerald-50 dark:bg-emerald-950/400/10 text-emerald-700 dark:text-emerald-300 dark:text-emerald-300"
               : "bg-muted text-muted-foreground",
           )}
         >
@@ -1010,7 +1011,7 @@ export function ProductSpecsPage({
                 <CreateProductForm
                   family={family}
                   brands={familyBrands}
-                  models={eligibleModels}
+                  subcategoryId={familySubcategoryId}
                   template={template}
                   usedModelIds={usedModelIds}
                   onSuccess={(name) => {
@@ -1048,7 +1049,7 @@ export function ProductSpecsPage({
         }
       >
         {templateUnavailable && (
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 type-body-sm text-amber-800">
+          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 type-body-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
             The template for this family could not be loaded. Spec pages stay
             listed but cannot be created or edited until it loads.
           </p>

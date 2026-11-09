@@ -141,7 +141,7 @@ export default function Notifications({
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={t("options")}
-              className="p-2 rounded-full transition-colors text-gray-500 hover:bg-gray-100 cursor-pointer outline-none"
+              className="p-2 rounded-full transition-colors text-muted-foreground hover:bg-muted cursor-pointer outline-none"
             >
               <MoreVertical />
             </DropdownMenuTrigger>
@@ -163,7 +163,7 @@ export default function Notifications({
         </div>
 
         {items.length === 0 ? (
-          <p className="py-10 text-center type-body-sm text-gray-500">
+          <p className="py-10 text-center type-body-sm text-muted-foreground">
             {t("empty")}
           </p>
         ) : (
@@ -182,7 +182,7 @@ export default function Notifications({
 
         {/* Footer: the rest of the feed, or its end */}
         {hasMore ? (
-          <div className="py-4 flex items-center justify-center border-t border-gray-50">
+          <div className="py-4 flex items-center justify-center border-t border-border">
             <button
               type="button"
               onClick={loadMore}
@@ -193,7 +193,7 @@ export default function Notifications({
             </button>
           </div>
         ) : items.length > 0 ? (
-          <h1 className="item-center text-center type-meta text-gray-400 py-4">
+          <h1 className="item-center text-center type-meta text-muted-foreground py-4">
             {t("noMore")}
           </h1>
         ) : null}

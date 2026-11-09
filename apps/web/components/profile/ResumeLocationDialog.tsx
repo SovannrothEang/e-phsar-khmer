@@ -121,7 +121,7 @@ export function ResumeLocationDialog({
               onClick={() =>
                 setLevel(level === "commune" ? "district" : "province")
               }
-              className="absolute left-4 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted"
+              className="absolute left-4 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -131,7 +131,7 @@ export function ResumeLocationDialog({
             <button
               type="button"
               aria-label={t("form.close")}
-              className="absolute right-4 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-muted text-gray-500 transition-colors hover:bg-muted/70"
+              className="absolute right-4 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70"
             >
               <X className="h-4 w-4" />
             </button>

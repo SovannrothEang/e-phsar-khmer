@@ -2,6 +2,7 @@ import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
+import PromoCard from "@/components/home/PromoCard";
 import ModelGrid from "@/components/category/ModelGrid";
 import TypeSelector from "@/components/category/TypeSelector";
 import Divider from "@/components/common/Divider";
@@ -15,6 +16,7 @@ import {
   fetchSubcategory,
 } from "@/lib/api/catalog";
 import { resolveTypeTiles } from "@/lib/category-types";
+import { openFiltersHref } from "@/lib/filter-route";
 import {
   feedQueryFromParams,
   firstParam,
@@ -57,9 +59,8 @@ export default function BrandScreen() {
   const brandId = Array.isArray(params.brandId)
     ? params.brandId[0]
     : params.brandId;
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    params.view === "grid" ? "grid" : "list",
-  );
+  // View is URL-driven so the filter screen can apply it in place.
+  const viewMode: ViewMode = params.view === "grid" ? "grid" : "list";
   const [modelSheetOpen, setModelSheetOpen] = useState(false);
 
   const subQuery = useQuery({
@@ -111,28 +112,29 @@ export default function BrandScreen() {
   const selectedModelId =
     models.find((model) => model.name === selectedModel)?.slug ?? "";
 
-  const feedQuery = useMemo(
-    () => ({
+  const feedQuery = useMemo(() => {
+    const fromParams = feedQueryFromParams(params);
+    return {
       subcategorySlug: subCategoryId,
-      ...(feedBrand ? { brand: feedBrand } : {}),
-      ...feedQueryFromParams(params),
-    }),
-    [subCategoryId, feedBrand, params],
-  );
+      ...fromParams,
+      // fromParams carries `brand: undefined` when the URL has no brand
+      // filter; spreading it after the route brand would erase the scope.
+      brand: feedBrand ?? fromParams.brand,
+    };
+  }, [subCategoryId, feedBrand, params]);
 
   const toggleViewMode = () => {
-    setViewMode(viewMode === "list" ? "grid" : "list");
+    router.setParams({ view: viewMode === "list" ? "grid" : "" });
   };
 
   const openFilters = () =>
-    router.push({
-      pathname: "/filters",
-      params: {
-        categoryId,
-        subCategoryId,
-        ...pickFilterParams(params),
-      },
-    });
+    router.push(
+      openFiltersHref(
+        "brand",
+        { categoryId, subCategoryId, brandId, brand: brand?.name },
+        pickFilterParams(params),
+      ),
+    );
 
   /** Model taps filter the feed in place: same model clears, a new one wins. */
   const toggleModel = (name: string) => {
@@ -158,6 +160,8 @@ export default function BrandScreen() {
         typeId,
         attrKey: typeTiles.key,
         attrValue: name,
+        // Keeps the brand the user already chose (brand -> bodytype flow).
+        ...(feedBrand ? { brand: feedBrand, brandScope: "1" } : {}),
       },
     });
   };
@@ -211,6 +215,7 @@ export default function BrandScreen() {
           categoryId={categoryId as string}
           subCategoryId={subCategoryId as string}
           onFiltersPress={openFilters}
+          brandIsScope
         />
 
         <FeedScrollView
@@ -246,6 +251,7 @@ export default function BrandScreen() {
             <ListingFeed
               query={feedQuery}
               viewMode={viewMode}
+              leading={<PromoCard viewMode={viewMode} />}
               emptyLabel="No ads in this brand yet."
             />
           </View>
@@ -267,6 +273,7 @@ export default function BrandScreen() {
           router.setParams({
             attrs: Object.keys(next).length > 0 ? JSON.stringify(next) : "",
           });
+          setModelSheetOpen(false);
         }}
         onClose={() => setModelSheetOpen(false)}
       />

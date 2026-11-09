@@ -128,7 +128,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                       type="button"
                       onClick={() => void sendCode()}
                       disabled={busy || !e164}
-                      className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-card rounded-sm cursor-pointer"
+                      className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-white rounded-sm cursor-pointer"
                     >
                       {busy ? t("sending") : t("submit")}
                     </Button>
@@ -153,7 +153,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                     type="button"
                     onClick={() => void confirm()}
                     disabled={busy || code.length !== OTP_LENGTH}
-                    className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-card rounded-sm cursor-pointer"
+                    className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-white rounded-sm cursor-pointer"
                   >
                     {busy ? t("verifying") : t("verify")}
                   </Button>

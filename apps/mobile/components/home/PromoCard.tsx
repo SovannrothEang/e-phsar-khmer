@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { cssInterop } from "nativewind";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
+import { useAuth } from "@/contexts/AuthContext";
+import { NEXT_SELL, SELL_ROUTE } from "@/lib/auth-redirect";
 import { useGridCardSize } from "../../hooks/useGridCardSize";
 
 cssInterop(LinearGradient, { className: "style" });
@@ -14,6 +16,22 @@ interface PromoCardProps {
 
 const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
   const { total } = useGridCardSize();
+  const { isAuthenticated } = useAuth();
+
+  /**
+   * Posting needs an account: a guest goes to Welcome first and the auth
+   * screens resume this flow once they are signed in.
+   */
+  const handleStartSelling = () => {
+    if (isAuthenticated) {
+      router.push(SELL_ROUTE as never);
+      return;
+    }
+    router.push({
+      pathname: "/(auth)/welcome",
+      params: { next: NEXT_SELL },
+    } as never);
+  };
 
   if (viewMode === "grid") {
     return (
@@ -57,7 +75,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
             {/* Button */}
             <TouchableOpacity
               className="w-full rounded-2xl bg-white py-2.5 shadow-md"
-              onPress={() => router.push("/account/choose-category" as never)}
+              onPress={handleStartSelling}
               activeOpacity={0.8}
             >
               <Text className="text-center text-xs font-bold text-sky-600 uppercase tracking-wide">
@@ -105,7 +123,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
 
           <TouchableOpacity
             className="w-full rounded-2xl bg-white py-3 shadow-md flex-row items-center justify-center gap-2"
-            onPress={() => router.push("/account/choose-category" as never)}
+            onPress={handleStartSelling}
             activeOpacity={0.8}
           >
             <Ionicons name="add-circle" size={18} color="#0EA5E9" />

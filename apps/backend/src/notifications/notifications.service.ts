@@ -170,7 +170,7 @@ export class NotificationsService {
         .select()
         .from(notifications)
         .where(where)
-        .orderBy(desc(notifications.createdAt))
+        .orderBy(desc(notifications.createdAt), desc(notifications.id))
         .limit(pageSize)
         .offset(offset),
       this.db.select({ value: count() }).from(notifications).where(where),

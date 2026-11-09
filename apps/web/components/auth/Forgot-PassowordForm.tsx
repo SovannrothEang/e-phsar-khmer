@@ -199,7 +199,7 @@ export function ForgotPasswordForm() {
 
         {step === 1 && (
           <>
-            <p className="type-body-sm text-gray-500 text-center mb-6">
+            <p className="type-body-sm text-muted-foreground text-center mb-6">
               Enter the phone number, username or email you registered on
               <br />
               PhsarKhmer and we&apos;ll send a code to set a new password.
@@ -227,10 +227,10 @@ export function ForgotPasswordForm() {
                     setIsTooShort(false);
                     setIsInvalidFormat(false);
                   }}
-                  className={`w-full h-10 bg-blue-50/50 border rounded ${
+                  className={`w-full h-10 bg-blue-50/50 dark:bg-input/30 border rounded ${
                     isTooShort || isInvalidFormat
                       ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      : "border-input focus:border-blue-500 focus:ring-blue-500"
                   } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
                 />
                 {isTooShort && (
@@ -259,7 +259,7 @@ export function ForgotPasswordForm() {
 
         {step === 2 && (
           <>
-            <p className="type-body-sm text-gray-500 text-center mb-6">
+            <p className="type-body-sm text-muted-foreground text-center mb-6">
               If an account matches, a 6-digit code was sent by SMS to the phone
               registered on it. Enter the code to verify it.
             </p>
@@ -329,7 +329,7 @@ export function ForgotPasswordForm() {
 
         {step === 3 && (
           <>
-            <p className="type-body-sm text-gray-500 text-center mb-6">
+            <p className="type-body-sm text-muted-foreground text-center mb-6">
               Your phone is verified. Set a new password for your account.
             </p>
 
@@ -350,7 +350,7 @@ export function ForgotPasswordForm() {
                   autoFocus
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-10 bg-blue-50/50 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors type-body-sm"
+                  className="w-full h-10 bg-blue-50/50 dark:bg-input/30 border border-input rounded focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors type-body-sm"
                 />
               </Field>
 
@@ -364,7 +364,7 @@ export function ForgotPasswordForm() {
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full h-10 bg-blue-50/50 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors type-body-sm"
+                  className="w-full h-10 bg-blue-50/50 dark:bg-input/30 border border-input rounded focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500 transition-colors type-body-sm"
                 />
               </Field>
 

@@ -269,9 +269,6 @@ const MODEL_SEEDS: Record<string, Record<string, string[]>> = {
   // are all monitors — see the stragglers note below.
   singtech: { phones: ['SingTech S100', 'SingTech S200'] },
   htc: { phones: ['HTC U23 Pro', 'HTC Desire 22'] },
-  ulefone: { phones: ['Ulefone Armor 26', 'Ulefone Power Armor 18'] },
-  // Yealink's models are VoIP desk phones and a headset; the `phones`
-  // subcategory is a consumer mobile category, so they are left unlinked.
   // Car-brand models per the mock design (insert-only; the mock's "Pirus"
   // typo is seeded verbatim)
   mg: {
@@ -309,7 +306,6 @@ const MODEL_SEEDS: Record<string, Record<string, string[]>> = {
  *   panasonic   Lumix GH6                                               (cameras — brand linked to laptops only)
  *   philips     27E1N, 242V8, 32M1                                      (monitors — brand not linked)
  *   vertu       Signature, Aster P                                      (phones — brand linked to smart-watches only)
- *   yealink     SIP-T31G, WH62                                          (desk phones/headset — no fitting subcategory)
  *
  * They stay in the `models` table (insert-only seeding never deletes) and are
  * simply unlinked, which under the API's filter rule means they still show for
@@ -638,18 +634,11 @@ export const BRANDS: BrandSeed[] = [
   { slug: 'realme', name: 'Realme', subcategories: ['phones'], sortOrder: 29 },
   { slug: 'redmi', name: 'Redmi', subcategories: ['phones'], sortOrder: 30 },
   { slug: 'tecno', name: 'Tecno', subcategories: ['phones'], sortOrder: 31 },
-  {
-    slug: 'ulefone',
-    name: 'Ulefone',
-    subcategories: ['phones'],
-    sortOrder: 32,
-  },
-  {
-    slug: 'yealink',
-    name: 'Yealink',
-    subcategories: ['phones'],
-    sortOrder: 33,
-  },
+  // Ulefone and Yealink are deliberately absent: the captain deleted both in
+  // the admin panel. Admin delete is a hard delete, but `seedBrands` re-inserts
+  // any brand missing from the table (and re-activates it on conflict), so a
+  // brand deleted there must also be removed here — otherwise the next
+  // `db:seed` resurrects it in every brand list.
   {
     slug: 'alldocube',
     name: 'Alldocube',

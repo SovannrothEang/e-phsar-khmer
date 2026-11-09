@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { useRouter } from "@/i18n/routing";
-import { ChevronDown, ChevronRight, Loader2, Minus, Plus } from "lucide-react";
+import { ChevronRight, Loader2, Minus, Plus } from "lucide-react";
 
 import ImageUpload from "@/components/post/ImageUpload";
 import LocationMapPicker from "@/components/post/LocationMapPicker";
@@ -30,19 +30,7 @@ import type { BackendModel } from "@/lib/api/categories";
 import { describeBucket } from "@/lib/subscription-pricing";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import DbImage from "@/components/common/DbImage";
+import { SearchPicker } from "@/components/common/SearchPicker";
 
 /** Spec-fixed pickers with no backend source (spec-detail-one.md:210-228). */
 const TAX_TYPES = ["Tax Paper", "Plate Number"] as const;
@@ -194,7 +182,7 @@ function TextInput({
       <FieldLabel label={label} required={required} />
       <div className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 type-body text-gray-500">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 type-body text-muted-foreground">
             {prefix}
           </span>
         )}
@@ -214,7 +202,7 @@ function TextInput({
               ? (event) => event.currentTarget.blur()
               : undefined
           }
-          className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+          className={`w-full border border-border rounded-lg py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
           } ${trailing ? "pr-14" : "pr-3"}`}
         />
@@ -224,177 +212,6 @@ function TextInput({
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * Searchable picker for long option lists (91+ brands, a brand's models):
- * the trigger opens a panel with a Search field over a scrolling list. Images
- * go through DbImage, so only Storage-backed icons render; the logo slot is
- * kept only when the option set actually carries images.
- */
-function SearchPicker({
-  label,
-  options,
-  value,
-  onChange,
-  required,
-  disabled,
-  placeholder,
-  emptyLabel,
-  showOnlyKm,
-  resolveInput,
-}: {
-  label: string;
-  options: {
-    id: string;
-    name: string;
-    nameKm?: string | null;
-    image?: string | null;
-  }[];
-  value: string;
-  onChange: (id: string) => void;
-  required?: boolean;
-  /** Inert until its parent choice is made (a disabled button fires no click,
-   *  so the popover can never open); renders empty rather than a placeholder. */
-  disabled?: boolean;
-  placeholder?: string;
-  emptyLabel?: string;
-  /** Drop the English half of `nameKm/name` (colours and the range pickers). */
-  showOnlyKm?: boolean;
-  /**
-   * Optional paste resolver (the Product Spec picker): a pasted product URL is
-   * matched against the loaded options and selected outright. Normal search
-   * filtering is untouched — a miss simply falls through to it.
-   */
-  resolveInput?: (text: string) => { id: string; name: string } | null;
-}) {
-  const t = useTranslations("PostForm");
-  const locale = useLocale();
-  const [open, setOpen] = useState(false);
-  /**
-   * Inline pick-list ranges (storage / screen size / RAM / VGA) carry no
-   * `nameKm` in the DB — their seeded options are strings like "1TB & Above".
-   * Translate only the words; the number/unit prefix is already universal and
-   * the stored value stays the English option name.
-   */
-  const kmOptionLabel = (name: string): string | null => {
-    if (name === "Integrated") return t("options.integrated");
-    const above = name.match(/^(.*?)\s*&\s*(?:Above|Larger)$/);
-    if (above) return t("options.andAbove", { value: above[1] });
-    const below = name.match(/^(.*?)\s*(?:&\s*(?:Under|Below)|or below)$/);
-    if (below) return t("options.andBelow", { value: below[1] });
-    return null;
-  };
-  const optionKm = (option: { name: string; nameKm?: string | null }) =>
-    option.nameKm ?? (locale === "km" ? kmOptionLabel(option.name) : null);
-  /** Bilingual on km ("សេដាន/Sedan"); the stored value stays the English name. */
-  const displayName = (option: { name: string; nameKm?: string | null }) => {
-    const km = optionKm(option);
-    return locale === "km" && km
-      ? showOnlyKm
-        ? km
-        : `${km}/${option.name}`
-      : option.name;
-  };
-  const selected = options.find((o) => o.id === value);
-  const withIcons = options.some((o) => !!o.image);
-
-  return (
-    <div>
-      <FieldLabel label={label} required={required} />
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            disabled={disabled}
-            // Keyboard paste on the focused (closed) trigger: the placeholder
-            // invites pasting a link, so it must work before the panel opens
-            // too — clicking the trigger opens the panel and pastes land in
-            // the CommandInput instead.
-            onPaste={
-              resolveInput
-                ? (event) => {
-                    const hit = resolveInput(
-                      event.clipboardData.getData("text"),
-                    );
-                    if (!hit) return;
-                    event.preventDefault();
-                    onChange(hit.id);
-                  }
-                : undefined
-            }
-            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left type-body focus:outline-none ${
-              disabled
-                ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                : "cursor-pointer text-gray-700 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            }`}
-          >
-            <span className={selected ? "" : "text-gray-400"}>
-              {selected
-                ? displayName(selected)
-                : disabled
-                  ? ""
-                  : (placeholder ?? t("chooseOption"))}
-            </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-[var(--radix-popover-trigger-width)] p-0"
-        >
-          <Command>
-            <CommandInput
-              placeholder={t("search")}
-              onPaste={
-                resolveInput
-                  ? (event) => {
-                      const hit = resolveInput(
-                        event.clipboardData.getData("text"),
-                      );
-                      if (!hit) return;
-                      event.preventDefault();
-                      onChange(hit.id);
-                      setOpen(false);
-                    }
-                  : undefined
-              }
-            />
-            <CommandList>
-              <CommandEmpty>{emptyLabel ?? t("noMatch")}</CommandEmpty>
-              {options.map((option) => {
-                const km = optionKm(option);
-                return (
-                  <CommandItem
-                    key={option.id}
-                    value={km ? `${km} ${option.name}` : option.name}
-                    onSelect={() => {
-                      onChange(option.id);
-                      setOpen(false);
-                    }}
-                    className="cursor-pointer"
-                  >
-                    {withIcons && (
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                        <DbImage
-                          src={option.image ?? ""}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="object-contain"
-                        />
-                      </span>
-                    )}
-                    <span>{displayName(option)}</span>
-                  </CommandItem>
-                );
-              })}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
     </div>
   );
 }
@@ -431,8 +248,8 @@ function ToggleGroup({
             onClick={() => onChange(o)}
             className={`h-11 cursor-pointer rounded-sm border type-nav transition-colors ${
               value === o
-                ? "border-gray-300 bg-gray-100 font-medium text-gray-800"
-                : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                ? "border-input bg-muted font-medium text-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted"
             }`}
           >
             {displayLabels?.[o] ?? o}
@@ -1186,14 +1003,14 @@ export default function ListingPostForm({
 
   if (configLoading) {
     return (
-      <div className="flex items-center justify-center py-24 text-gray-400">
+      <div className="flex items-center justify-center py-24 text-muted-foreground">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     );
   }
   if (configError || !config) {
     return (
-      <div className="py-16 text-center text-gray-500">
+      <div className="py-16 text-center text-muted-foreground">
         <p className="mb-4">{t("loadError")}</p>
         <button
           onClick={onBack}
@@ -1322,13 +1139,13 @@ export default function ListingPostForm({
         {/* Category breadcrumb */}
         <div>
           <FieldLabel label={t("category")} required />
-          <div className="flex flex-wrap items-center gap-3 rounded-sm border border-dashed border-gray-300 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-3 rounded-sm border border-dashed border-input px-3 py-2.5">
             <span className="type-body text-foreground">{categoryName}</span>
-            <ChevronRight className="w-4 h-4 text-gray-400" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
             <span className="type-body text-foreground">{subName}</span>
             <button
               onClick={onBack}
-              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 type-nav text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
+              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 type-nav text-white transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
             >
               {t("change")}
             </button>
@@ -1732,9 +1549,9 @@ export default function ListingPostForm({
                 // not turn an untouched discount into "0" (which then rendered
                 // as a 0% discount).
                 onWheel={(event) => event.currentTarget.blur()}
-                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full border border-border rounded-lg py-2.5 pl-3 pr-3 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
-              <div className="flex shrink-0 overflow-hidden rounded-sm border border-gray-200">
+              <div className="flex shrink-0 overflow-hidden rounded-sm border border-border">
                 {(
                   [
                     ["percent", "%"],
@@ -1748,8 +1565,8 @@ export default function ListingPostForm({
                     aria-pressed={discountType === kind}
                     className={`w-12 cursor-pointer type-nav transition-colors ${
                       discountType === kind
-                        ? "bg-gray-100 font-medium text-gray-800"
-                        : "bg-white text-gray-500 hover:bg-gray-50"
+                        ? "bg-muted font-medium text-foreground"
+                        : "bg-card text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {glyph}
@@ -1763,8 +1580,8 @@ export default function ListingPostForm({
         {has("deliveryFree") && (
           <div>
             <FieldLabel label={labelFor("deliveryFree", "Free Delivery")} />
-            <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
-              <span className="type-body text-gray-700">
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+              <span className="type-body text-foreground">
                 {deliveryFree ? t("yes") : t("no")}
               </span>
               <Switch
@@ -1786,7 +1603,7 @@ export default function ListingPostForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={8}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-border rounded-lg pl-3 pr-3 py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1807,7 +1624,7 @@ export default function ListingPostForm({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={3}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-border rounded-lg pl-3 pr-3 py-2.5 type-body text-foreground focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1865,7 +1682,7 @@ export default function ListingPostForm({
                         type="button"
                         onClick={() => removePhoneRow(i)}
                         aria-label={`${t("removePhone")} ${i + 1}`}
-                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-500/10"
                       >
                         <Minus className="h-4 w-4" strokeWidth={3} />
                       </button>
@@ -1878,7 +1695,7 @@ export default function ListingPostForm({
                   type="button"
                   onClick={() => setPhoneRows((n) => Math.min(3, n + 1))}
                   aria-label={t("addPhone")}
-                  className="mb-0.5 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-card transition-colors hover:bg-[#00a0e9]/80"
+                  className="mb-0.5 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#00a0e9] text-white transition-colors hover:bg-[#00a0e9]/80"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -1896,7 +1713,7 @@ export default function ListingPostForm({
           />
         )}
 
-        <p className="type-body text-gray-600">
+        <p className="type-body text-muted-foreground">
           {t("agreement.prefix")}{" "}
           <Link href="/posting-rule" className="text-[#00a0e9] hover:underline">
             {t("agreement.postingRule")}
@@ -1914,7 +1731,7 @@ export default function ListingPostForm({
         <button
           onClick={submit}
           disabled={submitting}
-          className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
+          className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-white transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
         >
           {submitting
             ? mode === "edit"

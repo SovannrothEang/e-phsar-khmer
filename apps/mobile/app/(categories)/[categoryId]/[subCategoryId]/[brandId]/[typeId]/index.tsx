@@ -2,12 +2,19 @@ import CategorySearchHeader from "@/components/category/CategorySearchHeader";
 import { FeedScrollView } from "@/components/category/FeedScrollView";
 import FilterChips from "@/components/category/FilterChips";
 import ListingFeed from "@/components/category/ListingFeed";
+import PromoCard from "@/components/home/PromoCard";
 import ModelGrid from "@/components/category/ModelGrid";
 import Divider from "@/components/common/Divider";
 import SafeAreaView from "@/components/common/SafeAreaView";
+import SelectionSheet from "@/components/common/SelectionSheet";
 import { Colors } from "@/constants/Colors";
 import { fetchBrands, fetchModels, fetchSubcategory } from "@/lib/api/catalog";
-import { feedQueryFromParams, pickFilterParams } from "@/lib/feed-params";
+import { openFiltersHref } from "@/lib/filter-route";
+import {
+  feedQueryFromParams,
+  pickFilterParams,
+  sanitizeAttrs,
+} from "@/lib/feed-params";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -37,9 +44,9 @@ export default function BrandTypeScreen() {
   const typeId = pick("typeId");
   const attrKey = pick("attrKey");
   const attrValue = pick("attrValue");
-  const [viewMode, setViewMode] = useState<ViewMode>(
-    params.view === "grid" ? "grid" : "list",
-  );
+  // View is URL-driven so the filter screen can apply it in place.
+  const viewMode: ViewMode = params.view === "grid" ? "grid" : "list";
+  const [modelSheetOpen, setModelSheetOpen] = useState(false);
 
   const subQuery = useQuery({
     queryKey: ["subcategory", categoryId, subCategoryId],
@@ -67,29 +74,51 @@ export default function BrandTypeScreen() {
   const typeName = attrValue || prettySlug(typeId);
 
   const feedBrand = brand?.name;
-  const feedQuery = useMemo(
-    () => ({
+  const selectedModel = feedQueryFromParams(params).attrs?.model ?? "";
+  const feedQuery = useMemo(() => {
+    const fromParams = feedQueryFromParams(params);
+    const attrs = sanitizeAttrs({
+      ...(attrKey && attrValue ? { [attrKey]: attrValue } : {}),
+      ...(fromParams.attrs ?? {}),
+    });
+    return {
       subcategorySlug: subCategoryId,
-      ...(feedBrand ? { brand: feedBrand } : {}),
-      ...(attrKey && attrValue ? { attrs: { [attrKey]: attrValue } } : {}),
-      ...feedQueryFromParams(params),
-    }),
-    [subCategoryId, feedBrand, attrKey, attrValue, params],
-  );
+      ...fromParams,
+      brand: feedBrand ?? fromParams.brand,
+      ...(Object.keys(attrs).length > 0 ? { attrs } : {}),
+    };
+  }, [subCategoryId, feedBrand, attrKey, attrValue, params]);
+
+  /** Model taps filter in place; the body type stays on the route. */
+  const toggleModel = (name: string) => {
+    const current = { ...(feedQueryFromParams(params).attrs ?? {}) };
+    if (current.model === name) delete current.model;
+    else current.model = name;
+    router.setParams({
+      attrs: Object.keys(current).length > 0 ? JSON.stringify(current) : "",
+    });
+  };
 
   const toggleViewMode = () => {
-    setViewMode(viewMode === "list" ? "grid" : "list");
+    router.setParams({ view: viewMode === "list" ? "grid" : "" });
   };
 
   const openFilters = () =>
-    router.push({
-      pathname: "/filters",
-      params: {
-        categoryId,
-        subCategoryId,
-        ...pickFilterParams(params),
-      },
-    });
+    router.push(
+      openFiltersHref(
+        "brandType",
+        {
+          categoryId,
+          subCategoryId,
+          brandId,
+          typeId,
+          attrKey,
+          attrValue,
+          brand: brand?.name,
+        },
+        pickFilterParams(params),
+      ),
+    );
 
   if (subQuery.isLoading) {
     return (
@@ -141,6 +170,7 @@ export default function BrandTypeScreen() {
           categoryId={categoryId as string}
           subCategoryId={subCategoryId as string}
           onFiltersPress={openFilters}
+          brandIsScope
         />
 
         <FeedScrollView
@@ -154,6 +184,9 @@ export default function BrandTypeScreen() {
                 id: model.slug,
                 name: model.name,
               }))}
+              selectedName={selectedModel}
+              onModelPress={(model) => toggleModel(model.name)}
+              onShowMore={() => setModelSheetOpen(true)}
             />
           )}
 
@@ -163,11 +196,33 @@ export default function BrandTypeScreen() {
             <ListingFeed
               query={feedQuery}
               viewMode={viewMode}
+              leading={<PromoCard viewMode={viewMode} />}
               emptyLabel="No ads match this selection yet."
             />
           </View>
         </FeedScrollView>
       </View>
+      <SelectionSheet
+        visible={modelSheetOpen}
+        title="Model"
+        options={models.map((model) => ({ id: model.slug, name: model.name }))}
+        value={models.find((model) => model.name === selectedModel)?.slug ?? ""}
+        loading={modelsQuery.isLoading}
+        emptyLabel="No models"
+        onSelect={(option) => {
+          toggleModel(option.name);
+          setModelSheetOpen(false);
+        }}
+        onClear={
+          selectedModel
+            ? () => {
+                toggleModel(selectedModel);
+                setModelSheetOpen(false);
+              }
+            : undefined
+        }
+        onClose={() => setModelSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }

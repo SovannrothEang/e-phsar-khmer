@@ -448,7 +448,7 @@ export function ResumePersonalDetailsDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
                 <span className="sr-only">{t("form.close")}</span>
@@ -484,9 +484,11 @@ export function ResumePersonalDetailsDialog({
                     <IconUser
                       size={64}
                       strokeWidth={1.5}
-                      className="text-gray-400"
+                      className="text-muted-foreground"
                     />
-                    <span className="type-body text-gray-500">3 x 4</span>
+                    <span className="type-body text-muted-foreground">
+                      3 x 4
+                    </span>
                   </div>
                 )}
                 <input
@@ -499,7 +501,7 @@ export function ResumePersonalDetailsDialog({
                 <button
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
-                  className="absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border bg-muted text-gray-600 transition-colors hover:bg-muted/70"
+                  className="absolute right-2 bottom-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border bg-muted text-muted-foreground transition-colors hover:bg-muted/70"
                 >
                   <IconPencil size={14} />
                   <span className="sr-only">{t("form.uploadPhoto")}</span>
@@ -597,7 +599,7 @@ export function ResumePersonalDetailsDialog({
                     type="button"
                     aria-label={t("form.clearDob")}
                     onClick={() => setDob(null)}
-                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <IconX size={18} />
                   </button>
@@ -720,14 +722,14 @@ export function ResumePersonalDetailsDialog({
                     type="button"
                     aria-label={t("form.clearLocation")}
                     onClick={() => setPlace(EMPTY_RESUME_LOCATION)}
-                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <IconX size={18} />
                   </button>
                 ) : (
                   <IconChevronDown
                     size={16}
-                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
                   />
                 )}
               </div>
@@ -804,14 +806,14 @@ export function ResumePersonalDetailsDialog({
                     type="button"
                     aria-label={t("form.clearEducation")}
                     onClick={() => setEducation(undefined)}
-                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-muted hover:text-gray-700"
+                    className="absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <IconX size={18} />
                   </button>
                 ) : (
                   <IconChevronDown
                     size={16}
-                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-gray-500"
+                    className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground"
                   />
                 )}
               </div>

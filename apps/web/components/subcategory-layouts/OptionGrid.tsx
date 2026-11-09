@@ -114,7 +114,7 @@ export default function OptionGrid({
                 textTiles
                   ? `border py-2 px-1 type-body-sm text-center transition-colors flex items-center justify-center min-h-[40px] ${
                       isSelected
-                        ? "text-blue-500 bg-blue-50 border-blue-100 font-medium"
+                        ? "text-blue-500 bg-blue-50 border-blue-100 font-medium dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-300"
                         : "hover:bg-muted bg-card"
                     }`
                   : `flex flex-col items-center text-center group ${isSelected ? "text-blue-500 font-medium" : ""}`
@@ -146,7 +146,7 @@ export default function OptionGrid({
         <div className="mt-4 flex justify-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full border rounded py-2 type-nav bg-muted hover:bg-gray-200"
+            className="w-full border rounded py-2 type-nav bg-muted hover:bg-secondary"
           >
             {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>

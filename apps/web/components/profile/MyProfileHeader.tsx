@@ -186,7 +186,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
             className={`relative h-[500px] md:h-[450px] lg:h-[400px] xl:h-[350px] w-full cursor-pointer ${
               displayedCover
                 ? ""
-                : "bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5"
+                : "bg-gradient-to-b from-[#00a0e9]/10 via-[#b8e0f7]/25 to-[#00a0e9]/5 dark:from-primary/10 dark:via-primary/15 dark:to-transparent"
             }`}
           >
             {displayedCover && (
@@ -297,16 +297,16 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                   </div>
 
                   <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                    <Button className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer">
+                    <Button className="flex items-center gap-2 px-5 h-11 bg-card border border-input rounded-lg font-medium text-muted-foreground hover:bg-muted/50 transition cursor-pointer">
                       <IdCard className="h-5 w-5" />
                       Resume (CV)
                     </Button>
-                    <Button className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer">
+                    <Button className="flex items-center justify-center h-11 w-11 bg-card border border-input rounded-lg text-muted-foreground hover:bg-muted/50 transition cursor-pointer">
                       <Forward className="h-5 w-5" />
                     </Button>
                     <Button
                       onClick={() => router.replace("/settings")}
-                      className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer"
+                      className="flex items-center justify-center h-11 w-11 bg-card border border-input rounded-lg text-muted-foreground hover:bg-muted/50 transition cursor-pointer"
                     >
                       <Settings className="h-5 w-5" />
                     </Button>

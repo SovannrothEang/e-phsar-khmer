@@ -6,9 +6,10 @@ import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { SELL_ROUTE, wantsSellAfterAuth } from "@/lib/auth-redirect";
 import { looksLikePhone } from "@/lib/phone";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -21,6 +22,9 @@ import {
 const SignInScreen = () => {
   const router = useRouter();
   const { signIn } = useAuth();
+  const params = useLocalSearchParams<{ next?: string | string[] }>();
+  // Carried from Welcome: "sell" resumes the posting flow after sign-in.
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -63,13 +67,15 @@ const SignInScreen = () => {
     setIsLoading(false);
 
     if (result.kind === "authenticated") {
-      router.replace("/(tabs)/account");
+      router.replace(
+        wantsSellAfterAuth(next) ? (SELL_ROUTE as never) : "/(tabs)/account",
+      );
       return;
     }
     if (result.kind === "otp") {
       router.push({
         pathname: "/(auth)/otp",
-        params: { mode: "login" },
+        params: next ? { mode: "login", next } : { mode: "login" },
       } as never);
       return;
     }

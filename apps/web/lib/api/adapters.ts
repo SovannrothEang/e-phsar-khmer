@@ -48,11 +48,21 @@ export interface BackendUser {
   authProviders?: ("google" | "facebook" | "telegram")[];
 }
 
-const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+/**
+ * A user counts as online while their last authenticated request or socket
+ * pong is inside this window. Keep it above ActivityService's 60 s write
+ * throttle, or an active user can read as offline between writes.
+ */
+export const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 
-function isOnline(lastSeenAt: string | null): boolean {
+export function isOnline(
+  lastSeenAt: string | null,
+  nowMs: number = Date.now(),
+): boolean {
   if (!lastSeenAt) return false;
-  return Date.now() - new Date(lastSeenAt).getTime() < ONLINE_WINDOW_MS;
+  const seen = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(seen)) return false;
+  return nowMs - seen < ONLINE_WINDOW_MS;
 }
 
 /**
@@ -81,6 +91,7 @@ export function toUiUser(u: BackendUser): User {
     following: [],
     followers: [],
     status: isOnline(u.lastSeenAt) ? "Online" : "Offline",
+    lastSeenAt: u.lastSeenAt,
     accountStatus:
       u.status === "suspended" || u.status === "deleted" ? u.status : "active",
     statusReason: u.statusReason ?? null,

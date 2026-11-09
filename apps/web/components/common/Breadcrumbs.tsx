@@ -43,7 +43,7 @@ export function Breadcrumbs({
             {!isFirst && (
               <ChevronRight
                 size={16}
-                className="block -translate-y-px text-gray-500"
+                className="block -translate-y-px text-muted-foreground"
               />
             )}
             {item.href ? (
@@ -67,7 +67,7 @@ export function Breadcrumbs({
             ) : (
               <h1
                 className={cn(
-                  "type-body text-gray-500 dark:text-gray-400",
+                  "type-body text-muted-foreground dark:text-muted-foreground",
                   item.className,
                 )}
               >

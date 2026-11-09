@@ -51,7 +51,9 @@ const ModelGrid = ({
               onPress={() => onModelPress?.(model)}
             >
               <Text
-                className={`text-base ${
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                className={`w-full pr-2 text-base ${
                   isSelected
                     ? "text-primary font-semibold"
                     : "text-neutral-text-main"

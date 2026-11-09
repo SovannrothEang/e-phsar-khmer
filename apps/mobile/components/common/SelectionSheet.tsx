@@ -45,6 +45,12 @@ interface SelectionSheetProps {
    * pair of the reference's Sort/Date sheets (every row gets a circle).
    */
   indicator?: "check" | "radio";
+  /**
+   * Hides the leading icon slot even when some options carry an image. Used
+   * by lists whose rows have no artwork (the furniture Type sheet), where the
+   * initial-letter fallback would be noise.
+   */
+  showIcons?: boolean;
 }
 
 /**
@@ -66,6 +72,7 @@ export default function SelectionSheet({
   searchable = true,
   compact = false,
   indicator = "check",
+  showIcons = true,
 }: SelectionSheetProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -88,7 +95,7 @@ export default function SelectionSheet({
     );
   }, [options, search]);
 
-  const withIcons = options.some((option) => !!option.image);
+  const withIcons = showIcons && options.some((option) => !!option.image);
 
   const listBody = loading ? (
     <View className="items-center py-12">
@@ -210,7 +217,7 @@ export default function SelectionSheet({
           {searchable ? (
             <>
               <View className="px-4 py-3">
-                <View className="h-14 flex-row items-center rounded-xl bg-gray-100 px-4">
+                <View className="h-14 flex-row items-center rounded-[4px] bg-gray-100 px-4">
                   <Ionicons name="search" size={22} color="#8E8E93" />
                   <TextInput
                     value={search}

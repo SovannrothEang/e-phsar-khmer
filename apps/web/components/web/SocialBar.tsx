@@ -32,7 +32,7 @@ import { markSignedOut } from "./SessionCacheGuard";
 
 /** The one layout every account-menu entry shares. */
 const ITEM =
-  "flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none";
+  "flex items-center gap-3 px-5 py-2.5 cursor-pointer text-foreground hover:bg-muted outline-none";
 
 interface SocialBarUser {
   username: string;
@@ -67,7 +67,7 @@ export function SocialBar({
       <Button
         variant={"ghost"}
         onClick={() => router.push("/chats")}
-        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
       >
         <IconMessageFilled className="scale-150" />
         <ChatUnreadBadge />
@@ -218,7 +218,7 @@ export function SocialBar({
                 markSignedOut(queryClient);
                 void userLogout();
               }}
-              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-gray-700 hover:bg-gray-50 outline-none"
+              className="flex items-center gap-3 px-5 py-2.5 cursor-pointer text-foreground hover:bg-muted outline-none"
             >
               <LogOut
                 className="scale-150 text-muted-foreground"

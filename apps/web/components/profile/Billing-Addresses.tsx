@@ -115,7 +115,7 @@ export default function BillingAddresses({ me }: { me?: SettingsUser | null }) {
                 <div className="mb-6 flex h-36 w-36 items-center justify-center rounded-full bg-muted">
                   <MapPinHouse
                     size={64}
-                    className="text-slate-600"
+                    className="text-muted-foreground"
                     strokeWidth={1.5}
                   />
                 </div>
@@ -157,19 +157,19 @@ export default function BillingAddresses({ me }: { me?: SettingsUser | null }) {
                       </div>
                       <div className="mt-2 space-y-1 text-sm text-foreground">
                         <p className="flex items-center gap-2">
-                          <UserRound className="h-4 w-4 shrink-0 text-gray-400" />
+                          <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {address.name}
                         </p>
                         <p className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+                          <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
                           {address.phone}
                         </p>
                         <p className="flex items-start gap-2">
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                           <span>
                             {address.address}
                             {address.company && (
-                              <span className="block text-gray-500">
+                              <span className="block text-muted-foreground">
                                 {address.company}
                               </span>
                             )}
@@ -183,7 +183,7 @@ export default function BillingAddresses({ me }: { me?: SettingsUser | null }) {
                         <button
                           type="button"
                           aria-label="Address actions"
-                          className="rounded-sm p-1 text-gray-500 hover:bg-muted"
+                          className="rounded-sm p-1 text-muted-foreground hover:bg-muted"
                         >
                           <EllipsisVertical className="h-5 w-5" />
                         </button>

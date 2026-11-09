@@ -195,7 +195,7 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
                   type="button"
                   onClick={() => void submit()}
                   disabled={!canSubmit}
-                  className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-card rounded-sm cursor-pointer"
+                  className="w-full bg-orange-500  py-4 hover:bg-orange-600 text-white rounded-sm cursor-pointer"
                 >
                   {saving ? t("saving") : t("submit")}
                 </Button>

@@ -498,12 +498,10 @@ function DeleteModelForm({
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function ModelsPage() {
   const queryClient = useQueryClient();
-  const { data: modelList = [], isLoading } = useQuery({
-    queryKey: ["admin", "models"],
-    queryFn: getAdminModels,
-  });
   const { data: allBrands = [] } = useQuery({
     queryKey: ["admin", "brands"],
     queryFn: getAdminBrands,
@@ -519,9 +517,27 @@ export default function ModelsPage() {
   const refreshModels = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "models"] });
 
+  const [searchInput, setSearchInput] = useState("");
+  // Committed on Enter, like the Listings page — the server does the search.
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const query = {
+    q: searchQuery || undefined,
+    categoryId: categoryFilter === "all" ? undefined : categoryFilter,
+    brandId: brandFilter === "all" ? undefined : brandFilter,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "models", query],
+    queryFn: () => getAdminModels(query),
+    placeholderData: (previous) => previous,
+  });
+  const rows = data?.models ?? [];
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   // Dialog States
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -542,46 +558,57 @@ export default function ModelsPage() {
     [allCategories],
   );
 
-  const filteredModels = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return modelList.filter((model) => {
-      const matchesCategory =
-        categoryFilter === "all" ||
-        model.subcategories.some(
-          (id) => subcategoryById.get(id)?.categoryId === categoryFilter,
-        );
-      if (!matchesCategory) return false;
-      if (brandFilter !== "all" && model.brandId !== brandFilter) return false;
-      if (!query) return true;
-      return [
-        model.name,
-        model.slug,
-        brandById.get(model.brandId)?.name ?? "",
-        ...modelSubcategoryNames(model, subcategoryById),
-        ...modelCategoryNames(model, subcategoryById, categoryById),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [
-    modelList,
-    searchQuery,
-    categoryFilter,
-    brandFilter,
-    brandById,
-    subcategoryById,
-    categoryById,
-  ]);
+  // Only the brands linked to the selected category belong in the filter; a
+  // phone brand under "Cars and Vehicles" can only produce an empty table.
+  const categorySubcategoryIds = useMemo(() => {
+    if (categoryFilter === "all") return null;
+    return new Set(
+      allSubcategories
+        .filter((sub) => sub.categoryId === categoryFilter)
+        .map((sub) => sub.subId),
+    );
+  }, [allSubcategories, categoryFilter]);
 
   const categoryOptions = allCategories.map((category) => ({
     value: category.cateId,
     label: category.name,
   }));
-  const brandOptions = allBrands.map((brand) => ({
-    value: brand.brandId,
-    label: brand.name,
-  }));
+  const brandOptions = allBrands
+    .filter(
+      (brand) =>
+        !categorySubcategoryIds ||
+        brand.subcategories.some((id) => categorySubcategoryIds.has(id)),
+    )
+    .map((brand) => ({ value: brand.brandId, label: brand.name }));
+
+  const changeCategory = (value: string) => {
+    setCategoryFilter(value);
+    setPage(1);
+    if (value === "all") return;
+    const subIds = new Set(
+      allSubcategories
+        .filter((sub) => sub.categoryId === value)
+        .map((sub) => sub.subId),
+    );
+    if (
+      brandFilter !== "all" &&
+      !(brandById.get(brandFilter)?.subcategories ?? []).some((id) =>
+        subIds.has(id),
+      )
+    ) {
+      setBrandFilter("all");
+    }
+  };
+
+  const changeBrand = (value: string) => {
+    setBrandFilter(value);
+    setPage(1);
+  };
+
+  const submitSearch = () => {
+    setSearchQuery(searchInput.trim());
+    setPage(1);
+  };
 
   const handleAdd = (data: ModelFormData) => {
     refreshModels();
@@ -600,6 +627,9 @@ export default function ModelsPage() {
   const handleDelete = () => {
     if (!selectedModel) return;
     const name = selectedModel.name;
+    // Deleting the last row on a later page would leave an out-of-range,
+    // empty page; step back to one that still has rows.
+    if (rows.length === 1 && page > 1) setPage((current) => current - 1);
     refreshModels();
     setSelectedModel(null);
     setIsDeleteDialogOpen(false);
@@ -720,20 +750,28 @@ export default function ModelsPage() {
         }
         toolbar={
           <>
-            <AdminSearch
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search model, brand, category..."
-            />
+            <form
+              className="w-full max-w-sm"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitSearch();
+              }}
+            >
+              <AdminSearch
+                value={searchInput}
+                onChange={setSearchInput}
+                placeholder="Search model, brand, category… (Enter)"
+              />
+            </form>
             <AdminFilter
               value={categoryFilter}
-              onChange={setCategoryFilter}
+              onChange={changeCategory}
               allLabel="All Categories"
               options={categoryOptions}
             />
             <AdminFilter
               value={brandFilter}
-              onChange={setBrandFilter}
+              onChange={changeBrand}
               allLabel="All Brands"
               options={brandOptions}
             />
@@ -742,15 +780,20 @@ export default function ModelsPage() {
       >
         <AdminTable
           columns={columns}
-          rows={filteredModels}
+          rows={rows}
           rowKey={(model) => model.modelId}
           isLoading={isLoading}
-          pageSize={20}
-          resetKey={`${searchQuery}:${categoryFilter}:${brandFilter}`}
           emptyTitle="No model found"
           emptyHint={
             searchQuery ? `No results for "${searchQuery}"` : undefined
           }
+          serverPagination={{
+            page,
+            totalPages,
+            total: data?.total ?? 0,
+            onPageChange: setPage,
+            totalLabel: "models",
+          }}
         />
       </AdminPage>
       {/* Edit Dialog Block */}

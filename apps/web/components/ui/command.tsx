@@ -91,12 +91,12 @@ function CommandInput({
 
   return (
     <div ref={wrapRef} data-slot="command-input-wrapper" className="p-2">
-      <div className="flex h-11 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 focus-within:ring-2 focus-within:ring-orange-400">
-        <SearchIcon className="size-4 shrink-0 text-gray-400" />
+      <div className="flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
+        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "h-full w-full bg-transparent type-body outline-hidden placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50",
+            "h-full w-full bg-transparent text-foreground type-body outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
           {...props}

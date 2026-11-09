@@ -1,11 +1,12 @@
 import {
   and,
   eq,
+  getTableName,
   gt,
   isNull,
   sql,
+  type Column,
   type SQL,
-  type SQLWrapper,
 } from 'drizzle-orm';
 import type { DbClient } from '../db/drizzle.provider';
 import { userSubscriptions } from '../db/schema/subscriptions.schema';
@@ -39,15 +40,22 @@ export async function hasActivePaidSubscription(
 
 /**
  * The same predicate as a correlated subquery, for row selects that need a
- * seller's verification without an extra round trip. `userId` is the column
- * expression to correlate on (e.g. `listings.userId`).
+ * seller's verification without an extra round trip. `userId` must be a real
+ * column (e.g. `listings.userId`), not an arbitrary expression: the column is
+ * emitted as a table-qualified identifier.
+ *
+ * The qualification is load-bearing. Drizzle renders a single-table select's
+ * columns without their table name, so a bare `${userId}` interpolation inside
+ * this subquery became `"id"` and bound to `user_subscriptions.id` instead of
+ * correlating to the outer row — verifiedAccount was silently false. A
+ * joined select rendered `"listings"."user_id"` and happened to work, which
+ * is why the trap only showed up in the new users query.
  */
-export function activePaidSubscriptionExistsSql(
-  userId: SQLWrapper,
-): SQL<boolean> {
+export function activePaidSubscriptionExistsSql(userId: Column): SQL<boolean> {
+  const qualified = sql`${sql.identifier(getTableName(userId.table))}.${sql.identifier(userId.name)}`;
   return sql<boolean>`exists (
     select 1 from user_subscriptions us
-    where us.user_id = ${userId}
+    where us.user_id = ${qualified}
       and us.superseded_at is null
       and us.expires_at > now()
   )`;

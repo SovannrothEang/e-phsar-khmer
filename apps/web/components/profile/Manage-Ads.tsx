@@ -225,7 +225,7 @@ export default function ManageAds() {
                     onChange={(e) => setKeyword(e.target.value)}
                     placeholder={t("searchPlaceholder")}
                     aria-label={t("searchPlaceholder")}
-                    className="h-11 border-gray-200 focus:ring-0"
+                    className="h-11 border-border focus:ring-0"
                   />
                   <InputGroupAddon align="inline-end">
                     <InputGroupButton

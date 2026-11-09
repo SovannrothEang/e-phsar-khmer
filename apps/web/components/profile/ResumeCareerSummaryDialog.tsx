@@ -100,7 +100,7 @@ export function ResumeCareerSummaryDialog({
             <DialogClose asChild>
               <button
                 type="button"
-                className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-gray-500 transition-colors hover:bg-muted"
+                className="ml-auto flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border text-muted-foreground transition-colors hover:bg-muted"
               >
                 <IconX size={18} />
                 <span className="sr-only">{t("form.close")}</span>
@@ -136,7 +136,7 @@ export function ResumeCareerSummaryDialog({
             <button
               type="button"
               onClick={onSkip}
-              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600"
+              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600 dark:bg-muted dark:text-foreground dark:hover:bg-muted/80"
             >
               {t("form.skip")}
             </button>
