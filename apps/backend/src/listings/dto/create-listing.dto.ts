@@ -117,8 +117,7 @@ export class CreateListingDto {
   /**
    * The trusted product-spec page this ad links to (a `models` id). Validated
    * by the service against a *published* spec page; null clears it on update.
-   * The phones form makes it required — the API keeps it optional like every
-   * other per-form rule.
+   * Optional — the posting forms offer it without requiring it.
    */
   @ApiPropertyOptional()
   @IsOptional()

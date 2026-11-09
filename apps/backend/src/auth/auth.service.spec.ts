@@ -1670,6 +1670,28 @@ describe('VerifyOtpDto validation', () => {
     );
     expect(errors.length).toBeGreaterThan(0);
   });
+
+  it('accepts the registration mode and rejects an unknown one', async () => {
+    const valid = await validate(
+      plainToInstance(VerifyOtpDto, {
+        phone: '+85512345678',
+        token: '000000',
+        password: 'password123',
+        mode: 'register',
+      }),
+    );
+    expect(valid).toHaveLength(0);
+
+    const invalid = await validate(
+      plainToInstance(VerifyOtpDto, {
+        phone: '+85512345678',
+        token: '000000',
+        password: 'password123',
+        mode: 'signup',
+      }),
+    );
+    expect(invalid.length).toBeGreaterThan(0);
+  });
 });
 
 describe('AuthService.findById', () => {
@@ -3303,6 +3325,85 @@ describe('AuthService phone OTP (provider switch)', () => {
       expect(otpSender.issueAndSend).not.toHaveBeenCalled();
     });
 
+    it('refuses a number that already has an account, without sending an SMS', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup (none), 2: the active owner of the number
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: 'h' })] : [],
+      );
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('refuses a number a soft-deleted account still holds (login revives it)', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup, 2: active owner (none), 3: recovery-window lookup
+      selects(db, (n) =>
+        n === 3
+          ? [
+              makeUser({
+                primaryPhone: PHONE,
+                deletedAt: new Date(),
+                status: 'deleted',
+              }),
+            ]
+          : [],
+      );
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('refuses a number verified on another account (user_phones)', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban, 2: active primary owner (none), 3: recovery window (none),
+      // 4: the phone linked to some account as a secondary number
+      selects(db, (n) => (n === 4 ? [makeUser({ id: 'other' })] : []));
+
+      const err = (await service
+        .registerWithPhone({ phone: PHONE, password: 'x' } as never)
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      expect(otpSender.issueAndSend).not.toHaveBeenCalled();
+    });
+
+    it('lets a bare legacy account register — completion is its only way in', async () => {
+      const { db, service, otpSender } = build('plasgate');
+      // 1: ban lookup (none), 2: the active row — password-less, so the guard
+      // must fall through instead of closing the account's only entry point.
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: null })] : [],
+      );
+      otpSender.issueAndSend.mockResolvedValue({
+        status: 'sent',
+        retryAfterSeconds: 300,
+      });
+
+      await expect(
+        service.registerWithPhone({ phone: PHONE, password: 'x' } as never),
+      ).resolves.toMatchObject({ otpSent: true });
+      expect(otpSender.issueAndSend).toHaveBeenCalledWith(
+        PHONE,
+        'register',
+        undefined,
+      );
+    });
+
     it('resend infers login for an active account and register otherwise', async () => {
       const a = build('plasgate');
       // 1: ban lookup (none), 2: active user lookup (found)
@@ -3439,6 +3540,56 @@ describe('AuthService phone OTP (provider switch)', () => {
         }),
       ).rejects.toBeDefined();
       expect(otpService.verify).not.toHaveBeenCalled();
+    });
+
+    it('register mode refuses an existing account instead of logging into it', async () => {
+      const { db, service, otpService } = build('plasgate');
+      // 1: ban lookup (none), 2: the active owner of the number
+      selects(db, (n) =>
+        n === 2 ? [makeUser({ primaryPhone: PHONE, passwordHash: 'h' })] : [],
+      );
+
+      const err = (await service
+        .verifyPhoneOtp({
+          phone: PHONE,
+          token: '123456',
+          password: 'password123',
+          mode: 'register',
+        })
+        .catch((e: unknown) => e)) as HttpException;
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.getStatus()).toBe(409);
+      expect(err.getResponse()).toMatchObject({
+        code: 'PHONE_ALREADY_REGISTERED',
+      });
+      // Nothing spent, and no tokens for somebody else's account.
+      expect(otpService.verify).not.toHaveBeenCalled();
+      expect(db.update).not.toHaveBeenCalled();
+      expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+
+    it('register mode still completes a bare account', async () => {
+      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+      const bare = makeUser({
+        primaryPhone: PHONE,
+        passwordHash: null,
+        username: null,
+      });
+      const { db, service, otpService } = build('plasgate');
+      // 1: ban, 2: the guard's owner lookup, 3: the existing-user lookup
+      selects(db, (n) => (n === 2 || n === 3 ? [bare] : []));
+      const sets = captureUpdates(db);
+      otpService.verify.mockResolvedValue({ status: 'ok', purpose: 'login' });
+
+      await service.verifyPhoneOtp({
+        phone: PHONE,
+        token: '123456',
+        password: 'password123',
+        mode: 'register',
+      });
+
+      expect(sets[0]).toMatchObject({ passwordHash: 'hashed' });
+      expect(db.insert).not.toHaveBeenCalled();
     });
 
     it('revives a deleted account after a valid code', async () => {

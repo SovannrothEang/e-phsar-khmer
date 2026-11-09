@@ -445,8 +445,6 @@ const NewAdScreen = () => {
         if (!contactPhones[0]?.trim()) {
           missing[field.key] = message("Phone Number");
         }
-      } else if (field.key === "productSpec") {
-        if (!productModelId) missing[field.key] = message(label);
       } else if (field.key === "condition") {
         if (!condition) missing[field.key] = message(label);
       } else if (field.key === "contactName") {

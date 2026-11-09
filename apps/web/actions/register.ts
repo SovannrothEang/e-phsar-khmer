@@ -16,7 +16,7 @@ export async function register(
   unsafeData: z.infer<typeof registerSchema>,
 ): Promise<
   | { success: true; phone: string; retryAfterSeconds?: number }
-  | { success: false; error?: string }
+  | { success: false; error?: string; code?: string }
 > {
   const data = registerSchema.safeParse(unsafeData);
 
@@ -41,6 +41,9 @@ export async function register(
     return {
       success: false,
       error: body?.error?.message ?? "Failed to send code",
+      // `PHONE_ALREADY_REGISTERED` is a different kind of "no": the number is
+      // fine, the account exists. The form offers signing in instead.
+      ...(body?.error?.code !== undefined ? { code: body.error.code } : {}),
     };
   }
 

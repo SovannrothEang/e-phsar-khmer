@@ -20,7 +20,6 @@ export const REQUIRED_FIELD_KEYS = new Set([
   "network",
   "jobType",
   "experience",
-  "productSpec",
 ]);
 
 /** Storage is required on computers, not on phones. */

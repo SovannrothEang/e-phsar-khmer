@@ -224,8 +224,8 @@ export interface ListingFormConfig {
   brands: BackendBrand[];
   /**
    * Published trusted product pages — only fetched when this subcategory
-   * declares `productSpec` (the phones form). Drives the required picker and
-   * local resolution of pasted product URLs; capped at 200 for v1.
+   * declares `productSpec` (the phones form). Drives the picker and local
+   * resolution of pasted product URLs; capped at 200 for v1.
    */
   products: ProductSummary[];
   /**
@@ -742,7 +742,7 @@ export interface CreateListingPayload {
   provinceId?: string;
   districtId?: string;
   communeId?: string;
-  /** Trusted spec page (a `models` id) — required by the phones form. */
+  /** Trusted spec page (a `models` id) — optional; the phones form offers it. */
   productModelId?: string;
   latitude?: number;
   longitude?: number;

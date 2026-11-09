@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2Icon } from "lucide-react";
 import { register } from "@/actions/register";
 import {
   clearRegisterDraft,
@@ -8,7 +9,7 @@ import {
   storeOtpRegistration,
   storeRegisterDraft,
 } from "@/lib/otp-registration";
-import { useRouter } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { FieldGroup, FieldSeparator } from "@/components/ui/field";
 import { registerSchema } from "@/schemas/register";
@@ -31,6 +32,15 @@ export function RegisterForm() {
   // Set once the handoff is stored: a debounced save still in flight must not
   // resurrect the draft we just cleared.
   const handedOffRef = useRef(false);
+  // The server's answer, not zod's: kept out of the field errors so a resident
+  // "number already has an account" stays on screen with its sign-in link.
+  const [submitError, setSubmitError] = useState<{
+    message: string;
+    signIn?: boolean;
+  } | null>(null);
+  // Stays `true` through the redirect: the action already resolved by then, so
+  // `isSubmitting` alone would re-arm the button for a second submit.
+  const [sending, setSending] = useState(false);
 
   const form = useAppForm({
     defaultValues: {
@@ -60,7 +70,19 @@ export function RegisterForm() {
       },
     },
     onSubmit: async ({ value }) => {
-      const res = await register(value);
+      if (sending) return;
+      setSending(true);
+      setSubmitError(null);
+
+      let res: Awaited<ReturnType<typeof register>>;
+      try {
+        res = await register(value);
+      } catch {
+        // A dropped request is not a rejection of the form: let them retry.
+        setSubmitError({ message: "Failed to send code. Please try again." });
+        setSending(false);
+        return;
+      }
 
       if (res.success) {
         handedOffRef.current = true;
@@ -78,9 +100,14 @@ export function RegisterForm() {
         form.reset();
         toast.success("Code sent to your phone.");
         router.push({ pathname: "/otp", query: { phone: res.phone } });
-      } else {
-        toast.error(res.error ?? "Failed to send code.");
+        return;
       }
+
+      setSubmitError({
+        message: res.error ?? "Failed to send code.",
+        signIn: res.code === "PHONE_ALREADY_REGISTERED",
+      });
+      setSending(false);
     },
   });
 
@@ -147,11 +174,31 @@ export function RegisterForm() {
                 <field.Input label="Confirm Password" type="password" />
               )}
             </form.AppField>
+            {submitError && (
+              <p role="alert" className="type-body-sm text-destructive">
+                {submitError.message}{" "}
+                {submitError.signIn && (
+                  <Link href="/login" className="underline underline-offset-2">
+                    Sign in
+                  </Link>
+                )}
+              </p>
+            )}
+
             <Button
               type="submit"
+              disabled={sending}
+              aria-busy={sending}
               className="h-10 w-full rounded-sm bg-orange-500 text-white hover:bg-orange-600 hover:text-white cursor-pointer"
             >
-              Submit
+              {sending ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                "Submit"
+              )}
             </Button>
 
             <FieldSeparator>Or</FieldSeparator>

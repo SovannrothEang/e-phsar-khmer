@@ -49,6 +49,10 @@ export function LoginForm({
   );
   // Set when the backend refuses a sign-in with 403 ACCOUNT_SUSPENDED.
   const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
+  // Covers the window `isSubmitting` does not: a successful login resolves by
+  // rejecting with the redirect signal, so the form re-arms before the route
+  // has swapped. Left `true` on success, cleared on every failure.
+  const [signingIn, setSigningIn] = useState(false);
   const closePoll = useRef<number | null>(null);
 
   useEffect(() => {
@@ -121,12 +125,16 @@ export function LoginForm({
       onChange: loginSchema,
     },
     onSubmit: async ({ value }) => {
+      if (signingIn) return;
+      setSigningIn(true);
+
       // Phone identifiers (local 0… format) log in via OTP — the backend
       // validates the password first and only then sends the code.
       if (isLocalPhone(value.login)) {
         const phone = normalizePhone(value.login);
         if (!phone) {
           toast.error("Invalid phone number.");
+          setSigningIn(false);
           return;
         }
         const result = await requestLoginOtp(phone, value.password);
@@ -139,10 +147,11 @@ export function LoginForm({
           });
           toast.success("Code sent to your phone.", { position: "top-right" });
           router.push({ pathname: "/otp", query: { phone } });
-        } else {
-          // Same readable cooldown / daily-cap copy as the verify page.
-          toast.error(otpFailureMessage(result, "Login failed."));
+          return;
         }
+        // Same readable cooldown / daily-cap copy as the verify page.
+        toast.error(otpFailureMessage(result, "Login failed."));
+        setSigningIn(false);
         return;
       }
 
@@ -164,6 +173,7 @@ export function LoginForm({
         if (isServerRedirect(error)) return;
         toast.error("Failed to log in. Please try again.");
       }
+      setSigningIn(false);
     },
   });
 
@@ -213,10 +223,18 @@ export function LoginForm({
 
               <Button
                 type="submit"
-                disabled={socialPending !== null}
+                disabled={socialPending !== null || signingIn}
+                aria-busy={signingIn}
                 className="h-10 w-full rounded-sm bg-orange-500 hover:bg-orange-600 text-white cursor-pointer"
               >
-                Login
+                {signingIn ? (
+                  <>
+                    <Loader2Icon className="h-4 w-4 animate-spin" />
+                    Logging in…
+                  </>
+                ) : (
+                  "Login"
+                )}
               </Button>
 
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
