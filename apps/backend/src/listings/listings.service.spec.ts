@@ -2016,3 +2016,120 @@ describe('ListingsService.findMineById', () => {
     );
   });
 });
+
+describe('ListingsService.findNearby', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * A fake Drizzle client for the nearby query: one listings select, then the
+   * batched photo select. `where`/`orderBy` are captured so the compiled SQL
+   * can be asserted instead of trusting the chain.
+   */
+  function nearbyDb(fixture: { rows?: Row[]; photos?: Row[] }) {
+    let whereArg: unknown;
+    let orderArgs: unknown[] = [];
+    let limitArg: unknown;
+
+    const builder = () => {
+      let value: unknown = [];
+      let currentTable: unknown;
+      const node: Record<string, unknown> = {};
+      const chain = () => node;
+      node.from = (table: unknown) => {
+        currentTable = table;
+        if (table === listings) value = fixture.rows ?? [];
+        else if (table === listingPhotos) value = fixture.photos ?? [];
+        return node;
+      };
+      node.leftJoin = chain;
+      node.innerJoin = chain;
+      node.where = (arg: unknown) => {
+        // The photo loader runs a second select; keep only the listings one.
+        if (currentTable === listings) whereArg = arg;
+        return node;
+      };
+      node.orderBy = (...args: unknown[]) => {
+        if (currentTable === listings) orderArgs = args;
+        return node;
+      };
+      node.limit = (arg: unknown) => {
+        if (currentTable === listings) limitArg = arg;
+        return Promise.resolve(value);
+      };
+      node.then = (
+        resolve: (v: unknown) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(value).then(resolve, reject);
+      return node;
+    };
+
+    return {
+      db: {
+        select: jest.fn(() => builder()),
+        insert: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      where: () => whereArg,
+      orderBy: () => orderArgs,
+      limit: () => limitArg,
+    };
+  }
+
+  it('returns the nearest rows with photos and the query meta', async () => {
+    const fake = nearbyDb({
+      rows: [
+        { id: 'l1', title: 'Near', sellerUsername: 'u1' },
+        { id: 'l2', title: 'Far', sellerUsername: 'u2' },
+      ],
+      photos: [{ listingId: 'l1', url: 'p1', path: 'listing/u1/p1', sort: 0 }],
+    });
+    const service = makeService(fake.db as never);
+
+    const result = await service.findNearby({
+      lat: 11.5564,
+      lng: 104.9282,
+      radiusKm: 10,
+      limit: 2,
+    });
+
+    expect(result.meta).toEqual({ limit: 2, radiusKm: 10 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2']);
+    expect(result.data[0].photos).toHaveLength(1);
+    expect(result.data[1].photos).toEqual([]);
+
+    const compiled = new PgDialect().sqlToQuery(fake.where() as never);
+    expect(compiled.sql).toContain('"listings"."status"');
+    // The same public read rule as the feed: suspended owners stay hidden.
+    expect(compiled.sql).toContain('"users"."status"');
+    expect(compiled.sql).toContain('is not null');
+    expect(compiled.sql).toMatch(/"listings"\."longitude"\s*[<>]=/);
+    expect(compiled.sql).toContain('asin');
+    expect(compiled.sql).toContain('<= $');
+    expect(fake.limit()).toBe(2);
+    expect(fake.orderBy()).toHaveLength(2);
+    const order = new PgDialect().sqlToQuery(fake.orderBy()[0] as never);
+    expect(order.sql).toContain('asc');
+  });
+
+  it('applies the documented defaults when the query omits them', async () => {
+    const fake = nearbyDb({ rows: [] });
+    const service = makeService(fake.db as never);
+
+    const result = await service.findNearby({ lat: 11.5564, lng: 104.9282 });
+
+    expect(result.meta).toEqual({ limit: 8, radiusKm: 10 });
+    expect(fake.limit()).toBe(8);
+  });
+
+  it('drops the longitude prefilter when the box crosses the antimeridian', async () => {
+    const fake = nearbyDb({ rows: [] });
+    const service = makeService(fake.db as never);
+
+    await service.findNearby({ lat: 0, lng: 179.95, radiusKm: 50 });
+
+    const compiled = new PgDialect().sqlToQuery(fake.where() as never);
+    expect(compiled.sql).not.toMatch(/"listings"\."longitude"\s*[<>]=/);
+    expect(compiled.sql).toContain('asin');
+  });
+});

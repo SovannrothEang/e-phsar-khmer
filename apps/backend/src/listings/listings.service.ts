@@ -72,6 +72,13 @@ import {
   trendingEventScoreSql,
 } from './trending';
 import type { QueryTrendingDto } from './dto/query-trending.dto';
+import type { QueryNearbyDto } from './dto/query-nearby.dto';
+import {
+  NEARBY_LIMIT_DEFAULT,
+  NEARBY_RADIUS_KM_DEFAULT,
+  nearbyBoundingBox,
+  nearbyDistanceKmSql,
+} from './nearby';
 
 export interface ListingWithPhotos extends ListingRow {
   photos: ListingPhotoRow[];
@@ -924,6 +931,70 @@ export class ListingsService {
 
     this.trendingCache.set(cacheKey, { at: Date.now(), rows: data });
     return { data, meta };
+  }
+
+  /**
+   * Active listings within `radiusKm` of a point, nearest first.
+   *
+   * Deliberately a bounded top-N read rather than a feed sort: the feed's
+   * keyset cursor carries only `{s,v,id,f}`, so a later page fetched from a
+   * different origin would reorder or skip rows. There is no cache either —
+   * the key would be a near-unique exact coordinate pair and would hold the
+   * caller's location in process memory.
+   *
+   * Listings without both coordinates are absent by design; the client shows
+   * an empty state rather than falling back to a province-wide result.
+   */
+  async findNearby(query: QueryNearbyDto): Promise<{
+    data: ListingWithPhotos[];
+    meta: { limit: number; radiusKm: number };
+  }> {
+    const limit = query.limit ?? NEARBY_LIMIT_DEFAULT;
+    const radiusKm = query.radiusKm ?? NEARBY_RADIUS_KM_DEFAULT;
+    const distance = nearbyDistanceKmSql(query.lat, query.lng);
+    const box = nearbyBoundingBox(query.lat, query.lng, radiusKm);
+
+    const rows = await this.db
+      .select({
+        ...getTableColumns(listings),
+        sellerUsername: users.username,
+        sellerVerifiedAccount: activePaidSubscriptionExistsSql(listings.userId),
+      })
+      .from(listings)
+      .leftJoin(users, eq(users.id, listings.userId))
+      .where(
+        and(
+          ...this.liveConditions(),
+          // Same public read rule as the feed, public detail and trending: a
+          // suspended seller's ads stay hidden until reinstatement, with no
+          // data change.
+          eq(users.status, 'active'),
+          isNotNull(listings.latitude),
+          isNotNull(listings.longitude),
+          gte(listings.latitude, String(box.minLat)),
+          lte(listings.latitude, String(box.maxLat)),
+          // A box that crosses the antimeridian cannot be expressed as one
+          // BETWEEN; skip the longitude prefilter and let the Haversine
+          // condition decide. The latitude box still narrows the scan.
+          ...(box.lngWraps
+            ? []
+            : [
+                gte(listings.longitude, String(box.minLng)),
+                lte(listings.longitude, String(box.maxLng)),
+              ]),
+          sql`${distance} <= ${radiusKm}`,
+        ),
+      )
+      .orderBy(sql`${distance} asc`, listings.id)
+      .limit(limit);
+
+    const photosMap = await this.batchLoadPhotos(rows.map((row) => row.id));
+    const data = rows.map((row) => ({
+      ...row,
+      photos: photosMap.get(row.id) ?? [],
+    }));
+
+    return { data, meta: { limit, radiusKm } };
   }
 
   /**

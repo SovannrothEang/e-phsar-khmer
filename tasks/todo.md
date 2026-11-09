@@ -7224,3 +7224,22 @@ SDK 58 package set.
 - **Pending** — physical-device walk (Android Expo Go 58.0.5 + iOS 58.0.7 on real devices) is
   not possible from this machine; only the LAN/firewall hop between the phone and
   `expo start --lan` remains unverified.
+
+## 2026-11-10 — Mobile Nearby: real location access
+
+- **Backend** — public `GET /api/v1/listings/nearby`: `lat`/`lng` required (blank values
+  rejected), `radiusKm` 1–50, `limit` 1–24, live listings with an active owner and both
+  coordinates, bounding-box + Haversine ordering, nearest first, no cursor/total/cache;
+  `lat`/`lng` redacted from the request and exception logs. Demo listings get province-centre
+  coordinates (title-hash jitter, null-only owner-scoped backfill; `sihanoukville` maps to the
+  live `preah-sihanouk` slug).
+- **Mobile** — `expo-location@58.0.20` with a foreground-only plugin; `useCurrentLocation`
+  (permission read on mount, explicit request on tap, bounded fix with Balanced→Low fallback,
+  in-memory only); the Nearby card states (idle/requesting/results/empty/error/denied/blocked);
+  the New Ad "Use my current location" pin, sent only when set.
+- **Verified** — backend 121 suites / 1,720 tests, build and eslint clean; mobile `tsc` and
+  `expo lint` clean; repo `format:check` clean; emulator: OS dialog → nearest-ads strip, denied
+  and blocked states issue no request, granted permission fetches on mount.
+- **Open** — New Ad pin runtime proof waits on a signed-in account (DEV_OTP no longer used);
+  iOS untested. The deployed API does not include the route yet; the app's Nearby card works
+  against the local backend and will work in production once this backend is deployed.

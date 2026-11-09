@@ -8,6 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { redactSensitiveQuery } from '../utils/redact';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -17,7 +18,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const where = `${request.method} ${request.originalUrl}`;
+    const where = `${request.method} ${redactSensitiveQuery(request.originalUrl)}`;
 
     if (exception instanceof BadRequestException) {
       const exceptionResponse = exception.getResponse();
