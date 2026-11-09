@@ -21,6 +21,13 @@ How to use this file:
 
 ### Added
 
+- **Mobile Nearby (location).** The home Nearby card is real: "Allow Location Access" asks
+  for foreground location, then lists the nearest live ads from the new public
+  `GET /api/v1/listings/nearby` (bounded radius/limit, nearest-first Haversine ordering,
+  owner-active read rule, no cursor, `lat`/`lng` redacted from logs). Demo listings get
+  province-centre coordinates; the New Ad form gains an optional "Use my current location"
+  pin. Needs `expo-location@58.0.20` and a native dev-build rebuild.
+
 - **Mobile Resume (CV) builder.** The account tab's `Resume (CV)` item now opens a real
   8-step wizard at `/account/resume` instead of a placeholder alert. The entry screen offers
   only **Create a New Resume** (no upload-existing-resume path) and lists the eight steps;
