@@ -11,6 +11,8 @@ export interface BackendUser {
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   role: "user" | "admin" | "super_admin";
+  /** Staff-written suspension reason, shown to the account at sign-in. */
+  statusReason?: string | null;
   status: "active" | "suspended" | "deleted";
   preferredLanguage: string;
   isBusiness: boolean;
@@ -79,6 +81,9 @@ export function toUiUser(u: BackendUser): User {
     following: [],
     followers: [],
     status: isOnline(u.lastSeenAt) ? "Online" : "Offline",
+    accountStatus:
+      u.status === "suspended" || u.status === "deleted" ? u.status : "active",
+    statusReason: u.statusReason ?? null,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
   };

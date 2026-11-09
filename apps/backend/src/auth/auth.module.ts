@@ -9,6 +9,7 @@ import { LoginLockoutService } from './login-lockout.service';
 import { SocialStateService } from './social-state.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OtpModule } from '../otp/otp.module';
+import { SettingsModule } from '../settings/settings.module';
 import { ThrottlerStorageModule } from '../common/throttler/throttler-storage.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -17,6 +18,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     PassportModule,
     NotificationsModule,
     OtpModule,
+    // The suspension refusal reads the support contacts from runtime settings.
+    SettingsModule,
     // Shares the throttler's single dedicated Redis connection with the
     // account lockout instead of opening another one.
     ThrottlerStorageModule,

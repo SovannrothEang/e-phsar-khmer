@@ -42,7 +42,13 @@ const SignUpScreen = () => {
       router.replace("/(tabs)/account");
       return;
     }
-    setPhoneError(result.message);
+    // Registration cannot suspend an account, but the outcome union carries
+    // the case; never fall through to reading `.message` on it.
+    setPhoneError(
+      result.kind === "error"
+        ? result.message
+        : "This account is suspended. Contact support.",
+    );
   };
 
   return (

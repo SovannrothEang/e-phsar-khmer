@@ -177,6 +177,9 @@ export class ReactionsService {
           and(
             eq(listingLikes.userId, userId),
             notInArray(listings.status, ['deleted', 'restricted']),
+            // A suspended seller's ads are hidden everywhere public
+            // (2026-11-08); these two lists are public reads too.
+            eq(users.status, 'active'),
           ),
         )
         // `id` breaks ties so a page boundary can never repeat or skip a row
@@ -188,10 +191,12 @@ export class ReactionsService {
         .select({ value: count() })
         .from(listingLikes)
         .innerJoin(listings, eq(listings.id, listingLikes.listingId))
+        .leftJoin(users, eq(users.id, listings.userId))
         .where(
           and(
             eq(listingLikes.userId, userId),
             notInArray(listings.status, ['deleted', 'restricted']),
+            eq(users.status, 'active'),
           ),
         ),
     ]);
@@ -235,6 +240,7 @@ export class ReactionsService {
           and(
             eq(listingSaves.userId, userId),
             notInArray(listings.status, ['deleted', 'restricted']),
+            eq(users.status, 'active'),
           ),
         )
         .orderBy(desc(listingSaves.createdAt), desc(listingSaves.id))
@@ -244,10 +250,12 @@ export class ReactionsService {
         .select({ value: count() })
         .from(listingSaves)
         .innerJoin(listings, eq(listings.id, listingSaves.listingId))
+        .leftJoin(users, eq(users.id, listings.userId))
         .where(
           and(
             eq(listingSaves.userId, userId),
             notInArray(listings.status, ['deleted', 'restricted']),
+            eq(users.status, 'active'),
           ),
         ),
     ]);

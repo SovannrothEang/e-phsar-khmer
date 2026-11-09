@@ -35,6 +35,8 @@ import {
   storeOtpRegistration,
 } from "@/lib/otp-registration";
 import { isServerRedirect } from "@/lib/next-redirect";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 
 const OTP_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -82,6 +84,9 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
   const router = useRouter();
   const [value, setValue] = useState("");
   const [verifying, setVerifying] = useState(false);
+  // A suspension reaches this endpoint too (it is a sign-in), and the OTP
+  // screen is then the only page the blocked user can see.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const [resending, setResending] = useState(false);
   // `null` until the countdown has ticked or a resend re-armed it; until then
   // the handoff's wait (or the 60 s fallback) is the countdown.
@@ -155,7 +160,11 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           doneRef.current = false;
           verifiedPhone = null;
           if (registration) storeOtpRegistration(registration);
-          toast.error(res.error);
+          if ("suspended" in res && res.suspended) {
+            setSuspended(res.suspended);
+          } else {
+            toast.error(res.error);
+          }
           setValue("");
         }
       } catch (error) {
@@ -295,6 +304,7 @@ export function OtpVerifyForm({ phone }: { phone: string }) {
           </div>
         </CardFooter>
       </form>
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </Card>
   );
 }

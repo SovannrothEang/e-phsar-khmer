@@ -6,7 +6,7 @@ const reviewer = { id: 'admin-1', role: 'admin' as const };
 /** A chain where every builder step returns itself and awaiting yields `rows`. */
 function chain(rows: unknown[]) {
   const c: Record<string, unknown> = {};
-  for (const k of ['from', 'leftJoin', 'where', 'limit', 'set']) {
+  for (const k of ['from', 'leftJoin', 'innerJoin', 'where', 'limit', 'set']) {
     c[k] = () => c;
   }
   c.for = () => Promise.resolve(rows);
@@ -30,7 +30,11 @@ function setup(found: unknown[]) {
       return c;
     }),
   };
-  const db = { transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) };
+  const db = {
+    transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    // The threshold alert runs after the commit against `this.db`.
+    select: jest.fn(() => chain([])),
+  };
   const listing = {
     id: 'l1',
     userId: 'u1',
@@ -40,9 +44,17 @@ function setup(found: unknown[]) {
     expiresAt: new Date(Date.now() + 86_400_000),
   };
   const listings = { moderate: jest.fn().mockResolvedValue(listing) };
-  const admin = { authorizeManage: jest.fn().mockResolvedValue(undefined) };
+  const admin = {
+    authorizeManage: jest.fn().mockResolvedValue(undefined),
+    suspendAccount: jest.fn().mockResolvedValue(undefined),
+    announceSuspension: jest.fn().mockResolvedValue(undefined),
+  };
   const adminListings = {
     notifyOwnerOfModeration: jest.fn().mockResolvedValue(undefined),
+  };
+  const notifications = { notifyStaff: jest.fn().mockResolvedValue(undefined) };
+  const settings = {
+    reportAlertThreshold: jest.fn().mockResolvedValue(3),
   };
   const service = new ReportsService(
     db as never,
@@ -50,8 +62,21 @@ function setup(found: unknown[]) {
     admin as never,
     {} as never,
     adminListings as never,
+    notifications as never,
+    settings as never,
   );
-  return { service, tx, sets, listings, admin, adminListings, listing };
+  return {
+    service,
+    tx,
+    sets,
+    db,
+    listings,
+    admin,
+    adminListings,
+    notifications,
+    settings,
+    listing,
+  };
 }
 
 describe('ReportsService.updateListingReportStatus', () => {
@@ -165,10 +190,13 @@ describe('ReportsService.updateListingReportStatus', () => {
 });
 
 describe('ReportsService.updateUserReportStatus', () => {
-  const pending = { id: 'r1', targetUserId: 'u9', status: 'pending' };
+  const pending = {
+    report: { id: 'r1', targetUserId: 'u9', status: 'pending' },
+    reason: 'Scam',
+  };
 
   it('suspends the target through the admin account rules on approval', async () => {
-    const { service, tx, sets, admin } = setup([pending]);
+    const { service, tx, admin } = setup([pending]);
     await service.updateUserReportStatus(
       'r1',
       { status: 'approved' },
@@ -177,7 +205,88 @@ describe('ReportsService.updateUserReportStatus', () => {
     expect(admin.authorizeManage).toHaveBeenCalledWith(tx, reviewer, 'u9', {
       status: 'suspended',
     });
-    expect(sets[1]).toMatchObject({ status: 'suspended' });
+    // The suspension carries the report's own reason, so the login refusal
+    // can explain itself.
+    expect(admin.suspendAccount).toHaveBeenCalledWith(
+      tx,
+      'u9',
+      'Reported: Scam',
+      reviewer.id,
+    );
+  });
+
+  it('closes the suspended account sockets after the commit', async () => {
+    const { service, admin } = setup([pending]);
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+    expect(admin.announceSuspension).toHaveBeenCalledWith('u9');
+  });
+
+  it('never bans a phone number on approval', async () => {
+    // `banned_phones` keeps its registration wall but the report path is no
+    // longer a writer: suspension is the appealable consequence instead.
+    const { service, tx, sets } = setup([pending]);
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+    const written = sets.filter(
+      (s) => typeof s === 'object' && s !== null && 'phone' in s,
+    );
+    expect(written).toHaveLength(0);
+    expect(tx.insert).toBeUndefined();
+  });
+
+  it('alerts staff with the summed count once the threshold is reached', async () => {
+    const { service, notifications, settings, db } = setup([pending]);
+    settings.reportAlertThreshold.mockResolvedValue(3);
+    // account reports = 2, approved reports on the owner's ads = 1
+    db.select
+      .mockImplementationOnce(() => chain([{ value: 2 }]))
+      .mockImplementationOnce(() => chain([{ value: 1 }]));
+
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'report.threshold',
+        data: { targetUserId: 'u9', approvedReports: 3, threshold: 3 },
+      }),
+    );
+  });
+
+  it('stays silent while the account is below the threshold', async () => {
+    const { service, notifications, settings, db } = setup([pending]);
+    settings.reportAlertThreshold.mockResolvedValue(3);
+    db.select
+      .mockImplementationOnce(() => chain([{ value: 1 }]))
+      .mockImplementationOnce(() => chain([{ value: 0 }]));
+
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('never alerts on a rejection', async () => {
+    const { service, notifications } = setup([pending]);
+    await service.updateUserReportStatus(
+      'r1',
+      { status: 'rejected' },
+      reviewer,
+    );
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
   });
 
   it('propagates a policy refusal (e.g. an admin reporting staff)', async () => {
@@ -196,6 +305,8 @@ describe('ReportsService.updateUserReportStatus', () => {
       reviewer,
     );
     expect(admin.authorizeManage).not.toHaveBeenCalled();
+    expect(admin.suspendAccount).not.toHaveBeenCalled();
+    expect(admin.announceSuspension).not.toHaveBeenCalled();
     expect(sets).toHaveLength(1);
   });
 });

@@ -13,7 +13,12 @@ export interface User {
   isVerified: boolean;
   following: string[];
   followers: string[];
+  /** Presence — unrelated to the account status below. */
   status: "Online" | "Offline";
+  /** Account state: what sign-in and public visibility read. */
+  accountStatus: "active" | "suspended" | "deleted";
+  /** The staff-written reason, shown to the account at sign-in. */
+  statusReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }

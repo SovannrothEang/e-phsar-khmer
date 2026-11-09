@@ -1,6 +1,8 @@
 import { AuthField } from "@/components/auth/AuthField";
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { SocialAuthSection } from "@/components/auth/SocialAuthSection";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +27,9 @@ const SignInScreen = () => {
   const [identifierError, setIdentifierError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // A suspended account cannot sign in, so this dialog is its only surface for
+  // the reason and the appeal channels.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
 
   const handleSignIn = async () => {
     const value = identifier.trim();
@@ -66,6 +71,10 @@ const SignInScreen = () => {
         pathname: "/(auth)/otp",
         params: { mode: "login" },
       } as never);
+      return;
+    }
+    if (result.kind === "suspended") {
+      setSuspended({ reason: result.reason, support: result.support });
       return;
     }
     setPasswordError(result.message);
@@ -167,6 +176,8 @@ const SignInScreen = () => {
           <SocialAuthSection gap={40} />
         </View>
       </ScrollView>
+
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </SafeAreaView>
   );
 };

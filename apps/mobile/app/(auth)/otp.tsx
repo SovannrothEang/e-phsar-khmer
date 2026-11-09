@@ -1,5 +1,7 @@
 import { AuthHeader } from "@/components/auth/AuthHeader";
 import { OtpCodeInput } from "@/components/auth/OtpCodeInput";
+import { SuspendedDialog } from "@/components/auth/SuspendedDialog";
+import type { SuspensionInfo } from "@/components/auth/SuspendedDialog";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +28,9 @@ export default function OtpScreen() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // The OTP verify is a sign-in, so a suspension can surface here too — this
+  // screen is then the only page the blocked user can see.
+  const [suspended, setSuspended] = useState<SuspensionInfo | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const [isResending, setIsResending] = useState(false);
 
@@ -62,6 +67,10 @@ export default function OtpScreen() {
     setIsLoading(false);
     if (result.kind === "authenticated") {
       router.replace("/(tabs)");
+      return;
+    }
+    if (result.kind === "suspended") {
+      setSuspended({ reason: result.reason, support: result.support });
       return;
     }
     if (result.kind === "error") setError(result.message);
@@ -225,6 +234,8 @@ export default function OtpScreen() {
           )}
         </View>
       </ScrollView>
+
+      <SuspendedDialog info={suspended} onClose={() => setSuspended(null)} />
     </SafeAreaView>
   );
 }

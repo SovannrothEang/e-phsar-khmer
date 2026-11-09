@@ -299,6 +299,7 @@ describe('ChatGateway.handleConnection', () => {
       iat?: number;
       tokensValidAfter?: Date | null;
       claimsTyp?: string;
+      status?: 'active' | 'suspended' | 'deleted';
     } = {},
   ) {
     const registry = new ConnectionRegistry();
@@ -314,6 +315,7 @@ describe('ChatGateway.handleConnection', () => {
           limit: jest.fn().mockResolvedValue([
             {
               id: USER,
+              status: opts.status ?? 'active',
               tokensValidAfter: opts.tokensValidAfter ?? null,
             },
           ]),
@@ -422,5 +424,18 @@ describe('ChatGateway.handleConnection', () => {
     await gateway.handleConnection(socket, req(`/ws/chat?ticket=${TICKET}`));
 
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it('rejects a suspended account, which the deletedAt-only check missed', async () => {
+    const { gateway, registry, socket, close, req } = makeHandshake({
+      status: 'suspended',
+    });
+
+    await gateway.handleConnection(socket, req(`/ws/chat?ticket=${TICKET}`));
+
+    // The handshake used to test `deletedAt` alone, so a suspension never
+    // reached an already-minted ticket.
+    expect(close).toHaveBeenCalledWith(4001, 'Account suspended');
+    expect(registry.isOnline(USER)).toBe(false);
   });
 });

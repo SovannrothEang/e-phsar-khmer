@@ -94,8 +94,8 @@ export async function getMyAdsPage(
         : null;
       return {
         ...base,
-        // Staff-inactive ads live in the Active tab; the row flag is what
-        // marks them and switches the actions to "republish".
+        // Staff-inactive ads live in the Active tab; the row flag marks them
+        // and hides the actions the owner no longer has (republish).
         inactive: row.status === "inactive",
         expiresInDays: left === null ? undefined : Math.ceil(left / DAY_MS),
       };

@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   boolean,
   check,
@@ -113,6 +114,18 @@ export const users = pgTable(
       .notNull(),
     role: userRoleEnum('role').default('user').notNull(),
     status: userStatusEnum('status').default('active').notNull(),
+    /**
+     * Current non-active state metadata, set by staff and cleared when the
+     * account returns to `active`. The login refusal surfaces `statusReason`,
+     * which is the only way a blocked account can read why. There is no appeal
+     * history: reinstating clears the triple.
+     */
+    statusReason: text('status_reason'),
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    suspendedById: uuid('suspended_by_id').references(
+      (): AnyPgColumn => users.id,
+      { onDelete: 'set null' },
+    ),
     isBusiness: boolean('is_business').default(false).notNull(),
     // Settings → Privacy lookup visibility: `true` = Public, `false` = Only Me.
     // Defaults reproduce the page's pre-persistence mock: phone, email and

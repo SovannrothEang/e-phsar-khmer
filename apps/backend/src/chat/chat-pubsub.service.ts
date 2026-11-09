@@ -25,6 +25,14 @@ export type ChatPushEvent =
       targetUserId: string;
       type: 'notification';
       payload: { type: string; data?: Record<string, unknown> };
+    }
+  // The account was suspended: close every socket it holds, in every
+  // instance. The handshake only stops NEW connections, and a live socket is
+  // the one write path no HTTP guard covers.
+  | {
+      targetUserId: string;
+      type: 'session_ended';
+      payload: { reason: string };
     };
 
 const CHANNEL = 'chat:push';
