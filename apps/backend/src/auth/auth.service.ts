@@ -261,6 +261,9 @@ export class AuthService {
     ip?: string | null,
   ): Promise<OtpRequestResult> {
     await this.assertPhoneNotBanned(dto.phone);
+    // Refused BEFORE any SMS is spent: a number that already belongs to an
+    // account must not walk the registration flow into that account.
+    await this.assertPhoneNotRegistered(dto.phone);
     if (this.usesOwnOtp) return this.sendOwnOtp(dto.phone, 'register', ip);
     await this.supabaseService.signInWithOtp(dto.phone);
     return { otpSent: true };
@@ -272,6 +275,13 @@ export class AuthService {
   ): Promise<AuthResult> {
     // Moderation ban first: a banned number must not even burn an OTP.
     await this.assertPhoneNotBanned(dto.phone);
+    // Registration mode is the caller saying "I am signing up", so an account
+    // that already holds this number is a conflict — never a silent login into
+    // it. `registerWithPhone` refuses the same numbers; this closes the window
+    // between the SMS and the code (and covers a client that skips step 1).
+    if (dto.mode === 'register') {
+      await this.assertPhoneNotRegistered(dto.phone);
+    }
     // Password is checked BEFORE the Supabase call so a wrong password
     // never burns an OTP attempt. For an existing user this is a login
     // (password must match); for an absent user this is a registration
@@ -1378,6 +1388,50 @@ export class AuthService {
       // The exception filter only forwards `code` and `details`, so the
       // structured payload the client needs lives there.
       details: { reason: user.statusReason, support },
+    });
+  }
+
+  /**
+   * The registration guard: a number that already answers to an account may not
+   * register again. Without it the OTP step is a takeover path — the same
+   * number reaches `verifyPhoneOtp`, which reads an existing row as a login and
+   * hands out tokens for the account the caller does not own.
+   *
+   * A bare legacy row (no `passwordHash`) is the one exception: the only way
+   * into it is COMPLETING registration (`verifyPhoneOtp`'s
+   * `completingBareAccount`), so refusing here would strand that account.
+   * Soft-deleted rows are not exempt — `login` revives those.
+   */
+  private async assertPhoneNotRegistered(phone: string): Promise<void> {
+    const [active] = await this.db
+      .select({ passwordHash: users.passwordHash })
+      .from(users)
+      .where(and(eq(users.primaryPhone, phone), isNull(users.deletedAt)))
+      .limit(1);
+    if (active) {
+      if (!active.passwordHash) return;
+      throw this.phoneAlreadyRegistered();
+    }
+
+    // A soft-deleted account keeps its number on purpose (recovery), so a
+    // fresh registration would fork a second row for the same person.
+    if (await this.findRecoverable(phone)) throw this.phoneAlreadyRegistered();
+
+    // A number verified on another account (`userPhones`) is taken even when
+    // it is not that account's primary one — the same rule
+    // `UsersService.assertPhoneAvailable` applies before a phone change.
+    const [linked] = await this.db
+      .select({ userId: userPhones.userId })
+      .from(userPhones)
+      .where(eq(userPhones.phone, phone))
+      .limit(1);
+    if (linked) throw this.phoneAlreadyRegistered();
+  }
+
+  private phoneAlreadyRegistered(): ConflictException {
+    return new ConflictException({
+      code: 'PHONE_ALREADY_REGISTERED',
+      message: 'This phone number already has an account. Sign in instead.',
     });
   }
 

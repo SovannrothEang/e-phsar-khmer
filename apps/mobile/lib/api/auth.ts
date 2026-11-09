@@ -108,6 +108,8 @@ export async function verifyPhoneOtp(input: {
   phone: string;
   token: string;
   password: string;
+  /** `register` makes the API refuse a number that already has an account. */
+  mode?: "register" | "login";
   firstName?: string;
   lastName?: string;
 }): Promise<AuthResult> {

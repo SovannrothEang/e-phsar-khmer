@@ -114,7 +114,13 @@ export async function requestLoginOtp(
 export async function verifyOtp(
   phone: string,
   token: string,
-  registration?: { password: string; firstName?: string; lastName?: string },
+  registration?: {
+    /** `register` makes the API refuse a number that already has an account. */
+    mode?: "register" | "login";
+    password: string;
+    firstName?: string;
+    lastName?: string;
+  },
   device?: DeviceIdentity,
   // No success branch: the flow ends in a redirect (below). The inferred
   // `| undefined` is what the client sees — on success the framework rejects
@@ -150,6 +156,7 @@ export async function verifyOtp(
       token,
       ...(registration
         ? {
+            mode: registration.mode,
             password: registration.password,
             firstName: registration.firstName,
             lastName: registration.lastName,

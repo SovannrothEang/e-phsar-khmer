@@ -908,12 +908,6 @@ export default function ListingPostForm({
       toast.error(t("errors.brandRequired"));
       return;
     }
-    // The trusted spec link is starred on the phones form — enforce it here or
-    // the star is a lie (required-ness is never read from `field_schema`).
-    if (has("productSpec") && productModelId === "") {
-      toast.error(t("errors.productRequired"));
-      return;
-    }
     // The computers spec cluster — all starred on every form that declares them.
     if (has("screenSize") && screenSize === "") {
       toast.error(t("errors.screenSizeRequired"));
@@ -1528,7 +1522,6 @@ export default function ListingPostForm({
             resolveInput={resolveProductPaste}
             placeholder={t("placeholders.chooseProduct")}
             emptyLabel={t("noProduct")}
-            required
           />
         )}
         {conditionSlot === "lead" && conditionBlock}
