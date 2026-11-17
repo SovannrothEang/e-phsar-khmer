@@ -39,7 +39,21 @@ describe('SettingsService', () => {
     const { db } = makeDb([[]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.reportAlertThreshold()).resolves.toBe(3);
+    await expect(service.reportAlertThreshold()).resolves.toBe(5);
+  });
+
+  it('returns the post-report default of 5 when the row is absent', async () => {
+    const { db } = makeDb([[]]);
+    const service = new SettingsService(db as never);
+
+    await expect(service.postReportAlertThreshold()).resolves.toBe(5);
+  });
+
+  it('returns the stored post-report threshold when it parses', async () => {
+    const { db } = makeDb([[{ value: 7 }]]);
+    const service = new SettingsService(db as never);
+
+    await expect(service.postReportAlertThreshold()).resolves.toBe(7);
   });
 
   it('returns every unset contact channel as absent', async () => {
@@ -50,10 +64,10 @@ describe('SettingsService', () => {
   });
 
   it('returns the stored value when it parses', async () => {
-    const { db } = makeDb([[{ value: 5 }]]);
+    const { db } = makeDb([[{ value: 7 }]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.reportAlertThreshold()).resolves.toBe(5);
+    await expect(service.reportAlertThreshold()).resolves.toBe(7);
   });
 
   it('falls back and warns instead of throwing on an unreadable value', async () => {
@@ -61,7 +75,7 @@ describe('SettingsService', () => {
     const { db } = makeDb([[{ value: 'not-a-number' }]]);
     const service = new SettingsService(db as never);
 
-    await expect(service.reportAlertThreshold()).resolves.toBe(3);
+    await expect(service.reportAlertThreshold()).resolves.toBe(5);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });

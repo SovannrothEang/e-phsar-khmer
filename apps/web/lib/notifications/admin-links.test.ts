@@ -33,6 +33,34 @@ describe("adminNotificationHref", () => {
     );
   });
 
+  it("filters the Users page to the threshold target", () => {
+    assert.equal(
+      adminNotificationHref({
+        type: "report.threshold",
+        data: {
+          targetUserId: "u1",
+          targetUsername: "scammer",
+          targetStatus: "suspended",
+        },
+      }),
+      "/wanderer/dashboard/users?q=scammer&status=suspended",
+    );
+  });
+
+  it("falls back to the display name when the target has no username", () => {
+    assert.equal(
+      adminNotificationHref({
+        type: "report.threshold",
+        data: {
+          targetUserId: "u1",
+          targetName: "Bad Actor",
+          targetStatus: "active",
+        },
+      }),
+      "/wanderer/dashboard/users?q=Bad+Actor&status=active",
+    );
+  });
+
   it("sends a post-publication edit to the Listings page", () => {
     assert.equal(
       adminNotificationHref({

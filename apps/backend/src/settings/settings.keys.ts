@@ -11,7 +11,11 @@ import { z } from 'zod';
 export const SETTING_DEFINITIONS = {
   'reports.alert_threshold': {
     schema: z.coerce.number().int().min(1).max(100),
-    default: 3,
+    default: 5,
+  },
+  'reports.post_alert_threshold': {
+    schema: z.coerce.number().int().min(1).max(100),
+    default: 5,
   },
   'support.contact_email': {
     schema: z.string().trim().email().max(255),

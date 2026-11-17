@@ -40,10 +40,15 @@ export default function ReportPostsPage() {
     queryKey: ["admin", "reports", "listings"],
     queryFn: getListingReports,
   });
+  // The post-threshold notice is written before the PATCH resolves, so refresh
+  // the bell with the queue instead of waiting for the background poll.
   const refresh = () =>
-    queryClient.invalidateQueries({
-      queryKey: ["admin", "reports", "listings"],
-    });
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "reports", "listings"],
+      }),
+      queryClient.invalidateQueries({ queryKey: ["admin", "notifications"] }),
+    ]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState("all");

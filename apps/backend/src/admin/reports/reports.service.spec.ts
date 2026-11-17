@@ -55,6 +55,7 @@ function setup(found: unknown[]) {
   const notifications = { notifyStaff: jest.fn().mockResolvedValue(undefined) };
   const settings = {
     reportAlertThreshold: jest.fn().mockResolvedValue(3),
+    postReportAlertThreshold: jest.fn().mockResolvedValue(5),
   };
   const service = new ReportsService(
     db as never,
@@ -83,6 +84,7 @@ describe('ReportsService.updateListingReportStatus', () => {
   const pending = {
     report: { id: 'r1', listingId: 'l1', status: 'pending' },
     reason: 'Scam',
+    listingUserId: 'u1',
   };
 
   it('takes the listing down inside the same transaction on approval', async () => {
@@ -187,6 +189,147 @@ describe('ReportsService.updateListingReportStatus', () => {
       service.updateListingReportStatus('r1', { status: 'approved' }, reviewer),
     ).rejects.toThrow(NotFoundException);
   });
+
+  it('stays silent below the post threshold', async () => {
+    const { service, notifications, db } = setup([pending]);
+    db.select.mockImplementationOnce(() => chain([{ value: 4 }]));
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('alerts staff when the post count reaches the threshold', async () => {
+    const { service, notifications, db } = setup([pending]);
+    db.select
+      .mockImplementationOnce(() => chain([{ value: 5 }]))
+      .mockImplementationOnce(() =>
+        chain([
+          {
+            username: 'reahuhin',
+            firstName: null,
+            lastName: null,
+            status: 'active',
+          },
+        ]),
+      );
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'report.threshold',
+        title: 'Account reached the post-report threshold',
+        body:
+          '@reahuhin has 5 approved reports on their posts (post threshold 5). ' +
+          'Review the account on the Users page.',
+        data: {
+          targetUserId: 'u1',
+          targetUsername: 'reahuhin',
+          targetName: null,
+          targetStatus: 'active',
+          listingId: 'l1',
+          reportId: 'r1',
+          approvedPostReports: 5,
+          threshold: 5,
+          source: 'listing',
+        },
+      }),
+    );
+    expect(notifications.notifyStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the post threshold, not the account threshold', async () => {
+    const { service, notifications, settings, db } = setup([pending]);
+    settings.reportAlertThreshold.mockResolvedValue(1);
+    settings.postReportAlertThreshold.mockResolvedValue(5);
+    db.select.mockImplementationOnce(() => chain([{ value: 4 }]));
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('alerts again on each newly approved report at or above the threshold', async () => {
+    const { service, notifications, db } = setup([pending]);
+    db.select.mockImplementation(() => chain([{ value: 6 }]));
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).toHaveBeenCalledTimes(2);
+  });
+
+  it('alerts when the report is approved on an already-moderated listing', async () => {
+    const { service, notifications, db } = setup([
+      { ...pending, listingModeratedAt: new Date() },
+    ]);
+    db.select.mockImplementationOnce(() => chain([{ value: 5 }]));
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not alert on rejection', async () => {
+    const { service, notifications } = setup([pending]);
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'rejected' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('does not alert when an already-approved report is re-patched', async () => {
+    const { service, notifications } = setup([
+      { ...pending, report: { ...pending.report, status: 'approved' } },
+    ]);
+
+    await service.updateListingReportStatus(
+      'r1',
+      { status: 'approved' },
+      reviewer,
+    );
+
+    expect(notifications.notifyStaff).not.toHaveBeenCalled();
+  });
+
+  it('survives a notification failure after the approval commits', async () => {
+    const { service, notifications, db } = setup([pending]);
+    db.select.mockImplementationOnce(() => chain([{ value: 5 }]));
+    notifications.notifyStaff.mockRejectedValue(new Error('socket down'));
+
+    await expect(
+      service.updateListingReportStatus('r1', { status: 'approved' }, reviewer),
+    ).resolves.toEqual({ id: 'r1' });
+  });
 });
 
 describe('ReportsService.updateUserReportStatus', () => {
@@ -247,7 +390,17 @@ describe('ReportsService.updateUserReportStatus', () => {
     // account reports = 2, approved reports on the owner's ads = 1
     db.select
       .mockImplementationOnce(() => chain([{ value: 2 }]))
-      .mockImplementationOnce(() => chain([{ value: 1 }]));
+      .mockImplementationOnce(() => chain([{ value: 1 }]))
+      .mockImplementationOnce(() =>
+        chain([
+          {
+            username: 'scammer',
+            firstName: 'Bad',
+            lastName: 'Actor',
+            status: 'suspended',
+          },
+        ]),
+      );
 
     await service.updateUserReportStatus(
       'r1',
@@ -258,7 +411,17 @@ describe('ReportsService.updateUserReportStatus', () => {
     expect(notifications.notifyStaff).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'report.threshold',
-        data: { targetUserId: 'u9', approvedReports: 3, threshold: 3 },
+        body:
+          '@scammer (Bad Actor) has 3 approved reports (account + post, ' +
+          'threshold 3). Review the account on the Users page.',
+        data: {
+          targetUserId: 'u9',
+          targetUsername: 'scammer',
+          targetName: 'Bad Actor',
+          targetStatus: 'suspended',
+          approvedReports: 3,
+          threshold: 3,
+        },
       }),
     );
   });

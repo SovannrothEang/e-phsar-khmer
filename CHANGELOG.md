@@ -21,6 +21,25 @@ How to use this file:
 
 ### Added
 
+- **Post-report threshold alert.** `reports.post_alert_threshold` (default 5, `app_settings`)
+  is a post-only triage signal: approving a listing report counts approved listing reports on
+  the owner's listings (account reports excluded), and at/above the threshold sends staff a
+  `report.threshold` notification with post-specific copy and `source: 'listing'`. It repeats on
+  every approval at/above the threshold; the post is still removed and its owner notified per
+  approval, and suspension stays a manual Users-page action. The account-report threshold now
+  also defaults to 5 (its combined counter is unchanged). No migration; no web or API-contract
+  change.
+
+- **Post-threshold backfill + bell freshness.** `pnpm --filter backend db:backfill-post-thresholds`
+  notifies owners who were already at/above the post threshold before the alert shipped. It is
+  idempotent (`--dry-run` and `--refresh` supported) and skips any owner that already has a
+  post-threshold notice. Threshold notices now name the account (`@handle (Name)`) and carry
+  `targetUsername` / `targetName` / `targetStatus`, so the bell's Open link filters the Users page
+  (`?q=…&status=…`); `--refresh` updates backfill rows written before the identity was added.
+  The report queue pages now invalidate the admin notification queries after a status update, and
+  the dashboard bell's background poll dropped from 60 s to 15 s, so the approving admin sees the
+  notice immediately.
+
 - **Mobile Nearby (location).** The home Nearby card is real: "Allow Location Access" asks
   for foreground location, then lists the nearest live ads from the new public
   `GET /api/v1/listings/nearby` (bounded radius/limit, nearest-first Haversine ordering,

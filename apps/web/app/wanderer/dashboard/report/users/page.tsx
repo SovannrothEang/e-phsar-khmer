@@ -68,8 +68,15 @@ export default function ReportUsersPage() {
     queryKey: ["admin", "reports", "users"],
     queryFn: getUserReports,
   });
+  // The threshold notice is written before the PATCH resolves, so refresh the
+  // bell with the queue instead of waiting for the background poll.
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["admin", "reports", "users"] });
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "reports", "users"],
+      }),
+      queryClient.invalidateQueries({ queryKey: ["admin", "notifications"] }),
+    ]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState("all");

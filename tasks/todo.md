@@ -7243,3 +7243,41 @@ SDK 58 package set.
 - **Open** — New Ad pin runtime proof waits on a signed-in account (DEV_OTP no longer used);
   iOS untested. The deployed API does not include the route yet; the app's Nearby card works
   against the local backend and will work in production once this backend is deployed.
+
+## 2026-11-18 — Post-report threshold alert
+
+- **Backend** — `reports.post_alert_threshold` (default 5) in `SETTING_DEFINITIONS` and
+  `SettingsService.postReportAlertThreshold()`. `updateListingReportStatus` now reads the
+  listing owner in the locked row and, after a newly approved report commits, counts approved
+  `listing_reports` on that owner's listings (account reports excluded) and calls
+  `alertIfPostThresholdReached`. At/above the threshold it sends `report.threshold` to every
+  active admin/super_admin with post-specific copy and `data` carrying `targetUserId`,
+  `targetUsername`, `targetName`, `targetStatus`, `listingId`, `reportId`,
+  `approvedPostReports`, `threshold` and `source: 'listing'`. The body names the account
+  (`@handle (Name)`), and the bell's Open link filters the Users page (`?q=…&status=…`). The
+  alert repeats on each approval at/above N, is best-effort, and never suspends anything; the
+  per-approval take-down and owner notice are unchanged. The account threshold
+  (`reports.alert_threshold`) now also defaults to 5; its combined counter is unchanged.
+  `db:backfill-post-thresholds` (`src/admin/reports/backfill-post-thresholds.ts`, `--dry-run`,
+  `--refresh`) covers owners already at/above the post threshold; it skips any owner with an
+  existing `report.threshold` notice, writes the durable in-app rows, and refreshes old backfill
+  rows with the identity.
+- **Tests** — `reports.service.spec.ts` covers below/at threshold, post-vs-account setting,
+  repeat alerts, already-moderated listings, rejection, re-patching an approved report, a
+  `notifyStaff` failure, and the account identity in both alert paths. `settings.service.spec.ts`
+  covers the default 5 and a stored value; `admin-links.test.ts` covers the identity-filtered
+  Users URL. Backfill dry-run/live/idempotency and `--refresh` were exercised against the shared
+  DB.
+- **Verified** — full backend Jest suite 122 suites / 1,741 tests passed; targeted ESLint on
+  the seven changed backend files clean; `nest build` clean; web `eslint`, `next build` and
+  `pnpm --filter web test` (130 tests) clean; Prettier check on the changed source/spec/docs
+  files clean. Backfill dry-run: 1 owner (`@reahuhin`, 10 approved post reports), 5 staff; live
+  run wrote 5 `report.threshold` rows; `--refresh` updated them with `targetUsername`,
+  `targetName` and `targetStatus`; the second dry-run skipped the owner. The admin queue pages
+  now invalidate `["admin","notifications"]` after a status update, and the bell poll is 15 s.
+- **Open** — the runtime alert and the identity in new notices need the backend
+  deployed/restarted; the filtered Open link, 15 s bell poll and queue invalidation need the web
+  deployed. The refreshed backfill rows are already in the shared DB and show the new body in
+  the existing dashboard; its Open link stays unfiltered until the web deploy. The account
+  counter still sums account + post reports. There is no dashboard control for either threshold
+  (API-only). No commit or PR.

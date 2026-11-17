@@ -37,8 +37,11 @@ import {
 import { toast } from "@/components/ui/sonner";
 import type { BackendNotification } from "@/types/notification";
 
-/** Matches the storefront badge and the report-queue cadence. */
-const POLL_MS = 60_000;
+/**
+ * The dashboard has no notification socket, so this bounds how stale the bell
+ * can be. Opening the drawer still refetches immediately.
+ */
+const POLL_MS = 15_000;
 const RECENT_LIMIT = 8;
 
 /** The report queues are unpaginated, so this is the exact pending count. */

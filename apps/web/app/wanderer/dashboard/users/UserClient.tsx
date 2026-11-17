@@ -99,15 +99,23 @@ function AccountTypeBadge({ type }: { type: User["accountType"] }) {
 
 export default function UserPage({
   initialData,
+  initialQ = "",
+  initialTab = "active",
 }: {
   initialData?: AdminUsersResult;
+  initialQ?: string;
+  initialTab?: string;
 }) {
   const queryClient = useQueryClient();
   const locale = useLocale();
+  const initialTabValue =
+    initialTab === "suspended" || initialTab === "deleted"
+      ? initialTab
+      : "active";
 
-  const [tab, setTab] = useState("active");
-  const [searchInput, setSearchInput] = useState("");
-  const [q, setQ] = useState("");
+  const [tab, setTab] = useState(initialTabValue);
+  const [searchInput, setSearchInput] = useState(initialQ);
+  const [q, setQ] = useState(initialQ);
   const [accountType, setAccountType] = useState("all");
   const [verified, setVerified] = useState("all");
   const [page, setPage] = useState(1);

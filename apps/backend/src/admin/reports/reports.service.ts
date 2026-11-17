@@ -43,6 +43,23 @@ function nameOf(u: {
   );
 }
 
+interface AccountIdentity {
+  username: string | null;
+  name: string | null;
+  status: string;
+}
+
+/** The account label a moderation notice shows: @handle (Name), Name, or the id. */
+function whoLabel(identity: AccountIdentity | null, fallback: string): string {
+  if (!identity) return fallback;
+  if (identity.username) {
+    return identity.name
+      ? `@${identity.username} (${identity.name})`
+      : `@${identity.username}`;
+  }
+  return identity.name ?? fallback;
+}
+
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
@@ -262,17 +279,52 @@ export class ReportsService {
       const approved = (accountReports?.value ?? 0) + (postReports?.value ?? 0);
       if (approved < threshold) return;
 
+      const identity = await this.loadAccountIdentity(targetUserId);
+      const who = whoLabel(identity, targetUserId);
       await this.notifications.notifyStaff({
         type: 'report.threshold',
         title: 'Account reached the report threshold',
-        body: `${approved} approved reports (threshold ${threshold}). Review the account on the Users page.`,
-        data: { targetUserId, approvedReports: approved, threshold },
+        body: `${who} has ${approved} approved reports (account + post, threshold ${threshold}). Review the account on the Users page.`,
+        data: {
+          targetUserId,
+          targetUsername: identity?.username ?? null,
+          targetName: identity?.name ?? null,
+          targetStatus: identity?.status ?? null,
+          approvedReports: approved,
+          threshold,
+        },
       });
     } catch (err) {
       this.logger.warn(
         `Could not alert staff about reports for ${targetUserId}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * The account's display identity for a staff notice. Best-effort: a missing
+   * row or a read failure must not stop the alert, so callers fall back to the
+   * user id.
+   */
+  private async loadAccountIdentity(
+    userId: string,
+  ): Promise<AccountIdentity | null> {
+    const [row] = await this.db
+      .select({
+        username: users.username,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (!row) return null;
+    return {
+      username: row.username,
+      name: [row.firstName, row.lastName].filter(Boolean).join(' ') || null,
+      status: row.status,
+    };
   }
 
   async removeUserReport(id: string): Promise<{ id: string }> {
@@ -342,12 +394,13 @@ export class ReportsService {
     dto: UpdateReportStatusDto,
     reviewer: RequestUser,
   ) {
-    const { row, notice } = await this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       const [found] = await tx
         .select({
           report: listingReports,
           reason: reportReasons.reason,
           listingModeratedAt: listings.moderatedAt,
+          listingUserId: listings.userId,
         })
         .from(listingReports)
         .leftJoin(reportReasons, eq(reportReasons.id, listingReports.reasonId))
@@ -357,6 +410,8 @@ export class ReportsService {
         .for('update', { of: listingReports });
       if (!found) throw new NotFoundException('Listing report not found');
       const { report } = found;
+      const approvedNow =
+        dto.status === 'approved' && report.status !== 'approved';
 
       const [updated] = await tx
         .update(listingReports)
@@ -364,7 +419,7 @@ export class ReportsService {
         .where(eq(listingReports.id, id))
         .returning();
 
-      if (dto.status === 'approved' && report.status !== 'approved') {
+      if (approvedNow) {
         const reason = found.reason
           ? `Reported: ${found.reason}`
           : 'Reported content';
@@ -392,10 +447,20 @@ export class ReportsService {
         return {
           row: updated,
           notice: moderated ? { listing: moderated, reason } : null,
+          approvedNow,
+          ownerId: found.listingUserId ?? null,
+          listingId: report.listingId,
         };
       }
-      return { row: updated, notice: null };
+      return {
+        row: updated,
+        notice: null,
+        approvedNow,
+        ownerId: found.listingUserId ?? null,
+        listingId: report.listingId,
+      };
     });
+    const { row, notice, approvedNow, ownerId, listingId } = result;
 
     if (notice) {
       await this.adminListings.notifyOwnerOfModeration(
@@ -404,7 +469,69 @@ export class ReportsService {
         notice.reason,
       );
     }
+
+    if (approvedNow && ownerId) {
+      await this.alertIfPostThresholdReached(ownerId, {
+        listingId,
+        reportId: id,
+      });
+    }
     return row;
+  }
+
+  /**
+   * Post-side triage signal, separate from the account threshold: counts only
+   * approved reports on listings this account owns. Best-effort by design —
+   * the approval has already committed, and a failed notice must not turn it
+   * into an error the admin would retry.
+   */
+  private async alertIfPostThresholdReached(
+    targetUserId: string,
+    context: { listingId: string; reportId: string },
+  ): Promise<void> {
+    try {
+      const [[postReports], threshold] = await Promise.all([
+        this.db
+          .select({ value: count() })
+          .from(listingReports)
+          .innerJoin(listings, eq(listings.id, listingReports.listingId))
+          .where(
+            and(
+              eq(listings.userId, targetUserId),
+              eq(listingReports.status, 'approved'),
+            ),
+          ),
+        this.settings.postReportAlertThreshold(),
+      ]);
+
+      const approved = postReports?.value ?? 0;
+      if (approved < threshold) return;
+
+      const identity = await this.loadAccountIdentity(targetUserId);
+      const who = whoLabel(identity, targetUserId);
+      await this.notifications.notifyStaff({
+        type: 'report.threshold',
+        title: 'Account reached the post-report threshold',
+        body: `${who} has ${approved} approved reports on their posts (post threshold ${threshold}). Review the account on the Users page.`,
+        data: {
+          targetUserId,
+          targetUsername: identity?.username ?? null,
+          targetName: identity?.name ?? null,
+          targetStatus: identity?.status ?? null,
+          listingId: context.listingId,
+          reportId: context.reportId,
+          approvedPostReports: approved,
+          threshold,
+          source: 'listing',
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Could not alert staff about post reports for ${targetUserId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async removeListingReport(id: string): Promise<{ id: string }> {

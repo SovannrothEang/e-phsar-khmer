@@ -69,6 +69,12 @@ export class SettingsService {
     return this.get<number>('reports.alert_threshold', executor);
   }
 
+  async postReportAlertThreshold(
+    executor: DbExecutor = this.db,
+  ): Promise<number> {
+    return this.get<number>('reports.post_alert_threshold', executor);
+  }
+
   /** Only the channels that are actually configured; empty strings are dropped. */
   async supportContacts(
     executor: DbExecutor = this.db,
