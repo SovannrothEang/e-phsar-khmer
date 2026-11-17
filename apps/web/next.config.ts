@@ -6,9 +6,21 @@ const withNextIntl = createNextIntlPlugin();
 // Derive the Supabase Storage host from the env so next/image can optimize
 // public bucket URLs. Evaluated at build time (server-side only); the host is
 // already visible in <img src> URLs delivered to the browser — no secret leak.
-const supabaseHost = process.env.SUPABASE_URL
-  ? new URL(process.env.SUPABASE_URL).hostname
-  : null;
+//
+// `vercel pull` writes "[SENSITIVE]" instead of the value for a sensitive env
+// var. The known production host is also hardcoded in `remotePatterns` below,
+// so a redacted or malformed value should drop the optional entry, not crash
+// the whole build.
+function supabaseHostname(raw: string | undefined): string | null {
+  if (!raw || raw === "[SENSITIVE]") return null;
+  try {
+    return new URL(raw).hostname;
+  } catch {
+    return null;
+  }
+}
+
+const supabaseHost = supabaseHostname(process.env.SUPABASE_URL);
 
 // A per-build stamp for the devices page ("Browser 2026.10.20"). Evaluated
 // when the config is loaded — at image build time in Docker, at server start
