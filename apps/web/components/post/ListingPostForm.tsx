@@ -1,5 +1,6 @@
 "use client";
 
+import type messages from "@/messages/en.json";
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -38,7 +39,9 @@ const ENGINE_TYPES = ["Diesel", "Electric", "Hybrid", "LPG", "Petrol"] as const;
 const TRANSMISSIONS = ["Auto", "Manual"] as const;
 
 /** Stored engine values → `PostForm.options.*` message keys. */
-const ENGINE_KEYS: Record<string, string> = {
+type PostFormOptionKey = keyof (typeof messages)["PostForm"]["options"];
+
+const ENGINE_KEYS: Record<string, PostFormOptionKey> = {
   Diesel: "diesel",
   Electric: "electric",
   Hybrid: "hybrid",
@@ -47,7 +50,9 @@ const ENGINE_KEYS: Record<string, string> = {
 };
 
 /** English `field_schema` labels → `PostForm.labels.*` message keys. */
-const LABEL_KEYS: Record<string, string> = {
+type PostFormLabelKey = keyof (typeof messages)["PostForm"]["labels"];
+
+const LABEL_KEYS: Record<string, PostFormLabelKey> = {
   Photos: "photos",
   Logo: "logo",
   Title: "title",
@@ -90,6 +95,17 @@ const LABEL_KEYS: Record<string, string> = {
   CPU: "cpu",
   VGA: "vga",
   "Vehicle Type": "vehicleType",
+};
+
+/**
+ * Stable field-key overrides for fields whose schema key is not the message
+ * key. Shared by every category (the contact trio), so they live here rather
+ * than in each seeded schema.
+ */
+const FIELD_KEY_LABELS: Record<string, PostFormLabelKey> = {
+  contactName: "name",
+  contactPhones: "phone",
+  contactEmail: "email",
 };
 
 /**
@@ -1022,11 +1038,19 @@ export default function ListingPostForm({
     );
   }
 
-  /** The schema's English label, translated through `PostForm.labels.*`. */
+  /**
+   * Field labels, resolved by stable keys: the schema's own `labelKey` (set
+   * for the jobs title/logo/salary variants), then the shared field-key map
+   * (contact fields), then the legacy English-label map, then the field key.
+   * English text is display only — `t.has` guards the final lookup.
+   */
   const labelFor = (key: string, fallback: string) => {
     const raw = config.labels[key] ?? fallback;
-    const messageKey = LABEL_KEYS[raw];
-    return messageKey ? t(`labels.${messageKey}`) : raw;
+    const messageKey = (config.labelKeys[key] ??
+      FIELD_KEY_LABELS[key] ??
+      LABEL_KEYS[raw] ??
+      key) as PostFormLabelKey;
+    return t.has(`labels.${messageKey}`) ? t(`labels.${messageKey}`) : raw;
   };
 
   const removePhoneRow = (index: number) => {

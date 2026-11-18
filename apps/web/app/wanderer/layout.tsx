@@ -7,6 +7,7 @@ import NextTopLoader from "nextjs-toploader";
 import { ClientThemeProvider } from "@/components/client-theme-provider";
 import { Providers } from "@/app/providers";
 import { resolveAdminLocale } from "@/lib/auth/admin-locale";
+import { routing, type Locale } from "@/i18n/routing";
 
 export const metadata: Metadata = {
   title: { default: "Admin — PhsarKhmer", template: "%s — Admin" },
@@ -24,7 +25,10 @@ export default async function WandererRootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await resolveAdminLocale();
+  const resolvedLocale = await resolveAdminLocale();
+  const locale: Locale = routing.locales.includes(resolvedLocale as Locale)
+    ? (resolvedLocale as Locale)
+    : routing.defaultLocale;
   const messages = (await import(`@/messages/${locale}.json`)).default;
 
   return (

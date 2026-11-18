@@ -84,7 +84,7 @@ const DEFAULT_HEADER_FLAGS: HeaderFlags = {
 };
 // ─── Attribute sets rendered as option grids on the browse pages; the rows
 //     carry subcategoryIds (UUIDs) — the page filters by the subcategory id. ──
-const ATTRIBUTE_SET_TITLES: Record<string, string> = {
+const ATTRIBUTE_SET_TITLES = {
   bodytypes: "Specs.attributes.bodyType",
   types: "Specs.attributes.type",
   accessories: "Specs.attributes.accessories",
@@ -112,8 +112,10 @@ const ATTRIBUTE_SET_TITLES: Record<string, string> = {
   screensize_laptop: "Specs.attributes.screenSize",
   screensize_monitor: "Specs.attributes.screenSize",
   vgas: "Specs.attributes.vga",
-};
-const ATTRIBUTE_SET_TYPES = Object.keys(ATTRIBUTE_SET_TITLES);
+} as const;
+const ATTRIBUTE_SET_TYPES = Object.keys(
+  ATTRIBUTE_SET_TITLES,
+) as (keyof typeof ATTRIBUTE_SET_TITLES)[];
 
 /**
  * Which attribute key a grid's value is stored under.

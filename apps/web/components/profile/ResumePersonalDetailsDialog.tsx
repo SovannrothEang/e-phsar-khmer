@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import type messages from "@/messages/en.json";
 import { MONTH_LABELS } from "@/lib/locale-labels";
 import type { ResumePersonalData } from "@/components/profile/ResumePreview";
 import {
@@ -77,13 +78,18 @@ export const EDUCATION_LEVELS = [
   "Doctor",
 ] as const;
 
-const GENDER_KEYS: Record<string, string> = { Male: "male", Female: "female" };
-const MARITAL_KEYS: Record<string, string> = {
+type ResumeOptionKey = keyof (typeof messages)["Resume"]["form"]["options"];
+
+const GENDER_KEYS: Record<string, ResumeOptionKey> = {
+  Male: "male",
+  Female: "female",
+};
+const MARITAL_KEYS: Record<string, ResumeOptionKey> = {
   Single: "single",
   Married: "married",
   Divorced: "divorced",
 };
-export const EDUCATION_KEYS: Record<string, string> = {
+export const EDUCATION_KEYS: Record<string, ResumeOptionKey> = {
   "High School": "highSchool",
   Associate: "associate",
   Professional: "professional",

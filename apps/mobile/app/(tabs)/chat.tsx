@@ -2,6 +2,7 @@ import RestoreHistoryModal from "@/components/chat/RestoreHistoryModal";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useChatBackup, type ChatBackupState } from "@/hooks/use-chat-backup";
 import {
   fetchChatMessages,
@@ -149,6 +150,7 @@ export default function ChatScreen() {
     : params.listingId;
 
   const { isAuthenticated, isLoading, userId } = useAuth();
+  const { t } = useLanguage();
 
   const [engine, setEngine] = useState<RatchetEngine | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
@@ -618,7 +620,7 @@ export default function ChatScreen() {
                     }}
                     className="mt-3 rounded-lg border border-primary px-5 py-2"
                   >
-                    <Text className="font-bold text-primary">Retry</Text>
+                    <Text className="font-bold text-primary">{t("retry")}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -648,7 +650,7 @@ export default function ChatScreen() {
                 </Text>
               ) : messages.length === 0 ? (
                 <Text className="py-6 text-center text-sm text-neutral-text-sub">
-                  Say hello — messages are end-to-end encrypted.
+                  {t("sayHello")}
                 </Text>
               ) : (
                 messages.map((message) => {
@@ -732,7 +734,7 @@ export default function ChatScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Type a message…"
+              placeholder={t("typeMessage")}
               placeholderTextColor={Colors.text.muted}
               multiline
               maxLength={2000}
@@ -798,7 +800,7 @@ export default function ChatScreen() {
       className="flex-1 bg-neutral-background"
     >
       <View className="flex-row items-center justify-between bg-primary px-4 py-3">
-        <Text className="text-xl font-bold text-white">Chat</Text>
+        <Text className="text-xl font-bold text-white">{t("chat")}</Text>
         <View className="flex-row items-center gap-4">
           <TouchableOpacity
             onPress={() => {
@@ -827,7 +829,7 @@ export default function ChatScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search chats"
+              placeholder={t("searchChats")}
               placeholderTextColor="#9CA3AF"
               autoFocus
               className="ml-2 flex-1 p-0 text-base text-gray-900 dark:text-white"

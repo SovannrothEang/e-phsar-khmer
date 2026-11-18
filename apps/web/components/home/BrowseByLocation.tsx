@@ -39,8 +39,8 @@ export default async function BrowseByLocation() {
           >
             {locale === "km" && province.nameKm
               ? province.nameKm
-              : t.has(province.name)
-                ? t(province.name)
+              : t.has(province.name as never)
+                ? t(province.name as never)
                 : province.name}
           </Link>
         ))}

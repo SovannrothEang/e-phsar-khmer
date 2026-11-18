@@ -1,159 +1,125 @@
-# Turborepo starter
+# PhsarKhmer
 
-This Turborepo starter is maintained by the Turborepo core team.
+Marketplace for buying and selling in Cambodia. This repo contains three apps:
 
-## Using this example
+- `apps/backend` — NestJS API (port 3000)
+- `apps/web` — Next.js website (port 3001)
+- `apps/mobile` — Expo React Native app
 
-Run the following command:
+## Requirements
 
-```sh
-npx create-turbo@latest
+- Node.js 22 (22.12 or newer)
+- pnpm 9.0.0
+- Git
+- Docker (optional — only used to run Redis)
+- Windows users: use WSL2
+
+Turbo comes with the project. You do not need to install it.
+
+## Setup
+
+### 1. Install pnpm
+
+```bash
+npm install -g pnpm@9.0.0
+pnpm --version   # should print 9.0.0
 ```
 
-## What's inside?
+### 2. Clone the project
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+git clone https://github.com/sakkunasuon2014/psa-npic.git
+cd psa-npic
 ```
 
-Without global `turbo`, use your package manager:
+### 3. Install dependencies
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```bash
+pnpm install
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### 4. Create the backend environment file
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
+```bash
+cp apps/backend/.env.example apps/backend/.env
 ```
 
-Without global `turbo`:
+Ask the team for the values. At minimum you need:
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `JWT_SECRET`
+- `JWT_REFRESH_SECRET`
+
+Payments, SMS and storage uploads need their own keys too — see the comments in `apps/backend/.env.example`.
+
+### 5. Start Redis
+
+```bash
+docker run --rm -d -p 6379:6379 redis:7-alpine
 ```
 
-### Develop
+### 6. Create the database
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+pnpm --filter backend db:migrate
+pnpm --filter backend db:seed
 ```
 
-Without global `turbo`, use your package manager:
+### 7. Start the backend
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+```bash
+pnpm --filter backend start:dev
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Check it works: <http://localhost:3000/health>
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### 8. Start the web app
 
-```sh
-turbo dev --filter=web
+In a second terminal:
+
+```bash
+pnpm --filter web dev
 ```
 
-Without global `turbo`:
+Open <http://localhost:3001>.
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+## Mobile app (optional)
+
+Install **Expo Go (SDK 58)** on your phone, put the phone on the same Wi-Fi, then:
+
+```bash
+pnpm --filter phsarkhmer exec expo start --lan --go
 ```
 
-### Remote Caching
+Scan the QR code. You do not need Android Studio for Expo Go.
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+A native build (`pnpm --filter phsarkhmer android`) needs JDK 17 and the Android SDK. iOS native builds need macOS.
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## Useful commands
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
+```bash
+pnpm build                 # build every package
+pnpm lint                  # lint every package
+pnpm format:check          # check formatting (same check as CI)
+pnpm --filter backend test
+pnpm --filter web test
+pnpm --filter phsarkhmer lint
 ```
 
-Without global `turbo`, use your package manager:
+## Troubleshooting
 
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
+- **`sharp` fails during install on Linux** — run `SHARP_IGNORE_GLOBAL_LIBVIPS=1 pnpm install`.
+- **Backend crashes on boot** — check Node is 22.12 or newer. Older Node cannot load some dependencies.
+- **Chat messages never arrive** — `NEXT_PUBLIC_WS_URL` in the web env must use the same host as `API_URL`.
+- **Uploads fail with 415 or 413** — a Supabase storage bucket setting; ask the team.
+- **Native modules are missing after install** — you are probably on pnpm 10; use 9.0.0.
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+## More docs
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how the system works
+- [AGENTS.md](AGENTS.md) — coding rules
+- [CHANGELOG.md](CHANGELOG.md) — what changed and when
+- `apps/backend/src/*/README.md` — per-module details (payment, chat, files, otp)

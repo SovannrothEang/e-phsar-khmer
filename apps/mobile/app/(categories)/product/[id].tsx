@@ -1,6 +1,7 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useReactions } from "@/contexts/ReactionsContext";
 import { ApiError } from "@/lib/api/client";
 import { fetchCategories, fetchListing } from "@/lib/api/listings";
@@ -45,6 +46,7 @@ export default function ProductDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { isAuthenticated, user } = useAuth();
+  const { t } = useLanguage();
   const { isLiked, isSaved, likeCountFor, toggleLike, toggleSave } =
     useReactions();
 
@@ -141,6 +143,9 @@ export default function ProductDetailScreen() {
   }
 
   const isExpired = listing.status === "expired";
+  // The trusted spec page the poster attached; the backend nulls it once the
+  // page is unpublished or its brand/model is inactive, so the chip hides too.
+  const productRef = listing.product;
   const liked = isLiked(listing.id);
   const saved = isSaved(listing.id);
   const likeCount = likeCountFor(listing.id, listing.likeCount ?? 0);
@@ -479,6 +484,33 @@ export default function ProductDetailScreen() {
               </View>
             )}
           </View>
+
+          {productRef ? (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/spec/[brand]/[model]",
+                  params: {
+                    brand: productRef.brandSlug,
+                    model: productRef.modelSlug,
+                  },
+                } as never)
+              }
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t("viewFullSpecs")}
+              className="mt-3 flex-row items-center gap-1 self-start rounded-md border border-primary/30 bg-[#DCEEF8] px-2.5 py-1.5 dark:border-primary/40 dark:bg-primary/15"
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={14}
+                color={Colors.primary.DEFAULT}
+              />
+              <Text className="text-sm font-semibold text-primary dark:text-sky-300">
+                {t("viewFullSpecs")}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Gray divider between section one and section two */}

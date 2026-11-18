@@ -140,7 +140,7 @@ const TabsLayout = () => {
         name="notification"
         listeners={({ navigation }) => createProtectedTabListener(navigation)}
         options={{
-          title: "Notification",
+          title: t("notification"),
           tabBarBadge:
             isAuthenticated && unreadCount > 0 ? unreadCount : undefined,
           tabBarBadgeStyle: {

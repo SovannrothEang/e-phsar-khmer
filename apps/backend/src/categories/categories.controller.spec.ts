@@ -46,8 +46,8 @@ describe('CategoriesController', () => {
 
   describe('getCategory', () => {
     it('passes slug and resolved locale to service', async () => {
-      await controller.getCategory('cars', 'zh-CN,en;q=0.8');
-      expect(mockService.getCategoryBySlug).toHaveBeenCalledWith('cars', 'zh');
+      await controller.getCategory('cars', 'km-KH,en;q=0.9');
+      expect(mockService.getCategoryBySlug).toHaveBeenCalledWith('cars', 'km');
     });
 
     it('defaults to en for unsupported locale', async () => {
@@ -58,11 +58,11 @@ describe('CategoriesController', () => {
 
   describe('getSubcategory', () => {
     it('passes slug, subSlug and resolved locale to service', async () => {
-      await controller.getSubcategory('cars', 'sale', 'zh-CN');
+      await controller.getSubcategory('cars', 'sale', 'km-KH');
       expect(mockService.getSubcategory).toHaveBeenCalledWith(
         'cars',
         'sale',
-        'zh',
+        'km',
       );
     });
 

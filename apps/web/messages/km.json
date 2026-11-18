@@ -33,19 +33,7 @@
       "title": "សូមស្វាគមន៍មកកាន់ PhsarKhmer ទីផ្សារអនឡាញដ៏ធំបំផុតនៅក្នុងប្រទេសកម្ពុជា។"
     },
     "BrowseByCategory": {
-      "title": "ស្វែងរកតាមប្រភេទ",
-      "Cars and Vehicles": "រថយន្ត និងយានយន្ត",
-      "Phones & Tablets": "ទូរស័ព្ទ & ថេប្លេត",
-      "Computers & Accessories": "កុំព្យូទ័រ & គ្រឿងបន្លាស់",
-      "Electronics & Appliances": "អេឡិចត្រូនិច & គ្រឿងប្រើប្រាស់",
-      "House & Land": "ផ្ទះ & ដី",
-      "Jobs": "ការងារ",
-      "Services": "សេវាកម្ម",
-      "Fashion & Beauty": "សំលៀកបំពាក់ & សម្រស់",
-      "Furniture & Decor": "គ្រឿងសង្ហារឹម & ការតុបតែង",
-      "Books, Sports & Hobbies": "សៀវភៅ កីឡា & ចំណូលចិត្ត",
-      "Pets": "សត្វចិញ្ចឹម",
-      "Foods": "អាហារ"
+      "title": "ស្វែងរកតាមប្រភេទ"
     },
     "trending": "កំពុងពេញនិយម",
     "latestads": "ផលិតផលចុងក្រោយ",

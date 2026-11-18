@@ -221,6 +221,13 @@ export interface ListingFormConfig {
    * this pair — the schema makes that unnecessary.)
    */
   labels: Record<string, string>;
+  /**
+   * Explicit UI message keys from the schema (`field_schema[].labelKey`), for
+   * the few fields whose key is not itself the message key. Optional per
+   * field; the form falls back to a stable field-key map, then the legacy
+   * English-label map.
+   */
+  labelKeys: Record<string, string>;
   brands: BackendBrand[];
   /**
    * Published trusted product pages — only fetched when this subcategory
@@ -444,9 +451,11 @@ export async function getListingFormConfig(
       : inlineKinds.map((name) => ({ name, nameKm: null, image: null }));
 
   const labels: Record<string, string> = {};
+  const labelKeys: Record<string, string> = {};
   for (const field of sub.fieldSchema ?? []) {
     const label = field.label?.en;
     if (label) labels[field.key] = label;
+    if (field.labelKey) labelKeys[field.key] = field.labelKey;
   }
 
   // The photo cap is per-subcategory data, not a constant: the 36 jobs forms
@@ -464,6 +473,7 @@ export async function getListingFormConfig(
     subcategoryId: sub.id,
     fields,
     labels,
+    labelKeys,
     brands,
     products,
     vehicleKinds,

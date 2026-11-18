@@ -46,7 +46,7 @@ const METRICS = [
     labelKey: "metrics.applyJob.label",
     descriptionKey: "metrics.applyJob.description",
   },
-] satisfies ReadonlyArray<{
+] as const satisfies ReadonlyArray<{
   key: keyof InsightSummary;
   labelKey: string;
   descriptionKey: string;

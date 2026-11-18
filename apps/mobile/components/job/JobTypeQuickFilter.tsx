@@ -1,4 +1,4 @@
-import { useLanguage } from "@/contexts/LanguageContext";
+import { type TranslationKey, useLanguage } from "@/contexts/LanguageContext";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Image,
@@ -10,7 +10,7 @@ import {
 
 export interface JobTypeItem {
   id: string;
-  labelKey: string;
+  labelKey: TranslationKey;
   defaultLabel: string;
   icon?: keyof typeof Ionicons.glyphMap;
   iconColor?: string;

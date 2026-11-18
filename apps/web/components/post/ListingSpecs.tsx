@@ -2,6 +2,7 @@
 
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
+import type messages from "@/messages/en.json";
 import type { ComponentProps } from "react";
 
 export interface ListingSpecsProps {
@@ -34,7 +35,10 @@ const toText = (v: unknown): string | undefined => {
 // then year, taxType, Condition (only for condition-carrying categories —
 // the same ones that show the Condition chip on the browse bar), bodyType,
 // engineType, transmission, color, then the remaining keys.
-const ATTR_KEYS: [key: string, labelKey: string][] = [
+type SpecsAttrKey =
+  `attributes.${keyof (typeof messages)["Specs"]["attributes"]}`;
+
+const ATTR_KEYS: [key: string, labelKey: SpecsAttrKey][] = [
   ["year", "attributes.year"],
   ["taxType", "attributes.taxType"],
   ["bodyType", "attributes.bodyType"],
@@ -99,7 +103,7 @@ const CONDITION_SUBCATEGORIES = new Set([
 
 // The parts-and-accessories form keys its "Type" picker (Cars/Bicycles/…) as
 // `vehicleType` — same key as the rentals' "Vehicle Type"; label per design.
-const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
+const LABEL_OVERRIDES: Record<string, Record<string, SpecsAttrKey>> = {
   "parts-and-accessories": { vehicleType: "attributes.type" },
   // The `accessory` key prints "Accessory" on Phone Accessories and
   // "Accessory Type" on Fashion Accessories (captain, 2026-09-27). Both

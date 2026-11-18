@@ -17,12 +17,12 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 
 type Props = {
-  defaultValue: string;
+  defaultValue: Locale;
   label: string;
 };
 
 type Language = {
-  value: string;
+  value: Locale;
   icon: string;
 };
 

@@ -40,6 +40,14 @@ How to use this file:
   the dashboard bell's background poll dropped from 60 s to 15 s, so the approving admin sees the
   notice immediately.
 
+- **Mobile product specs.** The listing detail now shows `View full specs` when
+  the post carries a published Product Specification, opening the new
+  `/spec/<brand>/<model>` screen backed by the public
+  `GET /products/:brandSlug/:modelSlug`. The screen mirrors web's fold-rule
+  spec sheet, trusted badge, family/fuel chips, and adds 404, retry and empty
+  states. Chrome is en/km; spec content stays English. No backend, schema or
+  dependency change.
+
 - **Mobile Nearby (location).** The home Nearby card is real: "Allow Location Access" asks
   for foreground location, then lists the nearest live ads from the new public
   `GET /api/v1/listings/nearby` (bounded radius/limit, nearest-first Haversine ordering,

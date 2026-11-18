@@ -192,8 +192,10 @@ export interface BackendFieldDef {
   required?: boolean;
   max?: number;
   options?: string[];
-  /** Localized display name; `en` is always present, `km`/`zh` may not be yet. */
-  label?: { en?: string; km?: string; zh?: string };
+  /** Localized display name; `en` is always present, `km` may not be yet. */
+  label?: { en?: string; km?: string };
+  /** Stable UI message key, set only where `key` is not the message key. */
+  labelKey?: string;
 }
 
 export interface BackendSubcategory {
