@@ -45,7 +45,7 @@ async function seed() {
       })
       .returning({ id: categories.id });
 
-    for (const locale of ['en', 'km', 'zh'] as const) {
+    for (const locale of ['en', 'km'] as const) {
       const value = cat.name[locale];
       if (!value) continue;
       await db
@@ -79,7 +79,7 @@ async function seed() {
         })
         .returning({ id: subcategories.id });
 
-      for (const locale of ['en', 'km', 'zh'] as const) {
+      for (const locale of ['en', 'km'] as const) {
         const value = sub.name[locale];
         if (!value) continue;
         await db

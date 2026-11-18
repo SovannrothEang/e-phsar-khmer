@@ -280,7 +280,7 @@ const SettingsScreen = () => {
         >
           <Ionicons name="chevron-back" size={26} color="white" />
         </TouchableOpacity>
-        <Text className="text-white text-lg font-bold">Settings</Text>
+        <Text className="text-white text-lg font-bold">{t("settings")}</Text>
         <View className="w-8" />
       </View>
 

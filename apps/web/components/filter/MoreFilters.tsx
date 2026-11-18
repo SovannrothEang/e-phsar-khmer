@@ -8,6 +8,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
+import type messages from "@/messages/en.json";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -247,7 +248,9 @@ function ToggleField({
 
 // Labels for the schema-driven selects (the keys `getBrowseFilterOptions`
 // returns); a key outside this map falls back to the schema's English label.
-const ATTRIBUTE_LABEL_KEYS = new Set([
+type SpecsAttrKey = keyof (typeof messages)["Specs"]["attributes"];
+
+const ATTRIBUTE_LABEL_KEYS = new Set<SpecsAttrKey>([
   "jobType",
   "experience",
   "bedroom",
@@ -263,6 +266,9 @@ const ATTRIBUTE_LABEL_KEYS = new Set([
   "vga",
   "network",
 ]);
+
+const isAttributeLabelKey = (key: string): key is SpecsAttrKey =>
+  ATTRIBUTE_LABEL_KEYS.has(key as SpecsAttrKey);
 
 // ─── Main component ───────────────────────────────────────────────────────────
 /** A dialog row a caller can turn off; everything else always renders. */
@@ -761,7 +767,7 @@ export default function MoreFilters({
             <SelectField
               key={select.key}
               label={
-                ATTRIBUTE_LABEL_KEYS.has(select.key)
+                isAttributeLabelKey(select.key)
                   ? t(`Specs.attributes.${select.key}`)
                   : select.label
               }

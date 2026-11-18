@@ -33,11 +33,6 @@ export const routing = defineRouting({
     "/sell": {},
 
     "/about": {},
-    "/contact": {
-      en: "/contact",
-      km: "/contact-haha",
-    },
-
     "/all-ads": {
       en: "/all-ads",
       km: "/all-ads",

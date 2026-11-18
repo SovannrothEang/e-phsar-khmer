@@ -33,19 +33,7 @@
       "title": "Welcome to PhsarKhmer, the biggest online market in Cambodia."
     },
     "BrowseByCategory": {
-      "title": "Browse By Category",
-      "Cars and Vehicles": "Car and Vehicle",
-      "Phones & Tablets": "Phones & Tablets",
-      "Computers & Accessories": "Computers & Accessories",
-      "Electronics & Appliances": "Electronics & Appliances",
-      "House & Land": "House & Land",
-      "Jobs": "Jobs",
-      "Services": "Services",
-      "Fashion & Beauty": "Fashion & Beauty",
-      "Furniture & Decor": "Furniture & Decor",
-      "Books, Sports & Hobbies": "Books, Sports & Hobbies",
-      "Pets": "Pets",
-      "Foods": "Foods"
+      "title": "Browse By Category"
     },
     "trending": "Trending",
     "latestads": "Latest Ads",

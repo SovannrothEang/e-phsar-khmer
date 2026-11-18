@@ -6,7 +6,7 @@ export interface FieldDef {
   required?: boolean;
   max?: number;
   options?: string[] | null;
-  label?: { en?: string; km?: string; zh?: string };
+  label?: { en?: string; km?: string };
 }
 
 export interface SubcategorySummary {

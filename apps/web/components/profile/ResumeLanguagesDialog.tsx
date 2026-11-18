@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import type messages from "@/messages/en.json";
 import { IconArrowLeft, IconChevronDown, IconX } from "@tabler/icons-react";
 
 import {
@@ -37,7 +38,10 @@ import { Command, CommandItem, CommandList } from "@/components/ui/command";
  */
 
 const LEVELS = ["Beginner", "Intermediate", "Advanced", "Native"] as const;
-const LEVEL_KEYS: Record<string, string> = {
+const LEVEL_KEYS: Record<
+  string,
+  keyof (typeof messages)["Resume"]["form"]["options"]
+> = {
   Beginner: "beginner",
   Intermediate: "intermediate",
   Advanced: "advanced",

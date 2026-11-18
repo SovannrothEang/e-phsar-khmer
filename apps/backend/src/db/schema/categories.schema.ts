@@ -12,7 +12,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
-export const localeEnum = pgEnum('locale', ['en', 'km', 'zh']);
+export const localeEnum = pgEnum('locale', ['en', 'km']);
 
 export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -107,11 +107,17 @@ export type NewCategoryTranslation = typeof categoryTranslations.$inferInsert;
 export type NewSubcategoryTranslation =
   typeof subcategoryTranslations.$inferInsert;
 
-export type I18nName = { en: string; km?: string; zh?: string };
+export type I18nName = { en: string; km?: string };
 
 export type FieldDef = {
   key: string;
   label: I18nName;
+  /**
+   * Optional UI message key for this field's label. Set only where the schema
+   * key is not itself the message key (jobs' title/price/photos variants).
+   * Display text (`label.en`) is never used as an identifier.
+   */
+  labelKey?: string;
   type:
     | 'text'
     | 'number'

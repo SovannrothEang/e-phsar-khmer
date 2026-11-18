@@ -7,6 +7,8 @@
  * these constants as values, which a client-module export would not give them.
  */
 
+import type messages from "@/messages/en.json";
+
 export const Q_PARAM = "q";
 export const CATEGORY_PARAM = "category";
 export const SUB_PARAM = "sub";
@@ -141,7 +143,10 @@ export type ConditionValue = (typeof CONDITION_OPTIONS)[number]["value"];
  * localized, so /km reads សាំង, ម៉ាស៊ូត, … while filtering still works. Shared
  * by the bar's Engine chip and the More Filters dialog.
  */
-export const ENGINE_LABEL_KEYS: Record<string, string> = {
+export const ENGINE_LABEL_KEYS: Record<
+  string,
+  keyof (typeof messages)["PostForm"]["options"]
+> = {
   Diesel: "diesel",
   Electric: "electric",
   Hybrid: "hybrid",

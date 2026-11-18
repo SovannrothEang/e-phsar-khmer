@@ -6,6 +6,7 @@ import LatestAds from "@/components/home/LatestAds";
 import NearbySection from "@/components/home/NearbySection";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { fetchAdvertisements } from "@/lib/api/advertisements";
 import { fetchCategories } from "@/lib/api/listings";
@@ -25,6 +26,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 const HomeScreen = () => {
   const { isAuthenticated } = useAuth();
   const { toggleTheme } = useTheme();
+  const { t } = useLanguage();
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
     queryFn: fetchCategories,
@@ -62,7 +64,7 @@ const HomeScreen = () => {
           ) : categories.length === 0 ? (
             <View className="items-center py-6">
               <Text className="text-sm text-gray-500">
-                Could not load categories.
+                {t("couldNotLoadCategories")}
               </Text>
             </View>
           ) : (

@@ -143,3 +143,37 @@ the commit that closed each row.
   browser-verified.
 - **E2E H3.2** — only the "locked + passcode" notice state was seen in a browser;
   "ready" and "locked, no passcode" were not.
+
+## 9. Locale-aware notification and SMS text — English today, by decision
+
+Captain, 2026-11-18: "keep it for now, and note it."
+
+Backend-generated user-facing text is hardcoded English:
+
+- `NotificationPayload.title`/`body` are built at each call site — e.g.
+  `${name} applied for ${job.title}` (`applications.service.ts:504`), plus the
+  listing-expiry, admin-removal and report notices. They render inside a Khmer
+  inbox.
+- The password-reset SMS is one English sentence
+  (`otp/otp-sms-sender.ts:192`); a Khmer user receives it in English.
+- API error _codes_ are stable (`INVALID_REASON`, `PHONE_BANNED`); the web
+  translates the ones it knows client-side, the backend `message` is English.
+
+`notifications.type` is already a stable key (`application.created`,
+`payment.succeeded`, `listing.expired`), so the fix is a `{type, locale}`
+template lookup plus a locale for SMS (the recipient's `preferredLanguage`) —
+not a redesign. Keep OTP secrets out of the outbox (`otp/README.md`).
+
+## 10. Mobile UI translation coverage — shell done, screens remain
+
+2026-11-18: the language now persists (`phsarkhmer.language` in AsyncStorage),
+hydrates before the first screen (so the first API calls already carry the
+stored `Accept-Language`), and the dictionary is typed (`TranslationKey`, en/km
+parity enforced by `tsc`). The tab shell, notification screen, chat inbox and
+settings header are translated.
+
+Remaining: ~45 screens still hardcode English (auth, filters, search, account,
+post/edit flows, dialogs). Add the `en`/`km` pair to
+`contexts/LanguageContext.tsx`, then replace the literal with `t(...)` — a
+missing key is a type error, and `pnpm --filter phsarkhmer exec tsc --noEmit`
+is the gate (`expo lint` alone is not enough).

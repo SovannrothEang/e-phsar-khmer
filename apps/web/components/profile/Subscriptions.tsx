@@ -8,6 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import type messages from "@/messages/en.json";
 import { useRouter } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +29,10 @@ const NEARLY_DAYS = 30;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const STATUS_LABEL_KEY: Record<SubscriptionStatus, string> = {
+const STATUS_LABEL_KEY: Record<
+  SubscriptionStatus,
+  keyof (typeof messages)["Me"]["subscriptions"]
+> = {
   active: "active",
   expired: "expired",
   superseded: "superseded",

@@ -1,5 +1,6 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   AppNotification,
   useNotification,
@@ -22,6 +23,7 @@ import {
 const NotificationScreen = () => {
   const router = useRouter();
   const { isDark } = useTheme();
+  const { t } = useLanguage();
   const {
     notifications,
     isLoading,
@@ -81,7 +83,9 @@ const NotificationScreen = () => {
     >
       {/* Header */}
       <View className="flex-row items-center justify-between bg-primary px-4 py-3">
-        <Text className="text-xl font-bold text-white">Notification</Text>
+        <Text className="text-xl font-bold text-white">
+          {t("notification")}
+        </Text>
         <TouchableOpacity
           onPress={() => setMenuOpen(true)}
           className="p-1"
@@ -117,7 +121,7 @@ const NotificationScreen = () => {
                 isDark ? "text-gray-400" : "text-gray-500"
               }`}
             >
-              No notifications
+              {t("noNotificationsYet")}
             </Text>
           </View>
         ) : (
@@ -166,7 +170,9 @@ const NotificationScreen = () => {
                   {isLoading ? (
                     <ActivityIndicator color={Colors.primary.DEFAULT} />
                   ) : (
-                    <Text className="font-bold text-primary">Load more</Text>
+                    <Text className="font-bold text-primary">
+                      {t("loadMore")}
+                    </Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -202,7 +208,7 @@ const NotificationScreen = () => {
               }`}
             >
               <Text className="text-base font-medium text-primary">
-                Mark all as read
+                {t("markAllRead")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -215,7 +221,7 @@ const NotificationScreen = () => {
               }`}
             >
               <Text className="text-base font-medium text-primary">
-                Delete all notifications
+                {t("deleteAllNotifications")}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -226,7 +232,7 @@ const NotificationScreen = () => {
               className="items-center py-4"
             >
               <Text className="text-base font-medium text-primary">
-                Notification settings
+                {t("notificationSettings")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -237,7 +243,7 @@ const NotificationScreen = () => {
             }`}
           >
             <Text className="text-base font-semibold text-gray-500">
-              Cancel
+              {t("cancel")}
             </Text>
           </TouchableOpacity>
         </TouchableOpacity>

@@ -92,6 +92,10 @@ const DETAIL_SKIP_KEYS = new Set([
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
+  // Upload failures are raised as plain Errors with a specific reason
+  // ("The photo upload was refused (413)."). Swallowing that behind a generic
+  // sentence is what made a refused photo look like a silent no-op.
+  if (error instanceof Error && error.message) return error.message;
   return "Something went wrong. Please try again.";
 }
 
@@ -120,6 +124,13 @@ const NewAdScreen = () => {
   // for the same reason, and submit validation already treats "" as missing.
   const [condition, setCondition] = useState<"" | "new" | "used">("");
   const [photos, setPhotos] = useState<PhotoEntry[]>([]);
+  // Photos upload as they are picked and land in `photos` after each PUT. A
+  // submit fired while that is still running would build its payload from a
+  // stale array, posting the ad without the photo the user just added. Keep a
+  // ref mirror (state updates are async, so awaiting alone is not enough) and
+  // the in-flight upload promise; submit awaits both.
+  const photosRef = useRef<PhotoEntry[]>([]);
+  const pendingUploads = useRef<Promise<void> | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Submit flags are inline (captain, 2026-11-04): no required asterisks; the
@@ -383,47 +394,63 @@ const NewAdScreen = () => {
     if (result.canceled || result.assets.length === 0) return;
 
     setUploading(true);
-    try {
-      for (const asset of result.assets.slice(0, remaining)) {
-        const mime = asset.mimeType ?? "image/jpeg";
-        if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
-          Alert.alert(
-            "Unsupported photo",
-            "Use a JPEG, PNG or WebP image — the storage bucket rejects other formats.",
-          );
-          continue;
-        }
-        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
-          Alert.alert("Photo too large", "Each photo must be 5 MB or smaller.");
-          continue;
-        }
+    const upload = (async () => {
+      try {
+        for (const asset of result.assets.slice(0, remaining)) {
+          const mime = asset.mimeType ?? "image/jpeg";
+          if (!["image/jpeg", "image/png", "image/webp"].includes(mime)) {
+            Alert.alert(
+              "Unsupported photo",
+              "Use a JPEG, PNG or WebP image — the storage bucket rejects other formats.",
+            );
+            continue;
+          }
+          if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+            Alert.alert(
+              "Photo too large",
+              "Each photo must be 5 MB or smaller.",
+            );
+            continue;
+          }
 
-        const filename =
-          asset.fileName ?? `photo-${Date.now()}.${mime.split("/")[1]}`;
-        const signed = await signListingUpload(filename);
-        const fileResponse = await fetch(asset.uri);
-        const blob = await fileResponse.blob();
-        const put = await fetch(signed.signedUrl, {
-          method: "PUT",
-          headers: { "Content-Type": mime },
-          body: blob,
-        });
-        if (!put.ok) throw new Error("The photo upload was refused.");
+          const filename =
+            asset.fileName ?? `photo-${Date.now()}.${mime.split("/")[1]}`;
+          const signed = await signListingUpload(filename);
+          const fileResponse = await fetch(asset.uri);
+          const blob = await fileResponse.blob();
+          const put = await fetch(signed.signedUrl, {
+            method: "PUT",
+            headers: { "Content-Type": mime },
+            body: blob,
+          });
+          if (!put.ok)
+            throw new Error(`The photo upload was refused (${put.status}).`);
 
-        setPhotos((current) => [
-          ...current,
-          {
-            url: signed.publicUrl,
-            path: signed.path,
-            sort: current.length,
-            localUri: asset.uri,
-          },
-        ]);
+          setPhotos((current) => {
+            const next = [
+              ...current,
+              {
+                url: signed.publicUrl,
+                path: signed.path,
+                sort: current.length,
+                localUri: asset.uri,
+              },
+            ];
+            photosRef.current = next;
+            return next;
+          });
+        }
+      } catch (error) {
+        Alert.alert("Upload failed", errorMessage(error));
+      } finally {
+        setUploading(false);
       }
-    } catch (error) {
-      Alert.alert("Upload failed", errorMessage(error));
+    })();
+    pendingUploads.current = upload;
+    try {
+      await upload;
     } finally {
-      setUploading(false);
+      if (pendingUploads.current === upload) pendingUploads.current = null;
     }
   };
 
@@ -501,6 +528,13 @@ const NewAdScreen = () => {
       return;
     }
 
+    // Every picked photo uploads in the background. Wait for it and read the
+    // ref mirror: `photos` in this closure is the snapshot from when Submit
+    // was tapped, so it would otherwise miss a photo that finishes uploading
+    // during the wait (the "ad posted without photos" bug).
+    if (pendingUploads.current) await pendingUploads.current;
+    const submitPhotos = photosRef.current;
+
     const attributes: Record<string, string> = {};
     for (const [key, value] of Object.entries(values)) {
       if (NON_ATTRIBUTE_KEYS.has(key)) continue;
@@ -528,9 +562,9 @@ const NewAdScreen = () => {
           }
         : {}),
       ...(declares("condition") && condition ? { condition } : {}),
-      ...(photos.length > 0
+      ...(submitPhotos.length > 0
         ? {
-            photos: photos.map((photo, index) => ({
+            photos: submitPhotos.map((photo, index) => ({
               url: photo.url,
               path: photo.path,
               sort: index,
@@ -680,14 +714,16 @@ const NewAdScreen = () => {
               />
               <TouchableOpacity
                 onPress={() =>
-                  setPhotos((current) =>
-                    current
+                  setPhotos((current) => {
+                    const next = current
                       .filter((_, itemIndex) => itemIndex !== index)
                       .map((item, itemIndex) => ({
                         ...item,
                         sort: itemIndex,
-                      })),
-                  )
+                      }));
+                    photosRef.current = next;
+                    return next;
+                  })
                 }
                 className="absolute -right-1.5 -top-1.5 h-6 w-6 items-center justify-center rounded-full bg-black/70"
               >
@@ -1429,16 +1465,20 @@ const NewAdScreen = () => {
       >
         <TouchableOpacity
           onPress={() => void handleSubmit()}
-          disabled={submitting || pinPending || !subcategory}
+          disabled={submitting || pinPending || uploading || !subcategory}
           activeOpacity={0.9}
           className={`h-12 items-center justify-center rounded-md ${
-            subcategory && !pinPending ? "bg-secondary-orange" : "bg-gray-300"
+            subcategory && !pinPending && !uploading
+              ? "bg-secondary-orange"
+              : "bg-gray-300"
           }`}
         >
           {submitting ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-base font-bold text-white">Submit</Text>
+            <Text className="text-base font-bold text-white">
+              {uploading ? "Uploading photo…" : "Submit"}
+            </Text>
           )}
         </TouchableOpacity>
       </View>

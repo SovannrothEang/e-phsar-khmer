@@ -3,9 +3,9 @@ import { resolveLocale } from './locale.util';
 describe('resolveLocale', () => {
   it.each([
     ['km-KH,en;q=0.9', 'km'],
-    ['zh-CN,en;q=0.8', 'zh'],
-    ['zh', 'zh'],
-    ['ZH', 'zh'],
+    ['zh-CN,en;q=0.8', 'en'],
+    ['zh', 'en'],
+    ['ZH', 'en'],
     ['KM', 'km'],
     ['en-US', 'en'],
     ['fr', 'en'],

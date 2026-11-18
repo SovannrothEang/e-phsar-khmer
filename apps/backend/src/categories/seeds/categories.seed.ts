@@ -2,14 +2,14 @@ import type { FieldDef } from '../../db/schema/categories.schema';
 
 export interface SubcategorySeed {
   slug: string;
-  name: { en: string; km?: string; zh?: string };
+  name: { en: string; km?: string };
   sortOrder?: number;
   fieldSchema?: FieldDef[];
 }
 
 export interface CategorySeed {
   slug: string;
-  name: { en: string; km?: string; zh?: string };
+  name: { en: string; km?: string };
   icon?: string;
   sortOrder: number;
   subcategories: SubcategorySeed[];
@@ -3957,6 +3957,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -3964,6 +3965,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4004,6 +4006,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4060,6 +4063,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4067,6 +4071,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4107,6 +4112,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4163,6 +4169,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4170,6 +4177,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4210,6 +4218,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4266,6 +4275,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4273,6 +4283,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4313,6 +4324,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4369,6 +4381,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4376,6 +4389,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4416,6 +4430,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4472,6 +4487,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4479,6 +4495,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4519,6 +4536,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4575,6 +4593,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4582,6 +4601,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4622,6 +4642,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4678,6 +4699,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4685,6 +4707,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4725,6 +4748,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4781,6 +4805,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4788,6 +4813,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4828,6 +4854,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4884,6 +4911,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4891,6 +4919,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -4931,6 +4960,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -4987,6 +5017,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -4994,6 +5025,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5034,6 +5066,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5090,6 +5123,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5097,6 +5131,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5137,6 +5172,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5193,6 +5229,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5200,6 +5237,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5240,6 +5278,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5296,6 +5335,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5303,6 +5343,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5343,6 +5384,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5402,6 +5444,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5409,6 +5452,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5449,6 +5493,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5505,6 +5550,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5512,6 +5558,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5552,6 +5599,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5608,6 +5656,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5615,6 +5664,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5655,6 +5705,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5711,6 +5762,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5718,6 +5770,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5758,6 +5811,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5814,6 +5868,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5821,6 +5876,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5861,6 +5917,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -5917,6 +5974,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -5924,6 +5982,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -5964,6 +6023,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6020,6 +6080,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6027,6 +6088,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6067,6 +6129,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6123,6 +6186,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6130,6 +6194,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6170,6 +6235,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6229,6 +6295,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6236,6 +6303,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6276,6 +6344,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6335,6 +6404,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6342,6 +6412,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6382,6 +6453,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6438,6 +6510,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6445,6 +6518,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6485,6 +6559,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6541,6 +6616,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6548,6 +6624,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6588,6 +6665,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6644,6 +6722,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6651,6 +6730,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6691,6 +6771,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6747,6 +6828,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6754,6 +6836,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6794,6 +6877,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6850,6 +6934,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6857,6 +6942,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -6897,6 +6983,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -6953,6 +7040,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -6960,6 +7048,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7000,6 +7089,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7056,6 +7146,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7063,6 +7154,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7103,6 +7195,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7159,6 +7252,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7166,6 +7260,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7206,6 +7301,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7262,6 +7358,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7269,6 +7366,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7309,6 +7407,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7365,6 +7464,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7372,6 +7472,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7412,6 +7513,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7471,6 +7573,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7478,6 +7581,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7518,6 +7622,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -7574,6 +7679,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'photos',
             label: { en: 'Logo' },
+            labelKey: 'logo',
             type: 'photos',
             required: false,
             max: 1,
@@ -7581,6 +7687,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'title',
             label: { en: 'Job Title' },
+            labelKey: 'jobTitle',
             type: 'text',
             required: true,
           },
@@ -7621,6 +7728,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'price',
             label: { en: 'Minimum salary' },
+            labelKey: 'minSalary',
             type: 'price',
             required: true,
           },
@@ -9445,6 +9553,7 @@ export const categoriesSeed: CategorySeed[] = [
           {
             key: 'accessory',
             label: { en: 'Accessory Type' },
+            labelKey: 'accessoryType',
             type: 'select',
             required: false,
             options: [

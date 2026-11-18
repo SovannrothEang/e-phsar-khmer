@@ -57,6 +57,9 @@ boundary and its own exit check, so nothing is mixed together.
 | My likes / saves, my profile, settings                         | no                          | yes                               | `GET /users/me/likes`, `GET /users/me/saves`, `GET/PATCH /users/me`                                                                                  |
 | Subscriptions / checkout                                       | no                          | yes (web only — deferred)         | `GET /subscriptions/me`, `POST /subscriptions/checkout`                                                                                              |
 
+> **Superseded 2026-11-10:** the Product spec page is no longer web-only — the mobile listing
+> detail links the published spec at `/spec/<brandSlug>/<modelSlug>` (see `ARCHITECTURE.md`).
+
 Everything in the lower half is gated by `isAuthenticated` today in the tab layout; the Account tab
 is the one open surface and already shows a sign-in CTA.
 
@@ -162,7 +165,7 @@ lands on the real Step-4 page and a feed card opens the real Step-3 detail.
 
 - `GET /categories` chips + `GET /listings?q=` with debounce and pagination; keep the existing search
   screen and its list/grid modes.
-- The web's product-spec matches (`GET /products?q=`) have no mobile screen — leave them out.
+- The web's product-spec matches (`GET /products?q=`) have no mobile search screen — leave them out. The single spec page now has a mobile screen at `/spec/<brand>/<model>` (2026-11-10).
 
 **Exit:** a keyword returns real rows and opens the real detail.
 
@@ -280,7 +283,8 @@ have yet (web has them, so this is UI work, not a new feature).
 - **Subscriptions / checkout** — mobile has only a placeholder entry; deferred, entry hidden.
 - **Resume, Insights, job applications, billing addresses, admin and product-spec pages** —
   deferred. Mobile has placeholder rows or screens for some of them; Step 10 hides those entries
-  rather than wiring them.
+  rather than wiring them. Product-spec pages shipped separately on 2026-11-10 at
+  `/spec/<brand>/<model>`; the rest stay deferred.
 - **Push notifications** — no FCM/APNs backend exists.
 
 ## Backend / environment notes
