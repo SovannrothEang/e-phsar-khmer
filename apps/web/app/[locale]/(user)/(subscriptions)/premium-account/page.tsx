@@ -52,7 +52,7 @@ export default async function PremiumAccountPage() {
       <main className="mx-auto max-w-4xl px-4">
         <div className="space-y-2 py-4">
           <h1 className="text-xl font-semibold">
-            Increase your sales with PSA Khmer Premium Service!
+            Increase your sales with PhsarKhmer Premium Service!
           </h1>
           <span className="block py-1 text-sm text-foreground">
             Choose the right category for your ads and start selling faster.

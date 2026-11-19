@@ -19,7 +19,7 @@ import {
  */
 
 const API = 'https://commons.wikimedia.org/w/api.php';
-const UA = 'psa-npic-demo-seed/1.0 (dev seed script)';
+const UA = 'e-phsar-khmer-demo-seed/1.0 (dev seed script)';
 const BAD_TITLE =
   /interior|engine|logo|badge|dashboard|cockpit|wheel|rim|headlight|taillight|steering|trunk|diagram|map|screenshot|sticker|emblem|crash|accident|wreck|museum|gauge|speedometer|odometer|console|pedal|gearbox|earphone|earbud|headphone|mansion|library|manual|spectromet|hands-on|vp9|scan|pdf|shimano|bicycle|keyboard|trackpad|camera of|MET\s+[A-Z]{3}\d|corolla cross/i;
 

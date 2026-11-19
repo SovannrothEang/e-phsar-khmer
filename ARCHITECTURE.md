@@ -1,6 +1,6 @@
-# PSA-NPIC Architecture
+# PhsarKhmer Architecture
 
-This is the current architecture guide for the PSA-NPIC monorepo. It records the system structure, module boundaries, API behavior, data flows, and implementation details that are easy to lose when changing one feature at a time. Verify time-sensitive details against the code before relying on them.
+This is the current architecture guide for the PhsarKhmer monorepo. It records the system structure, module boundaries, API behavior, data flows, and implementation details that are easy to lose when changing one feature at a time. Verify time-sensitive details against the code before relying on them.
 
 ## Approach and boundaries
 

@@ -7,6 +7,10 @@ dated entry per ship (`## YYYY-MM-DD — <title>`). Once an entry has shipped, f
 The full history up to 2026-10-24 (5,364 lines, every ship since 2026-08-17) was rolled into
 `CHANGELOG.md` on 2026-10-24. The original text is in git: `git show fd824a0:tasks/todo.md`.
 
+> **Historical note:** entries before 2026-11-19 use the old repository/project name `psa-npic`;
+> the current name is `e-phsar-khmer`. Real historical URLs, task IDs, and memory-file names are
+> kept as-is.
+
 ## Open items carried over from the old log
 
 Long-standing gaps are tracked in CLAUDE.md under **Known gaps**. These are the newer open items

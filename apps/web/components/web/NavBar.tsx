@@ -93,8 +93,8 @@ export function NavBar({ user }: { user: User | null }) {
           <div className="flex lg:hidden items-center justify-between w-full">
             <Link href={`/`} className="flex items-center gap-2">
               <div className="text-3xl font-bold whitespace-nowrap tracking-tight">
-                <span className="text-foreground">PSA</span>
-                <span className="text-[#00a0e9]">KHMER</span>
+                <span className="text-foreground">Phsar</span>
+                <span className="text-[#00a0e9]">Khmer</span>
               </div>
             </Link>
             <MobileNavSheet user={user} />

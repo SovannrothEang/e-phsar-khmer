@@ -1,7 +1,7 @@
 # Admin & Super Admin Backoffice Audit
 
 **Date:** 2026-10-24 (Asia/Phnom_Penh)  
-**Repository:** psa-npic, branch feat/subs, code at HEAD fd824a0 plus unrelated in-flight chat edits  
+**Repository:** psa-npic (now e-phsar-khmer), branch feat/subs, code at HEAD fd824a0 plus unrelated in-flight chat edits  
 **Scope:** the attached admin/super-admin use-case diagram vs the implemented admin API (apps/backend/src/admin, auth, payment, subscriptions, reports) and the /wanderer dashboard (apps/web); compared with Khmer24-style classifieds and Shopify-style backoffice governance.  
 **Method:** four parallel read-only audits (backend identity/RBAC; operational admin surface; web dashboard; industry comparison), then Lead verification of every critical/high claim against source. No files, migrations, or servers were changed. Targeted Jest suites for the identity policy and reports (3 suites, 32 tests) pass.
 

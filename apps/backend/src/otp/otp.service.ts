@@ -11,7 +11,7 @@ import {
   type OtpVerifyResult,
 } from './otp.types';
 
-const DERIVED_SECRET_LABEL = 'psa-npic:otp-hmac:v1';
+const DERIVED_SECRET_LABEL = 'e-phsar-khmer:otp-hmac:v1';
 
 /**
  * Issues and checks phone one-time codes. Codes are 6 digits, stored only as

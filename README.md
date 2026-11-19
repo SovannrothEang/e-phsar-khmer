@@ -28,8 +28,8 @@ pnpm --version   # should print 9.0.0
 ### 2. Clone the project
 
 ```bash
-git clone https://github.com/sakkunasuon2014/psa-npic.git
-cd psa-npic
+git clone https://github.com/sakkunasuon2014/e-phsar-khmer.git
+cd e-phsar-khmer
 ```
 
 ### 3. Install dependencies

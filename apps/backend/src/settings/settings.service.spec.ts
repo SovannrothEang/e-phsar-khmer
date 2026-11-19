@@ -82,11 +82,15 @@ describe('SettingsService', () => {
 
   it('drops cleared contact channels from the payload', async () => {
     // email, telegram, phone — read in that order.
-    const { db } = makeDb([[{ value: '' }], [{ value: 't.me/psa' }], []]);
+    const { db } = makeDb([
+      [{ value: '' }],
+      [{ value: 't.me/phsarkhmer' }],
+      [],
+    ]);
     const service = new SettingsService(db as never);
 
     await expect(service.supportContacts()).resolves.toEqual({
-      telegram: 't.me/psa',
+      telegram: 't.me/phsarkhmer',
     });
   });
 

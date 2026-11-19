@@ -48,7 +48,7 @@ describe('OTP_PROVIDER=plasgate credentials', () => {
   const smsCredentials = {
     SMS_PRIVATE_KEY: 'private-key',
     SMS_SECRET: 'secret',
-    SMS_SENDER: 'PSA',
+    SMS_SENDER: 'PhsarKhmer',
   };
 
   it('defaults to plasgate', () => {
