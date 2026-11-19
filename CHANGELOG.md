@@ -435,6 +435,17 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Changed
 
+- **Repo, folder and Vercel projects renamed to `e-phsar-khmer`.** The GitHub repository is now
+  `sakkunasuon2014/e-phsar-khmer`, the local checkout is `~/Documents/e-phsar-khmer`, and the
+  Vercel projects are `e-phsar-khmer` (backend) and `e-phsar-khmer-web` (web). Production moved to
+  `https://phsar-khmer-backend.vercel.app` and `https://phsar-khmer-web1.vercel.app`; the old
+  `psa-npic-*` production aliases are retired, and `FRONTEND_ORIGINS` was corrected for the new
+  web origin. The product brand stays **PhsarKhmer** (`phsarkhmer` package/slug/bundle IDs,
+  `phsarkhmer.com`, queue prefix). Stale `PSA` copy in the web navbar and premium page was fixed.
+  The seed user-agent, test fixtures and OTP HMAC label were updated. Frozen `npic-*` E2E
+  protocol labels and historical `psa-npic` plan/log references are intentionally unchanged.
+  No API or schema change.
+
 - **Mobile realigned to the Expo SDK 58 package set so it runs in Expo Go 58.** The app moved
   from Expo SDK 54 to SDK 58 for the user's physical-device Expo Go clients (Android 58.0.5,
   iOS 58.0.7; Expo Go supports SDK 58 only): `expo` `~58.0.23`, `react-native` `0.88.1`,
