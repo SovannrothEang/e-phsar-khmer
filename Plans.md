@@ -5,9 +5,11 @@ _harness_version: "4.3.3"
 
 # Plans.md - Task Tracking
 
-> **Project**: psa-npic
+> **Project**: e-phsar-khmer
 > **Last updated**: 2026-11-10
 > **Updated by**: Claude Code
+>
+> **Historical note**: entries dated before 2026-11-19 use the old repository/project name `psa-npic`; the current name is `e-phsar-khmer`. Real historical URLs, task IDs, and memory-file names are kept as-is.
 
 ---
 
