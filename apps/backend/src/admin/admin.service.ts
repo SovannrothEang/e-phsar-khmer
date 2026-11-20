@@ -29,6 +29,10 @@ import { users, userPhones } from '../db/schema/users.schema';
 import { userLoginDevices } from '../db/schema/login-devices.schema';
 import { ChatPubSubService } from '../chat/chat-pubsub.service';
 import type { UserRow } from '../db/schema/users.schema';
+import {
+  normalizeAdminUsername,
+  recordUsernameChange,
+} from '../users/username.util';
 import { listings } from '../db/schema/listings.schema';
 import { userSubscriptions } from '../db/schema/subscriptions.schema';
 import type {
@@ -49,6 +53,21 @@ const SALT_ROUNDS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Cambodia is ICT (UTC+7) with no daylight saving — a fixed offset is exact.
 const ICT_OFFSET_MS = 7 * 60 * 60 * 1000;
+const MAX_USERNAME_LENGTH = 50;
+
+/**
+ * Admin handles keep the casing the admin typed (uniqueness is enforced by the
+ * case-insensitive index); trimming + NFC keeps the stored value addressable by
+ * a URL. The DTO only bounds the raw string, so the real shape check is here.
+ */
+function normalizedAdminUsername(value: string): string {
+  const normalized = normalizeAdminUsername(value);
+  const length = Array.from(normalized).length;
+  if (length === 0 || length > MAX_USERNAME_LENGTH) {
+    throw new BadRequestException('USERNAME_INVALID');
+  }
+  return normalized;
+}
 
 export type PublicUser = Omit<UserRow, 'passwordHash' | 'tokensValidAfter'>;
 export type PublicUserWithAccount = PublicUser & {
@@ -347,13 +366,14 @@ export class AdminService {
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const primaryPhone = dto.phones?.[0] ?? null;
+    const username = normalizedAdminUsername(dto.username);
 
     try {
       return await this.db.transaction(async (tx) => {
         const [user] = await tx
           .insert(users)
           .values({
-            username: dto.username,
+            username,
             passwordHash,
             role: dto.role ?? 'user',
             firstName: dto.firstName ?? null,
@@ -400,7 +420,9 @@ export class AdminService {
     // Who may change what is decided in the transaction below, against the
     // locked target row (authorizeManage).
     const patch: Partial<UserRow> = {};
-    if (dto.username !== undefined) patch.username = dto.username;
+    if (dto.username !== undefined) {
+      patch.username = normalizedAdminUsername(dto.username);
+    }
     if (dto.role !== undefined) patch.role = dto.role;
     if (dto.status !== undefined && !suspending) patch.status = dto.status;
     if (suspending) {
@@ -428,8 +450,27 @@ export class AdminService {
           status: dto.status,
         });
 
+        // Read before the update so the released handle can be aliased.
+        const [before] =
+          dto.username !== undefined
+            ? await tx
+                .select({ username: users.username })
+                .from(users)
+                .where(eq(users.id, id))
+                .limit(1)
+            : [];
+
         if (Object.keys(patch).length > 0) {
           await tx.update(users).set(patch).where(eq(users.id, id));
+        }
+
+        if (dto.username !== undefined) {
+          await recordUsernameChange(
+            tx,
+            id,
+            before?.username ?? null,
+            patch.username ?? null,
+          );
         }
 
         // Suspension is a session-ending state: `suspendAccount` moves the

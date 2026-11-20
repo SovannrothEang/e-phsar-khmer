@@ -17,7 +17,7 @@ export class SearchUsersDto {
   @ApiProperty({
     description:
       'Name or @username fragment. Whitespace-split (max 5 tokens); every ' +
-      'token must occur in the username, first name or last name.',
+      'token must prefix-match the start of the username, first name or last name.',
     minLength: 1,
     maxLength: 100,
   })

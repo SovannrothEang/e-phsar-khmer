@@ -26,6 +26,8 @@ async function describeApiError(err: ApiError): Promise<string> {
   switch (err.message) {
     case "USERNAME_TAKEN":
       return t("usernameTaken");
+    case "USERNAME_INVALID":
+      return t("usernameInvalid");
     case "EMAIL_TAKEN":
       return t("emailTaken");
     case "PHONE_TAKEN":

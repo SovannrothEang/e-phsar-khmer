@@ -1,8 +1,10 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
 import SearchPostCard from "@/components/search/SearchPostCard";
+import SpecResultRow from "@/components/search/SpecResultRow";
 import UserResultRow from "@/components/search/UserResultRow";
 import { Colors } from "@/constants/Colors";
 import { fetchFeed } from "@/lib/api/feed";
+import { fetchProducts } from "@/lib/api/products";
 import { searchUsers } from "@/lib/api/users";
 import { firstParam } from "@/lib/feed-params";
 import { toCardProduct } from "@/lib/listing-card";
@@ -154,9 +156,23 @@ export default function SearchScreen() {
     } as never);
   };
 
+  const openSpecs = () => {
+    router.push({
+      pathname: "/search-specs",
+      params: { q: submittedQuery },
+    } as never);
+  };
+
   const userQuery = useQuery({
     queryKey: ["user-search", submittedQuery, 3],
     queryFn: () => searchUsers(submittedQuery, { pageSize: 3 }),
+    enabled: showResults && !isScoped,
+    staleTime: 30_000,
+  });
+
+  const specQuery = useQuery({
+    queryKey: ["product-search", submittedQuery, 3],
+    queryFn: () => fetchProducts(submittedQuery, 3),
     enabled: showResults && !isScoped,
     staleTime: 30_000,
   });
@@ -200,6 +216,8 @@ export default function SearchScreen() {
   const users = userQuery.data?.items ?? [];
   const userTotal = userQuery.data?.total ?? 0;
   const showUsers = !isScoped;
+  const specs = specQuery.data ?? [];
+  const showSpecs = !isScoped;
 
   const usersEmpty = !isScoped && userQuery.isSuccess && users.length === 0;
   const postsEmpty =
@@ -209,7 +227,12 @@ export default function SearchScreen() {
   // where an empty post result is reported; scoped searches keep the message.
   const showPostsSection = isScoped || !postsEmpty;
   const showGlobalEmpty =
-    !isScoped && userQuery.isSuccess && usersEmpty && postsEmpty;
+    !isScoped &&
+    userQuery.isSuccess &&
+    usersEmpty &&
+    postsEmpty &&
+    specQuery.isSuccess &&
+    specs.length === 0;
 
   return (
     <SafeAreaView
@@ -415,6 +438,67 @@ export default function SearchScreen() {
                 {userTotal >= 3 ? (
                   <TouchableOpacity
                     onPress={openUsers}
+                    activeOpacity={0.8}
+                    className="mx-3 mb-3 mt-1 h-11 items-center justify-center rounded-md bg-sky-100 dark:bg-sky-950"
+                    accessibilityRole="button"
+                  >
+                    <Text className="text-[15px] font-semibold text-sky-600 dark:text-sky-300">
+                      Show More
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null
+          ) : null}
+
+          {showSpecs ? (
+            specQuery.isLoading ? (
+              <View className="mx-3 mt-3 items-center rounded-lg bg-white py-6 dark:bg-gray-900">
+                <ActivityIndicator color={BLUE} />
+              </View>
+            ) : specQuery.isError ? (
+              <View className="mx-3 mt-3 rounded-lg bg-white px-4 py-4 dark:bg-gray-900">
+                <Text className="text-sm text-gray-500 dark:text-gray-400">
+                  Could not load specifications.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => specQuery.refetch()}
+                  className="mt-2 self-start"
+                >
+                  <Text className="text-sm font-semibold text-sky-600">
+                    Try again
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : specs.length > 0 ? (
+              <View
+                className="mx-3 mt-3 overflow-hidden rounded-lg bg-white dark:bg-gray-900"
+                style={{
+                  elevation: 2,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 2,
+                }}
+              >
+                <Text className="px-4 pb-1 pt-4 text-[16px] font-bold text-gray-900 dark:text-white">
+                  Specifications
+                </Text>
+                {specs.map((spec, index) => (
+                  <View
+                    key={spec.id}
+                    className={
+                      index > 0
+                        ? "border-t border-gray-100 dark:border-gray-800"
+                        : ""
+                    }
+                  >
+                    <SpecResultRow product={spec} />
+                  </View>
+                ))}
+                {specs.length >= 3 ? (
+                  <TouchableOpacity
+                    onPress={openSpecs}
                     activeOpacity={0.8}
                     className="mx-3 mb-3 mt-1 h-11 items-center justify-center rounded-md bg-sky-100 dark:bg-sky-950"
                     accessibilityRole="button"

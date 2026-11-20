@@ -22,7 +22,7 @@ import type {
   ProductSpecFamily,
   ProductSpecGroup,
 } from '../db/schema/products.schema';
-import { likeTerm } from '../utils/like-term';
+import { escapeLike } from '../utils/like-term';
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { QueryProductsDto } from './dto/query-products.dto';
 import type { UpdateProductDto } from './dto/update-product.dto';
@@ -114,7 +114,7 @@ export class ProductsService {
     if (q) {
       const tokens = q.split(/\s+/).filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
       for (const token of tokens) {
-        const term = likeTerm(token);
+        const term = `${escapeLike(token)}%`;
         conditions.push(
           or(
             ilike(brands.name, term),

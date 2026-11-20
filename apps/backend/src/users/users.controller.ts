@@ -253,7 +253,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'Search public user profiles by name or username',
     description:
-      'Anonymous read. Whitespace-split keyword match over username, first name and last name; only active, non-deleted users with a username. Serves the public search allow-list — never phone, email, role or moderation state.',
+      'Anonymous read. Whitespace-split keyword prefix match over username, first name and last name; only active, non-deleted users with a username. Serves the public search allow-list — never phone, email, role or moderation state.',
   })
   searchUsers(@Query() query: SearchUsersDto) {
     return this.usersService.searchUsers(query.q, query.page, query.pageSize);

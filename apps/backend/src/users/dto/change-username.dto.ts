@@ -1,11 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsString, Matches, MaxLength } from 'class-validator';
 
 export class ChangeUsernameDto {
-  @ApiProperty({ example: 'sokdara' })
+  @ApiProperty({ example: 'sok-dara' })
+  @Transform(({ value }: { value: unknown }): unknown =>
+    typeof value === 'string' ? value.normalize('NFC').trim() : value,
+  )
   @IsString()
-  @Matches(/^[a-zA-Z0-9._-]{3,50}$/, {
-    message: 'username must be 3-50 characters (letters, digits, . _ -)',
+  @MaxLength(50)
+  @Matches(/^[\p{L}\p{M}\p{N}._-]+$/u, {
+    message:
+      'username may contain letters (any script), numbers, marks, dot, underscore or dash',
   })
   username: string;
 }

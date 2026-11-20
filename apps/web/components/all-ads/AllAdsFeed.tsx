@@ -141,33 +141,32 @@ export default function AllAdsFeed({
 
       {/* Grid view */}
       <TabsContent value="grid" className="mt-4">
-        {posts.length === 0 ? (
+        {/* The Sell card keeps its place even with no results — it carries its
+            own listing-card footprint (see GridCardSell), so an empty feed
+            shows the same card a populated one does (captain, 2026-11-19). */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <GridCardSell />
+          {posts.map((post) => (
+            <GridCardPost key={post.postId} post={post} />
+          ))}
+        </div>
+        {posts.length === 0 && (
           <p className="py-12 text-center text-muted-foreground">
             {emptyMessage}
           </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <GridCardSell />
-            {posts.map((post) => (
-              <GridCardPost key={post.postId} post={post} />
-            ))}
-          </div>
         )}
       </TabsContent>
 
       {/* List view */}
       <TabsContent value="list" className="mt-4 space-y-4">
-        {posts.length === 0 ? (
+        <ListCardSell />
+        {posts.map((post) => (
+          <ListCardPost key={post.postId} post={post} />
+        ))}
+        {posts.length === 0 && (
           <p className="py-12 text-center text-muted-foreground">
             {emptyMessage}
           </p>
-        ) : (
-          <>
-            <ListCardSell />
-            {posts.map((post) => (
-              <ListCardPost key={post.postId} post={post} />
-            ))}
-          </>
         )}
       </TabsContent>
 

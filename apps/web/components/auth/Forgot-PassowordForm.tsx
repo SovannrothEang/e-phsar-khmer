@@ -17,6 +17,7 @@ import {
   requestPasswordReset,
   verifyPasswordResetCode,
 } from "@/actions/password-reset";
+import { isValidUsername, normalizeManualUsername } from "@/lib/username";
 import { Button } from "../ui/button";
 
 const OTP_LENGTH = 6;
@@ -88,20 +89,28 @@ export function ForgotPasswordForm() {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^\+?[0-9\s-]{8,15}$/;
-    const usernameRegex = /^[a-zA-Z0-9_.-]{3,20}$/;
+    // Usernames are Unicode-aware now: classify anything that is not an email
+    // or a phone as a handle and canonicalize it (a Khmer or `Sok--Dara`
+    // handle must reach the backend lookup in its stored form).
+    const usernameCandidate = normalizeManualUsername(value);
 
-    const isValidFormat =
-      emailRegex.test(value) ||
-      phoneRegex.test(value) ||
-      usernameRegex.test(value);
+    const isEmail = emailRegex.test(value);
+    const isPhone = phoneRegex.test(value);
+    const isUsername =
+      !isEmail && !isPhone && isValidUsername(usernameCandidate);
+
+    const isValidFormat = isEmail || isPhone || isUsername;
 
     if (!isValidFormat) {
       setIsInvalidFormat(true);
       return;
     }
 
+    const requestValue = isUsername ? usernameCandidate : value;
+    setIdentifier(requestValue);
+
     setRequesting(true);
-    const res = await requestPasswordReset(value);
+    const res = await requestPasswordReset(requestValue);
     setRequesting(false);
 
     if (!res.success) {

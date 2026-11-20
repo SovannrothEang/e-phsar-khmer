@@ -21,6 +21,10 @@ import type { User } from "@/lib/user";
 import type { ListingContext } from "@/types/chat";
 import { applyDiscount, shortLocation } from "@/lib/utils";
 import { trackEvent } from "@/lib/insights/queue";
+import { ProductSpecGroups } from "@/components/product/ProductSpecGroups";
+import { ProductSpecHeader } from "@/components/product/ProductSpecHeader";
+import { isPlainLeftClick } from "@/lib/product/spec-scroll";
+import type { ProductDetail } from "@/types/product";
 
 /**
  * Listing data slotted into this template. The page (RSC) builds this from
@@ -37,6 +41,8 @@ export interface RealDetailData {
   model?: { slug: string; name: string };
   /** Trusted spec page linked to this listing, while published. */
   product?: BackendProductRef | null;
+  /** Published spec sheet for `product`; null when absent or unreadable. */
+  productSpec?: ProductDetail | null;
   seller: User;
 }
 
@@ -50,6 +56,9 @@ export interface JobApplyState {
   appliedApplicationId: string | null;
   resume: ApplyResumeSummary | null;
 }
+
+/** Stable anchor for the inline product spec sheet (see the chip below). */
+const PRODUCT_SPECS_SECTION_ID = "product-specifications";
 
 /** Adapt a backend listing into the template's local `Post` shape. */
 function toPostView(l: BackendListing): Post {
@@ -164,6 +173,11 @@ export default function PostDetail({
   // The trusted spec page the listing links to; the backend nulls it once the
   // page is unpublished, so the link hides by itself.
   const product = real.product;
+  const productSpec = real.productSpec ?? null;
+  // Only a real sheet earns the section: an unreadable or empty page keeps the
+  // chip as a plain link to the product page.
+  const inlineSpecs =
+    productSpec && productSpec.specGroups.length > 0 ? productSpec : null;
 
   const hasBrand = !!brand;
   const hasModel = !!model;
@@ -324,6 +338,22 @@ export default function PostDetail({
                             model: product.modelSlug,
                           },
                         }}
+                        onClick={(event) => {
+                          if (!inlineSpecs || !isPlainLeftClick(event)) return;
+                          const target = document.getElementById(
+                            PRODUCT_SPECS_SECTION_ID,
+                          );
+                          if (!target) return;
+                          event.preventDefault();
+                          target.scrollIntoView({
+                            behavior: window.matchMedia(
+                              "(prefers-reduced-motion: reduce)",
+                            ).matches
+                              ? "auto"
+                              : "smooth",
+                            block: "start",
+                          });
+                        }}
                         className="inline-flex items-center gap-1 rounded-sm border border-sky-100 bg-blue-50 px-2 py-1 type-body-sm text-[#00a0e9] hover:underline"
                       >
                         {t("Post.viewFullSpecs")}
@@ -396,6 +426,23 @@ export default function PostDetail({
                 <ThreeButton post={post} viewerId={viewerId} />
               </div>
             </div>
+            {inlineSpecs && (
+              <>
+                <ProductSpecHeader
+                  product={inlineSpecs}
+                  trustedBadge={t("Product.trustedBadge")}
+                  trustedNote={t("Product.trustedNote")}
+                  id={PRODUCT_SPECS_SECTION_ID}
+                  headingLevel="h2"
+                />
+                <section className="rounded-sm border border-border bg-card p-4 md:p-6">
+                  <h2 className="type-section-title text-foreground">
+                    {t("Product.specifications")}
+                  </h2>
+                  <ProductSpecGroups groups={inlineSpecs.specGroups} />
+                </section>
+              </>
+            )}
             {/* Disclaimer */}
             <div className="bg-card border-l-3 border-l-[#f68b1e] rounded-r-sm p-4 type-body-sm shadow-sm">
               <h3 className="text-[#f68b1e] type-card-heading mb-2">

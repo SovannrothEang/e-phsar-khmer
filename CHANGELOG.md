@@ -21,6 +21,25 @@ How to use this file:
 
 ### Added
 
+- **Hyphenated Unicode usernames with old-handle redirects.** Registration now builds
+  `firstname-lastname` (`buildUsernameBase`: NFC, whitespace → `-`, characters outside letters/
+  marks/numbers/`. _ -` dropped, 50-code-point cap) and `generateUniqueUsername` suffixes `-2`,
+  `-3`, … while probing `lower(username)`. Migration 0058 makes `users_username_active_uq` a
+  partial expression index on `lower(username)`, so case variants cannot coexist; admin-created
+  handles keep their typed casing and the admin seed's `ON CONFLICT (username)` was replaced with
+  an explicit case-insensitive select-then-write. Settings → Change Username now accepts any
+  script's letters/marks/numbers plus `. _ -` (trimmed, NFC, lowercased, repeated and
+  leading/trailing hyphens collapsed); the web form and the forgot-password classifier mirror the
+  same rule. A rename writes the released handle into the new `user_username_history` table
+  (`ON DELETE CASCADE`), and `GET /users/by-username/:username` resolves the current holder first
+  (case-insensitively) and a released handle only when no account holds it, returning the profile's
+  current username. Web profile routes (`/[slug]`, `/[slug]/about`, `/followers`, `/following`)
+  answer a stale or differently-cased handle with `308` to the canonical URL, and the mobile
+  profile screen `router.replace`s to it; a slug is treated as a listing only when it ends in
+  `-adid-<uuid>`. Existing accounts are deliberately **not** renamed and no backfill runs.
+  Verified: backend 1781 tests, web 152 tests, lint/build gates, migration applied with no drift,
+  admin-seed idempotency, and browser/API checks against the dev backend.
+
 - **Post-report threshold alert.** `reports.post_alert_threshold` (default 5, `app_settings`)
   is a post-only triage signal: approving a listing report counts approved listing reports on
   the owner's listings (account reports excluded), and at/above the threshold sends staff a
@@ -47,6 +66,27 @@ How to use this file:
   spec sheet, trusted badge, family/fuel chips, and adds 404, retry and empty
   states. Chrome is en/km; spec content stays English. No backend, schema or
   dependency change.
+
+- **Mobile inline product specs.** The mobile ad detail now renders the same
+  trusted spec sheet inline below the seller profile — image, brand, `Trusted
+specs` badge, model name, family/fuel chips, staff note and the folded
+  groups — fetched from the public `GET
+/products/:brandSlug/:modelSlug` with the spec screen's query key, and
+  rendered only when the sheet has at least one group. The `View full specs`
+  chip, the `/spec/<brand>/<model>` screen and all loading/404/empty handling
+  there are unchanged; absent, unpublished or empty specs render nothing
+  extra. No backend, API or dependency change.
+
+- **Mobile search: Specification card.** The mobile search results now show a
+  Specifications card under the User preview — up to three matching trusted
+  spec pages (image, model, brand, chevron) with a Show More button when three
+  or more match, the same rule as the User card. Rows open the existing
+  `/spec/<brand>/<model>` screen; Show More opens the new `/search-specs?q=`
+  list, which renders every published match (`GET /products?q=&limit=200`,
+  the endpoint's cap). The card is hidden on scoped category/brand searches
+  and when no spec matches; matching is the endpoint's prefix search over
+  brand/model names and slugs (see the product-spec Changed entry). The card
+  itself added no backend endpoint, schema, dependency or translation key.
 
 - **Mobile Nearby (location).** The home Nearby card is real: "Allow Location Access" asks
   for foreground location, then lists the nearest live ads from the new public
@@ -435,6 +475,14 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
 
 ### Changed
 
+- **Listing detail: inline product specifications (web).** An ad linked to a published spec page now
+  renders the trusted product block — model image, brand, `Trusted specs` badge, model name,
+  family/fuel chips and the staff note — followed by the spec sheet, between the description and the
+  disclaimer. Its `View full specs` chip scrolls to that block instead of leaving the page. Plain
+  left clicks scroll; modified/middle clicks, a missing or unreadable sheet, and an empty sheet keep
+  the old `/product/[brand]/[model]` navigation. The product page is unchanged and still serves
+  search's `View specs` cards; the mobile app still opens `/spec/<brand>/<model>`.
+
 - **Repo, folder and Vercel projects renamed to `e-phsar-khmer`.** The GitHub repository is now
   `sakkunasuon2014/e-phsar-khmer`, the local checkout is `~/Documents/e-phsar-khmer`, and the
   Vercel projects are `e-phsar-khmer` (backend) and `e-phsar-khmer-web` (web). Production moved to
@@ -562,7 +610,38 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   user first opens a conversation (once per browser session); the per-message "Restore chat history" link was
   removed, and the undecryptable-message note now points at the backup passcode instead of another device.
 
+- **Public user search matches prefixes.** `GET /users/search` now requires
+  each whitespace-split token to prefix-match the username, first name or last
+  name (case-insensitive, escaped `ILIKE` with a trailing `%` only), instead of
+  matching anywhere inside them. `q=m` matches `malala` (first name) and
+  `my-john` (username) but no longer returns mid-word hits. The public
+  projection, active/non-staff filters, 5-token/100-char caps, offset
+  pagination, ordering (exact handle → handle prefix → the rest) and the web/
+  mobile User surfaces are otherwise unchanged. No schema, API-shape or
+  dependency change.
+
+- **Public product-spec search matches prefixes.** `GET /products` now requires
+  each whitespace-split token to prefix-match the brand or model name/slug
+  (case-insensitive, escaped `ILIKE` with a trailing `%` only), instead of
+  matching anywhere inside them, so searching `m` lists brands/models starting
+  with `m` instead of every page containing the letter. The mobile search card,
+  the web search Products section and the post form's Product Specification
+  picker inherit the narrower results; ordering, the family filter, the 200
+  limit and the public projection are unchanged. No schema, API-shape or
+  dependency change.
+
 ### Fixed
+
+- **A Khmer-language account is reachable from its listings.** Registration derives the handle
+  from the user's name (`buildUsernameBase` + `generateUniqueUsername`), so a Khmer name produces a
+  Khmer username. Next.js hands a page component its dynamic route params still percent-encoded
+  (its metadata resolver passes `generateMetadata` the decoded form), so the `/[slug]` profile
+  branch asked `GET /users/by-username/:username` for the literal `%E1%9E%9B…` string, got a 404,
+  and rendered the not-found page while the listing itself rendered fine. The profile routes
+  (`[slug]`, `/[slug]/about`, `/[slug]/followers`, `/[slug]/following`) now decode the slug once
+  through `lib/route-params.ts` (`decodeRouteParam`); ASCII handles and the `-adid-` listing branch
+  are unchanged. Verified: `web` unit tests, lint and build, plus a headless-browser click-through
+  from the listing's seller card to the profile page.
 
 - **Registering an existing phone number is refused instead of signing you into that account.**
   `POST /auth/register` only sent an SMS, so a number that already had an account walked the whole sign-up
@@ -637,6 +716,17 @@ modelSlug, modelName } | null`. The `phones` `field_schema` declares a
   (followers, membership) is unchanged. Verified in headless Chromium on `/en/me/applied-jobs` (Jobs),
   `/en/me/job-applications` (Jobs), `/en/me` and `/en/me/followers` (Manage Ads); `web` eslint clean, `next build`
   exit 0.
+- **Android bundling no longer fails on `@babel/plugin-transform-react-jsx`.** `nativewind/babel` (via
+  `react-native-css-interop@0.2.7/babel.js`) returns the JSX transform as a bare plugin name and
+  does not declare it; Babel resolves bare preset plugins from the app's `babel.config.js`
+  directory, while pnpm's isolated linker only links the package inside `babel-preset-expo`'s
+  virtual store, so every Android bundle died at `/__prewarm__/0.js` with `Cannot find module
+'@babel/plugin-transform-react-jsx'`. `apps/mobile` now declares it as a devDependency
+  (`^7.28.6`, the preset's own range; the lockfile keeps the single 7.29.7 copy), which links it
+  where Babel looks. Verified: the exact Babel transform, `expo export --platform android` (6.8 MB
+  Hermes bundle), the dev server's `launchAsset.url` (HTTP 200, 14 MB), `expo lint` and
+  `tsc --noEmit`. `expo install --check` still lists 17 patch-level updates, unrelated to this
+  crash (and `expo-crypto` stays pinned at 58.0.4).
 
 ### Known issues
 

@@ -9,9 +9,7 @@ import { useRouter } from "@/i18n/routing";
 import SettingSidebar from "./SettingSidebar";
 import { changeUsername } from "@/actions/settings";
 import type { SettingsUser } from "@/lib/auth/current-user";
-
-/** Same charset the API accepts — letters, digits, dot, underscore, dash. */
-const USERNAME_RE = /^[a-zA-Z0-9._-]{3,50}$/;
+import { isValidUsername, normalizeManualUsername } from "@/lib/username";
 
 export default function ChangeUsername({ me }: { me?: SettingsUser | null }) {
   const t = useTranslations("Settings.usernamePage");
@@ -19,16 +17,18 @@ export default function ChangeUsername({ me }: { me?: SettingsUser | null }) {
   const [username, setUsername] = useState(me?.username ?? "");
   const [saving, setSaving] = useState(false);
 
-  const trimmed = username.trim();
-  const isValid = USERNAME_RE.test(trimmed);
-  const isChanged = trimmed !== (me?.username ?? "");
+  const normalized = normalizeManualUsername(username);
+  const isValid = isValidUsername(normalized);
+  // A mixed-case admin-created handle is unchanged once normalized — saving
+  // lower-cases it, so a case-only difference is not an edit.
+  const isChanged = normalized !== normalizeManualUsername(me?.username ?? "");
   const canSubmit = isValid && isChanged && !saving;
 
   async function submit() {
     if (!canSubmit) return;
     setSaving(true);
 
-    const result = await changeUsername(trimmed);
+    const result = await changeUsername(normalized);
     setSaving(false);
 
     if (!result.success) {
@@ -36,6 +36,7 @@ export default function ChangeUsername({ me }: { me?: SettingsUser | null }) {
       return;
     }
 
+    setUsername(normalized);
     toast.success(t("updated"));
     router.refresh();
   }

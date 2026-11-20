@@ -71,9 +71,10 @@ const nextConfig: NextConfig = {
     "phsar-admin.localhost:3001",
   ],
   // Billing addresses moved from the profile tabs to the settings surface
-  // (captain, 2026-11-02). Redirected here rather than in a page: the
-  // `[locale]/(user)` layout awaits the session first, so a page-level
-  // `redirect()` can only answer with a 200 + meta refresh.
+  // (captain, 2026-11-02). Kept as static rules for these two fixed paths.
+  // Page-level `permanentRedirect` does return a real 308 under the
+  // `[locale]/(user)` layout (verified 2026-11-19 on the profile alias
+  // redirects), so this is a convenience, not a status-code workaround.
   async redirects() {
     return [
       {

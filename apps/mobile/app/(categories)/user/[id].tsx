@@ -62,6 +62,18 @@ const ProfileScreen = () => {
     enabled: !!username,
   });
   const profile = profileQuery.data;
+  // The backend resolves a released handle to the account's current username.
+  // Move the route to the canonical handle so shares and filters stay current.
+  useEffect(() => {
+    const canonical = profile?.username;
+    if (!canonical || canonical === username) return;
+    const rest = { ...params };
+    delete rest.id;
+    router.replace({
+      pathname: "/user/[id]",
+      params: { ...rest, id: canonical },
+    } as never);
+  }, [profile?.username, username, params]);
   const provincesQuery = useQuery({
     queryKey: ["provinces"],
     queryFn: fetchProvinces,
@@ -154,7 +166,9 @@ const ProfileScreen = () => {
   const handleShare = async () => {
     if (!profile?.username) return;
     try {
-      await Share.share({ message: `${SITE_URL}/${profile.username}` });
+      await Share.share({
+        message: `${SITE_URL}/${encodeURIComponent(profile.username)}`,
+      });
     } catch {
       /* dismissed */
     }

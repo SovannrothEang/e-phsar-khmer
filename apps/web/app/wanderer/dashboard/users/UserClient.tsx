@@ -242,7 +242,7 @@ export default function UserPage({
     // The public profile lives on the MARKETPLACE origin: this dashboard runs
     // on the admin host, which 404s every non-/wanderer path.
     window.open(
-      `${publicSiteOrigin(window.location.origin)}/${locale}/${user.username}`,
+      `${publicSiteOrigin(window.location.origin)}/${locale}/${encodeURIComponent(user.username)}`,
       "_blank",
       "noopener,noreferrer",
     );

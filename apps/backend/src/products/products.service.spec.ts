@@ -83,7 +83,7 @@ describe('ProductsService public reads', () => {
     expect(limit).toHaveBeenCalledWith(6);
   });
 
-  it('searches every token across brand and model names/slugs', async () => {
+  it('prefix-matches every token across brand and model names/slugs', async () => {
     const db = makeDb();
     const service = makeService(db);
     const { chain, where } = selectChain([]);
@@ -95,9 +95,8 @@ describe('ProductsService public reads', () => {
     expect(compiled.sql).toContain('"is_published"');
     expect(compiled.sql).toContain('is_active');
     expect(compiled.sql.match(/ilike/gi)?.length).toBe(8);
-    expect(compiled.params).toEqual(
-      expect.arrayContaining(['%iphone%', '%18%']),
-    );
+    expect(compiled.params).toEqual(expect.arrayContaining(['iphone%', '18%']));
+    expect(compiled.params).not.toContain('%iphone%');
   });
 
   it('escapes wildcard characters in the search term', async () => {
@@ -109,7 +108,7 @@ describe('ProductsService public reads', () => {
     await service.listPublished({ q: '100%', limit: 5 });
 
     const compiled = dialect.sqlToQuery(where.mock.calls[0][0] as SQL);
-    expect(compiled.params).toContain('%100\\%%');
+    expect(compiled.params).toContain('100\\%%');
   });
 
   it('returns a published page by brand/model slug', async () => {

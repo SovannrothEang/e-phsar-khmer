@@ -875,7 +875,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
       });
       const supabase = makeSupabase();
       const service = makeAuthService(db, supabase);
-      const getCapture = mockInsert(db, makeUser({ username: 'sokdara' }));
+      const getCapture = mockInsert(db, makeUser({ username: 'sok-dara' }));
 
       const result = await service.verifyPhoneOtp({
         phone: PHONE,
@@ -893,7 +893,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
         passwordHash: 'hashed-password',
         firstName: 'Sok',
         lastName: 'Dara',
-        username: 'sokdara',
+        username: 'sok-dara',
       });
       expect(selectCall).toBe(5);
     });
@@ -1095,7 +1095,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
           makeLoginDevices(),
           notifications,
         );
-        mockInsert(db, makeUser({ username: 'sokdara' }));
+        mockInsert(db, makeUser({ username: 'sok-dara' }));
 
         await service.verifyPhoneOtp({
           phone: PHONE,
@@ -1194,7 +1194,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
                 Promise.resolve([
                   makeUser({
                     primaryPhone: PHONE,
-                    username: 'legacyuser',
+                    username: 'legacy-user',
                     passwordHash: 'hashed-password',
                   }),
                 ]),
@@ -1218,7 +1218,7 @@ describe('AuthService verifyPhoneOtp + requestLoginOtp', () => {
         passwordHash: 'hashed-password',
         firstName: 'Legacy',
         lastName: 'User',
-        username: 'legacyuser',
+        username: 'legacy-user',
       });
       expect(db.insert).not.toHaveBeenCalled();
       expect(supabase.verifyOtp).toHaveBeenCalledTimes(1);

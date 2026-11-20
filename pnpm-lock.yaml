@@ -349,6 +349,9 @@ importers:
         specifier: ^3.4.19
         version: 3.4.19(yaml@2.9.1)
     devDependencies:
+      '@babel/plugin-transform-react-jsx':
+        specifier: ^7.28.6
+        version: 7.29.7(@babel/core@7.29.7)
       '@react-native-community/cli':
         specifier: ^20.2.0
         version: 20.2.0(typescript@6.0.3)

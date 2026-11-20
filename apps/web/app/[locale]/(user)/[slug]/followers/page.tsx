@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
-import { redirect } from "@/i18n/routing";
+import { permanentRedirect } from "@/i18n/routing";
+import { decodeRouteParam, definedQuery } from "@/lib/route-params";
 import { getPublicProfile } from "@/lib/api/users";
 
 /**
@@ -10,18 +11,23 @@ import { getPublicProfile } from "@/lib/api/users";
  */
 export default async function ProfileFollowersRedirect({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
-  const profile = await getPublicProfile(slug);
+  const sp = await searchParams;
+  const profile = await getPublicProfile(decodeRouteParam(slug));
   if (!profile) notFound();
 
-  return redirect({
+  // `profile.username` is the current handle even when the requested slug is
+  // an old one, so this also canonicalizes renamed accounts.
+  return permanentRedirect({
     href: {
       pathname: "/[username]",
       params: { username: profile.username ?? slug },
-      query: { tab: "followers" },
+      query: { ...definedQuery(sp), tab: "followers" },
     },
     locale: await getLocale(),
   });

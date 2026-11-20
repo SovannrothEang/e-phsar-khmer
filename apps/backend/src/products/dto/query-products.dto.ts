@@ -12,7 +12,7 @@ import { PRODUCT_SPEC_FAMILIES } from '../../db/schema/products.schema';
 import type { ProductSpecFamily } from '../../db/schema/products.schema';
 
 export class QueryProductsDto {
-  /** Free-text search over brand + model names/slugs. */
+  /** Free-text prefix search over brand + model names/slugs. */
   @IsOptional()
   @IsString()
   @MaxLength(100)

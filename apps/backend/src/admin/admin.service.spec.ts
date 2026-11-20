@@ -1,8 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { AdminService } from './admin.service';
 import { users } from '../db/schema/users.schema';
 import { userLoginDevices } from '../db/schema/login-devices.schema';
+
+jest.mock('bcrypt');
 
 const actor = { id: 'admin-1', role: 'admin' as const };
 
@@ -209,5 +212,111 @@ describe('AdminService.listUsers filters', () => {
     const { sql, params } = compiled(wheres);
     expect(sql).toContain('"status"');
     expect(params).toContain('deleted');
+  });
+});
+
+describe('AdminService username normalization and aliases', () => {
+  function chain(rows: unknown[]) {
+    const c: Record<string, unknown> = {};
+    c.from = () => c;
+    c.where = () => c;
+    c.limit = () => c;
+    c.for = () => c;
+    c.then = (resolve: (v: unknown[]) => unknown) =>
+      Promise.resolve(rows).then(resolve);
+    return c;
+  }
+
+  function makeUsernameTx(oldUsername: string | null, newUsername: string) {
+    const updates: Update[] = [];
+    const history: Update[] = [];
+    let selectCall = 0;
+    const tx = {
+      select: () => {
+        selectCall += 1;
+        if (selectCall === 1) return chain([{ id: 'u1', role: 'user' }]);
+        if (selectCall === 2) return chain([{ username: oldUsername }]);
+        return chain([{ id: 'u1', username: newUsername }]);
+      },
+      update: (table: unknown) => {
+        const c = chain([]);
+        c.set = (values: Record<string, unknown>) => {
+          updates.push({ table, values });
+          return chain([]);
+        };
+        return c;
+      },
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => {
+          history.push({ table, values });
+          return { onConflictDoUpdate: () => Promise.resolve() };
+        },
+      }),
+      delete: () => chain([]),
+    };
+    const db = {
+      transaction: (cb: (t: unknown) => unknown) => cb(tx),
+    };
+    return { db, updates, history };
+  }
+
+  it('createUser trims and NFC-composes the handle but keeps its casing', async () => {
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+    const inserted: Record<string, unknown>[] = [];
+    const tx = {
+      insert: (table: unknown) => ({
+        values: (values: Record<string, unknown>) => {
+          inserted.push({ table, values });
+          return {
+            returning: () => Promise.resolve([{ ...values, id: 'u1' }]),
+          };
+        },
+      }),
+    };
+    const db = { transaction: (cb: (t: unknown) => unknown) => cb(tx) };
+    const service = makeService(db);
+
+    await service.createUser(
+      { username: '  CaféSok ', password: 'x' } as never,
+      actor,
+    );
+
+    expect(inserted[0]?.values.username).toBe('CaféSok');
+  });
+
+  it('createUser rejects a whitespace-only handle before any write', async () => {
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+    const transaction = jest.fn();
+    const service = makeService({ transaction });
+
+    await expect(
+      service.createUser({ username: '   ', password: 'x' } as never, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('updateUser writes the released handle into the alias history', async () => {
+    (bcrypt.hash as jest.Mock).mockResolvedValue('hashed');
+    const { db, updates, history } = makeUsernameTx('Old.Handle', 'Sok.Dara');
+    const service = makeService(db);
+
+    await service.updateUser('u1', { username: ' Sok.Dara ' }, actor);
+
+    const userUpdate = updates.find((u) => u.table === users);
+    expect(userUpdate?.values.username).toBe('Sok.Dara');
+    expect(history).toHaveLength(1);
+    expect(history[0]?.values).toEqual({
+      userId: 'u1',
+      username: 'old.handle',
+    });
+  });
+
+  it('updateUser writes no alias for a case-only change', async () => {
+    const { db, history } = makeUsernameTx('sokdara', 'SokDara');
+    const service = makeService(db);
+
+    await service.updateUser('u1', { username: 'SokDara' }, actor);
+
+    expect(history).toHaveLength(0);
   });
 });

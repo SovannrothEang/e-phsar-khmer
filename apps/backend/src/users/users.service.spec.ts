@@ -18,6 +18,7 @@ import { UsersController } from './users.controller';
 import { BillingAddressesService } from './billing-addresses.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { ChangeUsernameDto } from './dto/change-username.dto';
 import { IS_PUBLIC_KEY } from '../common/decorators/public.decorator';
 
 jest.mock('bcrypt');
@@ -1079,7 +1080,7 @@ describe('UsersService updateProfile username generation', () => {
           }),
         };
       }
-      // collision check: johndoe → free
+      // collision check: john-doe → free
       return {
         from: () => ({
           where: () => ({ limit: () => Promise.resolve([]) }),
@@ -1100,7 +1101,7 @@ describe('UsersService updateProfile username generation', () => {
     }));
 
     await service.updateProfile('u1', { firstName: 'John', lastName: 'Doe' });
-    expect(capturedUpdateData.username).toBe('johndoe');
+    expect(capturedUpdateData.username).toBe('john-doe');
   });
 
   it('appends suffix on collision', async () => {
@@ -1117,14 +1118,14 @@ describe('UsersService updateProfile username generation', () => {
         };
       }
       if (selectCall === 2) {
-        // johndoe → taken
+        // john-doe → taken
         return {
           from: () => ({
             where: () => ({ limit: () => Promise.resolve([{ id: 'x' }]) }),
           }),
         };
       }
-      // johndoe2 → free
+      // john-doe-2 → free
       return {
         from: () => ({
           where: () => ({ limit: () => Promise.resolve([]) }),
@@ -1145,7 +1146,7 @@ describe('UsersService updateProfile username generation', () => {
     }));
 
     await service.updateProfile('u1', { firstName: 'John', lastName: 'Doe' });
-    expect(capturedUpdateData.username).toBe('johndoe2');
+    expect(capturedUpdateData.username).toBe('john-doe-2');
   });
 
   it('tries multiple suffixes on multiple collisions', async () => {
@@ -1162,14 +1163,14 @@ describe('UsersService updateProfile username generation', () => {
         };
       }
       if (selectCall === 2 || selectCall === 3) {
-        // johndoe and johndoe2 → taken
+        // john-doe and john-doe-2 → taken
         return {
           from: () => ({
             where: () => ({ limit: () => Promise.resolve([{ id: 'x' }]) }),
           }),
         };
       }
-      // johndoe3 → free
+      // john-doe-3 → free
       return {
         from: () => ({
           where: () => ({ limit: () => Promise.resolve([]) }),
@@ -1190,7 +1191,7 @@ describe('UsersService updateProfile username generation', () => {
     }));
 
     await service.updateProfile('u1', { firstName: 'John', lastName: 'Doe' });
-    expect(capturedUpdateData.username).toBe('johndoe3');
+    expect(capturedUpdateData.username).toBe('john-doe-3');
   });
 
   it('does not overwrite an existing username', async () => {
@@ -1626,12 +1627,30 @@ describe('UsersService self-service account changes', () => {
   });
 
   describe('changeUsername', () => {
-    it('lowercases the candidate before writing it', async () => {
-      db.select.mockReturnValue({
+    function sequenceSelects(results: unknown[][]) {
+      let call = 0;
+      db.select.mockImplementation(() => ({
         from: () => ({
-          where: () => ({ limit: () => Promise.resolve([]) }),
+          where: () => ({
+            limit: () => Promise.resolve(results[call++] ?? []),
+          }),
         }),
+      }));
+    }
+
+    function mockHistoryInsert() {
+      const values = jest.fn();
+      const onConflictDoUpdate = jest.fn(() => Promise.resolve());
+      db.insert.mockReturnValue({
+        values: (row: unknown) => {
+          values(row);
+          return { onConflictDoUpdate };
+        },
       });
+      return { values, onConflictDoUpdate };
+    }
+
+    function mockUpdate() {
       db.update.mockReturnValue({
         set: (values: Record<string, unknown>) => ({
           where: () => ({
@@ -1639,35 +1658,102 @@ describe('UsersService self-service account changes', () => {
           }),
         }),
       });
+    }
+
+    it('lowercases, trims and collapses hyphens before writing', async () => {
+      sequenceSelects([[{ username: 'Old.Handle' }], []]);
+      const history = mockHistoryInsert();
+      mockUpdate();
 
       const result = await service.changeUsername('u1', {
-        username: 'Sok.Dara',
+        username: '  Sok--Dara  ',
       });
 
-      expect(result.username).toBe('sok.dara');
+      expect(result.username).toBe('sok-dara');
+      expect(history.values).toHaveBeenCalledWith({
+        userId: 'u1',
+        username: 'old.handle',
+      });
+    });
+
+    it('keeps a Khmer handle intact', async () => {
+      sequenceSelects([[{ username: 'old-handle' }], []]);
+      mockHistoryInsert();
+      mockUpdate();
+
+      const result = await service.changeUsername('u1', {
+        username: 'សុខ-ដារា',
+      });
+
+      expect(result.username).toBe('សុខ-ដារា');
+    });
+
+    it('rejects a candidate that normalizes out of shape', async () => {
+      for (const username of ['ab', 'sok dara', 'sok@dara']) {
+        await expect(
+          service.changeUsername('u1', { username }),
+        ).rejects.toThrow(BadRequestException);
+      }
+      expect(db.select).not.toHaveBeenCalled();
     });
 
     it('refuses a username another account already holds', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () => Promise.resolve([{ id: 'someone-else' }]),
-          }),
-        }),
-      });
+      sequenceSelects([[{ username: 'old.handle' }], [{ id: 'someone-else' }]]);
 
       await expect(
         service.changeUsername('u1', { username: 'sokdara' }),
       ).rejects.toThrow(ConflictException);
       expect(db.update).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('matches the existing handle case-insensitively, even under -2', async () => {
+      let call = 0;
+      const wheres: unknown[] = [];
+      db.select.mockImplementation(() => ({
+        from: () => ({
+          where: (where: unknown) => {
+            wheres.push(where);
+            return {
+              limit: () =>
+                Promise.resolve(call++ === 0 ? [{ username: 'old' }] : []),
+            };
+          },
+        }),
+      }));
+      mockHistoryInsert();
+      mockUpdate();
+
+      await service.changeUsername('u1', { username: 'SokDara' });
+
+      const probe = new PgDialect().sqlToQuery(wheres[1] as never);
+      expect(probe.sql).toContain('lower(');
+      expect(probe.sql).toContain('"username"');
+      expect(probe.params).toContain('sokdara');
+    });
+
+    it('writes no alias for a case-only change', async () => {
+      sequenceSelects([[{ username: 'sokdara' }], []]);
+      const history = mockHistoryInsert();
+      mockUpdate();
+
+      await service.changeUsername('u1', { username: 'SokDara' });
+
+      expect(history.values).not.toHaveBeenCalled();
+    });
+
+    it('writes no alias when the account had no username', async () => {
+      sequenceSelects([[{ username: null }], []]);
+      const history = mockHistoryInsert();
+      mockUpdate();
+
+      await service.changeUsername('u1', { username: 'sok-dara' });
+
+      expect(history.values).not.toHaveBeenCalled();
     });
 
     it('maps the check-then-write race onto a 409', async () => {
-      db.select.mockReturnValue({
-        from: () => ({
-          where: () => ({ limit: () => Promise.resolve([]) }),
-        }),
-      });
+      sequenceSelects([[{ username: 'old.handle' }], []]);
       db.update.mockReturnValue({
         set: () => ({
           where: () => ({
@@ -1913,17 +1999,20 @@ describe('UsersService self-service account changes', () => {
 });
 
 describe('UsersService public profile visibility', () => {
-  it('does not expose a moderation-suspended account', async () => {
-    let where: unknown;
+  it('does not expose a moderation-suspended account, and never aliases it', async () => {
     const db = makeDb();
+    const wheres: unknown[] = [];
+    let call = 0;
     db.select.mockImplementation(() => {
+      call++;
       const c: Record<string, unknown> = {};
       c.from = () => c;
       c.where = (arg: unknown) => {
-        where = arg;
+        wheres.push(arg);
         return c;
       };
-      c.limit = () => Promise.resolve([]);
+      // 1: active lookup → miss; 2: holder probe → the suspended account.
+      c.limit = () => Promise.resolve(call === 2 ? [{ id: 'suspended' }] : []);
       return c;
     });
     const service = makeService(db);
@@ -1932,9 +2021,65 @@ describe('UsersService public profile visibility', () => {
       NotFoundException,
     );
 
-    const { sql } = new PgDialect().sqlToQuery(where as never);
+    const { sql } = new PgDialect().sqlToQuery(wheres[0] as never);
     expect(sql).toContain('"status" = $');
     expect(sql).toContain('"deleted_at" is null');
+    expect(sql).toContain('lower(');
+    // The handle still belongs to an account: history is never consulted.
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('resolves a released handle only when no account holds it', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain([]); // no active holder
+      if (call === 2) return chain([]); // no suspended/deleted holder
+      if (call === 3) return chain([{ userId: fakeUser.id }]); // alias row
+      if (call === 4) return chain([fakeUser]); // active row by id
+      if (call === 7) return chain([]); // subscription probe
+      return chain([{ value: 0 }]); // follow counts
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('released-handle');
+
+    expect(profile.username).toBe(fakeUser.username);
+    expect(db.select).toHaveBeenCalledTimes(7);
+  });
+
+  it('a history alias to an account that is not publicly viewable is a 404', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 3) return chain([{ userId: 'gone' }]);
+      return chain([]);
+    });
+    const service = makeService(db);
+
+    await expect(service.getPublicProfile('former-handle')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('a case-insensitive current holder wins over the history table', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('SOKDARA');
+
+    expect(profile.username).toBe(fakeUser.username);
+    // user row + follow counts + subscription probe — history never read.
+    expect(db.select).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -2197,7 +2342,7 @@ function searchDb(
 }
 
 describe('UsersService searchUsers', () => {
-  it('filters to active, non-deleted, username-bearing users and matches every token', async () => {
+  it('filters to active, non-deleted, username-bearing users and prefix-matches every token', async () => {
     const capture: { where?: unknown } = {};
     const service = makeService(searchDb([], 0, capture));
 
@@ -2210,7 +2355,8 @@ describe('UsersService searchUsers', () => {
     expect(sql).toContain('"username" is not null');
     expect(params).toContain('active');
     expect(params).toContain('user');
-    expect(params).toContain('%sak%');
+    expect(params).toContain('sak%');
+    expect(params).not.toContain('%sak%');
   });
 
   it('treats the caller’s LIKE wildcards literally', async () => {
@@ -2220,8 +2366,8 @@ describe('UsersService searchUsers', () => {
     await service.searchUsers('50% a_b', 1, 3);
 
     const { params } = new PgDialect().sqlToQuery(capture.where as never);
-    expect(params).toContain('%50\\%%');
-    expect(params).toContain('%a\\_b%');
+    expect(params).toContain('50\\%%');
+    expect(params).toContain('a\\_b%');
   });
 
   it('caps the query at five tokens', async () => {
@@ -2231,8 +2377,8 @@ describe('UsersService searchUsers', () => {
     await service.searchUsers('a b c d e f', 1, 3);
 
     const { params } = new PgDialect().sqlToQuery(capture.where as never);
-    expect(params).toContain('%e%');
-    expect(params).not.toContain('%f%');
+    expect(params).toContain('e%');
+    expect(params).not.toContain('f%');
   });
 
   it('returns the public allow-list without contact or moderation fields', async () => {
@@ -2521,4 +2667,26 @@ describe('UsersController GET /users/search', () => {
   it('keeps the :id UUID guard for /users/:id', async () => {
     await request(app.getHttpServer()).get('/users/not-a-uuid').expect(400);
   });
+});
+
+describe('ChangeUsernameDto', () => {
+  it.each([['sok-dara'], ['សុខ-ដារា'], ['Sok.Dara_01'], ['  sok-dara  ']])(
+    'accepts %p',
+    async (username) => {
+      const errors = await validate(
+        plainToInstance(ChangeUsernameDto, { username }),
+      );
+      expect(errors).toHaveLength(0);
+    },
+  );
+
+  it.each([['sok dara'], ['sok@dara'], ['a'.repeat(51)]])(
+    'rejects %p',
+    async (username) => {
+      const errors = await validate(
+        plainToInstance(ChangeUsernameDto, { username }),
+      );
+      expect(errors.some((e) => e.property === 'username')).toBe(true);
+    },
+  );
 });

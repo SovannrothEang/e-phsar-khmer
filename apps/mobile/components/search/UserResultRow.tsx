@@ -29,7 +29,12 @@ const UserResultRow = ({ user, showChevron = true }: UserResultRowProps) => {
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={() => router.push(`/user/${user.username}` as never)}
+      onPress={() =>
+        router.push({
+          pathname: "/user/[id]",
+          params: { id: user.username },
+        } as never)
+      }
       className="flex-row items-center px-4 py-3"
       accessibilityRole="button"
       accessibilityLabel={`${title}, @${user.username}`}

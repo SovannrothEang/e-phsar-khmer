@@ -407,6 +407,13 @@
       "when": 1794976811025,
       "tag": "0057_en_km_only",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1795084891607,
+      "tag": "0058_fixed_blue_blade",
+      "breakpoints": true
     }
   ]
 }

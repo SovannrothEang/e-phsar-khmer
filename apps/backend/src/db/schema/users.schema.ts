@@ -164,9 +164,11 @@ export const users = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    // Partial uniques: soft-deleted users release username/phone/email for reuse
+    // Partial uniques: soft-deleted users release username/phone/email for reuse.
+    // Usernames compare case-insensitively so `SokDara` and `sokdara` cannot
+    // coexist; the lowercase variant is what the app writes.
     uniqueIndex('users_username_active_uq')
-      .on(t.username)
+      .on(sql`lower(${t.username})`)
       .where(sql`deleted_at is null`),
     uniqueIndex('users_primary_phone_active_uq')
       .on(t.primaryPhone)
@@ -178,6 +180,30 @@ export const users = pgTable(
     index('users_province_id_idx').on(t.provinceId),
     index('users_district_id_idx').on(t.districtId),
     index('users_commune_id_idx').on(t.communeId),
+  ],
+);
+
+/**
+ * Handles a user has released through a username change. The public profile
+ * lookup consults this only when no account currently holds the handle, so a
+ * reclaimed name always resolves to its present owner. `username` is stored
+ * normalized (lowercase + NFC) and unique: the latest releaser owns the alias.
+ */
+export const userUsernameHistory = pgTable(
+  'user_username_history',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    username: varchar('username', { length: 50 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    uniqueIndex('user_username_history_username_uq').on(t.username),
+    index('user_username_history_user_id_idx').on(t.userId),
   ],
 );
 

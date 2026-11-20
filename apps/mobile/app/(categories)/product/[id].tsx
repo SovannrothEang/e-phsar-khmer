@@ -1,10 +1,12 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
+import ProductSpecBody from "@/components/product/ProductSpecBody";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useReactions } from "@/contexts/ReactionsContext";
 import { ApiError } from "@/lib/api/client";
 import { fetchCategories, fetchListing } from "@/lib/api/listings";
+import { fetchProductSpec } from "@/lib/api/products";
 import { fetchFollowStatus, followUser, unfollowUser } from "@/lib/api/users";
 import {
   basePrice,
@@ -62,6 +64,21 @@ export default function ProductDetailScreen() {
   });
 
   const listing = listingQuery.data;
+
+  // Public spec sheet for the linked product; shared query key with the spec
+  // screen so opening it from the chip is instant.
+  const listingProduct = listing?.product ?? null;
+  const specQuery = useQuery({
+    queryKey: [
+      "product-spec",
+      listingProduct?.brandSlug,
+      listingProduct?.modelSlug,
+    ],
+    queryFn: () =>
+      fetchProductSpec(listingProduct!.brandSlug, listingProduct!.modelSlug),
+    enabled: !!listingProduct,
+    staleTime: 5 * 60_000,
+  });
 
   const insets = useSafeAreaInsets();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -145,7 +162,13 @@ export default function ProductDetailScreen() {
   const isExpired = listing.status === "expired";
   // The trusted spec page the poster attached; the backend nulls it once the
   // page is unpublished or its brand/model is inactive, so the chip hides too.
-  const productRef = listing.product;
+  const productRef = listingProduct;
+  // Only a real sheet earns the inline block: loading, a 404 or an empty
+  // sheet renders nothing; the chip remains the way to the screen.
+  const inlineSpec =
+    specQuery.data && specQuery.data.specGroups.length > 0
+      ? specQuery.data
+      : null;
   const liked = isLiked(listing.id);
   const saved = isSaved(listing.id);
   const likeCount = likeCountFor(listing.id, listing.likeCount ?? 0);
@@ -700,7 +723,10 @@ export default function ProductDetailScreen() {
             {listing.sellerUsername ? (
               <TouchableOpacity
                 onPress={() =>
-                  router.push(`/user/${listing.sellerUsername}` as never)
+                  router.push({
+                    pathname: "/user/[id]",
+                    params: { id: listing.sellerUsername },
+                  } as never)
                 }
                 className="flex-1 items-center justify-center rounded-lg bg-[#DCEEF8] py-3"
                 activeOpacity={0.7}
@@ -729,6 +755,13 @@ export default function ProductDetailScreen() {
             ) : null}
           </View>
         </View>
+
+        {inlineSpec && (
+          <>
+            <View className="h-2 bg-neutral-border dark:bg-gray-800" />
+            <ProductSpecBody product={inlineSpec} />
+          </>
+        )}
 
         <View className="h-24" />
       </ScrollView>

@@ -12,7 +12,8 @@ import { parseFeedParams } from "@/lib/search-params";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { loadPostDetailProps } from "@/lib/api/post-detail-props";
-import { redirect } from "@/i18n/routing";
+import { decodeRouteParam, definedQuery } from "@/lib/route-params";
+import { permanentRedirect, redirect } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import {
   displayName,
@@ -22,11 +23,15 @@ import {
 } from "@/lib/api/users";
 import type { Metadata } from "next";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * `title-adid-<uuid>` is a listing; only a trailing UUID counts. A handle that
+ * merely contains `-adid-` (usernames may now carry hyphens) stays a profile.
+ */
+const ADID_ID_RE =
+  /-adid-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
-function extractId(slug: string): string {
-  return slug?.includes("-adid-") ? slug.split("-adid-").pop() || slug : slug;
+function listingIdFromSlug(slug: string): string | null {
+  return ADID_ID_RE.exec(slug)?.[1] ?? null;
 }
 
 export async function generateMetadata({
@@ -36,19 +41,16 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
 
-  if (slug?.includes("-adid-")) {
-    const actualId = extractId(slug);
-    // Real listings are looked up by UUID; any other id is a dead link. Same
-    // locale as the page body asks for, so the two share one request
+  const listingId = listingIdFromSlug(slug);
+  if (listingId) {
+    // Same locale as the page body asks for, so the two share one request
     // (`getListingById` is memoised per request).
-    if (UUID_RE.test(actualId)) {
-      const listing = await getListingById(actualId, await getLocale());
-      if (listing) {
-        return {
-          title: listing.title,
-          description: listing.description ?? "Post Detail",
-        };
-      }
+    const listing = await getListingById(listingId, await getLocale());
+    if (listing) {
+      return {
+        title: listing.title,
+        description: listing.description ?? "Post Detail",
+      };
     }
     return { title: "404 Not found" };
   }
@@ -74,7 +76,10 @@ export default async function SlugPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  // Page-component params arrive percent-encoded (see `decodeRouteParam`);
+  // `generateMetadata` above already receives the decoded form.
+  const slug = decodeRouteParam(rawSlug);
   const sp = await searchParams;
   // Both resolved against the seller's own tree below — a profile URL's
   // `?category=`/`?subcategory=` is only meaningful if that seller actually
@@ -85,13 +90,11 @@ export default async function SlugPage({
   const rawSubcategory =
     typeof sp.subcategory === "string" ? sp.subcategory : undefined;
 
-  // Handle Post Detail — a real listing UUID renders the detail template; any
-  // other id is a dead link.
-  if (slug?.includes("-adid-")) {
-    const actualId = extractId(slug);
-    // A malformed id is a dead link — nothing to ask the backend.
-    if (!UUID_RE.test(actualId)) notFound();
-    const props = await loadPostDetailProps(actualId, await getLocale());
+  // Handle Post Detail — a trailing listing UUID renders the detail template;
+  // every other slug is a profile handle.
+  const listingId = listingIdFromSlug(slug);
+  if (listingId) {
+    const props = await loadPostDetailProps(listingId, await getLocale());
     // A real listing that is gone (draft, withdrawn, moderated, unknown id)
     // must 404 rather than render a fabricated ad at a dead link. Decided here,
     // before any HTML is sent, so the response status is still a real 404.
@@ -104,6 +107,22 @@ export default async function SlugPage({
   if (!profile) notFound();
 
   const locale = await getLocale();
+  // A former handle (or a differently-cased one) resolves to the current
+  // account; send the browser to the canonical URL. The backend returns the
+  // profile's CURRENT username, so this always converges in one hop.
+  if (profile.username && profile.username !== slug) {
+    const query = definedQuery(sp);
+    return permanentRedirect({
+      href: {
+        pathname: "/[username]",
+        params: { username: profile.username },
+        // next-intl renders an empty query as a trailing `?`.
+        query: Object.keys(query).length > 0 ? query : undefined,
+      },
+      locale,
+    });
+  }
+
   const user = toProfileUser(profile, locale);
   const viewer = await getCurrentUser();
   const following = await getFollowStatus(profile.id);

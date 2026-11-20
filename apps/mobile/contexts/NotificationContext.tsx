@@ -111,7 +111,10 @@ function actionFor(
   const listingId = typeof data.listingId === "string" ? data.listingId : null;
 
   if (type.startsWith("follow.") && username) {
-    return { actionText: "View Profile", actionRoute: `/user/${username}` };
+    return {
+      actionText: "View Profile",
+      actionRoute: `/user/${encodeURIComponent(username)}`,
+    };
   }
   if (MY_ADS_NOTICE_TYPES.includes(type)) {
     return { actionText: "View My Ads", actionRoute: MY_ADS_ROUTE };

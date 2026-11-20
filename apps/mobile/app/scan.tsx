@@ -253,7 +253,9 @@ function MyQrPanel() {
   const insets = useSafeAreaInsets();
   const { user, isAuthenticated } = useAuth();
   const qrRef = useRef<QrSvgRef | null>(null);
-  const link = user?.username ? `${SITE_URL}/${user.username}` : SITE_URL;
+  const link = user?.username
+    ? `${SITE_URL}/${encodeURIComponent(user.username)}`
+    : SITE_URL;
 
   const copyLink = async () => {
     await Clipboard.setStringAsync(link);

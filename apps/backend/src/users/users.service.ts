@@ -23,7 +23,10 @@ import * as bcrypt from 'bcrypt';
 import {
   buildUsernameBase,
   generateUniqueUsername,
+  isValidManualUsername,
+  normalizeManualUsername,
   normalizeUsername,
+  recordUsernameChange,
 } from './username.util';
 import { randomUUID } from 'node:crypto';
 import { DRIZZLE } from '../db/drizzle.provider';
@@ -36,6 +39,7 @@ import {
   userBlocks,
   userFollows,
   userPhones,
+  userUsernameHistory,
   users,
 } from '../db/schema/users.schema';
 import type { UserRow, UserPhoneRow } from '../db/schema/users.schema';
@@ -61,7 +65,7 @@ import {
   activePaidSubscriptionExistsSql,
   hasActivePaidSubscription,
 } from '../subscriptions/verified-account.util';
-import { escapeLike, likeTerm } from '../utils/like-term';
+import { escapeLike } from '../utils/like-term';
 import type { PublicUser } from '../auth/auth.service';
 
 /** Matches AuthService/AdminService — bcrypt cost is a property of the data, not the caller. */
@@ -113,6 +117,32 @@ export interface PublicProfile {
   followers: number;
   following: number;
 }
+
+/** The one allow-list projection both public reads share. */
+const PUBLIC_PROFILE_COLUMNS = {
+  id: users.id,
+  username: users.username,
+  firstName: users.firstName,
+  lastName: users.lastName,
+  profilePhotoUrl: users.profilePhotoUrl,
+  coverPhotoUrl: users.coverPhotoUrl,
+  phoneVerifiedAt: users.phoneVerifiedAt,
+  emailVerifiedAt: users.emailVerifiedAt,
+  createdAt: users.createdAt,
+};
+
+type PublicProfileRow = Pick<
+  UserRow,
+  | 'id'
+  | 'username'
+  | 'firstName'
+  | 'lastName'
+  | 'profilePhotoUrl'
+  | 'coverPhotoUrl'
+  | 'phoneVerifiedAt'
+  | 'emailVerifiedAt'
+  | 'createdAt'
+>;
 
 /**
  * One row of the public user search. A separate allow-list from
@@ -577,31 +607,50 @@ export class UsersService {
    * Self-service username change. The probe deliberately covers every row,
    * soft-deleted ones included — the same stricter-than-the-index rule
    * `generateUniqueUsername` follows, so a handle can't be taken from an
-   * account that is 90 days away from being purged.
+   * account that is 90 days away from being purged. The write and the alias
+   * row share one transaction: a changed handle without its history row would
+   * silently break every old profile link.
    */
   async changeUsername(
     userId: string,
     dto: ChangeUsernameDto,
   ): Promise<PublicUser> {
-    const candidate = normalizeUsername(dto.username);
-
-    const [taken] = await this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.username, candidate))
-      .limit(1);
-    if (taken && taken.id !== userId) {
-      throw new ConflictException('USERNAME_TAKEN');
+    const candidate = normalizeManualUsername(dto.username);
+    if (!isValidManualUsername(candidate)) {
+      throw new BadRequestException('USERNAME_INVALID');
     }
 
     try {
-      const [updated] = await this.db
-        .update(users)
-        .set({ username: candidate, updatedAt: new Date() })
-        .where(eq(users.id, userId))
-        .returning();
-      if (!updated) throw new NotFoundException('User not found');
-      return this.toPublicUser(updated);
+      return await this.db.transaction(async (tx) => {
+        const [current] = await tx
+          .select({ username: users.username })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+        if (!current) throw new NotFoundException('User not found');
+
+        const [taken] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(
+            and(
+              sql`lower(${users.username}) = ${candidate}`,
+              ne(users.id, userId),
+            ),
+          )
+          .limit(1);
+        if (taken) throw new ConflictException('USERNAME_TAKEN');
+
+        const [updated] = await tx
+          .update(users)
+          .set({ username: candidate, updatedAt: new Date() })
+          .where(eq(users.id, userId))
+          .returning();
+        if (!updated) throw new NotFoundException('User not found');
+
+        await recordUsernameChange(tx, userId, current.username, candidate);
+        return this.toPublicUser(updated);
+      });
     } catch (err) {
       // The probe above is check-then-write; the partial unique index is the
       // truth when two people pick the same handle at once.
@@ -994,35 +1043,21 @@ export class UsersService {
   /**
    * One allow-list projection for both public reads, so `GET /users/:id`
    * cannot drift back into serving the full user row.
+   *
+   * The username path is case-insensitive and falls back to the released-handle
+   * history only when NO account (active, suspended or soft-deleted) holds the
+   * handle. A reclaimed name therefore always resolves to its present owner,
+   * and a suspended/deleted holder never exposes the previous one. The returned
+   * `username` is always the current handle, which is what lets the web and
+   * mobile clients redirect an old profile URL to the canonical one.
    */
   private async loadPublicProfile(
     match: { id: string } | { username: string },
   ): Promise<PublicProfile> {
-    const [user] = await this.db
-      .select({
-        id: users.id,
-        username: users.username,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        profilePhotoUrl: users.profilePhotoUrl,
-        coverPhotoUrl: users.coverPhotoUrl,
-        phoneVerifiedAt: users.phoneVerifiedAt,
-        emailVerifiedAt: users.emailVerifiedAt,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      // A moderation-suspended account is not publicly viewable: approving a
-      // user report must take the profile down, not just block its login.
-      .where(
-        and(
-          'id' in match
-            ? eq(users.id, match.id)
-            : eq(users.username, match.username),
-          isNull(users.deletedAt),
-          eq(users.status, 'active'),
-        ),
-      )
-      .limit(1);
+    const user =
+      'id' in match
+        ? await this.findActiveProfileRowById(match.id)
+        : await this.findActiveProfileRowByUsername(match.username);
     if (!user) throw new NotFoundException('User not found');
 
     const counts = await this.getFollowCounts(user.id);
@@ -1040,6 +1075,63 @@ export class UsersService {
     };
   }
 
+  /** A publicly viewable row — active and not soft-deleted. */
+  private async findActiveProfileRowById(
+    id: string,
+  ): Promise<PublicProfileRow | null> {
+    const [row] = await this.db
+      .select(PUBLIC_PROFILE_COLUMNS)
+      .from(users)
+      // A moderation-suspended account is not publicly viewable: approving a
+      // user report must take the profile down, not just block its login.
+      .where(
+        and(
+          eq(users.id, id),
+          isNull(users.deletedAt),
+          eq(users.status, 'active'),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  private async findActiveProfileRowByUsername(
+    username: string,
+  ): Promise<PublicProfileRow | null> {
+    const handle = normalizeUsername(username);
+
+    const [active] = await this.db
+      .select(PUBLIC_PROFILE_COLUMNS)
+      .from(users)
+      .where(
+        and(
+          sql`lower(${users.username}) = ${handle}`,
+          isNull(users.deletedAt),
+          eq(users.status, 'active'),
+        ),
+      )
+      .limit(1);
+    if (active) return active;
+
+    // The handle still belongs to an account that is not publicly visible.
+    // Do not fall through to history: the alias may name a previous owner.
+    const [holder] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`lower(${users.username}) = ${handle}`)
+      .limit(1);
+    if (holder) return null;
+
+    const [alias] = await this.db
+      .select({ userId: userUsernameHistory.userId })
+      .from(userUsernameHistory)
+      .where(eq(userUsernameHistory.username, handle))
+      .limit(1);
+    if (!alias) return null;
+
+    return this.findActiveProfileRowById(alias.userId);
+  }
+
   /**
    * Public user search by handle or name.
    *
@@ -1049,10 +1141,10 @@ export class UsersService {
    * invisible here too, and rows without a username are omitted because the
    * profile screen is username-addressed.
    *
-   * Matching is a case-insensitive substring per token — AND across tokens, OR
-   * across the handle/first/last columns — because Khmer and partial handles
-   * have no word boundaries. `likeTerm`/`escapeLike` keep the caller's `%`,
-   * `_` and `\` literal instead of turning them into patterns.
+   * Matching is a case-insensitive prefix per token — AND across tokens, OR
+   * across the handle/first/last columns — so a hit must start where the name
+   * starts; `escapeLike` keeps the caller's `%`, `_` and `\` literal instead of
+   * turning them into patterns.
    */
   async searchUsers(
     q: string,
@@ -1090,7 +1182,7 @@ export class UsersService {
       eq(users.role, 'user'),
       isNotNull(users.username),
       ...tokens.map((token) => {
-        const pattern = likeTerm(token);
+        const pattern = `${escapeLike(token)}%`;
         return or(
           ilike(users.username, pattern),
           ilike(users.firstName, pattern),

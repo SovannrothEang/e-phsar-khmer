@@ -46,7 +46,8 @@ import {
 } from "@/lib/sell";
 import { SITE_URL } from "@/lib/site";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +107,7 @@ function SectionBand() {
 const NewAdScreen = () => {
   const { isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const params = useLocalSearchParams<{
     category?: string | string[];
     subcategory?: string | string[];
@@ -416,14 +418,24 @@ const NewAdScreen = () => {
           const filename =
             asset.fileName ?? `photo-${Date.now()}.${mime.split("/")[1]}`;
           const signed = await signListingUpload(filename);
-          const fileResponse = await fetch(asset.uri);
-          const blob = await fileResponse.blob();
-          const put = await fetch(signed.signedUrl, {
-            method: "PUT",
-            headers: { "Content-Type": mime },
-            body: blob,
-          });
-          if (!put.ok)
+          // Stream the picked file to the signed URL from disk. Do NOT read it
+          // with `fetch(asset.uri)`: Expo 58's fetch answers an unreadable
+          // local file with a synthetic 404 whose body is the literal text
+          // "File not found", so the PUT stored those 14 bytes as an image —
+          // an ad that publishes with a photo that never renders (seen in
+          // storage for the 2026-11-10 posts). `uploadAsync` reads the bytes
+          // from the file itself and rejects when the picker's cached copy is
+          // gone, so a stale pick fails loudly instead of posting garbage.
+          const put = await FileSystem.uploadAsync(
+            signed.signedUrl,
+            asset.uri,
+            {
+              httpMethod: "PUT",
+              uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+              headers: { "Content-Type": mime },
+            },
+          );
+          if (put.status < 200 || put.status >= 300)
             throw new Error(`The photo upload was refused (${put.status}).`);
 
           setPhotos((current) => {
@@ -612,10 +624,28 @@ const NewAdScreen = () => {
         Alert.alert("Could not publish", errorMessage(error));
         return;
       }
+      // The ad is live; leave the creation flow entirely. Replacing only the
+      // form left the two chooser screens under the ad, so Back from a
+      // freshly published ad walked the category → subcategory stack again.
+      // Land on My Ads → Active and offer the live ad from there: Back from
+      // the ad returns to the seller's ads, never to the chooser.
+      //
+      // The landing list must include this ad even when its cached page is
+      // still inside the 30 s staleTime (posting straight from My Ads' Sell
+      // button is the common case), so mark both queries stale first.
+      void queryClient.invalidateQueries({ queryKey: ["my-ads"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-ads-counts"] });
+      if (router.canDismiss()) {
+        router.dismissAll();
+        router.push("/account/my-ads?tab=active" as never);
+      } else {
+        router.replace("/account/my-ads?tab=active" as never);
+      }
       Alert.alert("Ad published", "Your ad is now live on PhsarKhmer.", [
+        { text: "Done", style: "cancel" },
         {
           text: "View ad",
-          onPress: () => router.replace(`/product/${created.id}` as never),
+          onPress: () => router.push(`/product/${created.id}` as never),
         },
       ]);
     } catch (error) {

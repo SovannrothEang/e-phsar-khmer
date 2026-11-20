@@ -53,3 +53,29 @@ export async function fetchProductSpec(
   );
   return data;
 }
+
+/** One row of the public published-spec list (`GET /products`). */
+export interface ProductSummary {
+  id: string;
+  brandSlug: string;
+  brandName: string;
+  modelSlug: string;
+  modelName: string;
+  image: string | null;
+}
+
+/**
+ * Published spec pages matching a keyword over brand/model names and slugs.
+ * Public and auth-free; the backend caps `q` at 100 chars and `limit` at 200.
+ */
+export async function fetchProducts(
+  q: string,
+  limit = 3,
+): Promise<ProductSummary[]> {
+  const qs = new URLSearchParams({ q, limit: String(limit) });
+  const { data } = await apiFetch<ProductSummary[]>(
+    `/products?${qs.toString()}`,
+    { auth: false },
+  );
+  return data ?? [];
+}

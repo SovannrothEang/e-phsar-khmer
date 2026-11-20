@@ -8,6 +8,8 @@ import type { User } from "@/lib/user";
 import { applyDiscount, shortLocation } from "@/lib/utils";
 import { placeDisplayName } from "@/lib/places";
 import type { FeedQuery } from "@/lib/search-params";
+import { getProduct } from "./products";
+import type { ProductDetail } from "@/types/product";
 
 const slugify = (s: string) =>
   s
@@ -105,6 +107,12 @@ export async function buildRealDetailData(
   const listing = await listingRequest;
   if (!listing) return null;
   const sellerRequest = toSellerView(listing);
+  // The trusted spec sheet renders inline on the ad page now. Start it as soon
+  // as the listing lands; a failed read is null and the chip keeps its old
+  // navigation.
+  const productSpecRequest: Promise<ProductDetail | null> = listing.product
+    ? getProduct(listing.product.brandSlug, listing.product.modelSlug)
+    : Promise.resolve(null);
   const allCategories = await categoriesRequest;
 
   const cate = allCategories?.find((c) => c.id === listing.categoryId);
@@ -167,6 +175,7 @@ export async function buildRealDetailData(
     model: toBreadcrumb("model"),
     seller: await sellerRequest,
     product: listing.product ?? null,
+    productSpec: await productSpecRequest,
   };
 }
 
