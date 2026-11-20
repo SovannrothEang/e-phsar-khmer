@@ -2,6 +2,23 @@
 
 You are a pragmatic senior engineer. Your job is to help me design and build a long-term maintainable backend API.
 
+## Instruction source
+
+- `AGENTS.md` is the single source of repository behavior for every coding agent.
+- `CLAUDE.md` is a compatibility pointer only; it must not contain separate or conflicting instructions.
+- Read `ARCHITECTURE.md` for the current system map and verify time-sensitive details against the code.
+- Keep long-lived architecture and module documentation in `ARCHITECTURE.md`, `docs/`, or the owning module's `README.md`.
+
+## Repository commands
+
+- First setup: `pnpm install`
+- Root checks: `pnpm build`, `pnpm lint`, `pnpm check-types`, `pnpm format:check`
+- Backend: `pnpm --filter backend build`, `pnpm --filter backend test`, `pnpm --filter backend lint`
+- Web: `pnpm --filter web build`, `pnpm --filter web test`, `pnpm --filter web lint`
+- Mobile: `pnpm --filter phsarkhmer lint`
+
+Use the package-specific script for targeted validation. Do not use a broader or slower command when a package or file-level check is sufficient.
+
 Non-negotiable rules:
 
 1. Prefer modular monolith with strict module boundaries
@@ -55,6 +72,22 @@ Respond with:
 - Do not rename files/classes unless required.
 - Do not create "future-proof" abstractions without a current use case.
 
+## Ban nuance APIs
+
+Anything that takes nuance to use well becomes slop in agent output. Do not hand those APIs to agents, and do not add another prose bullet here when a lint check can fail the build instead. When you correct an agent, encode the correction as a type, a test, or a lint rule.
+
+**Banned on UI surfaces** (`components/**`, `app/**` pages — not `hooks/**`, `lib/**`, or `contexts/**`):
+
+- `useEffect` / `useLayoutEffect`. Derive during render, handle the event, or reset with a `key`. If it is a real subscription, extract a named hook whose API cannot be misused.
+- `setTimeout(..., 0)` / `setTimeout(..., 1)` (and the no-delay form). Fix event order or the subscription; do not yield to "release later in case it comes back".
+- Explanatory comments, especially ones that tell the next agent not to do X. Those go stale and become an escape hatch. Encode the constraint, then delete the comment.
+
+**Allowed, behind a named API:** WebSocket / media / DOM listeners, syncing with an external non-React store, and real timers (OTP countdown, reconnect backoff) live in `hooks/` or `lib/` with a name that states the effect (`useChatWs`, `useVisiblePoller`). Components consume the hook; they do not open a raw effect.
+
+Existing UI `useEffect` calls are ratcheted in `packages/eslint-config/nuance-bans.cjs`. Shrink that list. Never add a path, and never `eslint-disable` these rules.
+
+**Do not delegate nuance.** Product calls, API shape, and "is this effect justified?" stay in this session. Subagents get mechanical work with a check they can fail — not judgment.
+
 ## Testing
 
 - Add tests for changed behavior.
@@ -72,7 +105,7 @@ Respond with:
 - **Stack:** TypeScript monorepo managed with pnpm and Turborepo. It contains a NestJS backend (Drizzle ORM, PostgreSQL, Supabase), a Next.js/React web app, an Expo/React Native mobile app, and shared React UI packages.
 - **Style:** Follow the naming, formatting, and module patterns already used in the affected package; use strong TypeScript types and validate inputs at boundaries. In the backend, use DTO validation and the existing NestJS exception handling rather than ad hoc parsing or response shapes. Add tests for changed behavior using the package's existing test setup; do not add a test framework just for a change.
 - **Important paths:** Treat `apps/backend/src/auth/`, `apps/backend/src/payment/`, `apps/backend/src/chat/` (especially `e2e/`), `apps/backend/src/db/schema/`, and `apps/backend/drizzle/migrations/` as high-impact areas. Trace their callers, database constraints, and API contracts before changing them. Never expose or commit secrets from environment files.
-- **Never:** Add dependencies without a concrete need; introduce Kafka, microservices, CQRS, or other architectural complexity unless explicitly requested; or edit generated output and lockfiles by hand. Use the relevant source files and tooling instead.
+- **Never:** Add dependencies without a concrete need; introduce Kafka, microservices, CQRS, or other architectural complexity unless explicitly requested; edit generated output and lockfiles by hand; or reach for a nuance API (`useEffect`, `setTimeout(..., 0)`) in a component when a named hook, derived render, or event handler will do. Use the relevant source files and tooling instead.
 
 ## Review rules
 
