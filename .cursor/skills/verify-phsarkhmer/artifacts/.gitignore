@@ -1,0 +1,4 @@
+# Proof artifacts produced by verification runs. They are local evidence, not
+# source: keep the directory in git, keep its contents out.
+*
+!.gitignore
