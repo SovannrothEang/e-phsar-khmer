@@ -59,9 +59,11 @@ function limitQuery(rows: unknown[]) {
   };
 }
 
-// .from().where() → rows
+// .from().where() or .from().innerJoin().where() → rows
 function whereQuery(rows: unknown[]) {
-  return { from: () => ({ where: () => Promise.resolve(rows) }) };
+  const where = () => Promise.resolve(rows);
+  const afterFrom = { innerJoin: () => ({ where }), where };
+  return { from: () => afterFrom };
 }
 
 // .from().leftJoin().where().groupBy().limit() → rows

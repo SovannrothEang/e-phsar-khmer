@@ -108,6 +108,7 @@ async function ensureBrowser() {
       "--no-sandbox",
       "--disable-gpu",
       "--disable-dev-shm-usage",
+      "--disable-extensions",
       "--no-first-run",
       "--no-default-browser-check",
       // Force (hover: hover): plain headless reports hover:none and silently

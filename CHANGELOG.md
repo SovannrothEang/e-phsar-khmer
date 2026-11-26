@@ -19,6 +19,14 @@ How to use this file:
 
 ## [Unreleased]
 
+### Fixed
+
+- **Chat does not encrypt to an account that has not set a backup passcode.** Signing in still
+  registers an E2E device on `/me`, but `loadTargetDevices` now requires `e2e_backups.wrapped_key`.
+  A sender messaging a new user who has not opened chat or saved the passcode holds locally
+  (existing held-send path) instead of writing ciphertext those keys cannot restore. After the
+  recipient saves a passcode, the held send retries as before.
+
 ### Added
 
 - **Hyphenated Unicode usernames with old-handle redirects.** Registration now builds
