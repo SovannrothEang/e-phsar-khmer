@@ -218,10 +218,11 @@ export type NewUserE2eOneTimePrekey = typeof userE2eOneTimePrekeys.$inferInsert;
  * identified by its identity key: re-registering the same key from the same
  * browser claims the existing row instead of creating a new device.
  *
- * "Active" = revokedAt is null AND lastSeenAt within 30 days, or — when a
- * user has no such device — their 2 most recently seen non-revoked devices
- * (see loadTargetDevices in chat/e2e/e2e-devices.util.ts). Senders must
- * encrypt to exactly the active set or the send is rejected with 409.
+ * "Active" = the account has a backup passcode, revokedAt is null, AND
+ * lastSeenAt within 30 days, or — when a passcoded user has no such device —
+ * their 2 most recently seen non-revoked devices (see loadTargetDevices in
+ * chat/e2e/e2e-devices.util.ts). Senders must encrypt to exactly the active
+ * set or the send is rejected with 409.
  */
 export const userE2eDevices = chatSchema.table(
   'user_e2e_devices',

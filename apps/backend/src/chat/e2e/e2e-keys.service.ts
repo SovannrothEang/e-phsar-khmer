@@ -367,9 +367,10 @@ export class E2eKeysService {
 
   /**
    * Active device ids for `targetUserId`, newest first — the set a sender
-   * must encrypt to (loadTargetDevices: fresh devices, else the newest two
-   * stale ones). Claims no prekey. Block-gated like getBundle, except for the caller's
-   * own devices (the send path fans out to those too).
+   * must encrypt to (loadTargetDevices: passcoded accounts only, then fresh
+   * devices, else the newest two stale ones). Claims no prekey. Block-gated
+   * like getBundle, except for the caller's own devices (the send path fans
+   * out to those too).
    */
   async listActiveDevices(
     callerId: string,

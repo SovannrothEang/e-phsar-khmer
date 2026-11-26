@@ -235,7 +235,7 @@ else
   say "  … starting backend (log: $LOGS/backend.log)"
   (
     cd "$REPO"
-    setsid env DEV_OTP_TOKEN="$DEV_OTP_TOKEN" DATABASE_URL="$DATABASE_URL" \
+    setsid env PORT="$BACKEND_PORT" DEV_OTP_TOKEN="$DEV_OTP_TOKEN" DATABASE_URL="$DATABASE_URL" \
       QUEUE_HOST=localhost QUEUE_PORT="$REDIS_PORT" \
       pnpm --filter backend dev >"$LOGS/backend.log" 2>&1 &
     echo $! >"$BACKEND_PID_FILE"

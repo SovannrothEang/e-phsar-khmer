@@ -85,14 +85,17 @@ describe('pickTargetDevices', () => {
 describe('loadTargetDevices', () => {
   function executorReturning(rows: DeviceCandidate[]) {
     const wheres: SQL[] = [];
-    const select = jest.fn(() => ({
-      from: () => ({
+    const select = jest.fn(() => {
+      const chain = {
+        from: () => chain,
+        innerJoin: () => chain,
         where: (cond: SQL) => {
           wheres.push(cond);
           return Promise.resolve(rows);
         },
-      }),
-    }));
+      };
+      return chain;
+    });
     return { executor: { select } as unknown as DbExecutor, select, wheres };
   }
 
@@ -120,6 +123,17 @@ describe('loadTargetDevices', () => {
     // Staleness is no longer a filter: it only decides between the fresh set
     // and the fallback, so a quiet account is still returned.
     expect(sql).not.toContain('last_seen_at');
+  });
+
+  it('is not targetable until the account has a backup passcode', async () => {
+    const { executor, wheres } = executorReturning([
+      candidate('a', 'u1', 25, true),
+    ]);
+
+    await loadTargetDevices(executor, ['u1']);
+
+    const { sql } = new PgDialect().sqlToQuery(wheres[0]);
+    expect(sql).toContain('"wrapped_key" is not null');
   });
 });
 

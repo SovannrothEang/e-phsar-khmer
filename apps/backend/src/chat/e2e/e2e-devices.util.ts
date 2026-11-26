@@ -1,6 +1,6 @@
-import { and, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../db/drizzle.provider';
-import { userE2eDevices } from '../../db/schema/chat.schema';
+import { e2eBackups, userE2eDevices } from '../../db/schema/chat.schema';
 
 /** Hard cap on active devices per user; registering past it evicts the least recently seen. */
 export const MAX_ACTIVE_DEVICES = 5;
@@ -15,7 +15,7 @@ export const DEVICE_STALE_DAYS = 30;
 /**
  * How many of a user's most recently seen non-revoked devices stay targetable
  * when none of them was seen within DEVICE_STALE_DAYS. Staleness may shrink a
- * registered account's set but never empty it, so a seller who went quiet
+ * passcoded account's set but never empty it, so a seller who went quiet
  * still receives messages instead of looking "not set up".
  */
 export const STALE_FALLBACK_DEVICES = 2;
@@ -65,6 +65,9 @@ export function pickTargetDevices(
  * encrypted to. The devices endpoint, the bundle fetch and the send path's
  * set check all go through it, so the sender's envelope set and the server's
  * expected set cannot disagree (a mismatch would loop on E2E_DEVICES_MISMATCH).
+ *
+ * An account is in the set only after it has a backup passcode
+ * (`e2e_backups.wrapped_key`). Until then the sender holds.
  */
 export async function loadTargetDevices(
   executor: DbExecutor,
@@ -79,10 +82,12 @@ export async function loadTargetDevices(
       fresh: sql<boolean>`${userE2eDevices.lastSeenAt} > now() - make_interval(days => ${DEVICE_STALE_DAYS})`,
     })
     .from(userE2eDevices)
+    .innerJoin(e2eBackups, eq(e2eBackups.userId, userE2eDevices.userId))
     .where(
       and(
         inArray(userE2eDevices.userId, userIds),
         isNull(userE2eDevices.revokedAt),
+        isNotNull(e2eBackups.wrappedKey),
       ),
     );
   return pickTargetDevices(candidates);

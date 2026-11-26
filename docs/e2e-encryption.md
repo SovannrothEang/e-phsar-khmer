@@ -267,11 +267,13 @@ no longer sees "ask them to open Messages once".
    page being left — 8.4 s of the OTP verify's 10.9 s), so the client no longer has the user id to call
    `bootstrapE2eAfterAuth` with, and that helper is gone. `E2eBackupProvider`'s `useE2eEngine` bootstraps
    the device as soon as `/me` renders — the safety net is now the only path, one page later.
-2. **Targetability rule** (`loadTargetDevices`, `apps/backend/src/chat/e2e/e2e-devices.util.ts`). Per user:
-   the non-revoked devices seen within `DEVICE_STALE_DAYS` (30); if there are none, the
-   `STALE_FALLBACK_DEVICES` (2) most recently seen non-revoked devices. The devices list, the bundle fetch
-   and both send-path set checks all call it, so the sender's envelope set and the server's expected set
-   cannot disagree. A user with at least one non-revoked device is therefore always targetable.
+2. **Targetability rule** (`loadTargetDevices`, `apps/backend/src/chat/e2e/e2e-devices.util.ts`). Per user,
+   only after the account has a backup passcode (`e2e_backups.wrapped_key` is set): the non-revoked devices
+   seen within `DEVICE_STALE_DAYS` (30); if there are none, the `STALE_FALLBACK_DEVICES` (2) most recently
+   seen non-revoked devices. The devices list, the bundle fetch and both send-path set checks all call it,
+   so the sender's envelope set and the server's expected set cannot disagree. A signed-in user with a
+   registered device but no passcode is **not** targetable. That is the same "no devices" case as someone
+   who never signed in on an E2E build: the sender holds.
    **Limit:** a message to a stale device is readable only if the person comes back on that same browser; a
    different browser or cleared data is a new device with no envelope for it (only the history backup helps).
 3. **Staying fresh.** The leader tab re-runs the device heartbeat and prekey top-up about every 6 h and on
@@ -279,7 +281,8 @@ no longer sees "ask them to open Messages once".
    asked for persistent storage (`navigator.storage.persist()`), since identity keys live only in
    IndexedDB. Consecutive bootstrap failures are counted (`bootstrap-health.ts`) and one dismissible notice
    appears in the chat column after two in a row (storage blocked vs other).
-4. **A recipient with no device at all** (never signed in on an E2E build). The sender **holds** the sealed
+4. **A recipient with no targetable device** (never signed in on an E2E build, or signed in but has not
+   set a backup passcode). The sender **holds** the sealed
    message locally (`held-sends.ts`, IndexedDB `npic-e2e-held-sends`, glue in `held-sends-runtime.ts`):
    - the bubble reads "Waiting for <name> to join secure chat. It will send automatically." with Cancel;
    - it is retried when the thread opens and by one app-wide loop that exists only while something is held
